@@ -55,14 +55,12 @@ function decodeFixture(data: unknown): Fixture {
     }
     for (const entry of segment.inputs) {
       if (entry === null) continue;
-      const [moveX, moveY, aimX, aimY, buttons] = entry;
+      const [moveX, moveY, , , buttons] = entry;
       const ok =
         entry.length === 5 &&
         entry.every(isInt) &&
         Math.abs(moveX) <= 1 &&
         Math.abs(moveY) <= 1 &&
-        isInt(aimX) &&
-        isInt(aimY) &&
         buttons >= 0 &&
         buttons <= 255;
       if (!ok) throw new Error(`segment ${s}: bad input ${JSON.stringify(entry)}`);

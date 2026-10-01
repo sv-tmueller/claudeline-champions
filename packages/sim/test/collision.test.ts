@@ -20,7 +20,7 @@ function pairDistance(state: GameState, a: number, b: number): number {
   return Math.hypot(champion(state, a).x - champion(state, b).x, champion(state, a).y - champion(state, b).y);
 }
 
-// Inputs for ticks that step the sim and fail the test on the first invariant violation.
+// Steps the sim for `ticks` ticks and fails on the first invariant violation.
 function runChecked(state: GameState, inputs: (PlayerInput | undefined)[], ticks: number): void {
   for (let i = 0; i < ticks; i++) {
     step(state, inputs);
