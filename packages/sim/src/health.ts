@@ -71,3 +71,19 @@ export function applyEffects(
     else applyHeal(state, targetId, effect.amount, sourceId);
   }
 }
+
+/** Shared by the projectile and area spawns. */
+export function copyEffects(
+  effects: readonly Effect[],
+  reject: (problem: string) => never,
+): Effect[] {
+  if (!Array.isArray(effects)) return reject('effects must be an array');
+  return effects.map((effect) => {
+    const type: unknown = effect.type;
+    if (type !== 'damage' && type !== 'heal') return reject(`unknown effect type ${String(type)}`);
+    if (!Number.isFinite(effect.amount) || effect.amount <= 0) {
+      return reject(`effect amount ${effect.amount} is not a number above 0`);
+    }
+    return { type, amount: effect.amount };
+  });
+}

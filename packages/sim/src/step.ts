@@ -1,4 +1,5 @@
 import { BASE_MOVE_SPEED, DT } from './constants';
+import { expireAreas, stepAreas } from './area';
 import { resolveChampion } from './collision';
 import { resolveInput } from './input';
 import type { PlayerInput } from './input';
@@ -36,7 +37,9 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
   }
 
   stepProjectiles(state);
+  stepAreas(state);
   expireProjectiles(state);
+  expireAreas(state);
 
   state.tick += 1;
 }
