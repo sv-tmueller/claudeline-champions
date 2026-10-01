@@ -29,9 +29,12 @@ function sanitizeAxis(value: unknown): MoveAxis {
   return value === -1 || value === 1 ? value : 0;
 }
 
-/** A non-finite aim coordinate keeps the stored aim. */
+/**
+ * A non-finite aim coordinate keeps the stored aim. `+ 0` turns -0 into +0, which a JSON
+ * round trip would do anyway and which would otherwise change atan2 in `step`.
+ */
 function sanitizeAim(value: unknown, stored: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : stored;
+  return typeof value === 'number' && Number.isFinite(value) ? value + 0 : stored;
 }
 
 /** Anything but a non-negative integer is no buttons; valid bits are masked to the defined ones. */
@@ -47,11 +50,13 @@ function sanitizeButtons(value: unknown): number {
  * checked at runtime and an invalid one falls back to its neutral value.
  */
 export function resolveInput(
-  input: PlayerInput | undefined,
+  input: PlayerInput | undefined | null,
   aimX: number,
   aimY: number,
 ): PlayerInput {
-  if (input === undefined) return { moveX: 0, moveY: 0, aimX, aimY, buttons: 0 };
+  // Anything that is not an object (null, a number, a string) counts as missing.
+  if (typeof input !== 'object' || input === null)
+    return { moveX: 0, moveY: 0, aimX, aimY, buttons: 0 };
   return {
     moveX: sanitizeAxis(input.moveX),
     moveY: sanitizeAxis(input.moveY),

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Button, checksum, createMatch, step } from '../src/index';
+import { Button, checksum, cloneState, createMatch, step } from '../src/index';
 import { resolveInput } from '../src/input';
 import type { GameState, PlayerInput } from '../src/index';
-import { champion, config2v2, openArena } from './helpers';
+import { champion, config2v2, input, openArena } from './helpers';
 
 function open(): GameState {
   return createMatch(config2v2(), openArena(), 1);
@@ -10,7 +10,14 @@ function open(): GameState {
 
 /** Builds an input from untrusted values, as a network peer could send. */
 function raw(fields: Record<string, unknown>): PlayerInput {
-  return { moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0, ...fields } as unknown as PlayerInput;
+  return {
+    moveX: 0,
+    moveY: 0,
+    aimX: 0,
+    aimY: 0,
+    buttons: 0,
+    ...fields,
+  } as unknown as PlayerInput;
 }
 
 function walk(fields: Record<string, unknown>, ticks = 60): GameState {
@@ -99,7 +106,74 @@ describe('input sanitizing', () => {
   });
 
   it('passes a valid input through unchanged', () => {
-    const valid: PlayerInput = { moveX: -1, moveY: 1, aimX: 123, aimY: -45, buttons: 5 };
+    const valid: PlayerInput = {
+      moveX: -1,
+      moveY: 1,
+      aimX: 123,
+      aimY: -45,
+      buttons: 5,
+    };
     expect(resolveInput(valid, 9, 9)).toEqual(valid);
+  });
+
+  it('normalizes a -0 aim so the state survives a JSON round trip', () => {
+    const state = open();
+    // At y = +0 a westward aim makes atan2 depend on the sign of the aim's zero.
+    champion(state, 0).y = 0;
+    step(state, [raw({ aimX: -1000, aimY: -0 })]);
+    expect(Object.is(champion(state, 0).aimY, -0)).toBe(false);
+    expect(Object.is(champion(state, 0).aimX, -0)).toBe(false);
+    const clone = cloneState(state);
+    step(state, []);
+    step(clone, []);
+    expect(checksum(clone)).toBe(checksum(state));
+  });
+
+  it('normalizes a -0 aimX as well', () => {
+    expect(Object.is(resolveInput(raw({ aimX: -0 }), 5, 5).aimX, -0)).toBe(false);
+  });
+});
+
+describe('malformed input entries', () => {
+  it('treats a null entry as a missing input without throwing', () => {
+    const state = open();
+    const before = state.champions.map((c) => ({ ...c }));
+    const tick = state.tick;
+    expect(() => step(state, [null as unknown as PlayerInput])).not.toThrow();
+    expect(state.tick).toBe(tick + 1);
+    state.champions.forEach((c, i) => {
+      expect(c.x).toBe(before[i]?.x);
+      expect(c.y).toBe(before[i]?.y);
+      expect(c.aimX).toBe(before[i]?.aimX);
+      expect(c.aimY).toBe(before[i]?.aimY);
+    });
+  });
+
+  it('moves the other champions normally around a null entry', () => {
+    const state = open();
+    const start = state.champions.map((c) => ({ x: c.x, y: c.y }));
+    const entries = [input(1, 0), null, input(0, 1), input(-1, 0)] as unknown as PlayerInput[];
+    for (let i = 0; i < 30; i++) step(state, entries);
+    expect(champion(state, 1).x).toBe(start[1]?.x);
+    expect(champion(state, 1).y).toBe(start[1]?.y);
+    expect(champion(state, 0).x).toBeGreaterThan(start[0]?.x ?? 0);
+    expect(champion(state, 2).y).toBeGreaterThan(start[2]?.y ?? 0);
+    expect(champion(state, 3).x).toBeLessThan(start[3]?.x ?? 0);
+  });
+
+  it.each([
+    ['a number', 5],
+    ['a string', 'move'],
+    ['an array', [1, 0, 0, 0, 0]],
+    ['a boolean', true],
+  ])('treats %s as a missing input', (_name, value) => {
+    const state = open();
+    const before = { ...champion(state, 0) };
+    expect(() => step(state, [value as unknown as PlayerInput])).not.toThrow();
+    const c = champion(state, 0);
+    expect(c.x).toBe(before.x);
+    expect(c.y).toBe(before.y);
+    expect(c.aimX).toBe(before.aimX);
+    expect(c.aimY).toBe(before.aimY);
   });
 });
