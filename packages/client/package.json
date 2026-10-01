@@ -1,0 +1,18 @@
+{
+  "name": "@claudeline/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@claudeline/bots": "*",
+    "@claudeline/sim": "*",
+    "three": "~0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "~0.186.0"
+  }
+}
