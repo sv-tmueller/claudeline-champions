@@ -78,7 +78,8 @@ not vertical.
   projectiles.
 - The visuals come from the same JSON as the collision. The validator checks
   that each `Obstacle_i` translation is `(x_i, 0, -y_i)` within 1e-4, and a
-  missing translation counts as zero.
+  missing translation counts as zero. A translation that is present must be
+  three finite numbers.
 
 ### Champion
 
@@ -98,11 +99,13 @@ not vertical.
 
 `validate_glb.py <file-or-dir>...` prints `OK <path>` or `FAIL <path>: <reason>`
 per file. It exits 1 if any file fails, and also if it finds no glb at all, so
-an empty folder cannot pass.
+an empty folder cannot pass. An unexpected error while checking a file is
+reported as that file's FAIL line, and the remaining files still run.
 
 - Structure: magic `glTF`, version 2, header length equal to the file size
   (this catches every truncation), a JSON chunk first, an optional BIN chunk,
-  chunk lengths that are multiples of 4, and `asset.version` 2.0.
+  chunk lengths that are multiples of 4, and `asset.version` 2.0. `nodes` is
+  a list of objects with string names.
 - The parent folder decides the rules. `arenas/<id>.glb` is checked against
   `data/arenas/<id>.json`, and `champions/*.glb` needs a `Champion` node. Any
   other folder fails.

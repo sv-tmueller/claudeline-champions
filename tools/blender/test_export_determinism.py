@@ -32,14 +32,27 @@ CASES = {
 
 @unittest.skipUnless(os.access(BLENDER, os.X_OK), "Blender is not installed")
 class ExportDeterminismTests(unittest.TestCase):
-    def regenerate(self, name, out_dir):
+    def regenerate(self, name, out_dir, run):
         script, args, _ = CASES[name]
         out = Path(out_dir) / ("%s.glb" % name)
-        subprocess.run(
+        # Remove the previous run's file, so a run that writes nothing cannot
+        # pass by leaving the old bytes in place.
+        out.unlink(missing_ok=True)
+        result = subprocess.run(
             [str(RUN), str(REPO / "tools" / "blender" / script), "--"] + args + ["--out", str(out)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+        output = "\n--- stdout ---\n%s\n--- stderr ---\n%s" % (result.stdout, result.stderr)
+        self.assertEqual(
+            result.returncode,
+            0,
+            "%s run %d: Blender exited %d%s" % (name, run, result.returncode, output),
+        )
+        self.assertTrue(
+            out.is_file(),
+            "%s run %d: Blender exited 0 but did not write %s%s" % (name, run, out, output),
         )
         return out.read_bytes()
 
@@ -48,7 +61,7 @@ class ExportDeterminismTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for run in range(RUNS):
                 self.assertEqual(
-                    self.regenerate(name, tmp),
+                    self.regenerate(name, tmp, run + 1),
                     committed,
                     "%s run %d differs from the committed glb" % (name, run + 1),
                 )

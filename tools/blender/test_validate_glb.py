@@ -10,6 +10,7 @@ import struct
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import validate_glb
 
@@ -40,14 +41,12 @@ def pack_glb(doc, binary=None, magic=b"glTF", version=2, pad=True):
 
 def arena_doc(arena, extra_nodes=(), drop=(), rename=None, animations=False):
     """A glTF document shaped like what gen_arena.py exports."""
-    half_w = arena["size"]["width"] / 2
-    half_h = arena["size"]["height"] / 2
     nodes = [
         {"name": "Floor", "mesh": 0},
-        {"name": "Wall_N", "mesh": 0, "translation": [0, 0, -(half_h + 0.25)]},
-        {"name": "Wall_S", "mesh": 0, "translation": [0, 0, half_h + 0.25]},
-        {"name": "Wall_E", "mesh": 0, "translation": [half_w + 0.25, 0, 0]},
-        {"name": "Wall_W", "mesh": 0, "translation": [-(half_w + 0.25), 0, 0]},
+        {"name": "Wall_N", "mesh": 0},
+        {"name": "Wall_S", "mesh": 0},
+        {"name": "Wall_E", "mesh": 0},
+        {"name": "Wall_W", "mesh": 0},
     ]
     for i, ob in enumerate(arena["obstacles"]):
         nodes.append(
@@ -216,7 +215,38 @@ class ArenaNodeTests(ValidatorCase):
         for node in doc["nodes"]:
             if node["name"] == "Obstacle_7":
                 node["translation"] = [0, 0, 7]  # the JSON says y = 7, so z = -7
-        self.assertRejected(self.arena_glb(pack_glb(doc)), "translation")
+        self.assertRejected(self.arena_glb(pack_glb(doc)), "does not match")
+
+    def test_rejects_malformed_nodes_and_translations(self):
+        def with_node(extra):
+            return arena_doc(load_arena(), extra_nodes=[extra])
+
+        def with_bad_nodes_value(value):
+            doc = arena_doc(load_arena())
+            doc["nodes"] = value
+            return doc
+
+        def with_translation(index, value):
+            doc = arena_doc(load_arena())
+            for node in doc["nodes"]:
+                if node["name"] == "Obstacle_%d" % index:
+                    node["translation"] = value
+            return doc
+
+        cases = {
+            "non-dict node": (with_node(5), "must be an object"),
+            "list name": (with_node({"name": ["Floor"], "mesh": 0}), "name must be a string"),
+            "nodes is a dict": (with_bad_nodes_value({"a": 1}), "nodes must be a list"),
+            "nodes is null": (with_bad_nodes_value(None), "nodes must be a list"),
+            "string component": (with_translation(1, ["-8", 0, 0]), "translation must be"),
+            "scalar translation": (with_translation(1, 5), "translation must be"),
+            "two components": (with_translation(1, [-8, 0]), "translation must be"),
+            "nan component": (with_translation(1, [float("nan"), 0, 0]), "translation must be"),
+            "bool components": (with_translation(0, [False, 0, False]), "translation must be"),
+        }
+        for label, (doc, reason) in cases.items():
+            with self.subTest(case=label):
+                self.assertRejected(self.arena_glb(pack_glb(doc)), reason)
 
     def test_missing_translation_counts_as_zero(self):
         doc = arena_doc(load_arena())
@@ -238,6 +268,18 @@ class ChampionTests(ValidatorCase):
     def test_rejects_champion_without_champion_node(self):
         path = self.write("champions", "p.glb", pack_glb(champion_doc("Body")))
         self.assertRejected(path, "Champion")
+
+    def test_rejects_non_dict_node(self):
+        doc = champion_doc()
+        doc["nodes"].insert(0, 5)
+        path = self.write("champions", "p.glb", pack_glb(doc))
+        self.assertRejected(path, "nodes[0] must be an object")
+
+    def test_rejects_unhashable_node_name(self):
+        doc = champion_doc()
+        doc["nodes"].insert(0, {"name": ["x"]})
+        path = self.write("champions", "p.glb", pack_glb(doc))
+        self.assertRejected(path, "nodes[0].name must be a string")
 
 
 class ArenaJsonTests(unittest.TestCase):
@@ -335,7 +377,7 @@ class ArenaJsonTests(unittest.TestCase):
             a["spawns"]["teamA"][2] = [-8, 0]  # inside the rect at (-8, 0)
             a["spawns"]["teamB"][2] = [8, 0]
 
-        self.assertJsonRejected(mutate, "spawn")
+        self.assertJsonRejected(mutate, "touches")
 
     def test_rejects_too_few_spawns(self):
         def mutate(a):
@@ -438,6 +480,50 @@ class CommandLineTests(ValidatorCase):
         self.assertEqual(code, 1)
         self.assertIn("OK", out)
         self.assertIn("FAIL", out)
+
+    def test_malformed_file_does_not_stop_the_remaining_files(self):
+        def bad_doc(mutate):
+            doc = arena_doc(load_arena())
+            mutate(doc)
+            return doc
+
+        def set_translation(doc):
+            doc["nodes"][5]["translation"] = ["a", 0, 0]
+
+        cases = {
+            "non-dict node": (
+                lambda doc: doc["nodes"].append(5),
+                "must be an object",
+            ),
+            "list name": (
+                lambda doc: doc["nodes"].append({"name": ["Floor"]}),
+                "name must be a string",
+            ),
+            "non-numeric translation": (set_translation, "translation must be"),
+        }
+        good = self.write("champions", "good.glb", pack_glb(champion_doc()))
+        for label, (mutate, reason) in cases.items():
+            with self.subTest(case=label):
+                bad = self.arena_glb(pack_glb(bad_doc(mutate)))
+                code, out = self.run_main([bad, good])
+                lines = out.splitlines()
+                self.assertEqual(code, 1)
+                self.assertTrue(lines[0].startswith("FAIL %s: " % bad), lines[0])
+                self.assertIn(reason, lines[0])
+                self.assertEqual(lines[1], "OK %s" % good)
+
+    def test_unexpected_validator_error_becomes_a_fail_line(self):
+        def boom(path, doc):
+            raise RuntimeError("boom")
+
+        arena = self.arena_glb(pack_glb(arena_doc(load_arena())))
+        good = self.write("champions", "good.glb", pack_glb(champion_doc()))
+        with mock.patch.dict(validate_glb.CATEGORY_RULES, {"arenas": boom}):
+            code, out = self.run_main([arena, good])
+        lines = out.splitlines()
+        self.assertEqual(code, 1)
+        self.assertIn("validator error: RuntimeError: boom", lines[0])
+        self.assertEqual(lines[1], "OK %s" % good)
 
 
 if __name__ == "__main__":
