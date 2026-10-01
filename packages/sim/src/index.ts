@@ -13,3 +13,14 @@ export type {
   RectObstacle,
   SpawnPoint,
 } from './arena';
+export { Button } from './input';
+export type { MoveAxis, PlayerInput } from './input';
+export type {
+  ChampionState,
+  GameState,
+  MatchConfig,
+  PlayerConfig,
+  SimEvent,
+  StatusInstance,
+  TeamId,
+} from './state';
