@@ -15,7 +15,9 @@
     "typecheck": "tsc -p packages/sim && tsc -p packages/bots && tsc -p packages/client && tsc -p tsconfig.tools.json",
     "test": "vitest run",
     "e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run e2e"
+    "assets:validate": "python3 tools/blender/validate_glb.py assets/models",
+    "assets:test": "python3 -B -m unittest discover -s tools/blender -p 'test_*.py'",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run assets:validate && npm run assets:test && npm run e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
