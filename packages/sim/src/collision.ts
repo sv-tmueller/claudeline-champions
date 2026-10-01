@@ -79,7 +79,7 @@ function clampToBoundary(p: Point, width: number, height: number, r: number): bo
 function pushOutPass(state: GameState, p: Point, selfId: number): boolean {
   let pushed = false;
   for (const other of state.champions) {
-    if (other.id === selfId) continue;
+    if (other.id === selfId || !other.alive) continue;
     if (pushOutOfCircle(p, other.x, other.y, 2 * CHAMPION_RADIUS)) pushed = true;
   }
   for (const o of state.arena.obstacles) {

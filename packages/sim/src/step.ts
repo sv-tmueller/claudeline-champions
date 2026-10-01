@@ -13,7 +13,7 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
 
   for (const champion of state.champions) {
     const input = resolved[champion.id];
-    if (!input) continue;
+    if (!champion.alive || !input) continue;
     champion.aimX = input.aimX;
     champion.aimY = input.aimY;
 
