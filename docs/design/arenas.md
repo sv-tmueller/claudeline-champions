@@ -8,6 +8,8 @@ This document sets the rules every arena must follow. It contains no specific ar
 
 `[spec]` marks a value copied from the design spec. `[tuned]` marks a value chosen here, which a balance pass may move.
 
+The sample arena JSON in spec section 8.1 is a schema illustration, not a compliant layout. Its obstacles have no mirrored twins, for example.
+
 ## 1. Playable area
 
 - The playable area is a rectangle centred on the origin `[spec]`.
@@ -18,7 +20,7 @@ This document sets the rules every arena must follow. It contains no specific ar
 
 ## 2. Symmetry
 
-- Every arena is left-right symmetric. It mirrors across the line `x = 0` `[spec]`.
+- Every arena is left-right symmetric. It mirrors across the line `x = 0` `[tuned]`. The spec states this for Arena 1 only. This rule extends it to every arena.
 - Every obstacle at `(x, y)` has a twin at `(-x, y)` with the same type, size and `blocksProjectiles` value `[tuned]`.
 - An obstacle centred on `x = 0` is its own twin. It must be symmetric itself.
 - Circles and axis-aligned rectangles stay the same kind of shape when mirrored, so the rule holds for every allowed obstacle type.

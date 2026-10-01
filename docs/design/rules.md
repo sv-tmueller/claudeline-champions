@@ -54,7 +54,6 @@ At the end of the round end pause, before the next round starts, the sim does th
 The sim also does this `[tuned]`:
 
 - Every status is removed.
-- Every projectile and area is removed.
 - A cast in progress is dropped.
 - The round timer is set to 90 s and the ring is removed.
 
@@ -105,7 +104,9 @@ Round wins are the only thing that carries over.
   - while the champion is stunned,
   - while the champion is silenced. This includes the mobility slot.
 - Casting is also blocked while the champion is dead, during warmup and during the round end pause, while the slot is on cooldown, and while energy is too low `[tuned]`.
-- A rooted champion cannot cast an ability that contains a `dash` effect. The cast is rejected and costs nothing `[tuned]`.
+- A rooted champion cannot start a cast of an ability that contains a `dash` effect. The cast is rejected and costs nothing `[tuned]`.
+- If root lands during the windup of such a cast, the cast continues, but its `dash` effect is skipped. The cast's other effects still apply `[tuned]`.
+- A `teleport` effect stays allowed under root `[tuned]`.
 - Buttons are held, not pressed once. On every tick where a button is held and its slot is ready, the cast starts `[tuned]`. Holding M1 repeats the basic attack.
 - If several slots are ready on the same tick, one cast starts. The order is F, R, E, Q, SPACE, M2, M1 `[tuned]`.
 - Effects fire when the windup ends. They use the aim position from that tick `[tuned]`.
@@ -126,7 +127,7 @@ A windup is interrupted when `[tuned]`:
 - the champion dies,
 - the round is decided.
 
-Silence, root, slow and knockback do not interrupt a windup. Knockback still moves a champion with a locked windup, because it is an outside impulse and not walking.
+Silence, root, slow and knockback do not interrupt a windup. Root skips only the `dash` effect of a cast that is already winding up, as described in section 2.3. Knockback still moves a champion with a locked windup, because it is an outside impulse and not walking.
 
 An interrupted cast fires no effects. Its cooldown stays running and its energy cost is not refunded.
 
@@ -135,7 +136,8 @@ An interrupted cast fires no effects. Its cooldown stays running and its energy 
 - Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.
 - Energy is earned only by landing abilities on enemies and, for support kits, by healing allies `[spec]`.
 - Energy resets to 0 at the start of each round `[spec]`.
-- The sim awards energy through the `energyGain` effect primitive. Kits do not add other energy sources `[tuned]`.
+- The sim applies the table in section 3.1 on its own whenever an ability lands. Kits do not carry `energyGain` for these standard hits `[tuned]`.
+- A kit uses the `energyGain` effect only for an extra grant on top of the table. Kits add no other energy sources `[tuned]`.
 
 ### 3.1 Gain values `[tuned]`
 
@@ -145,12 +147,13 @@ An interrupted cast fires no effects. Its cooldown stays running and its energy 
 | Skill hit on an enemy (M2, SPACE, Q, E, R) | 10 |
 | EX variant hit on an enemy | 10 |
 | Ultimate hit on an enemy | 15 per enemy hit |
-| M1 heal that restores health to an ally | 5 |
-| Skill or EX heal that restores health to an ally | 10 |
-| Ultimate heal that restores health to an ally | 15 per ally healed |
+| M1 heal that restores health to an ally (support kits only) | 5 |
+| Skill or EX heal that restores health to an ally (support kits only) | 10 |
+| Ultimate heal that restores health to an ally (support kits only) | 15 per ally healed |
 
 Detail rules:
 
+- A shield or a status alone gives nothing. Only a hit that lands on an enemy, or a heal that restores health to an ally, gives energy.
 - One cast gives energy at most once per target, however many of its effects or area pulses touch that target.
 - A hit counts when it lands. A hit that a shield fully absorbs still gives energy.
 - A hit on an invulnerable champion gives no energy.
@@ -195,7 +198,9 @@ Stacking rules:
 
 ### 4.1 Catalog `[tuned]`
 
-| Status | Default duration | Blocks | Stacking across different sources |
+The ranges in the Duration range column bind kits. Every ability must pick its durations and strengths inside them.
+
+| Status | Duration range | Blocks | Stacking across different sources |
 |--------|------------------|--------|-----------------------------------|
 | Stun | 0.5 to 2.0 s (30 to 120 ticks) | Movement and casting `[spec]`. Interrupts a windup. | Does not stack. The longest remaining time wins. Remaining stun is capped at 2.0 s. |
 | Root | 1.0 to 2.5 s (60 to 150 ticks) | Movement only `[spec]`. That means walking and abilities with a `dash` effect. | Does not stack. The longest remaining time wins. |
@@ -206,17 +211,17 @@ Stacking rules:
 | Damage over time | 1.0 to 4.0 s (60 to 240 ticks), one tick every 0.5 s (30 ticks) | Nothing. | Stacks. Each source ticks on its own. |
 | Heal over time | 2.0 to 5.0 s (120 to 300 ticks), one tick every 0.5 s (30 ticks) | Nothing. | Stacks. Each source ticks on its own. |
 | Knockback | 1 to 4 m of push over 6 to 15 ticks (0.1 to 0.25 s) | Nothing. It moves the champion. Root does not stop it. | Stacks. Impulses add. The total remaining push is capped at 6 m. |
-| Invulnerable | 0.5 to 2.0 s (30 to 120 ticks) | Nothing. See the details below. | Does not stack. The longest remaining time wins. |
+| Invulnerable | 0.5 to 2.0 s (30 to 120 ticks) | No actions; blocks incoming damage and hostile statuses, see below | Does not stack. The longest remaining time wins. |
 
 Per-status details:
 
 - Move speed: base speed is 5.5 m/s `[spec]`. Speed is `5.5 * (1 + haste - slow)`, where haste is at most 0.5 and slow is at most 0.7. The result is never below 30 percent or above 150 percent of base speed.
-- Stun: a stunned champion cannot move or cast. A stun that arrives during a windup cancels the cast.
-- Root: a rooted champion can still aim and can cast anything without a `dash` effect. A `teleport` effect is not blocked.
+- Stun: a stunned champion cannot move or cast. A stun that arrives during a windup cancels the cast. A stunned champion is still pushed by knockback `[tuned]`.
+- Root: a rooted champion can still aim and can cast anything without a `dash` effect. A `teleport` effect is not blocked. Root cannot start a dash cast, and it skips the `dash` effect of a dash cast that is already winding up (section 2.3). A rooted champion is still pushed by knockback.
 - Silence: a silenced champion can still move. A windup already running when silence arrives is not interrupted.
 - Shield: damage goes to shields before health.
-- Damage over time: the total damage of one application stays inside the 8 to 30 per hit range `[spec]`. A refresh resets the remaining time and takes the new damage per tick. It keeps the current tick timer.
-- Heal over time: the total healing of one application also stays inside 8 to 30. Refresh works like damage over time.
+- Damage over time: the total damage of one application stays inside the 8 to 30 per hit range `[tuned]`. The range is from the spec, but applying it to the total of a damage over time is a choice made here. A refresh resets the remaining time and takes the new damage per tick. It keeps the current tick timer.
+- Heal over time: the total healing of one application also stays inside 8 to 30 `[tuned]`. Refresh works like damage over time.
 - Knockback: a champion moves along the push direction with a linearly decaying speed. An obstacle or the arena wall stops the push. Pushes deal no damage.
 - Invulnerable: blocks all damage, including ring damage. Blocks new stun, root, silence, slow, damage over time and knockback. Does not block healing, shields or haste. It does not remove statuses that are already running, but damage over time deals no damage while it lasts.
 
@@ -247,7 +252,7 @@ Default controls `[spec]`:
 
 - Rebinding arrives in milestone 5 `[spec]`. Until then the keys above are fixed.
 - Tab shows the scoreboard while it is held `[tuned]`. The scoreboard lists every champion with its team, its champion, alive or dead, kills and deaths.
-- In local matches the menu pauses the sim `[tuned]`. Online matches will not pause. That is decided in milestone 6.
+- In local matches the menu pauses the sim `[tuned]`. Pausing online is decided in milestone 6.
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
 - The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.
@@ -258,7 +263,7 @@ Default controls `[spec]`:
 - It is tilted about 55 degrees from horizontal `[spec]`.
 - It is placed so the whole arena fits the viewport with margin `[spec]`.
 - There is no rotation and no zoom in v1 `[spec]`.
-- Framing does not depend on the window size, so it works from a browser tab to a fullscreen 4K window `[spec]`.
+- Rendering uses resolution-independent camera framing and a device-pixel-ratio aware canvas, so it scales from a browser tab to a fullscreen 4K window `[spec]`.
 
 ## 8. HUD
 
@@ -266,7 +271,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 
 | Element | Content |
 |---------|---------|
-| Health bar | Current and max health of the local champion. A shield shows as an extra segment. |
+| Health bar | Current and max health of the local champion, in detail. A shield shows as an extra segment. |
 | Energy bar | Energy from 0 to 100. Marks at 25 (EX ready) and 100 (ultimate ready). |
 | Cooldown icons | One icon per slot: M1, M2, SPACE, Q, E, R, F. Each shows the remaining cooldown, and whether it is blocked by silence or low energy. |
 | Round score | Round wins of both teams, with the 3 needed to win the match. |
@@ -274,6 +279,8 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Ring warning | A countdown from 10 s before sudden death starts `[tuned]`. During sudden death a red edge warning shows when the local champion is outside the ring. |
 | Kill feed | A line per death, showing the killer (or "ring") and the victim. Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
 | Debug overlay | Draws collision circles, obstacles, projectiles and line of sight `[spec]`. Off by default. |
+
+Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. The HUD health bar is the detailed view of the local champion only.
 
 ## 9. 2v2 and 3v3
 
