@@ -2,6 +2,7 @@ import { BASE_MOVE_SPEED, DT } from './constants';
 import { resolveChampion } from './collision';
 import { resolveInput } from './input';
 import type { PlayerInput } from './input';
+import { expireProjectiles, stepProjectiles } from './projectile';
 import type { GameState } from './state';
 
 export function step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void {
@@ -33,6 +34,9 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
 
     resolveChampion(state, champion, prevX, prevY);
   }
+
+  stepProjectiles(state);
+  expireProjectiles(state);
 
   state.tick += 1;
 }
