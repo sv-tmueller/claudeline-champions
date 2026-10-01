@@ -7,10 +7,11 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 ## 0. How to read the numbers
 
-- Values from the spec are copied, not changed here: base move speed 5.5 m/s, champion radius 0.5 m, max health 120 (ranged, support) to 160 (melee), damage and heal 8 to 30 per hit (ultimates up to 60), projectile speed 12 to 25 m/s, projectile radius 0.2 to 0.6 m, EX cost 25 energy, ultimate cost 100 energy.
-- Everything else (cooldowns, windups, ranges, status strengths and durations, energy gains) is a tuning value chosen inside those ranges. These values may move in balance passes.
+- Values from the spec are copied, not changed here: base move speed 5.5 m/s, champion radius 0.5 m, max health 120 (ranged, support) to 160 (melee), damage 8 to 30 per hit (ultimates up to 60), projectile speed 12 to 25 m/s, projectile radius 0.2 to 0.6 m, EX cost 25 energy, ultimate cost 100 energy.
+- The spec gives the 8 to 30 range (ultimates up to 60) for damage only. Using the same range for heals is a roster choice.
+- Everything else (cooldowns, windups, ranges, status strengths and durations) is a tuning value chosen inside those ranges. These values may move in balance passes.
 - Status durations and strengths follow the status catalog and stacking rules of the rules document (`docs/design/rules.md`). Stun is 0.5 to 2.0 s, root 1.0 to 2.5 s, silence 1.0 to 3.0 s, slow 20 to 60 percent for 1.0 to 3.0 s, haste 20 to 50 percent for 1.0 to 4.0 s, shield 20 to 60 absorb for 3 to 6 s, damage over time 1.0 to 4.0 s, heal over time 2.0 to 5.0 s, knockback 1 to 4 m over 6 to 15 ticks, invulnerable 0.5 to 2.0 s. Damage over time and heal over time tick every 0.5 s, and the total of one application stays inside 8 to 30.
-- Energy gains use the rules document values. An M1 hit gives 5. A skill or EX hit gives 10. An ultimate hit gives 15 per enemy hit. Healing an ally gives 5 (M1), 10 (skill or EX) or 15 per ally healed (ultimate). A shield or a status alone gives nothing. In the tables, `energyGain 5` means the ability grants that amount through the `energyGain` effect when it lands on an enemy or, for healing, when it restores health to an ally.
+- Energy gains use the rules document values. An M1 hit gives 5. A skill or EX hit gives 10. An ultimate hit gives 15 per enemy hit. Healing an ally gives 5 (M1), 10 (skill or EX) or 15 per ally healed (ultimate). Only support kits earn energy from healing. A shield or a status alone gives nothing. The sim applies this table on its own, so the kit tables do not list `energyGain` for standard hits. A kit lists `energyGain` only where it grants extra energy on top of the table. No v1 kit does.
 - Every ability is built only from the toolkit primitives `projectile`, `dash`, `meleeArc`, `area`, `applyStatus`, `heal`, `shield`, `teleport`, `knockback` and `energyGain`. No kit has a passive. Any speed change comes from a haste or slow status.
 - Windup rules are `free` (move at normal speed), `slowed` (move at 50 percent of current speed) or `locked` (no walking). A windup of 0 is instant. The effects fire when the windup ends.
 - An EX variant costs 25 energy, uses the same cooldown as its base ability and lists only what changes. Each kit has exactly two EX variants. The ultimate costs 100 energy and has no EX variant.
@@ -22,7 +23,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 **Fantasy.** Hargrim is a retired quarry foreman who fights with a stone-cutter's maul. He walks into the fight, drags people to him and breaks the ground under their feet. He cannot chase a fast target, so he makes sure the target has nowhere to go.
 
-**Role and range.** Frontline bruiser. Intended range is 0 to 3 m, with a pull that reaches 9 m.
+**Role and range.** Frontline bruiser. Intended range is 0 to 3 m, with a hook that reaches 9 m.
 
 **Stats.**
 
@@ -36,33 +37,33 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Maul Swing: `meleeArc` (100 degree arc), `energyGain 5` | 12 damage | 2.5 m | n/a | 0.6 s | 0.15 s, slowed | none |
-| M2 | Ground Slam: `area` (circle, radius 2.0 m, centred 2.5 m ahead, one hit), `applyStatus`, `energyGain 10` | 18 damage | 2.5 m to centre | n/a | 6 s | 0.4 s, slowed | slow 30 percent for 1.5 s |
+| M1 | Maul Swing: `meleeArc` (100 degree arc) | 12 damage | 2.5 m | n/a | 0.6 s | 0.15 s, slowed | none |
+| M2 | Ground Slam: `area` (circle, radius 2.0 m, centred 2.5 m ahead, one hit), `applyStatus` | 18 damage | 2.5 m to centre | n/a | 6 s | 0.4 s, slowed | slow 30 percent for 1.5 s |
 | SPACE | Rush: `dash` (5 m in 0.25 s), `applyStatus` | none | 5 m | n/a | 7 s | 0, free | haste 20 percent for 1.5 s on self |
 | Q | Rally Cry: `area` (circle, radius 4 m around caster), `applyStatus` | none | 4 m radius | n/a | 14 s | 0.2 s, slowed | haste 30 percent for 2.0 s on allies in the area, including self |
-| E | Chain Hook: `projectile`, `knockback` (pull toward caster, up to 4 m in 12 ticks, stops at contact), `energyGain 10` | 14 damage | 9 m | 20 m/s / 0.4 m | 9 s | 0.3 s, locked | none |
+| E | Chain Hook: `projectile`, `knockback` (pull toward caster, up to 4 m in 12 ticks, stops at contact), `applyStatus` | 14 damage | 9 m | 20 m/s / 0.4 m | 9 s | 0.3 s, locked | slow 30 percent for 1.0 s |
 | R | Iron Hide: `shield` on self, `applyStatus` | 40 absorb for 4 s | self | n/a | 12 s | 0, free | haste 20 percent for 1.5 s on self |
-| F | Quarry Break (ultimate): `dash` (6 m forward), `area` (circle, radius 3.5 m, at the dash end), `applyStatus`, `knockback` (3 m outward in 10 ticks), `energyGain 15` per enemy hit | 40 damage | 6 m dash, 3.5 m radius | n/a | 10 s | 0.5 s, locked | stun 1.0 s |
+| F | Quarry Break (ultimate): `dash` (6 m in 0.3 s), `area` (circle, radius 3.5 m, at the dash end), `applyStatus`, `knockback` (3 m outward in 10 ticks) | 40 damage | 6 m dash, 3.5 m radius | n/a | 10 s | 0.5 s, locked | stun 1.0 s |
 
 **EX variants** (Shift plus slot, 25 energy).
 
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
 | M2 | Ground Slam EX: radius 2.0 m becomes 2.75 m, damage 18 becomes 26, slow becomes 50 percent for 2.0 s. |
-| SPACE | Rush EX: dash distance 5 m becomes 7 m. At the dash end an extra `area` (circle, radius 1.5 m) deals 12 damage, applies stun 0.5 s and grants `energyGain 10`. Haste on self becomes 30 percent for 2.0 s. |
+| SPACE | Rush EX: dash distance 5 m becomes 7 m. At the dash end an extra `area` (circle, radius 1.5 m) deals 12 damage and applies stun 0.5 s. Haste on self becomes 30 percent for 2.0 s. |
 
 **Intended counters.**
 
 - Beats Skerrow. Iron Hide absorbs the opening Rend, the slow from Ground Slam stops a dash-away, and 160 health outlasts her 130. Her Vanish Step is one 0.5 s window every 16 s.
-- Beats Lumeth. Chain Hook pulls her out of position and she has only a short Glide (4 m) to answer it. Her heals cannot keep up with a bruiser she cannot escape.
-- Loses to Quillon. Quillon outranges every Hargrim tool except the hook. Bind Shot and Snare Orb keep Hargrim slow or rooted while bolts land from 14 m.
+- Beats Lumeth. Chain Hook pulls Lumeth 4 m closer and slows her, and she has only a short Glide (4 m) to answer it. Her heals cannot keep up with a bruiser she cannot escape.
+- Loses to Quillon. Quillon outranges every Hargrim tool, the hook included. Bind Shot and Snare Orb keep Hargrim slow or rooted while bolts land from 14 m.
 
 **Bot profile sketch.**
 
 | Field | Value |
 |-------|-------|
 | Preferred range | 0 to 3 m, closes distance |
-| Opener | SPACE (Rush) from 4 to 5 m, or E (Chain Hook) from 6 to 9 m when the target is running |
+| Opener | SPACE (Rush) from 4 to 5 m, or E (Chain Hook) from 4 to 7 m when the target is running |
 | Escape | R (Iron Hide), then walk away under haste |
 | Finisher | M2 (Ground Slam), or E on a fleeing target at low health |
 
@@ -70,7 +71,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 **Fantasy.** Quillon is a surveyor from a drowned city who turned her measuring rods into long-range bolts. She reads the arena like a map. Every shot is placed where the target will be, not where it stands.
 
-**Role and range.** Backline damage dealer. Intended range is 9 to 13 m, and her longest shot reaches 18 m.
+**Role and range.** Backline damage dealer. Intended range is 9 to 13 m, and her longest shot reaches 20 m.
 
 **Stats.**
 
@@ -84,13 +85,13 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Rod Bolt: `projectile`, `energyGain 5` | 11 damage | 14 m | 22 m/s / 0.25 m | 0.5 s | 0.1 s, free | none |
-| M2 | Bind Shot: `projectile`, `applyStatus`, `energyGain 10` | 14 damage | 12 m | 14 m/s / 0.4 m | 6 s | 0.3 s, slowed | slow 40 percent for 1.5 s |
+| M1 | Rod Bolt: `projectile` | 11 damage | 14 m | 22 m/s / 0.25 m | 0.5 s | 0.1 s, free | none |
+| M2 | Bind Shot: `projectile`, `applyStatus` | 14 damage | 12 m | 14 m/s / 0.4 m | 6 s | 0.3 s, slowed | slow 40 percent for 1.5 s |
 | SPACE | Skip: `teleport` (4 m toward the aim point) | none | 4 m | n/a | 9 s | 0, free | none |
-| Q | Snare Orb: `projectile`, `applyStatus`, `energyGain 10` | 8 damage | 10 m | 12 m/s / 0.6 m | 12 s | 0.4 s, locked | root 1.0 s |
-| E | Lance: `projectile`, `energyGain 10` | 28 damage | 18 m | 25 m/s / 0.2 m | 8 s | 0.6 s, locked | none |
+| Q | Snare Orb: `projectile`, `applyStatus` | 8 damage | 10 m | 12 m/s / 0.6 m | 12 s | 0.4 s, locked | root 1.0 s |
+| E | Lance: `projectile` | 28 damage | 18 m | 25 m/s / 0.2 m | 8 s | 0.6 s, locked | none |
 | R | Hush Ward: `shield` on self, `applyStatus` | 30 absorb for 3 s | self | n/a | 14 s | 0, free | haste 30 percent for 1.5 s on self |
-| F | Sunspear (ultimate): `projectile` (pierces every champion in its path), `applyStatus`, `energyGain 15` per enemy hit | 45 damage | 20 m | 25 m/s / 0.6 m | 10 s | 0.8 s, locked | slow 40 percent for 2.0 s |
+| F | Sunspear (ultimate): `projectile` (pierces every champion in its path), `applyStatus` | 45 damage | 20 m | 25 m/s / 0.6 m | 10 s | 0.8 s, locked | slow 40 percent for 2.0 s |
 
 **EX variants** (Shift plus slot, 25 energy).
 
@@ -132,13 +133,13 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Mend Bolt: `projectile`, `heal` on an ally hit, damage on an enemy hit, `energyGain 5` | 10 heal or 10 damage | 12 m | 20 m/s / 0.35 m | 0.6 s | 0.1 s, free | none |
-| M2 | Soothing Surge: `projectile` (hits allies only, passes through enemies), `heal`, `applyStatus`, `energyGain 10` | 14 heal, plus 12 heal over time in total | 10 m | 16 m/s / 0.5 m | 5 s | 0.3 s, slowed | heal over time for 3.0 s (2 per tick) |
+| M1 | Mend Bolt: `projectile`, `heal` on an ally hit, damage on an enemy hit | 10 heal or 10 damage | 12 m | 20 m/s / 0.35 m | 0.6 s | 0.1 s, free | none |
+| M2 | Soothing Surge: `projectile` (hits allies only, passes through enemies), `heal`, `applyStatus` | 14 heal, plus 12 heal over time in total | 10 m | 16 m/s / 0.5 m | 5 s | 0.3 s, slowed | heal over time for 3.0 s (2 per tick) |
 | SPACE | Glide: `dash` (4 m in 0.2 s), `applyStatus` | none | 4 m | n/a | 8 s | 0, free | haste 30 percent for 1.0 s on self |
-| Q | Binding Sigil: `area` (circle, radius 1.5 m, placed up to 9 m away, one hit), `applyStatus`, `energyGain 10` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
-| E | Lantern Burst: `area` (circle, radius 3 m around caster, one hit), `knockback` (2 m outward in 8 ticks), `energyGain 10` | 12 damage | 3 m radius | n/a | 9 s | 0.2 s, slowed | none |
+| Q | Binding Sigil: `area` (circle, radius 1.5 m, placed up to 9 m away, one hit), `applyStatus` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
+| E | Lantern Burst: `area` (circle, radius 3 m around caster, one hit), `knockback` (2 m outward in 8 ticks) | 12 damage | 3 m radius | n/a | 9 s | 0.2 s, slowed | none |
 | R | Aegis Veil: `area` (circle, radius 5 m around caster), `shield` on allies in the area, including self | 30 absorb for 4 s | 5 m radius | n/a | 12 s | 0, free | none |
-| F | Dawnbloom (ultimate): `area` (circle, radius 5 m around caster, one hit), `heal` on allies, `applyStatus`, `energyGain 15` per ally healed | 30 heal, plus 30 heal over time in total | 5 m radius | n/a | 10 s | 0.6 s, slowed | heal over time for 3.0 s (5 per tick) on allies, slow 30 percent for 2.0 s on enemies |
+| F | Dawnbloom (ultimate): `area` (circle, radius 5 m around caster, one hit), `heal` on allies, `applyStatus` | 30 heal, plus 30 heal over time in total | 5 m radius | n/a | 10 s | 0.6 s, slowed | heal over time for 3.0 s (5 per tick) on allies, slow 30 percent for 2.0 s on enemies |
 
 **EX variants** (Shift plus slot, 25 energy).
 
@@ -150,7 +151,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 **Intended counters.**
 
 - Beats Quillon. Aegis Veil absorbs a full Lance, Soothing Surge outheals Rod Bolt, and Binding Sigil roots her where Skip lands. Lumeth's M1 reaches 12 m, close to Quillon's 14 m.
-- Loses to Hargrim. Chain Hook pulls her into maul range and Ground Slam slows her. Lantern Burst pushes him 2 m, and he walks it back in under half a second.
+- Loses to Hargrim. Chain Hook pulls her 4 m closer and slows her, so Ground Slam lands next. Lantern Burst pushes him 2 m, and he walks it back in under half a second.
 - Loses to Skerrow. Quiet Dart silences every Lumeth ability, shield included, and 120 health dies to Lunge, Rend and Twin Cut inside four seconds.
 
 **Bot profile sketch.**
@@ -182,19 +183,19 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Twin Cut: `meleeArc` (90 degree arc), `energyGain 5` | 9 damage | 2.0 m | n/a | 0.4 s | 0.1 s, free | none |
-| M2 | Throwing Knife: `projectile`, `applyStatus`, `energyGain 10` | 12 damage | 10 m | 24 m/s / 0.2 m | 3 s | 0.1 s, free | slow 20 percent for 1.0 s |
+| M1 | Twin Cut: `meleeArc` (90 degree arc) | 9 damage | 2.0 m | n/a | 0.4 s | 0.1 s, free | none |
+| M2 | Throwing Knife: `projectile`, `applyStatus` | 12 damage | 10 m | 24 m/s / 0.2 m | 3 s | 0.1 s, free | slow 20 percent for 1.0 s |
 | SPACE | Lunge: `dash` (6 m in 0.2 s), `applyStatus` | none | 6 m | n/a | 6 s | 0, free | haste 20 percent for 1.5 s on self |
-| Q | Quiet Dart: `projectile`, `applyStatus`, `energyGain 10` | 8 damage | 11 m | 20 m/s / 0.3 m | 12 s | 0.2 s, free | silence 1.5 s |
-| E | Rend: `meleeArc` (90 degree arc), `applyStatus`, `energyGain 10` | 20 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
+| Q | Quiet Dart: `projectile`, `applyStatus` | 8 damage | 11 m | 20 m/s / 0.3 m | 12 s | 0.2 s, free | silence 1.5 s |
+| E | Rend: `meleeArc` (90 degree arc), `applyStatus` | 20 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
 | R | Vanish Step: `teleport` (up to 5 m toward the aim point), `applyStatus` | none | 5 m | n/a | 16 s | 0, free | invulnerable 0.5 s on self |
-| F | Reaper's Dance (ultimate): `teleport` (up to 8 m toward the aim point), `meleeArc` (360 degrees), `applyStatus`, `energyGain 15` per enemy hit | 40 damage | 8 m teleport, 2.5 m arc | n/a | 10 s | 0.3 s, locked | stun 0.5 s, then silence 2.0 s |
+| F | Reaper's Dance (ultimate): `teleport` (up to 8 m toward the aim point), `meleeArc` (360 degrees), `applyStatus` | 40 damage | 8 m teleport, 2.5 m arc | n/a | 10 s | 0.3 s, locked | stun 0.5 s and silence 2.0 s, both applied on hit, so the silence outlasts the stun |
 
 **EX variants** (Shift plus slot, 25 energy).
 
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
-| SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, 2.0 m) deals 14 damage and grants `energyGain 10`. Haste on self becomes 30 percent for 2.0 s. |
+| SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, 2.0 m) deals 14 damage. Haste on self becomes 30 percent for 2.0 s. |
 | E | Rend EX: direct damage 20 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
 
 **Intended counters.**
@@ -214,7 +215,7 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 
 ## 5. Every 2v2 pairing works
 
-Each pairing has a plan and a weakness. No pairing is a flat loss against another, and no champion in a pairing adds nothing.
+Each pairing has a plan and a weakness. No pairing is a flat loss against another, and every champion in a pairing contributes.
 
 | Pairing | Why it works | Its weakness |
 |---------|--------------|--------------|
