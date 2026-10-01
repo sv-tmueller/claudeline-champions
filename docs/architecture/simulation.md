@@ -36,10 +36,14 @@ Aim is quantized to integer centimeters so the record is small and stable on
 the wire later. A missing input for a player on a tick is treated as "no
 movement, no buttons, aim unchanged".
 
-The sim sanitizes every input at runtime because inputs will later arrive over the
-network: a move axis that is not exactly -1, 0 or 1 becomes 0, a non-finite aim
-coordinate keeps the stored aim, and buttons that are not a non-negative integer
-become 0, with valid buttons masked to the eight defined bits.
+The sim sanitizes every input at runtime because inputs will later arrive over
+the network. `step` never throws on an input value and never leaves the state
+partly stepped. An entry that is not an object (`null`, a number, a string)
+counts as missing. A move axis that is not exactly -1, 0 or 1 becomes 0. A
+non-finite aim coordinate keeps the stored aim, and `-0` is stored as `+0` so
+every stored number survives a JSON round trip. Buttons that are not a
+non-negative integer become 0, with valid buttons masked to the eight defined
+bits.
 
 ## State and API surface
 
