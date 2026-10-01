@@ -1,0 +1,292 @@
+# Game rules and controls
+
+Status: v1 rules, pre-implementation
+Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4, 5, 6 and 10
+Companion document: [arena design principles](arenas.md)
+
+This document defines how a match plays and how it is controlled. The sim, the client and the bots implement it. Champion kits and arena layouts are not covered here.
+
+## 0. How to read the numbers
+
+- `[spec]` marks a value copied from the design spec. It does not change here.
+- `[tuned]` marks a value this document chose, either inside a range the spec gives or where the spec is silent. These values may move in balance passes.
+- The sim counts time in integer ticks at 60 Hz (`TICK_RATE = 60`, `DT = 1 / 60`). Seconds in this document convert to ticks once, at match creation: `ticks = seconds * 60`.
+- Where this document and the issue acceptance criteria seem to disagree, the spec governs. One such case is in section 3.2.
+- Difficulty tiers for bots (easy, normal, hard) change only reaction delay, aim error and dodge probability. They do not change any rule in this document `[spec]`.
+
+## 1. Match and round flow
+
+A match is a state machine: `warmup -> round -> roundEnd -> (round | matchEnd)` `[spec]`.
+
+| Phase | Length | What happens |
+|-------|--------|--------------|
+| Warmup | 3 s (180 ticks) `[spec]` | Champions stand at their spawn points. Movement and casting are locked. |
+| Round | 90 s (5400 ticks) `[spec]` | Normal play. The round timer counts down from 90 s. |
+| Sudden death | 30 s of shrinking, then a hold | Starts when the round timer reaches 0. See section 1.1. |
+| Round end pause | 3 s (180 ticks) `[spec]` | Starts on the tick a round is decided. Then the reset happens. |
+| Match end | n/a | The match is over once a team has 3 round wins and the round end pause has finished. |
+
+Notes on the flow:
+
+- Warmup happens once, before round 1. Between rounds the state goes from `roundEnd` straight to `round`, as in the spec's state machine. The 3 s round end pause is the only break between rounds.
+- During the round end pause, movement and casting are locked. Projectiles and areas are removed on the tick the round is decided. No damage, healing or status effect is applied during the pause `[tuned]`.
+- The match has no cap on the number of rounds. Draws score nothing, so a match can run longer than five rounds.
+
+### 1.1 Sudden death
+
+- When the round timer expires, a ring centred on the arena starts to shrink.
+- The ring radius goes linearly from 18 m to 3 m over 30 s (1800 ticks) `[spec]`. That is 1/120 m per tick.
+- A champion outside the ring takes 10 damage per second `[spec]`. The sim applies this every tick as 10 / 60 damage.
+- "Outside" means the centre of the champion circle is farther from the ring centre than the current radius `[tuned]`. The champion radius is 0.5 m `[spec]`.
+- After 30 s the ring holds at 3 m until the round is decided `[spec]`. There is no further time limit.
+- Ring damage ignores shields and gives no energy to anyone `[tuned]`. The invulnerable status blocks it.
+- The ring values (`startRadius`, `endRadius`, `damagePerSecond`) are stored per arena in the arena definition. The v1 values are 18, 3 and 10.
+
+### 1.2 What resets between rounds
+
+At the end of the round end pause, before the next round starts, the sim does this `[spec]`:
+
+- Every champion is fully healed to its max health.
+- Every cooldown is reset to 0.
+- Energy is set to 0.
+- Every champion respawns at its team's spawn point.
+
+The sim also does this `[tuned]`:
+
+- Every status is removed.
+- Every projectile and area is removed.
+- A cast in progress is dropped.
+- The round timer is set to 90 s and the ring is removed.
+
+Round wins are the only thing that carries over.
+
+### 1.3 Win conditions and draws
+
+- A team wins a round when every enemy champion is dead `[spec]`.
+- A team wins the match when it reaches 3 round wins `[spec]`. The value is the `roundsToWin` field of `MatchConfig`.
+- Draw rule `[spec]`: if both teams lose their last living champion on the same tick, the round is a draw. Nobody scores. The next round starts after the normal round end pause.
+- Dead champions stay dead until the round ends. There is no respawn during a round. A dead champion does not collide with anything and cannot be hit `[tuned]`.
+- There is no win by timer. If both teams are alive when the timer expires, sudden death decides the round.
+
+## 2. Abilities
+
+### 2.1 Slot layout
+
+| Slot | Button | Role |
+|------|--------|------|
+| M1 | Left mouse | Basic attack |
+| M2 | Right mouse | Secondary attack |
+| SPACE | Space | Mobility |
+| Q | Q | Utility |
+| E | E | Offense |
+| R | R | Defense |
+| F | F | Ultimate |
+
+`[spec]` The roles follow the Bloodline layout from the spec: Q, E and R are utility, offense and defense.
+
+### 2.2 EX variants and the ultimate
+
+- Holding Shift with a slot casts that slot's EX variant, where the kit defines one `[spec]`.
+- Each kit defines exactly two EX variants `[spec]`. They sit on two of the slots M1, M2, SPACE, Q, E and R `[tuned]`. The ultimate has no EX variant.
+- An EX variant costs 25 energy `[spec]`.
+- The ultimate is on F and costs 100 energy `[spec]`.
+- Shift with a slot that has no EX variant is ignored, and the normal ability casts `[tuned]`.
+- If energy is below the cost of the EX variant, the cast is rejected. It does not fall back to the normal ability `[tuned]`. The client plays a "not enough energy" cue.
+- Energy is paid when the cast starts, not when the windup ends. An interrupted cast does not refund energy `[tuned]`.
+
+### 2.3 Cooldowns and casting
+
+- Every ability has a cooldown in ticks, a windup in ticks (0 for instant), a movement rule during the windup and a list of effects `[spec]`.
+- There is no global cooldown `[spec]`. Using one slot never puts another slot on cooldown.
+- The cooldown starts when the cast starts, and it keeps counting down during the windup `[tuned]`.
+- An EX variant and the normal ability of the same slot share one cooldown `[tuned]`.
+- Casting is blocked `[spec]`:
+  - while another windup is in progress,
+  - while the champion is stunned,
+  - while the champion is silenced. This includes the mobility slot.
+- Casting is also blocked while the champion is dead, during warmup and during the round end pause, while the slot is on cooldown, and while energy is too low `[tuned]`.
+- A rooted champion cannot cast an ability that contains a `dash` effect. The cast is rejected and costs nothing `[tuned]`.
+- Buttons are held, not pressed once. On every tick where a button is held and its slot is ready, the cast starts `[tuned]`. Holding M1 repeats the basic attack.
+- If several slots are ready on the same tick, one cast starts. The order is F, R, E, Q, SPACE, M2, M1 `[tuned]`.
+- Effects fire when the windup ends. They use the aim position from that tick `[tuned]`.
+
+### 2.4 Windup and movement rules
+
+Every ability picks one movement rule for its windup `[spec]`:
+
+| Rule | Effect during the windup |
+|------|--------------------------|
+| free | The champion moves at its normal speed. |
+| slowed | The champion moves at 50 percent of its current speed `[tuned]`. This multiplies after slow and haste. |
+| locked | The champion cannot walk. Its walking velocity is zero. |
+
+A windup is interrupted when `[tuned]`:
+
+- the champion is stunned,
+- the champion dies,
+- the round is decided.
+
+Silence, root, slow and knockback do not interrupt a windup. Knockback still moves a champion with a locked windup, because it is an outside impulse and not walking.
+
+An interrupted cast fires no effects. Its cooldown stays running and its energy cost is not refunded.
+
+## 3. Energy economy
+
+- Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.
+- Energy is earned only by landing abilities on enemies and, for support kits, by healing allies `[spec]`.
+- Energy resets to 0 at the start of each round `[spec]`.
+- The sim awards energy through the `energyGain` effect primitive. Kits do not add other energy sources `[tuned]`.
+
+### 3.1 Gain values `[tuned]`
+
+| Event | Energy gained |
+|-------|---------------|
+| M1 hit on an enemy | 5 |
+| Skill hit on an enemy (M2, SPACE, Q, E, R) | 10 |
+| EX variant hit on an enemy | 10 |
+| Ultimate hit on an enemy | 15 per enemy hit |
+| M1 heal that restores health to an ally | 5 |
+| Skill or EX heal that restores health to an ally | 10 |
+| Ultimate heal that restores health to an ally | 15 per ally healed |
+
+Detail rules:
+
+- One cast gives energy at most once per target, however many of its effects or area pulses touch that target.
+- A hit counts when it lands. A hit that a shield fully absorbs still gives energy.
+- A hit on an invulnerable champion gives no energy.
+- A heal gives energy only if it restores at least some health. Healing a full-health ally or healing yourself gives nothing.
+- Damage over time and heal over time ticks give no energy. The cast that applied them gives energy once, when it lands.
+- Ring damage gives no energy.
+- Energy spent on an EX variant or the ultimate comes out of the same pool.
+
+### 3.2 Worked example
+
+The numbers below describe one typical kit. They are an illustration, not a balance simulation.
+
+Assume that in every 10 s of active combat the player lands 2 basic hits and 1 skill hit on enemies.
+
+- 2 basic hits give 2 x 5 = 10 energy.
+- 1 skill hit gives 10 energy.
+- That is 20 energy per 10 s, or 2 energy per second.
+- The ultimate is ready after 50 s of active combat if no EX variant is cast.
+
+| Round | Active combat | Energy at the end | Result |
+|-------|---------------|-------------------|--------|
+| 1 | 40 s | 80 | Ultimate not ready. |
+| 2 | 55 s | 100 at 50 s | Ultimate cast at about 52 s. |
+| 3 | 45 s | 90 | Ultimate not ready. |
+
+Each EX cast costs 25 energy and delays the ultimate by about 12 s of active combat.
+
+A support kit lands the same total: 2 M1 heals on hurt allies (10) plus 1 skill heal (10) per 10 s of active combat.
+
+Note on the acceptance criterion "reaches its ultimate within two to three rounds of landed hits": the spec resets energy to 0 every round (sections 4.6 and 4.7), so energy cannot carry over between rounds. The spec governs. This document reads the criterion as follows. A typical kit reaches 100 energy in a round that holds about 50 s of active combat. The ultimate is available in roughly one round out of every two to three. Rounds that end early do not reach it.
+
+## 4. Statuses
+
+Every status has a remaining tick count `[spec]`. The catalog below is the full v1 list `[spec]`.
+
+Stacking rules:
+
+- The source of a status is the pair (casting champion, ability slot) `[tuned]`. An EX variant has the same source as its normal slot.
+- Spec rule: the same status from the same source refreshes its duration rather than stacking `[spec]`. A refresh also replaces the strength (percent, amount or impulse) with the new value `[tuned]`.
+- Spec rule: different sources stack unless this document says otherwise for that status `[spec]`. The table gives the rule per status.
+- No v1 ability removes statuses. A status ends when its time runs out, when the champion dies, or at a round reset `[tuned]`.
+
+### 4.1 Catalog `[tuned]`
+
+| Status | Default duration | Blocks | Stacking across different sources |
+|--------|------------------|--------|-----------------------------------|
+| Stun | 0.5 to 2.0 s (30 to 120 ticks) | Movement and casting `[spec]`. Interrupts a windup. | Does not stack. The longest remaining time wins. Remaining stun is capped at 2.0 s. |
+| Root | 1.0 to 2.5 s (60 to 150 ticks) | Movement only `[spec]`. That means walking and abilities with a `dash` effect. | Does not stack. The longest remaining time wins. |
+| Silence | 1.0 to 3.0 s (60 to 180 ticks) | Casting only `[spec]`, including the mobility slot. Movement stays allowed. | Does not stack. The longest remaining time wins. |
+| Slow | 20 to 60 percent, 1.0 to 3.0 s (60 to 180 ticks) | Nothing. It lowers move speed. | Stacks. Percents add, capped at 70 percent in total. Each source keeps its own timer. |
+| Haste | 20 to 50 percent, 1.0 to 4.0 s (60 to 240 ticks) | Nothing. It raises move speed. | Stacks. Percents add, capped at 50 percent in total. Each source keeps its own timer. |
+| Shield | 20 to 60 absorb, 3 to 6 s (180 to 360 ticks) | Nothing. It absorbs damage. | Stacks. Absorb amounts add. Damage uses up the oldest shield first. A shield that times out loses its remaining absorb. |
+| Damage over time | 1.0 to 4.0 s (60 to 240 ticks), one tick every 0.5 s (30 ticks) | Nothing. | Stacks. Each source ticks on its own. |
+| Heal over time | 2.0 to 5.0 s (120 to 300 ticks), one tick every 0.5 s (30 ticks) | Nothing. | Stacks. Each source ticks on its own. |
+| Knockback | 1 to 4 m of push over 6 to 15 ticks (0.1 to 0.25 s) | Nothing. It moves the champion. Root does not stop it. | Stacks. Impulses add. The total remaining push is capped at 6 m. |
+| Invulnerable | 0.5 to 2.0 s (30 to 120 ticks) | Nothing. See the details below. | Does not stack. The longest remaining time wins. |
+
+Per-status details:
+
+- Move speed: base speed is 5.5 m/s `[spec]`. Speed is `5.5 * (1 + haste - slow)`, where haste is at most 0.5 and slow is at most 0.7. The result is never below 30 percent or above 150 percent of base speed.
+- Stun: a stunned champion cannot move or cast. A stun that arrives during a windup cancels the cast.
+- Root: a rooted champion can still aim and can cast anything without a `dash` effect. A `teleport` effect is not blocked.
+- Silence: a silenced champion can still move. A windup already running when silence arrives is not interrupted.
+- Shield: damage goes to shields before health.
+- Damage over time: the total damage of one application stays inside the 8 to 30 per hit range `[spec]`. A refresh resets the remaining time and takes the new damage per tick. It keeps the current tick timer.
+- Heal over time: the total healing of one application also stays inside 8 to 30. Refresh works like damage over time.
+- Knockback: a champion moves along the push direction with a linearly decaying speed. An obstacle or the arena wall stops the push. Pushes deal no damage.
+- Invulnerable: blocks all damage, including ring damage. Blocks new stun, root, silence, slow, damage over time and knockback. Does not block healing, shields or haste. It does not remove statuses that are already running, but damage over time deals no damage while it lasts.
+
+## 5. Health
+
+- Max health is 120 for ranged and support kits and 160 for melee kits `[spec]`. A kit that mixes roles may use a value between the two, in steps of 10 `[tuned]`. The roster document decides.
+- Health does not regenerate during a round. Only healing effects restore it `[spec]`.
+- Healing cannot raise health above max health `[tuned]`.
+- Health is a number with a fraction. A champion dies when health is 0 or lower. The HUD shows health rounded up `[tuned]`.
+- Ability damage is 8 to 30 per hit, and ultimates go up to 60 `[spec]`.
+
+## 6. Controls
+
+Default controls `[spec]`:
+
+| Input | Action |
+|-------|--------|
+| W, A, S, D | Move. W is screen-up, which is `+y` in the sim. |
+| Mouse | Aim. The aim point is where the mouse ray hits the ground plane. |
+| Left mouse button | M1 |
+| Right mouse button | M2 |
+| Space | Mobility |
+| Q, E, R | Q, E and R slots |
+| F | Ultimate |
+| Shift (held) | EX variant of the slot that is cast |
+| Tab | Scoreboard |
+| Escape | Menu |
+
+- Rebinding arrives in milestone 5 `[spec]`. Until then the keys above are fixed.
+- Tab shows the scoreboard while it is held `[tuned]`. The scoreboard lists every champion with its team, its champion, alive or dead, kills and deaths.
+- In local matches the menu pauses the sim `[tuned]`. Online matches will not pause. That is decided in milestone 6.
+- The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
+- The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
+- The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.
+
+## 7. Camera
+
+- The camera is fixed `[spec]`.
+- It is tilted about 55 degrees from horizontal `[spec]`.
+- It is placed so the whole arena fits the viewport with margin `[spec]`.
+- There is no rotation and no zoom in v1 `[spec]`.
+- Framing does not depend on the window size, so it works from a browser tab to a fullscreen 4K window `[spec]`.
+
+## 8. HUD
+
+The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
+
+| Element | Content |
+|---------|---------|
+| Health bar | Current and max health of the local champion. A shield shows as an extra segment. |
+| Energy bar | Energy from 0 to 100. Marks at 25 (EX ready) and 100 (ultimate ready). |
+| Cooldown icons | One icon per slot: M1, M2, SPACE, Q, E, R, F. Each shows the remaining cooldown, and whether it is blocked by silence or low energy. |
+| Round score | Round wins of both teams, with the 3 needed to win the match. |
+| Round timer | Time left in the round. After it reaches 0 it shows sudden death. |
+| Ring warning | A countdown from 10 s before sudden death starts `[tuned]`. During sudden death a red edge warning shows when the local champion is outside the ring. |
+| Kill feed | A line per death, showing the killer (or "ring") and the victim. Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
+| Debug overlay | Draws collision circles, obstacles, projectiles and line of sight `[spec]`. Off by default. |
+
+## 9. 2v2 and 3v3
+
+`MatchConfig` sets the team size to 2 or 3 `[spec]`. Both teams always have the same size `[tuned]`.
+
+| Aspect | 2v2 | 3v3 |
+|--------|-----|-----|
+| Champions per team | 2 | 3 |
+| Spawn points used | The first two of the team's spawn points | All three of the team's spawn points |
+| Spawn assignment | Players take spawn points in team order | Players take spawn points in team order |
+| Everything else | Same | Same |
+
+- Arena definitions list up to three spawn points per team, and a 2v2 uses the first two `[spec]`.
+- The round and ring timings, energy values, health values and status rules are the same in both modes.
+- The scoreboard and kill feed show more entries in 3v3. The HUD layout is the same.
+- The first playable is 2v2. 3v3 arrives in milestone 5 `[spec]`.
