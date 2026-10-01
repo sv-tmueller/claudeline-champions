@@ -49,7 +49,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
 | M2 | Ground Slam EX: radius 2.0 m becomes 2.75 m, damage 18 becomes 26, slow becomes 50 percent for 2.0 s. |
-| SPACE | Rush EX: dash distance 5 m becomes 7 m. At the dash end an extra `area` (circle, radius 1.5 m) deals 12 damage and applies stun 0.5 s. Haste on self becomes 30 percent for 2.0 s. |
+| SPACE | Rush EX: dash distance 5 m becomes 7 m. At the dash end an extra `area` (circle, radius 1.5 m) deals 12 damage, applies stun 0.5 s and grants `energyGain 10`. Haste on self becomes 30 percent for 2.0 s. |
 
 **Intended counters.**
 
@@ -194,7 +194,7 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
-| SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, 2.0 m) deals 14 damage. Haste on self becomes 30 percent for 2.0 s. |
+| SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, 2.0 m) deals 14 damage and grants `energyGain 10`. Haste on self becomes 30 percent for 2.0 s. |
 | E | Rend EX: direct damage 20 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
 
 **Intended counters.**
