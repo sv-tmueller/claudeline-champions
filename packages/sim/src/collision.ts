@@ -72,22 +72,27 @@ function clampToBoundary(p: Point, width: number, height: number, r: number): bo
   return moved;
 }
 
-function penetratesAnything(state: GameState, champion: ChampionState): boolean {
-  const probe = { x: champion.x, y: champion.y };
+/**
+ * One resolution pass for the circle at p: pushes it out of every other champion, every
+ * obstacle and finally the boundary. Returns whether anything moved it.
+ */
+function pushOutPass(state: GameState, p: Point, selfId: number): boolean {
+  let pushed = false;
   for (const other of state.champions) {
-    if (other.id !== champion.id && pushOutOfCircle(probe, other.x, other.y, 2 * CHAMPION_RADIUS)) {
-      return true;
-    }
+    if (other.id === selfId) continue;
+    if (pushOutOfCircle(p, other.x, other.y, 2 * CHAMPION_RADIUS)) pushed = true;
   }
   for (const o of state.arena.obstacles) {
     const hit =
       o.type === 'circle'
-        ? pushOutOfCircle(probe, o.x, o.y, o.r + CHAMPION_RADIUS)
-        : pushOutOfRect(probe, o, CHAMPION_RADIUS);
-    if (hit) return true;
+        ? pushOutOfCircle(p, o.x, o.y, o.r + CHAMPION_RADIUS)
+        : pushOutOfRect(p, o, CHAMPION_RADIUS);
+    if (hit) pushed = true;
   }
+  // The boundary goes last so the playable-rectangle rule always holds exactly.
   const { width, height } = state.arena.size;
-  return clampToBoundary(probe, width, height, CHAMPION_RADIUS);
+  if (clampToBoundary(p, width, height, CHAMPION_RADIUS)) pushed = true;
+  return pushed;
 }
 
 /**
@@ -102,25 +107,11 @@ export function resolveChampion(
   prevX: number,
   prevY: number,
 ): void {
-  const { width, height } = state.arena.size;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
-    let pushed = false;
-    for (const other of state.champions) {
-      if (other.id === champion.id) continue;
-      if (pushOutOfCircle(champion, other.x, other.y, 2 * CHAMPION_RADIUS)) pushed = true;
-    }
-    for (const o of state.arena.obstacles) {
-      const hit =
-        o.type === 'circle'
-          ? pushOutOfCircle(champion, o.x, o.y, o.r + CHAMPION_RADIUS)
-          : pushOutOfRect(champion, o, CHAMPION_RADIUS);
-      if (hit) pushed = true;
-    }
-    // The boundary goes last so the playable-rectangle rule always holds exactly.
-    if (clampToBoundary(champion, width, height, CHAMPION_RADIUS)) pushed = true;
-    if (!pushed) return;
+    if (!pushOutPass(state, champion, champion.id)) return;
   }
-  if (penetratesAnything(state, champion)) {
+  // One more pass on a probe tells whether the champion is still penetrating.
+  if (pushOutPass(state, { x: champion.x, y: champion.y }, champion.id)) {
     champion.x = prevX;
     champion.y = prevY;
   }
