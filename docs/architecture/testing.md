@@ -5,8 +5,15 @@ Source: spec section 9.
 ## Check suite
 
 `npm run check` runs lint, typecheck, unit tests and the Playwright smoke
-test. It is the check suite every package must pass. CI runs it on every pull
-request.
+test. It is the check suite every package must pass.
+
+CI is split by cost:
+
+- Typecheck, lint and unit tests run on pull requests that touch code, drafts
+  included.
+- Build and the Playwright smoke test run on pull requests that are ready for
+  review and on pushes to main. They skip draft pull requests.
+- Changes that touch only `docs/` or Markdown files do not trigger CI.
 
 ## Test types
 

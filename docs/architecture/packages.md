@@ -20,7 +20,7 @@ docs/architecture/          living reference for humans and agents
 docs/design/                game design documents (rules, roster, arenas)
 docs/roadmap.md             living roadmap
 docs/superpowers/specs/     approved designs (the design spec)
-.github/workflows/ci.yml    runs `npm run check` on every pull request
+.github/workflows/ci.yml    typecheck, lint and unit tests on code pull requests; build and e2e on ready pull requests and main
 ```
 
 ## Dependency rules
