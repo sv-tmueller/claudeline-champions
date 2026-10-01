@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   checks:
-    name: Typecheck, lint and unit tests
+    name: Typecheck, lint, unit tests and asset checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,6 +34,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
+      # ubuntu-latest ships python3. The Blender tests skip without Blender.
+      - run: npm run assets:validate
+      - run: npm run assets:test
 
   # Build and e2e skip draft pull requests. A draft shows green without them.
   build:
