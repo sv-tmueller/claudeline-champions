@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validate committed glb models and arena definitions. Standard library only.
 
 Usage: validate_glb.py <file-or-dir>...
@@ -83,6 +82,11 @@ def read_glb(data):
 
 def is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def is_finite_number(value):
+    # Only floats can be NaN or infinite. math.isfinite on a huge int raises.
+    return is_number(value) and (not isinstance(value, float) or math.isfinite(value))
 
 
 def check_keys(obj, expected, where):
@@ -248,7 +252,7 @@ def check_arena(path, doc):
 
     nodes = doc.get("nodes", [])
     names = [n.get("name") for n in nodes]
-    duplicates = sorted({str(n) for n in names if names.count(n) > 1})
+    duplicates = sorted(str(n) for n, c in Counter(names).items() if c > 1)
     if duplicates:
         return "duplicate node names: " + ", ".join(duplicates)
     expected = {"Floor", "Wall_N", "Wall_S", "Wall_E", "Wall_W"}
@@ -270,15 +274,35 @@ def check_arena(path, doc):
         if "matrix" in node:
             return "Obstacle_%d uses a matrix, expected a translation" % i
         translation = node.get("translation", [0, 0, 0])
-        want = [ob["x"], 0, -ob["y"]]
-        if len(translation) != 3 or any(
-            abs(a - b) > TRANSLATION_TOLERANCE for a, b in zip(translation, want)
+        if not (
+            isinstance(translation, list)
+            and len(translation) == 3
+            and all(is_finite_number(v) for v in translation)
         ):
+            return "Obstacle_%d translation must be three finite numbers, got %r" % (
+                i,
+                translation,
+            )
+        want = [ob["x"], 0, -ob["y"]]
+        if any(abs(a - b) > TRANSLATION_TOLERANCE for a, b in zip(translation, want)):
             return "Obstacle_%d translation %s does not match the JSON, expected %s" % (
                 i,
                 translation,
                 want,
             )
+    return None
+
+
+def check_nodes(doc):
+    """Return a reason if nodes is not a list of objects with string names."""
+    nodes = doc.get("nodes", [])
+    if not isinstance(nodes, list):
+        return "nodes must be a list"
+    for i, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            return "nodes[%d] must be an object" % i
+        if "name" in node and not isinstance(node["name"], str):
+            return "nodes[%d].name must be a string" % i
     return None
 
 
@@ -309,7 +333,7 @@ def validate_file(path):
         return "unknown category folder %r, expected arenas or champions" % (
             path.parent.name
         )
-    return rule(path, doc)
+    return check_nodes(doc) or rule(path, doc)
 
 
 def main(argv):
@@ -328,7 +352,10 @@ def main(argv):
         return 1
     failed = False
     for path in files:
-        error = validate_file(path)
+        try:
+            error = validate_file(path)
+        except Exception as exc:  # fail closed and keep checking the other files
+            error = "validator error: %s: %s" % (type(exc).__name__, exc)
         if error is None:
             print("OK %s" % path)
         else:
