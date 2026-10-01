@@ -24,3 +24,6 @@ export type {
   StatusInstance,
   TeamId,
 } from './state';
+export { createMatch } from './match';
+export { checksum } from './checksum';
+export { cloneState } from './state';
