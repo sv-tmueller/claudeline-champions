@@ -120,7 +120,7 @@ movement, no buttons, aim unchanged".
 `Map`, no `Set`, no closures. Entities live in arrays ordered by ascending id.
 Iteration order is always id order. This gives:
 
-- `createMatch(config: MatchConfig, seed: number): GameState`
+- `createMatch(config: MatchConfig, arena: ArenaDef, seed: number): GameState`
 - `step(state: GameState, inputs: PlayerInput[]): void` advances one tick in place
 - `cloneState(state): GameState`
 - `checksum(state): number` for replay and desync tests
@@ -189,8 +189,8 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
 - Round end: 3 seconds, then full heal, cooldown reset, energy to 0, respawn at
   the team's spawn points.
 - Match end: first team to `roundsToWin` (default 3) round wins.
-- `MatchConfig`: arena id, team size (2 or 3), per-player champion id and team,
-  rounds to win, seed.
+- `MatchConfig`: team size (2 or 3), per-player champion id and team, rounds to
+  win. The parsed arena and the seed are `createMatch` parameters.
 
 ### 4.8 Determinism rules (enforced by review and tests)
 

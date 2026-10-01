@@ -11,6 +11,10 @@
   The client maps sim `(x, y)` to Three.js `(x, 0, -y)` so screen-up is `+y`.
 - Champions are circles of radius 0.5 m. Obstacles are circles or axis-aligned
   rectangles. The arena boundary rectangle is a wall.
+- Collision: after each champion moves, in id order, it is pushed out of the
+  other champions, the obstacles and the boundary, and slides along them.
+  Champions block each other's bodies and cannot shove each other: the moving
+  champion is pushed out and every other champion counts as static.
 - Line of sight is a segment-versus-obstacle test against obstacles flagged
   `blocksProjectiles`.
 
@@ -32,14 +36,27 @@ Aim is quantized to integer centimeters so the record is small and stable on
 the wire later. A missing input for a player on a tick is treated as "no
 movement, no buttons, aim unchanged".
 
+The sim sanitizes every input at runtime because inputs will later arrive over
+the network. `step` never throws on an input value and never leaves the state
+partly stepped. An entry that is not an object (`null`, a number, a string)
+counts as missing. A move axis that is not exactly -1, 0 or 1 becomes 0. A
+non-finite aim coordinate keeps the stored aim, and `-0` is stored as `+0` so
+every stored number survives a JSON round trip. Buttons that are not a
+non-negative integer become 0, with valid buttons masked to the eight defined
+bits.
+
 ## State and API surface
 
 `GameState` is plain, JSON-serializable data: no classes with methods, no
 `Map`, no `Set`, no closures. Entities live in arrays ordered by ascending id.
 Iteration order is always id order. This gives:
 
-- `createMatch(config: MatchConfig, seed: number): GameState`
-- `step(state: GameState, inputs: PlayerInput[]): void` advances one tick in place
+- `createMatch(config: MatchConfig, arena: ArenaDef, seed: number): GameState`
+  takes the parsed arena, because the sim does no I/O. `parseArenaDef` turns
+  arena JSON into an `ArenaDef`.
+- `step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void`
+  advances one tick in place. `inputs[i]` belongs to champion id `i`; an
+  `undefined` or absent entry is a missing input.
 - `cloneState(state): GameState`
 - `checksum(state): number` for replay and desync tests
 - `state.events: SimEvent[]` cleared at the start of each tick, appended during
@@ -107,8 +124,9 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
 - Round end: 3 seconds, then full heal, cooldown reset, energy to 0, respawn at
   the team's spawn points.
 - Match end: first team to `roundsToWin` (default 3) round wins.
-- `MatchConfig`: arena id, team size (2 or 3), per-player champion id and team,
-  rounds to win, seed.
+- `MatchConfig`: team size (2 or 3) and per-player champion id and team
+  (`players[i]` becomes champion id `i`). Rounds to win joins it with match
+  flow. The arena and the seed are `createMatch` parameters, not config fields.
 
 The ring values come from the arena definition. See [assets](assets.md).
 
