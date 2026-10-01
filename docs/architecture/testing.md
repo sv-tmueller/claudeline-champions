@@ -10,9 +10,10 @@ test. It is the check suite every package must pass.
 CI is split by cost:
 
 - Typecheck, lint and unit tests run on pull requests that touch code, drafts
-  included.
+  included, and on pushes to main.
 - Build and the Playwright smoke test run on pull requests that are ready for
-  review and on pushes to main. They skip draft pull requests.
+  review and on pushes to main. They skip draft pull requests. They start only
+  after the typecheck, lint and unit test job passes.
 - Changes that touch only `docs/` or Markdown files do not trigger CI.
 
 ## Test types

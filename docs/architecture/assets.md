@@ -23,8 +23,6 @@
 Arena nodes: `Floor`, `Wall_N`, `Wall_S`, `Wall_E`, `Wall_W`,
 `Obstacle_<index>` matching the obstacle's index in the JSON.
 
-Champion node: one mesh node named `Champion`.
-
 ## Asset contracts
 
 These go beyond the spec. They are what the client and the sim can rely on.

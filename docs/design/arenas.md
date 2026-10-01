@@ -8,7 +8,7 @@ This document sets the rules every arena must follow. It contains no specific ar
 
 `[spec]` marks a value copied from the design spec. `[tuned]` marks a value chosen here, which a balance pass may move.
 
-The sample arena JSON in spec section 8.1 is a schema illustration, not a compliant layout. Its obstacles have no mirrored twins, for example.
+The sample arena JSON in spec section 8.1 is a schema illustration, not a compliant layout. Its rect obstacle at (-6, 5) has no mirrored twin at (6, 5), for example.
 
 ## 1. Playable area
 

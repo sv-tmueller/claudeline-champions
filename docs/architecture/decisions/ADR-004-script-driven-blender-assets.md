@@ -6,8 +6,8 @@ Accepted.
 
 ## Context
 
-Hand modelling in the Blender UI is not reproducible by agents. Assets must be reproducible from the
-repository, and arena visuals must match arena collision.
+Hand modelling in the Blender UI is not reproducible by agents. Assets must be
+reproducible from the repository, and arena visuals must match arena collision.
 
 ## Decision
 
