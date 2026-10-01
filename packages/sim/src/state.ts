@@ -48,7 +48,7 @@ export interface MatchConfig {
   players: PlayerConfig[];
 }
 
-// structuredClone is not in the sim's lib, and state is plain JSON by contract.
+// The sim's lib has no built-in deep clone, and state is plain JSON by contract.
 export function cloneState(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;
 }
