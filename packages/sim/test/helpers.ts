@@ -95,3 +95,81 @@ export function checkInvariants(state: GameState): string[] {
   }
   return problems;
 }
+
+export type ContactKind =
+  | 'boundary'
+  | 'boundarySlide'
+  | 'circle'
+  | 'circleSlide'
+  | 'rect'
+  | 'rectSlide'
+  | 'rectCorner'
+  | 'pair'
+  | 'pairPinned';
+
+export const ALL_CONTACT_KINDS: ContactKind[] = [
+  'boundary',
+  'boundarySlide',
+  'circle',
+  'circleSlide',
+  'rect',
+  'rectSlide',
+  'rectCorner',
+  'pair',
+  'pairPinned',
+];
+
+const CONTACT_TOLERANCE = 1e-6;
+
+/**
+ * Which contacts the champions are in right now. A contact counts only at
+ * contact distance (within 1e-6) with the walk velocity pointing into the
+ * surface, so a champion that merely runs tangent to a wall does not count.
+ */
+export function contactKinds(state: GameState): Set<ContactKind> {
+  const found = new Set<ContactKind>();
+  const r = CHAMPION_RADIUS;
+  const limitX = state.arena.size.width / 2 - r;
+  const limitY = state.arena.size.height / 2 - r;
+  const pointsInto = (c: ChampionState, tx: number, ty: number) =>
+    c.vx * (tx - c.x) + c.vy * (ty - c.y) > 0;
+  const atBoundary = (c: ChampionState) =>
+    Math.abs(c.x) >= limitX - CONTACT_TOLERANCE || Math.abs(c.y) >= limitY - CONTACT_TOLERANCE;
+
+  for (const c of state.champions) {
+    const intoX = (c.x >= limitX - CONTACT_TOLERANCE && c.vx > 0) || (c.x <= -limitX + CONTACT_TOLERANCE && c.vx < 0);
+    const intoY = (c.y >= limitY - CONTACT_TOLERANCE && c.vy > 0) || (c.y <= -limitY + CONTACT_TOLERANCE && c.vy < 0);
+    if (intoX || intoY) found.add('boundary');
+    if ((intoX && c.vy !== 0) || (intoY && c.vx !== 0)) found.add('boundarySlide');
+    for (const o of state.arena.obstacles) {
+      if (o.type === 'circle') {
+        const dist = Math.hypot(c.x - o.x, c.y - o.y);
+        if (Math.abs(dist - (o.r + r)) <= CONTACT_TOLERANCE && pointsInto(c, o.x, o.y)) {
+          found.add('circle');
+          const cross = c.vx * (o.y - c.y) - c.vy * (o.x - c.x);
+          if (Math.abs(cross) > 1e-3) found.add('circleSlide');
+        }
+      } else {
+        const qx = Math.min(Math.max(c.x, o.x - o.w / 2), o.x + o.w / 2);
+        const qy = Math.min(Math.max(c.y, o.y - o.h / 2), o.y + o.h / 2);
+        const dx = c.x - qx;
+        const dy = c.y - qy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0 && Math.abs(dist - r) <= CONTACT_TOLERANCE && pointsInto(c, qx, qy)) {
+          found.add('rect');
+          if (dx !== 0 && dy !== 0) found.add('rectCorner');
+          if ((dx === 0 && c.vx !== 0) || (dy === 0 && c.vy !== 0)) found.add('rectSlide');
+        }
+      }
+    }
+    for (const other of state.champions) {
+      if (other.id === c.id) continue;
+      const dist = Math.hypot(c.x - other.x, c.y - other.y);
+      if (Math.abs(dist - 2 * r) <= CONTACT_TOLERANCE && pointsInto(c, other.x, other.y)) {
+        found.add('pair');
+        if (atBoundary(other)) found.add('pairPinned');
+      }
+    }
+  }
+  return found;
+}
