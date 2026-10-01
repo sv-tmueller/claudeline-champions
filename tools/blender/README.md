@@ -3,7 +3,9 @@
 Scripts that build the arena and champion models and check them. The committed
 `.glb` files in `assets/models` were generated with Blender 5.2.1 LTS. Exports
 are byte-identical across runs on that version, so regenerating must leave
-`git status` clean.
+`git status` clean. `test_export_determinism.py` checks this by building each
+model four times in Blender and comparing the bytes to the committed file. It
+skips when Blender is missing.
 
 ## Commands
 
@@ -27,6 +29,7 @@ packages, so they can run in CI.
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json` |
 | `gen_champion.py` | Builds a placeholder champion glb |
 | `blender_common.py` | Scene clearing, materials and export, shared by the generators |
+| `test_export_determinism.py` | Regenerates each model four times and compares it to the committed glb. Needs Blender, skips without it |
 | `validate_glb.py` | Checks glb structure, node names and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator. The tests that read the committed models need `assets/models` to exist |
 
@@ -82,6 +85,9 @@ not vertical.
 - `--champion placeholder` writes `assets/models/champions/placeholder.glb`.
   Roster ids come later with the roster document.
 - One mesh node named `Champion`, built in one bmesh with a material per part.
+  The head sphere is built from explicit vertices and faces, because
+  `bmesh.ops.create_uvsphere` changes its face vertex order between runs and
+  would make the export differ each time.
 - Origin at the feet, footprint inside a 0.5 m radius, about 1.7 m tall.
 - It faces +X in both Blender and glTF, so the client can set
   `rotation.y = aimAngle` directly. An accent-coloured visor and chest plate
