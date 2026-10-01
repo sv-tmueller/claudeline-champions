@@ -13,6 +13,13 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'bots',
+          environment: 'node',
+          include: ['packages/bots/test/**/*.test.ts'],
+        },
+      },
+      {
+        test: {
           name: 'client',
           environment: 'node',
           include: ['packages/client/src/**/*.test.ts'],
