@@ -37,7 +37,7 @@ collision circles, obstacles, projectiles and line of sight.
 
 Steam readiness: `Platform { identity(), loadSettings(), saveSettings(),
 unlockAchievement(id), openUrl(url) }`. `BrowserPlatform` is the only
-implementation until milestone 8. Game code only talks to the interface.
+implementation until milestone 8.
 
 ## Steam readiness rules
 
