@@ -21,3 +21,12 @@ export const Button = {
   F: 64,
   SHIFT: 128,
 } as const;
+
+/** The missing-input rule: no movement, no buttons, aim unchanged. */
+export function resolveInput(
+  input: PlayerInput | undefined,
+  aimX: number,
+  aimY: number,
+): PlayerInput {
+  return input ?? { moveX: 0, moveY: 0, aimX, aimY, buttons: 0 };
+}
