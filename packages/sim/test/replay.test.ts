@@ -116,7 +116,12 @@ describe('replay fixture', () => {
   });
 
   it('reproduces the committed checksum', () => {
-    expect(checksum(replay())).toBe(fixture.checksum);
+    const { projectiles, areas, nextEntityId, ...movement } = replay();
+    // The fixture predates these fields, so its checksum covers the state without them.
+    expect(projectiles).toEqual([]);
+    expect(areas).toEqual([]);
+    expect(nextEntityId).toBe(4);
+    expect(checksum(movement as GameState)).toBe(fixture.checksum);
   });
 
   it('gives the same checksum when replayed twice in one process', () => {

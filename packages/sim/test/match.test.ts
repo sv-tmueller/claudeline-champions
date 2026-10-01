@@ -116,4 +116,18 @@ describe('createMatch', () => {
     expect(() => createMatch(config2v2(), arena01, 1.5)).toThrow('seed must be an integer');
     expect(() => createMatch(config2v2(), arena01, NaN)).toThrow('seed must be an integer');
   });
+
+  it('stores a +0 aim for a spawn y of -0.003', () => {
+    const arena = { ...arena01, spawns: { ...arena01.spawns, teamA: [[-12, -0.003], [-12, -2]] as [number, number][] } };
+    const state = createMatch(config2v2(), arena, 1);
+    expect(Object.is(state.champions[0]?.aimY, 0)).toBe(true);
+  });
+
+  it('starts with no projectiles or areas and the entity ids after the champions', () => {
+    const state = createMatch(config2v2(), arena01, 1);
+    expect(state.projectiles).toEqual([]);
+    expect(state.areas).toEqual([]);
+    expect(state.nextEntityId).toBe(4);
+    expect(createMatch(config3v3(), arena01, 1).nextEntityId).toBe(6);
+  });
 });

@@ -5,10 +5,15 @@ import type { PlayerInput } from './input';
 import type { GameState } from './state';
 
 export function step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void {
+  // Read every input before anything changes, so an entry whose property read throws
+  // leaves the state exactly as it was.
+  const resolved = state.champions.map((c) => resolveInput(inputs[c.id], c.aimX, c.aimY));
+
   state.events.length = 0;
 
   for (const champion of state.champions) {
-    const input = resolveInput(inputs[champion.id], champion.aimX, champion.aimY);
+    const input = resolved[champion.id];
+    if (!input) continue;
     champion.aimX = input.aimX;
     champion.aimY = input.aimY;
 
