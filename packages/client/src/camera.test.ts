@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Vector3 } from 'three';
+import { Euler, PerspectiveCamera, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   CAMERA_TILT_DEG,
@@ -69,5 +69,20 @@ describe('camera framing', () => {
     expect(southEast?.y).toBeLessThan(0);
     expect(northWest?.y).toBeGreaterThan(0);
     expect(northEast?.y).toBeGreaterThan(0);
+  });
+});
+
+describe('champion facing convention', () => {
+  // The champion glb faces +X. rotation.y = theta must turn it toward sim
+  // direction (cos theta, sin theta), so team A (0) looks along +x and team B
+  // (pi) along -x.
+  const thetas = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+
+  it.each(thetas)('rotation.y = %f turns +X toward sim (cos, sin)', (theta) => {
+    const facing = new Vector3(1, 0, 0).applyEuler(new Euler(0, theta, 0));
+    const expected = simToThree(Math.cos(theta), Math.sin(theta));
+    expect(facing.x).toBeCloseTo(expected.x, 12);
+    expect(facing.y).toBeCloseTo(expected.y, 12);
+    expect(facing.z).toBeCloseTo(expected.z, 12);
   });
 });
