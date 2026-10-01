@@ -5,3 +5,11 @@ export {
   DT,
   TICK_RATE,
 } from './constants';
+export { parseArenaDef } from './arena';
+export type {
+  ArenaDef,
+  CircleObstacle,
+  Obstacle,
+  RectObstacle,
+  SpawnPoint,
+} from './arena';
