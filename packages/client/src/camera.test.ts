@@ -1,11 +1,16 @@
 import { Euler, PerspectiveCamera, Vector3 } from 'three';
+import { parseArenaDef } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
+import arena01Json from '../../../data/arenas/arena01.json';
 import {
   CAMERA_TILT_DEG,
   CAMERA_VERTICAL_FOV_DEG,
   FIT_MARGIN,
   cameraPosition,
+  fitCamera,
   fitCameraDistance,
+  groundAimCm,
+  pointerToNdc,
   simToThree,
 } from './camera';
 
@@ -84,5 +89,72 @@ describe('champion facing convention', () => {
     expect(facing.x).toBeCloseTo(expected.x, 12);
     expect(facing.y).toBeCloseTo(expected.y, 12);
     expect(facing.z).toBeCloseTo(expected.z, 12);
+  });
+});
+
+describe('mouse aim', () => {
+  const arena = parseArenaDef(arena01Json);
+  const WIDTH = 1280;
+  const HEIGHT = 720;
+
+  function fittedCamera(): PerspectiveCamera {
+    const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
+    fitCamera(camera, WIDTH, HEIGHT, arena);
+    return camera;
+  }
+
+  // Sim points to ground, given in meters. Includes the arena corners, the
+  // champion 0 spawn, the origin and one point outside the arena.
+  const points: [string, number, number][] = [
+    ['south-west corner', -15, -10],
+    ['south-east corner', 15, -10],
+    ['north-west corner', -15, 10],
+    ['north-east corner', 15, 10],
+    ['champion 0 spawn', -12, 2],
+    ['origin', 0, 0],
+    ['outside the arena', 17.25, -6.5],
+  ];
+
+  it.each(points)('groundAimCm returns the sim point for %s within 1 cm', (_name, x, y) => {
+    const camera = fittedCamera();
+    // Projects with three's own camera, so the test does not share the raycast.
+    const ndc = simToThree(x, y).project(camera);
+    const aim = groundAimCm(camera, ndc.x, ndc.y);
+    if (!aim) throw new Error('no ground hit');
+    expect(Number.isInteger(aim.x)).toBe(true);
+    expect(Number.isInteger(aim.y)).toBe(true);
+    expect(Math.abs(aim.x - x * 100)).toBeLessThanOrEqual(1);
+    expect(Math.abs(aim.y - y * 100)).toBeLessThanOrEqual(1);
+  });
+
+  it('never returns -0', () => {
+    const camera = fittedCamera();
+    const aim = groundAimCm(camera, 0, 0);
+    expect(Object.is(aim?.x, -0)).toBe(false);
+    expect(Object.is(aim?.y, -0)).toBe(false);
+  });
+
+  it('returns null when the ray misses the ground plane', () => {
+    // The fitted camera looks down steeply enough that every pixel hits the
+    // ground, so this one looks up: the ray points away from y = 0.
+    const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 16 / 9, 0.1, 500);
+    camera.position.set(0, 5, 10);
+    camera.lookAt(0, 10, 0);
+    camera.updateMatrixWorld();
+    expect(groundAimCm(camera, 0, 0)).toBeNull();
+  });
+
+  it('fitCamera sets the aspect and the world matrix', () => {
+    const camera = fittedCamera();
+    expect(camera.aspect).toBeCloseTo(16 / 9, 12);
+    const centre = simToThree(0, 0).project(camera);
+    expect(Math.hypot(centre.x, centre.y)).toBeCloseTo(0, 6);
+  });
+
+  it('pointerToNdc maps the rect corners to +-1 with y flipped', () => {
+    const rect = { left: 10, top: 20, width: 200, height: 100 };
+    expect(pointerToNdc(10, 20, rect)).toEqual({ x: -1, y: 1 });
+    expect(pointerToNdc(210, 120, rect)).toEqual({ x: 1, y: -1 });
+    expect(pointerToNdc(110, 70, rect)).toEqual({ x: 0, y: 0 });
   });
 });
