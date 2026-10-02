@@ -1,6 +1,7 @@
 import { CHAMPION_RADIUS } from './constants';
 import { length } from './geometry';
-import { applyEffects, copyEffects } from './health';
+import { landHit } from './energy';
+import { copyEffects } from './health';
 import { nextId } from './state';
 import type { AreaState, AreaTargets, Effect, GameState, TeamId } from './state';
 
@@ -24,8 +25,12 @@ export function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
-/** Spawns a circular area and returns its id. It acts from the next `step` on. */
-export function spawnArea(state: GameState, spec: AreaSpec): number {
+/**
+ * Spawns a circular area and returns its id. It acts from the next `step` on. `castId` is the cast
+ * that placed it, whose hits earn energy; it must be in `state.casts`. Dev tools spawn with null
+ * through `debug`.
+ */
+export function spawnArea(state: GameState, spec: AreaSpec, castId: number | null = null): number {
   const owner = state.champions[spec.ownerId];
   if (!owner) return fail(`unknown owner ${spec.ownerId}`);
   for (const key of ['x', 'y', 'radius'] as const) {
@@ -42,6 +47,9 @@ export function spawnArea(state: GameState, spec: AreaSpec): number {
     return fail(`unknown targets ${String(spec.targets)}`);
   }
   const effects = copyEffects(spec.effects, fail);
+  if (castId !== null && !state.casts.some((c) => c.id === castId)) {
+    return fail(`unknown cast ${castId}`);
+  }
 
   const area: AreaState = {
     id: nextId(state),
@@ -56,6 +64,7 @@ export function spawnArea(state: GameState, spec: AreaSpec): number {
     intervalTicks: spec.intervalTicks,
     ticksToNextApply: 0,
     effects,
+    castId,
   };
   state.areas.push(area);
   state.events.push({
@@ -88,7 +97,7 @@ export function stepAreas(state: GameState): void {
         .map((c) => c.id);
       state.events.push({ type: 'areaTick', areaId: area.id, targetIds });
       for (const targetId of targetIds) {
-        applyEffects(state, area.ownerId, targetId, area.effects, area);
+        landHit(state, area, targetId, area.effects, area);
       }
       area.ticksToNextApply = area.intervalTicks;
     }

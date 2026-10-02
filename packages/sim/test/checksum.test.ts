@@ -7,6 +7,7 @@ import { startDash } from '../src/motion';
 import { spawnProjectile } from '../src/projectile';
 import { applyKnockback, applyShield, applyStatus } from '../src/status';
 import { arena01, config2v2 } from './helpers';
+import { MENDER_ID, STRIKER_ID, testMender, testStriker } from './kits';
 
 function fresh(): GameState {
   return createMatch(config2v2(), arena01, 1337);
@@ -214,5 +215,82 @@ describe('checksum of status and dash state', () => {
     const state = loaded();
     expect(checksum(cloneState(state))).toBe(checksum(state));
     expect(cloneState(state)).toEqual(state);
+  });
+});
+
+describe('checksum of ability state', () => {
+  function loaded(): GameState {
+    const config = {
+      teamSize: 2 as const,
+      players: [
+        { championId: STRIKER_ID, team: 'A' as const },
+        { championId: MENDER_ID, team: 'A' as const },
+        { championId: STRIKER_ID, team: 'B' as const },
+        { championId: MENDER_ID, team: 'B' as const },
+      ],
+    };
+    const state = createMatch(config, arena01, 1337, [testStriker(), testMender()]);
+    state.champions[0]!.cooldowns[3] = 17;
+    state.champions[0]!.cast = { castId: 4, slot: 'Q', ex: false, windupTicks: 18, windupLeft: 7 };
+    state.casts.push({ id: 4, casterId: 0, slot: 'Q', ex: false, credited: [2] });
+    state.casts.push({ id: 5, casterId: 2, slot: 'M2', ex: true, credited: [] });
+    state.champions[1]!.dash = {
+      dirX: 1, dirY: 0, stepLength: 0.5, ticksLeft: 4, castId: 4,
+      then: [{ type: 'heal', amount: 3 }],
+    };
+    spawnProjectile(state, {
+      ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2,
+      lifetimeTicks: 60, pierce: true, effects: [{ type: 'damage', amount: 10 }],
+    });
+    spawnArea(state, {
+      ownerId: 2, x: 3, y: 4, radius: 2, durationTicks: 60, intervalTicks: 30,
+      targets: 'all', effects: [{ type: 'heal', amount: 5 }],
+    });
+    state.projectiles[0]!.castId = 4;
+    state.areas[0]!.castId = 5;
+    return state;
+  }
+
+  it('is stable for equal states and changes with each new field', () => {
+    const base = checksum(loaded());
+    expect(checksum(loaded())).toBe(base);
+    const mutations: [string, (s: GameState) => void][] = [
+      ['cooldowns entry', (s) => void (s.champions[0]!.cooldowns[3] = 16)],
+      ['cooldowns other entry', (s) => void (s.champions[3]!.cooldowns[0] = 1)],
+      ['cast windupLeft', (s) => void (s.champions[0]!.cast!.windupLeft = 6)],
+      ['cast windupTicks', (s) => void (s.champions[0]!.cast!.windupTicks = 19)],
+      ['cast slot', (s) => void (s.champions[0]!.cast!.slot = 'E')],
+      ['cast ex', (s) => void (s.champions[0]!.cast!.ex = true)],
+      ['cast castId', (s) => void (s.champions[0]!.cast!.castId = 5)],
+      ['no cast', (s) => void (s.champions[0]!.cast = null)],
+      ['cast record credited entry', (s) => void (s.casts[0]!.credited[0] = 3)],
+      ['cast record credited length', (s) => void s.casts[0]!.credited.push(3)],
+      ['cast record slot', (s) => void (s.casts[0]!.slot = 'E')],
+      ['cast record ex', (s) => void (s.casts[1]!.ex = false)],
+      ['cast record caster', (s) => void (s.casts[1]!.casterId = 3)],
+      ['cast record removed', (s) => void s.casts.pop()],
+      ['kit maxHealth', (s) => void (s.kits[0]!.maxHealth += 10)],
+      ['kit cooldown', (s) => void (s.kits[1]!.slots.F.cooldownTicks += 1)],
+      ['kit support', (s) => void (s.kits[1]!.support = false)],
+      ['kit ex slots', (s) => void (s.kits[0]!.ex = ['M2', 'Q'])],
+      ['kit nested effect', (s) => void ((s.kits[0]!.slots.M1.effects[0] as { cosHalfAngle: number }).cosHalfAngle += 0.001)],
+      ['kit order', (s) => void s.kits.reverse()],
+      ['projectile castId', (s) => void (s.projectiles[0]!.castId = null)],
+      ['area castId', (s) => void (s.areas[0]!.castId = 4)],
+      ['dash castId', (s) => void (s.champions[1]!.dash!.castId = null)],
+      ['dash then amount', (s) => void ((s.champions[1]!.dash!.then[0] as { amount: number }).amount += 1)],
+      ['dash then removed', (s) => void (s.champions[1]!.dash!.then = [])],
+    ];
+    for (const [name, mutate] of mutations) {
+      const state = loaded();
+      mutate(state);
+      expect(checksum(state), name).not.toBe(base);
+    }
+  });
+
+  it('survives a clone with kits, casts and a dash with a then list', () => {
+    const state = loaded();
+    expect(cloneState(state)).toEqual(state);
+    expect(checksum(cloneState(state))).toBe(checksum(state));
   });
 });

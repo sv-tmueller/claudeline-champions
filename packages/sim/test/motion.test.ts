@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, step } from '../src/index';
 import type { GameState, Obstacle, SimEvent } from '../src/index';
-import { startDash, teleport } from '../src/motion';
+import { startDash, stepForcedMotion, teleport } from '../src/motion';
 import { applyKnockback, applyStatus } from '../src/status';
 import { checkInvariants, champion, config2v2, input, openArena, place } from './helpers';
 
@@ -38,7 +38,9 @@ describe('startDash', () => {
     const state = open();
     place(state, 0, 1, 2);
     expect(startDash(state, 0, dashOf(3, 6, 0, 2))).toBe(true);
-    expect(champion(state, 0).dash).toEqual({ dirX: 0, dirY: 1, stepLength: 0.5, ticksLeft: 6 });
+    expect(champion(state, 0).dash).toEqual({
+      dirX: 0, dirY: 1, stepLength: 0.5, ticksLeft: 6, castId: null, then: [],
+    });
     expect(state.events).toEqual([
       { type: 'dashStarted', championId: 0, x: 1, y: 2, dirX: 0, dirY: 1, distance: 3, ticks: 6 },
     ]);
@@ -524,5 +526,81 @@ describe('teleport', () => {
     expect(Object.is(champion(state, 0).x, 0)).toBe(true);
     expect(Object.is(champion(state, 0).y, 0)).toBe(true);
     expect(champion(state, 0).dash).not.toBeNull();
+  });
+});
+
+describe('dash cast fields and the finished dash', () => {
+  const then = [{ type: 'heal' as const, amount: 3 }];
+
+  it('stores the cast id and the then list it is given, and a direct dash stores null and none', () => {
+    const state = open();
+    startDash(state, 0, dashOf(3, 6), { castId: 9, then });
+    expect(champion(state, 0).dash).toEqual({
+      dirX: 1, dirY: 0, stepLength: 0.5, ticksLeft: 6, castId: 9, then,
+    });
+    startDash(state, 1, dashOf(3, 6));
+    expect(champion(state, 1).dash).toMatchObject({ castId: null, then: [] });
+  });
+
+  it('copies the then list', () => {
+    const state = open();
+    const list = [...then];
+    startDash(state, 0, dashOf(3, 6), { castId: 9, then: list });
+    list.length = 0;
+    expect(champion(state, 0).dash?.then).toEqual(then);
+  });
+
+  it('replaces a running dash with its cast fields', () => {
+    const state = open();
+    startDash(state, 0, dashOf(3, 6), { castId: 9, then });
+    startDash(state, 0, dashOf(2, 4));
+    expect(champion(state, 0).dash).toMatchObject({ castId: null, then: [] });
+  });
+
+  it('returns the dash that completed this tick, and nothing while it runs', () => {
+    const state = open();
+    startDash(state, 0, dashOf(3, 3), { castId: 9, then });
+    const c = champion(state, 0);
+    const record = c.dash;
+    expect(stepForcedMotion(state, c)).toBeNull();
+    expect(stepForcedMotion(state, c)).toBeNull();
+    expect(c.dash).toBe(record);
+    expect(stepForcedMotion(state, c)).toBe(record);
+    expect(c.dash).toBeNull();
+    expect(stepForcedMotion(state, c)).toBeNull();
+  });
+
+  it('returns the dash that a push ended as blocked', () => {
+    const state = open([wall(3, 0, 1, 4)]);
+    startDash(state, 0, dashOf(6, 6), { castId: 9, then });
+    const c = champion(state, 0);
+    const record = c.dash;
+    let ended: unknown = null;
+    for (let i = 0; i < 6 && !ended; i++) ended = stepForcedMotion(state, c);
+    expect(ended).toBe(record);
+    expect(state.events.at(-1)).toMatchObject({ type: 'dashEnded', reason: 'blocked' });
+  });
+
+  it('returns the dash that root ended, with or without a knockback running', () => {
+    for (const push of [false, true]) {
+      const state = open();
+      startDash(state, 0, dashOf(3, 6), { castId: 9, then });
+      applyStatus(state, 0, { type: 'root', ticks: 30 }, NONE);
+      if (push) applyKnockback(state, 0, { dirX: 0, dirY: 1, distance: 1, ticks: 6 }, NONE);
+      const c = champion(state, 0);
+      const record = c.dash;
+      expect(stepForcedMotion(state, c), `push ${push}`).toBe(record);
+      expect(c.dash).toBeNull();
+      expect(state.events.some((e) => e.type === 'dashEnded' && e.reason === 'rooted')).toBe(true);
+    }
+  });
+
+  it('returns nothing for a knockback alone, and for a dash that a stun ended before', () => {
+    const state = open();
+    applyKnockback(state, 0, { dirX: 0, dirY: 1, distance: 1, ticks: 6 }, NONE);
+    expect(stepForcedMotion(state, champion(state, 0))).toBeNull();
+    startDash(state, 1, dashOf(3, 6), { castId: 9, then });
+    applyStatus(state, 1, { type: 'stun', ticks: 30 }, NONE);
+    expect(stepForcedMotion(state, champion(state, 1))).toBeNull();
   });
 });

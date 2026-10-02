@@ -1,18 +1,40 @@
 import type { ArenaDef } from './arena';
 import { DEFAULT_MAX_HEALTH } from './constants';
+import { SLOTS } from './input';
+import { validateKit } from './kit';
+import type { KitDef } from './kit';
 import type { ChampionState, GameState, MatchConfig, TeamId } from './state';
 
 function fail(problem: string): never {
   throw new Error(`Invalid match: ${problem}`);
 }
 
-export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number): GameState {
+/**
+ * Starts a match. `kits` are the ability kits, plain data: a player whose `championId` equals a
+ * kit's id gets that kit's health, speed and abilities, and any other player gets none and the
+ * default health and base speed. Every kit given is validated and an id may appear once; the state
+ * keeps a copy of the kits the players use, in the order they were given.
+ */
+export function createMatch(
+  config: MatchConfig,
+  arena: ArenaDef,
+  seed: number,
+  kits: readonly KitDef[] = [],
+): GameState {
   const { teamSize, players } = config;
   if (teamSize !== 2 && teamSize !== 3) fail('teamSize must be 2 or 3');
   if (players.length !== 2 * teamSize) {
     fail(`expected ${2 * teamSize} players, got ${players.length}`);
   }
   if (!Number.isInteger(seed)) fail('seed must be an integer');
+
+  const checked = kits.map((kit) => validateKit(kit));
+  const ids = new Set<string>();
+  for (const kit of checked) {
+    if (ids.has(kit.id)) fail(`duplicate kit id "${kit.id}"`);
+    ids.add(kit.id);
+  }
+  const used = checked.filter((kit) => players.some((p) => p.championId === kit.id));
 
   const teams: TeamId[] = ['A', 'B'];
   for (const team of teams) {
@@ -30,6 +52,8 @@ export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number):
     const spawns = player.team === 'A' ? arena.spawns.teamA : arena.spawns.teamB;
     const [x, y] = spawns[slot] as [number, number];
     const ahead = player.team === 'A' ? 100 : -100;
+    const kit = used.find((k) => k.id === player.championId);
+    const maxHealth = kit ? kit.maxHealth : DEFAULT_MAX_HEALTH;
     return {
       id,
       team: player.team,
@@ -41,12 +65,14 @@ export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number):
       facing: player.team === 'A' ? 0 : Math.PI,
       aimX: Math.round(x * 100) + ahead,
       aimY: Math.round(y * 100) + 0,
-      health: DEFAULT_MAX_HEALTH,
-      maxHealth: DEFAULT_MAX_HEALTH,
+      health: maxHealth,
+      maxHealth,
       energy: 0,
       alive: true,
       statuses: [],
       dash: null,
+      cooldowns: SLOTS.map(() => 0),
+      cast: null,
     };
   });
 
@@ -58,6 +84,8 @@ export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number):
     nextEntityId: champions.length,
     projectiles: [],
     areas: [],
+    kits: used,
+    casts: [],
     events: [],
   };
 }

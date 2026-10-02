@@ -305,7 +305,9 @@ describe('death', () => {
     applyStatus(state, 2, { type: 'slow', percent: 30, ticks: 60 }, SRC(0));
     applyShield(state, 2, { absorb: 5, ticks: 200 }, SRC(1));
     applyStatus(state, 2, { type: 'stun', ticks: 60 }, SRC(0));
-    champion(state, 2).dash = { dirX: 1, dirY: 0, stepLength: 0.1, ticksLeft: 4 };
+    champion(state, 2).dash = {
+      dirX: 1, dirY: 0, stepLength: 0.1, ticksLeft: 4, castId: null, then: [],
+    };
     champion(state, 2).health = 10;
     state.events.length = 0;
     applyDamage(state, 2, 100, 0);
@@ -435,5 +437,100 @@ describe('copyEffects', () => {
       'Rejected: effect amount 0 is not a number above 0',
     );
     expect(() => copyEffects('x' as never, reject)).toThrow('Rejected: effects must be an array');
+  });
+});
+
+describe('death with a windup', () => {
+  it('interrupts the windup last, after the statuses and the dash end', () => {
+    const state = open();
+    applyStatus(state, 2, { type: 'slow', percent: 30, ticks: 60 }, SRC(0));
+    champion(state, 2).dash = {
+      dirX: 1, dirY: 0, stepLength: 0.1, ticksLeft: 4, castId: 7, then: [],
+    };
+    champion(state, 2).cast = { castId: 7, slot: 'E', ex: true, windupTicks: 20, windupLeft: 9 };
+    champion(state, 2).health = 10;
+    state.events.length = 0;
+    applyDamage(state, 2, 100, 0);
+    expect(state.events.map((e) => e.type)).toEqual([
+      'damage', 'death', 'statusExpired', 'dashEnded', 'castInterrupted',
+    ]);
+    expect(state.events[4]).toEqual({
+      type: 'castInterrupted', championId: 2, castId: 7, slot: 'E', ex: true, reason: 'death',
+    });
+    expect(champion(state, 2).cast).toBeNull();
+  });
+
+  it('leaves a champion that survives with its windup', () => {
+    const state = open();
+    champion(state, 2).cast = { castId: 7, slot: 'E', ex: false, windupTicks: 20, windupLeft: 9 };
+    applyDamage(state, 2, 50, 0);
+    expect(champion(state, 2).cast).toMatchObject({ castId: 7, windupLeft: 9 });
+  });
+});
+
+describe('applyEffects slot and return value', () => {
+  const hit = { x: 0, y: 0 };
+
+  it('puts the given slot on every status, shield and push it applies', () => {
+    const state = open();
+    place(state, 2, 5, 0);
+    applyEffects(
+      state, 0, 2,
+      [
+        { type: 'applyStatus', status: { type: 'slow', percent: 30, ticks: 60 } },
+        { type: 'shield', absorb: 30, ticks: 120 },
+        { type: 'knockback', distance: 2, ticks: 8, direction: 'away' },
+      ],
+      { x: 0, y: 0 },
+      'Q',
+    );
+    expect(champion(state, 2).statuses.map((s) => s.slot)).toEqual(['Q', 'Q', 'Q']);
+    expect(state.events.filter((e) => e.type === 'statusApplied').map((e) => (e as { slot: string }).slot)).toEqual(['Q', 'Q', 'Q']);
+  });
+
+  it('applies no slot when none is given', () => {
+    const state = open();
+    applyEffects(state, 0, 2, [{ type: 'shield', absorb: 30, ticks: 120 }], hit);
+    expect(champion(state, 2).statuses[0]?.slot).toBeNull();
+  });
+
+  it('returns the health its heals restored, and 0 without one', () => {
+    const state = open();
+    champion(state, 2).health = 100;
+    const heals: Effect[] = [{ type: 'heal', amount: 8 }, { type: 'damage', amount: 3 }, { type: 'heal', amount: 20 }];
+    // 8, then 3 lost, then 20 capped at the 15 missing.
+    expect(applyEffects(state, 0, 2, heals, hit)).toBe(23);
+    expect(champion(state, 2).health).toBe(120);
+    expect(applyEffects(state, 0, 2, heals.slice(1, 2), hit)).toBe(0);
+    // The damage left 117, so a heal of 5 restores only the 3 missing.
+    expect(applyEffects(state, 0, 2, [{ type: 'heal', amount: 5 }], hit)).toBe(3);
+    expect(applyEffects(state, 0, 2, [{ type: 'heal', amount: 5 }], hit)).toBe(0);
+  });
+
+  it('skips energyGain: it changes nothing and emits nothing', () => {
+    const state = open();
+    expect(applyEffects(state, 0, 2, [{ type: 'energyGain', amount: 5 }], hit)).toBe(0);
+    expect(champion(state, 0).energy).toBe(0);
+    expect(state.events).toEqual([]);
+  });
+});
+
+describe('copyEffects energyGain', () => {
+  const reject = (problem: string): never => {
+    throw new Error(`rejected: ${problem}`);
+  };
+
+  it('copies an integer amount from 1 to 100', () => {
+    for (const amount of [1, 5, 100]) {
+      expect(copyEffects([{ type: 'energyGain', amount }], reject)).toEqual([{ type: 'energyGain', amount }]);
+    }
+  });
+
+  it('rejects anything else with the amount in the message', () => {
+    for (const amount of [0, -5, 101, 2.5, NaN, Infinity, '5']) {
+      expect(() => copyEffects([{ type: 'energyGain', amount: amount as number }], reject)).toThrow(
+        `rejected: effect energyGain amount ${String(amount)} is not an integer from 1 to 100`,
+      );
+    }
   });
 });

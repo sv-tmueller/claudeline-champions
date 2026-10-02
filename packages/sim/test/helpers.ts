@@ -178,16 +178,30 @@ export function contactKinds(state: GameState): Set<ContactKind> {
 /**
  * The state as the fixtures that predate the ability toolkit saw it. Those fixtures stay byte
  * for byte as committed, so their checksums cover the state without the fields the toolkit
- * added. This asserts each dropped field is neutral first, so a regression that changes
- * behavior for a match without statuses cannot hide behind the projection.
+ * and the kit contract added. This asserts each dropped field is neutral first, so a regression
+ * that changes behavior for a match without statuses or kits cannot hide behind the projection.
  */
 export function legacyState(state: GameState): GameState {
   const copy = cloneState(state);
   for (const c of copy.champions) {
     if (c.dash !== null) throw new Error(`champion ${c.id} has a dash`);
     if (c.statuses.length > 0) throw new Error(`champion ${c.id} has statuses`);
+    if (c.cooldowns.length !== 7 || c.cooldowns.some((v) => v !== 0)) {
+      throw new Error(`champion ${c.id} has a cooldown`);
+    }
+    if (c.cast !== null) throw new Error(`champion ${c.id} has a cast`);
     delete (c as Partial<ChampionState>).dash;
+    delete (c as Partial<ChampionState>).cooldowns;
+    delete (c as Partial<ChampionState>).cast;
   }
+  for (const entity of [...copy.projectiles, ...copy.areas]) {
+    if (entity.castId !== null) throw new Error(`entity ${entity.id} has a cast id`);
+    delete (entity as Partial<typeof entity>).castId;
+  }
+  if (copy.kits.length > 0) throw new Error('state has kits');
+  if (copy.casts.length > 0) throw new Error('state has casts');
+  delete (copy as Partial<GameState>).kits;
+  delete (copy as Partial<GameState>).casts;
   return copy;
 }
 
@@ -213,6 +227,10 @@ export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability'> = {
   teleport: 'ability',
   dashStarted: 'ability',
   dashEnded: 'ability',
+  castStarted: 'ability',
+  castFired: 'ability',
+  castInterrupted: 'ability',
+  energyGained: 'ability',
 };
 
 const UNIQUE_STATUSES = ['stun', 'root', 'silence', 'invulnerable'];

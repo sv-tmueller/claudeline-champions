@@ -1,6 +1,7 @@
 import { CHAMPION_RADIUS } from './constants';
 import { direction, length } from './geometry';
-import { applyEffects, copyEffects } from './health';
+import { landHit } from './energy';
+import { copyEffects } from './health';
 import type { Effect, GameState } from './state';
 
 export interface MeleeArcSpec {
@@ -15,6 +16,8 @@ export interface MeleeArcSpec {
   /** Cosine of the half-angle, in [-1, 1]; -1 is a full circle. Stored as data, never computed. */
   cosHalfAngle: number;
   effects: readonly Effect[];
+  /** The cast that swung it, whose hits earn energy; it must be in `state.casts`. */
+  castId?: number | null;
 }
 
 function fail(problem: string): never {
@@ -42,6 +45,10 @@ export function meleeArc(state: GameState, spec: MeleeArcSpec): number[] {
     return fail('cosHalfAngle must be from -1 to 1');
   }
   const effects = copyEffects(spec.effects, fail);
+  const castId = spec.castId ?? null;
+  if (castId !== null && !state.casts.some((c) => c.id === castId)) {
+    return fail(`unknown cast ${castId}`);
+  }
 
   const reach = spec.radius + CHAMPION_RADIUS;
   const targetIds: number[] = [];
@@ -70,6 +77,7 @@ export function meleeArc(state: GameState, spec: MeleeArcSpec): number[] {
     targetIds: [...targetIds],
   });
   const origin = { x: spec.x + 0, y: spec.y + 0 };
-  for (const targetId of targetIds) applyEffects(state, spec.ownerId, targetId, effects, origin);
+  const source = { ownerId: spec.ownerId, castId };
+  for (const targetId of targetIds) landHit(state, source, targetId, effects, origin);
   return targetIds;
 }

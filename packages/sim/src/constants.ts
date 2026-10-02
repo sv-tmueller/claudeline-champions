@@ -40,3 +40,16 @@ export const MAX_TELEPORT_METERS = 1e9;
  * `sweepCircle`, so every position the sim holds stays within a few of these.
  */
 export const MAX_ARENA_METERS = 1e6;
+
+/** Energy runs from 0 to this; a gain above it is lost. */
+export const MAX_ENERGY = 100;
+/** Energy an EX variant costs, paid when the cast starts. */
+export const EX_ENERGY_COST = 25;
+/** Energy the ultimate on F costs, paid when the cast starts. */
+export const ULTIMATE_ENERGY_COST = 100;
+/** Multiplies walking speed, after slow and haste, during a `slowed` windup. */
+export const SLOWED_WINDUP_FACTOR = 0.5;
+/** What a hit on an enemy, or a heal on an ally, gives, by the slot that cast it. */
+export const ENERGY_GAIN_M1 = 5;
+export const ENERGY_GAIN_SKILL = 10;
+export const ENERGY_GAIN_ULTIMATE = 15;

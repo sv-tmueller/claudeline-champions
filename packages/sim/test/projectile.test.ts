@@ -87,6 +87,7 @@ describe('spawnProjectile', () => {
         pierce: false,
         hitIds: [],
         effects: [{ type: 'damage', amount: 10 }],
+        castId: null,
       },
     ]);
     expect(state.events).toEqual([

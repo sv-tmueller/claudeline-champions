@@ -3,7 +3,8 @@ import { isPositiveInteger } from './area';
 import { CHAMPION_RADIUS, DT } from './constants';
 import { clamp, length, sweepCircle, sweepRect } from './geometry';
 import type { Point } from './geometry';
-import { applyEffects, copyEffects } from './health';
+import { landHit } from './energy';
+import { copyEffects } from './health';
 import { nextId } from './state';
 import type { Effect, GameState, ProjectileEndReason, ProjectileState } from './state';
 
@@ -31,9 +32,14 @@ function fail(problem: string): never {
 
 /**
  * Spawns a projectile owned by champion `spec.ownerId` and returns its id. It acts from the
- * next `step` on. A dead owner may still spawn one.
+ * next `step` on. A dead owner may still spawn one. `castId` is the cast that fired it, whose
+ * hits earn energy; it must be in `state.casts`. Dev tools spawn with null through `debug`.
  */
-export function spawnProjectile(state: GameState, spec: ProjectileSpec): number {
+export function spawnProjectile(
+  state: GameState,
+  spec: ProjectileSpec,
+  castId: number | null = null,
+): number {
   const owner = state.champions[spec.ownerId];
   if (!owner) return fail(`unknown owner ${spec.ownerId}`);
   for (const key of ['x', 'y', 'dirX', 'dirY', 'speed', 'radius'] as const) {
@@ -56,6 +62,9 @@ export function spawnProjectile(state: GameState, spec: ProjectileSpec): number 
   }
   if (typeof spec.pierce !== 'boolean') return fail('pierce must be a boolean');
   const effects = copyEffects(spec.effects, fail);
+  if (castId !== null && !state.casts.some((c) => c.id === castId)) {
+    return fail(`unknown cast ${castId}`);
+  }
 
   const projectile: ProjectileState = {
     id: nextId(state),
@@ -70,6 +79,7 @@ export function spawnProjectile(state: GameState, spec: ProjectileSpec): number 
     pierce: spec.pierce,
     hitIds: [],
     effects,
+    castId,
   };
   state.projectiles.push(projectile);
   state.events.push({
@@ -164,7 +174,7 @@ function sweep(state: GameState, p: ProjectileState): boolean {
       x: pos.x,
       y: pos.y,
     });
-    applyEffects(state, p.ownerId, contact.id, p.effects, pos);
+    landHit(state, p, contact.id, p.effects, pos);
   };
   const expire = (reason: ProjectileEndReason, t: number) => {
     const pos = at(t);

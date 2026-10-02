@@ -867,3 +867,59 @@ describe('walking under statuses', () => {
     expect(champion(state, 0).vx).toBe(BASE);
   });
 });
+
+describe('stun and a windup', () => {
+  function winding(): GameState {
+    const state = open();
+    champion(state, 2).cast = { castId: 6, slot: 'Q', ex: false, windupTicks: 18, windupLeft: 11 };
+    return state;
+  }
+
+  it('interrupts the windup after the status and the dash end, in that order', () => {
+    const state = winding();
+    champion(state, 2).dash = {
+      dirX: 1, dirY: 0, stepLength: 0.1, ticksLeft: 4, castId: 6, then: [],
+    };
+    applyStatus(state, 2, { type: 'stun', ticks: 40 }, NONE);
+    expect(fresh(state).map((e) => e.type)).toEqual(['statusApplied', 'dashEnded', 'castInterrupted']);
+    expect(champion(state, 2).cast).toBeNull();
+    expect(champion(state, 2).dash).toBeNull();
+  });
+
+  it('reports the cast it dropped', () => {
+    const state = winding();
+    applyStatus(state, 2, { type: 'stun', ticks: 40 }, NONE);
+    expect(state.events[1]).toEqual({
+      type: 'castInterrupted', championId: 2, castId: 6, slot: 'Q', ex: false, reason: 'stun',
+    });
+  });
+
+  it('is not interrupted by silence, root, slow, haste or a knockback', () => {
+    const state = winding();
+    applyStatus(state, 2, { type: 'silence', ticks: 40 }, NONE);
+    applyStatus(state, 2, { type: 'root', ticks: 40 }, NONE);
+    applyStatus(state, 2, { type: 'slow', percent: 30, ticks: 40 }, NONE);
+    applyStatus(state, 2, { type: 'haste', percent: 30, ticks: 40 }, NONE);
+    applyKnockback(state, 2, { dirX: 1, dirY: 0, distance: 2, ticks: 8 }, NONE);
+    expect(champion(state, 2).cast).toMatchObject({ castId: 6, windupLeft: 11 });
+    expect(state.events.some((e) => e.type === 'castInterrupted')).toBe(false);
+  });
+
+  it('is not interrupted by a stun that invulnerable blocks or a shorter stun does not replace', () => {
+    const blocked = winding();
+    applyStatus(blocked, 2, { type: 'invulnerable', ticks: 40 }, NONE);
+    expect(applyStatus(blocked, 2, { type: 'stun', ticks: 40 }, NONE)).toBe(false);
+    expect(champion(blocked, 2).cast).not.toBeNull();
+
+    const dead = winding();
+    champion(dead, 2).alive = false;
+    expect(applyStatus(dead, 2, { type: 'stun', ticks: 40 }, NONE)).toBe(false);
+    expect(champion(dead, 2).cast).not.toBeNull();
+  });
+
+  it('does nothing for a champion with no windup', () => {
+    const state = open();
+    applyStatus(state, 2, { type: 'stun', ticks: 40 }, NONE);
+    expect(state.events.map((e) => e.type)).toEqual(['statusApplied']);
+  });
+});
