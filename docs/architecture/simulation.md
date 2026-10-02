@@ -274,9 +274,9 @@ bad input before it changes anything.
   that is not a positive integer, a projectile `pierce` that is not a boolean,
   `effects` that is not an array, an effect of an unknown type or with a bad
   field (an amount at or below 0, a status spec that `applyStatus` would
-  reject, a shield with no positive absorb or whole ticks, a knockback with a
-  distance at or below 0, no whole ticks or a direction other than `away` or
-  `toward`). A dead owner may still spawn.
+  reject, a shield with no absorb from above 0 to 1e6 or ticks from 1 to 36000, a
+  knockback with a distance outside 0 to 1e6, ticks outside 1 to 36000 or a
+  direction other than `away` or `toward`). A dead owner may still spawn.
 - `meleeArc` hits every alive enemy of `ownerId` whose body overlaps the circle
   of `radius` around `(x, y)`, `dist <= radius + 0.5` inclusive, and whose
   centre lies inside the arc. The arc is the half-angle stored as its cosine,
@@ -341,6 +341,14 @@ first emits `statusExpired` with reason `replaced` for the instance it removes.
 Remaining stun is capped at 120 ticks when it is applied (`STUN_CAP_TICKS`).
 Slow and haste add their percents over all sources and the totals are capped at
 70 and 50 (`SLOW_CAP_PERCENT`, `HASTE_CAP_PERCENT`).
+Every status, shield and knockback spec is bounded, so no number in the state or
+an event can overflow to infinity or turn NaN: `ticks` is an integer from 1 to
+36000, ten minutes (`MAX_STATUS_TICKS`); `absorb`, `perPulse` and `distance` are
+numbers above 0 and at most 1e6 (`MAX_MAGNITUDE`); `percent` is an integer from
+1 to 100. A spec outside these bounds throws `Invalid status: ...` (or the
+effect form of the message for a projectile, area or melee arc). The
+`absorbLeft` of a `shieldAbsorbed` event is the sum over the target's shields,
+which stays finite because each is at most 1e6.
 
 ### Speed
 
