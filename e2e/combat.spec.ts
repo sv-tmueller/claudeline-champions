@@ -45,7 +45,7 @@ const RING_SLACK_TICKS = 4;
 const COMBAT_CODE =
   /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
 // Measured in a warm steady state: 0 bytes in every counted function but
-// onAnimationFrame, which shows 24 to 48 B per window in the clean mode (three's
+// onAnimationFrame, which shows 0 to 48 B per window in the clean mode (three's
 // own callback and the inlined frame, cause not isolated) and about 1100 B in the
 // bad mode (see the retries below). Each of these fails the limit: a template string
 // written to a hook every frame (about 800 B), a closure made per call in
@@ -294,8 +294,8 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     // on an empty arena is thrown away when the first projectile arrives, so
     // the engine warms up on volleys. The measured windows hold no spawn and no
     // end of a shot, only frames with eight shots in flight, and in them the
-    // combat code allocates nothing. On the CI runner every frame costs 150 to
-    // 190 ms of software rendering at 1280x720 whether or not hooks are read
+    // combat code allocates nothing. On the CI runner every frame costs 105 to
+    // 210 ms of software rendering at 1280x720 whether or not hooks are read
     // between frames, and the heap probe counts JavaScript allocations and
     // never looks at pixels, so the canvas shrinks first. The resize is
     // outside every measured window.
