@@ -55,9 +55,9 @@ test('walks east at 5.5 m/s while D is held and stops on release', async ({ page
     await openMatch(page, failed);
 
     // Record the sim tick at which the browser delivers the KeyD release. The
-    // listener is capture-phase on window, so it runs before the app's own
-    // listener: the tick it reads is when the release arrived, not when the app
-    // honoured it. That makes the bound below free of input-delivery latency.
+    // bound below is free of input-delivery latency because this listener reads
+    // the tick in the task that delivers the event, before any frame can sample
+    // the release and step the sim. Capture phase is only a safety choice.
     await page.evaluate(() => {
       window.addEventListener(
         'keyup',
@@ -112,8 +112,8 @@ test('walks east at 5.5 m/s while D is held and stops on release', async ({ page
     // Never more than the ticks from the key down to the tick at which the
     // browser delivered the release, plus one tick. A slow runner delays both
     // ends alike, so this holds at any latency. A stuck or late-honoured key
-    // keeps walking past upTick and fails: it walks into champion 2 at
-    // (1200, 200) and settles at 1100 cm, 2300 cm from the start.
+    // keeps walking past upTick and fails. A stuck key walks into champion 2
+    // at (1200, 200) and settles at 1100 cm, 2300 cm from the start.
     const upTick = await page.evaluate(
       () => (window as unknown as { __keyUpTick?: number }).__keyUpTick,
     );

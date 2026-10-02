@@ -54,3 +54,37 @@ test('the client renders the arena and the F3 overlay, and writes two screenshot
     expect(problems).toEqual([]);
   }
 });
+
+test('data-arena is set only after the arena is drawn', async ({ page }) => {
+  const { problems, failed } = watchProblems(page);
+  // No frame callback ever runs, so only the draw before the hook can put the
+  // arena on the canvas.
+  await page.addInitScript(() => {
+    window.requestAnimationFrame = () => 0;
+  });
+  // The arena model is held back, so a hook set before the load finishes shows
+  // up as a data-arena attribute while the model is still missing.
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/models/arenas/arena01.glb', async (route) => {
+    await released;
+    await route.continue();
+  });
+
+  try {
+    await page.goto('/');
+    await orFail(page.waitForSelector('canvas[data-rendered="true"]'), failed);
+    expect(await page.locator('canvas').getAttribute('data-arena')).toBeNull();
+    release();
+    await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
+    expect(await page.locator('canvas').getAttribute('data-tick')).toBe('0');
+
+    const first = await page.screenshot();
+    expect((await pixelStats(page, first)).distinctColours).toBeGreaterThan(16);
+  } finally {
+    release();
+    expect(problems).toEqual([]);
+  }
+});
