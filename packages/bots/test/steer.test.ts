@@ -61,6 +61,23 @@ describe('steerToward', () => {
     expect(Object.is(west.moveY, 0)).toBe(true);
   });
 
+  it('returns positive zero on an axis that quantizes to zero from a negative offset', () => {
+    // 4.0 per 10 is below tan(22.5 degrees), so that axis is off although its offset is negative.
+    const cases: [number, number, number, number][] = [
+      [-4.0, 10, 0, 1],
+      [10, -4.0, 1, 0],
+      [4.0, -10, 0, -1],
+      [-10, 4.0, -1, 0],
+      [-4.0, -10, 0, -1],
+      [-10, -4.0, -1, 0],
+    ];
+    for (const [x, y, moveX, moveY] of cases) {
+      const move = steerToward(origin, { x, y });
+      expect(Object.is(move.moveX, moveX), `${x},${y} moveX ${move.moveX}`).toBe(true);
+      expect(Object.is(move.moveY, moveY), `${x},${y} moveY ${move.moveY}`).toBe(true);
+    }
+  });
+
   it('stops for a non-finite target or position', () => {
     expect(steerToward(origin, { x: Number.NaN, y: 5 })).toEqual({ moveX: 0, moveY: 0 });
     expect(steerToward(origin, { x: 5, y: Number.POSITIVE_INFINITY })).toEqual({
