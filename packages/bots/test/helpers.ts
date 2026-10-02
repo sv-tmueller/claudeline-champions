@@ -275,7 +275,7 @@ export function holding(
   const target = state.champions[acted.targetId];
   if (target === undefined || !target.alive || target.team === c.team) return false;
   const d = Math.hypot(c.x - target.x, c.y - target.y);
-  const { rangeMin, rangeMax } = profileFor(c.championId);
+  const { rangeMin, rangeMax } = profileFor(c.championId, kitOf(state, c));
   if (acted.intent === 'engage') return d <= rangeMax && hasLineOfSight(state, c, target);
   if (acted.intent === 'kite') {
     return d >= rangeMin && d <= rangeMax && hasLineOfSight(state, c, target);
