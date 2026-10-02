@@ -16,7 +16,7 @@ export const KNOCKBACK_CAP_METERS = 6;
 export const STATUS_PULSE_TICKS = 30;
 /** Forced motion is resolved against collision in steps of at most this many meters. */
 export const MOTION_SUBSTEP_METERS = 0.25;
-/** Longest status, shield or knockback a spec may ask for: ten minutes of ticks. */
+/** Longest status, shield, knockback or dash a spec may ask for: ten minutes of ticks. */
 export const MAX_STATUS_TICKS = 36000;
 /** Largest absorb, damage or heal per pulse, or knockback distance a spec may ask for. */
 export const MAX_MAGNITUDE = 1e6;
@@ -30,6 +30,13 @@ export const MIN_DASH_DISTANCE = 1e-6;
 /**
  * A teleport may span at most this many meters along each axis, measured from the champion. The
  * line of sight test squares each span, so the sum of squares is at most 2e18, far below the
- * largest double (about 1.8e308), whatever the arena.
+ * largest double (about 1.8e308). With every arena dimension and spawn within `MAX_ARENA_METERS`,
+ * the squares `sweepCircle` forms from a position stay below overflow as well.
  */
 export const MAX_TELEPORT_METERS = 1e9;
+/**
+ * Largest size, spawn coordinate or obstacle dimension, in meters, that `parseArenaDef` accepts. A
+ * champion stands at its spawn until the first step, and a teleport from there feeds the squares in
+ * `sweepCircle`, so every position the sim holds stays within a few of these.
+ */
+export const MAX_ARENA_METERS = 1e6;

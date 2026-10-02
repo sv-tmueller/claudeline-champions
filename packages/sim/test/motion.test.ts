@@ -91,6 +91,7 @@ describe('startDash', () => {
       dashOf(3, 1e300),
       dashOf(5e-324, 2),
       dashOf(1e-7, 6),
+      dashOf('5' as unknown as number, 6),
     ];
     for (const spec of bad) {
       expect(() => startDash(state, 0, spec), JSON.stringify(spec)).toThrow(/^Invalid dash: /);
@@ -101,6 +102,16 @@ describe('startDash', () => {
 });
 
 describe('dash bounds', () => {
+  it('names the whole distance range in the message', () => {
+    const state = open();
+    expect(() => startDash(state, 0, dashOf(1001, 6))).toThrow(
+      'Invalid dash: distance 1001 is not a number from 0.000001 to 1000',
+    );
+    expect(() => startDash(state, 0, dashOf('5' as unknown as number, 6))).toThrow(
+      'Invalid dash: distance 5 is not a number from 0.000001 to 1000',
+    );
+  });
+
   it('rejects ticks above the status bound with the same message as a knockback', () => {
     const state = open();
     for (const ticks of [36001, 9007199254740994, 1e300]) {

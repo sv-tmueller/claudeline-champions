@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HASTE_CAP_PERCENT,
   KNOCKBACK_CAP_METERS,
+  MAX_ARENA_METERS,
   MAX_DASH_DISTANCE,
   MAX_MAGNITUDE,
   MAX_STATUS_TICKS,
@@ -32,5 +33,9 @@ describe('status and motion constants', () => {
     expect(MAX_DASH_DISTANCE).toBe(1000);
     expect(MIN_DASH_DISTANCE).toBe(1e-6);
     expect(MAX_TELEPORT_METERS).toBe(1e9);
+  });
+
+  it('holds the bound on arena dimensions and coordinates', () => {
+    expect(MAX_ARENA_METERS).toBe(1e6);
   });
 });

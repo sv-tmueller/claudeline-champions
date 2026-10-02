@@ -1,3 +1,5 @@
+import { MAX_ARENA_METERS } from './constants';
+
 export type SpawnPoint = [number, number];
 
 export interface CircleObstacle {
@@ -59,12 +61,25 @@ function readField(obj: JsonObject, key: string, path: string): unknown {
   return value;
 }
 
-function readNumber(value: unknown, path: string, positive = false): number {
+/**
+ * `bounded` keeps a size, a coordinate or an obstacle dimension within `MAX_ARENA_METERS`, so that
+ * the sums and products the sim forms from them (a teleport spanning the arena, a sweep square)
+ * stay far from overflow.
+ */
+function readNumber(value: unknown, path: string, positive = false, bounded = false): number {
   if (typeof value !== 'number') {
     return fail(path, `expected a number, got ${describeType(value)}`);
   }
   if (!Number.isFinite(value)) return fail(path, 'expected a number, got a non-finite value');
   if (positive && value <= 0) return fail(path, 'expected a number above 0');
+  if (bounded && Math.abs(value) > MAX_ARENA_METERS) {
+    return fail(
+      path,
+      positive
+        ? `expected a number at most ${MAX_ARENA_METERS}`
+        : `expected a number with magnitude at most ${MAX_ARENA_METERS}`,
+    );
+  }
   // JSON.parse('-0') gives -0, which would not survive a JSON round trip of the state.
   return value + 0;
 }
@@ -91,7 +106,10 @@ function readArray(value: unknown, path: string): unknown[] {
 function readPoint(value: unknown, path: string): SpawnPoint {
   const arr = readArray(value, path);
   if (arr.length !== 2) return fail(path, `expected 2 numbers, got ${arr.length}`);
-  return [readNumber(arr[0], `${path}[0]`), readNumber(arr[1], `${path}[1]`)];
+  return [
+    readNumber(arr[0], `${path}[0]`, false, true),
+    readNumber(arr[1], `${path}[1]`, false, true),
+  ];
 }
 
 function readPoints(value: unknown, path: string): SpawnPoint[] {
@@ -101,8 +119,8 @@ function readPoints(value: unknown, path: string): SpawnPoint[] {
 function readObstacle(value: unknown, path: string): Obstacle {
   const obj = readObject(value, path);
   const type = readField(obj, 'type', path);
-  const num = (key: string, positive = false) =>
-    readNumber(readField(obj, key, path), child(path, key), positive);
+  const num = (key: string, positive = false, bounded = false) =>
+    readNumber(readField(obj, key, path), child(path, key), positive, bounded);
   const common = () => ({
     height: num('height', true),
     blocksProjectiles: readBoolean(
@@ -111,10 +129,23 @@ function readObstacle(value: unknown, path: string): Obstacle {
     ),
   });
   if (type === 'circle') {
-    return { type, x: num('x'), y: num('y'), r: num('r', true), ...common() };
+    return {
+      type,
+      x: num('x', false, true),
+      y: num('y', false, true),
+      r: num('r', true, true),
+      ...common(),
+    };
   }
   if (type === 'rect') {
-    return { type, x: num('x'), y: num('y'), w: num('w', true), h: num('h', true), ...common() };
+    return {
+      type,
+      x: num('x', false, true),
+      y: num('y', false, true),
+      w: num('w', true, true),
+      h: num('h', true, true),
+      ...common(),
+    };
   }
   return fail(child(path, 'type'), `unknown obstacle type ${JSON.stringify(type)}`);
 }
@@ -131,8 +162,8 @@ export function parseArenaDef(data: unknown): ArenaDef {
     id: readString(readField(root, 'id', '(root)'), 'id'),
     name: readString(readField(root, 'name', '(root)'), 'name'),
     size: {
-      width: readNumber(readField(size, 'width', 'size'), 'size.width', true),
-      height: readNumber(readField(size, 'height', 'size'), 'size.height', true),
+      width: readNumber(readField(size, 'width', 'size'), 'size.width', true, true),
+      height: readNumber(readField(size, 'height', 'size'), 'size.height', true, true),
     },
     spawns: {
       teamA: readPoints(readField(spawns, 'teamA', 'spawns'), 'spawns.teamA'),

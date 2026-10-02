@@ -29,7 +29,7 @@ export function isTicks(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-/** A tick count a status, shield or knockback may have: 1 to `MAX_STATUS_TICKS`. */
+/** A tick count a status, shield, knockback or dash may have: 1 to `MAX_STATUS_TICKS`. */
 export function isStatusTicks(value: unknown): value is number {
   return isTicks(value) && value <= MAX_STATUS_TICKS;
 }
