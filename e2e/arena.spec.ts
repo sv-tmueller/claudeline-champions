@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { orFail, watchProblems } from './support';
 
 interface PixelStats {
   distinctColours: number;
@@ -32,15 +33,11 @@ async function pixelStats(page: Page, png: Buffer): Promise<PixelStats> {
 }
 
 test('the client renders the arena and the F3 overlay, and writes two screenshots', async ({ page }, testInfo) => {
-  const problems: string[] = [];
-  page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
-  page.on('console', (message) => {
-    if (message.type() === 'error') problems.push(`console: ${message.text()}`);
-  });
+  const { problems, failed } = watchProblems(page);
 
   try {
     await page.goto('/');
-    await page.waitForSelector('canvas[data-arena="arena01"]');
+    await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
 
     const arena = await page.screenshot({ path: testInfo.outputPath('arena.png') });
     const plain = await pixelStats(page, arena);
@@ -48,7 +45,7 @@ test('the client renders the arena and the F3 overlay, and writes two screenshot
     expect(plain.overlayPixels).toBe(0);
 
     await page.keyboard.press('F3');
-    await page.waitForSelector('canvas[data-overlay="on"]');
+    await orFail(page.waitForSelector('canvas[data-overlay="on"]'), failed);
 
     const overlay = await page.screenshot({ path: testInfo.outputPath('arena-overlay.png') });
     const outlined = await pixelStats(page, overlay);

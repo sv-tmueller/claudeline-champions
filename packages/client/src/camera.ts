@@ -1,4 +1,5 @@
-import { Vector3 } from 'three';
+import type { ArenaDef } from '@claudeline/sim';
+import { type PerspectiveCamera, Plane, Raycaster, Vector2, Vector3 } from 'three';
 
 export const CAMERA_TILT_DEG = 55;
 export const CAMERA_VERTICAL_FOV_DEG = 40;
@@ -54,4 +55,62 @@ export function fitCameraDistance(input: FitInput): number {
     );
   }
   return distance;
+}
+
+/**
+ * Frames the whole arena for a viewport of the given CSS size. The camera is
+ * not in the scene, so its world matrix is updated here for the raycaster.
+ */
+export function fitCamera(
+  camera: PerspectiveCamera,
+  width: number,
+  height: number,
+  arena: ArenaDef,
+): void {
+  camera.aspect = width / height;
+  const distance = fitCameraDistance({
+    aspect: camera.aspect,
+    verticalFovDeg: CAMERA_VERTICAL_FOV_DEG,
+    tiltDeg: CAMERA_TILT_DEG,
+    halfWidth: arena.size.width / 2,
+    halfDepth: arena.size.height / 2,
+    margin: FIT_MARGIN,
+  });
+  camera.position.copy(cameraPosition(distance, CAMERA_TILT_DEG));
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+}
+
+export interface Ndc {
+  x: number;
+  y: number;
+}
+
+/** Client (CSS pixel) coordinates to normalized device coordinates; NDC y points up. */
+export function pointerToNdc(
+  clientX: number,
+  clientY: number,
+  rect: { left: number; top: number; width: number; height: number },
+): Ndc {
+  return {
+    x: 2 * ((clientX - rect.left) / rect.width) - 1,
+    y: 1 - 2 * ((clientY - rect.top) / rect.height),
+  };
+}
+
+const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
+const raycaster = new Raycaster();
+const rayOrigin = new Vector2();
+const hit = new Vector3();
+
+/**
+ * The ground point under an NDC position as integer sim centimeters, or null
+ * when the ray misses the plane (cursor above the horizon).
+ */
+export function groundAimCm(camera: PerspectiveCamera, ndcX: number, ndcY: number): { x: number; y: number } | null {
+  raycaster.setFromCamera(rayOrigin.set(ndcX, ndcY), camera);
+  if (!raycaster.ray.intersectPlane(groundPlane, hit)) return null;
+  // Three (x, 0, z) is sim (x, -z). `+ 0` turns -0 into 0, as the sim does for aim.
+  return { x: Math.round(hit.x * 100) + 0, y: Math.round(-hit.z * 100) + 0 };
 }
