@@ -85,6 +85,9 @@ describe('spawnArea', () => {
     ['an unknown target filter', { targets: 'everyone' as never }],
     ['a zero effect amount', { effects: [{ type: 'heal' as const, amount: 0 }] }],
     ['an infinite effect amount', { effects: [{ type: 'damage' as const, amount: Infinity }] }],
+    ['a status effect with a bad spec', { effects: [{ type: 'applyStatus' as const, status: { type: 'dot' as const, perPulse: 0, ticks: 60 } }] }],
+    ['a shield effect with fractional ticks', { effects: [{ type: 'shield' as const, absorb: 5, ticks: 1.5 }] }],
+    ['a knockback effect with no ticks', { effects: [{ type: 'knockback' as const, distance: 1, ticks: 0, direction: 'away' as const }] }],
   ])('throws on %s and changes nothing', (_name, over) => {
     const state = open();
     expect(() => spawnArea(state, spec(over))).toThrow('Invalid area');
@@ -218,5 +221,39 @@ describe('who an area affects', () => {
     const state = createMatch(config2v2(), arena01, 1);
     place(state, 2, 2.2, 0);
     expect(targetsOf(state, { x: -2, radius: 4 })).toEqual([2]);
+  });
+});
+
+describe('area hit effects', () => {
+  it('pushes targets away from the area centre', () => {
+    const state = open();
+    place(state, 2, 1, 1);
+    place(state, 3, -1, 0);
+    spawnArea(state, spec({ effects: [{ type: 'knockback', distance: 2, ticks: 8, direction: 'away' }] }));
+    step(state, []);
+    const dir = (id: number) => champion(state, id).statuses[0] as { dirX: number; dirY: number };
+    expect(dir(2).dirX).toBeCloseTo(Math.SQRT1_2, 12);
+    expect(dir(2).dirY).toBeCloseTo(Math.SQRT1_2, 12);
+    expect(dir(3)).toMatchObject({ dirX: -1, dirY: 0 });
+  });
+
+  it('gives no push to a target exactly at the centre', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(state, spec({ effects: [{ type: 'knockback', distance: 2, ticks: 8, direction: 'away' }] }));
+    step(state, []);
+    expect(champion(state, 2).statuses).toEqual([]);
+  });
+
+  it('refreshes a status each pulse instead of stacking it', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(
+      state,
+      spec({ intervalTicks: 10, effects: [{ type: 'applyStatus', status: { type: 'slow', percent: 30, ticks: 25 } }] }),
+    );
+    for (let i = 0; i < 25; i++) step(state, []);
+    expect(champion(state, 2).statuses).toHaveLength(1);
+    expect(champion(state, 2).statuses[0]).toMatchObject({ type: 'slow', sourceId: 0 });
   });
 });

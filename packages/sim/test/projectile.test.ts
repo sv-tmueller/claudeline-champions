@@ -153,6 +153,9 @@ describe('spawnProjectile', () => {
     ['a NaN effect amount', { effects: [{ type: 'heal' as const, amount: NaN }] }],
     ['a negative effect amount', { effects: [{ type: 'damage' as const, amount: -3 }] }],
     ['an unknown effect type', { effects: [{ type: 'burn', amount: 3 } as never] }],
+    ['a status effect with a bad spec', { effects: [{ type: 'applyStatus' as const, status: { type: 'slow' as const, percent: 0, ticks: 5 } }] }],
+    ['a shield effect with no absorb', { effects: [{ type: 'shield' as const, absorb: 0, ticks: 60 }] }],
+    ['a knockback effect with a bad direction', { effects: [{ type: 'knockback', distance: 2, ticks: 8, direction: 'up' } as never] }],
   ])('throws on %s and changes nothing', (_name, over) => {
     const state = open();
     expect(() => spawnProjectile(state, spec(over))).toThrow('Invalid projectile');
@@ -171,6 +174,13 @@ describe('projectile direction bounds', () => {
     ['an exact zero', { dirX: 0, dirY: 0 }, 'direction is zero'],
   ])('names the problem for %s', (_name, over, message) => {
     expect(() => spawnProjectile(open(), spec(over))).toThrow(message);
+  });
+
+  it('accepts a direction of exactly 1e-150 on one axis, since only values below it are rejected', () => {
+    const state = open();
+    spawnProjectile(state, spec({ dirX: 1e-150, dirY: 0, speed: 10 }));
+    expect(state.projectiles[0]?.vx).toBe(10);
+    expect(state.projectiles[0]?.vy).toBe(0);
   });
 
   it('still accepts a small direction above the bound and normalizes it', () => {
@@ -493,5 +503,44 @@ describe('a champion against a wall', () => {
     spawnProjectile(inside, spec({ x: -8, y: 0, dirX: 1, radius: 0.2 }));
     step(inside, []);
     expect(inside.projectiles).toHaveLength(0);
+  });
+});
+
+describe('projectile hit effects', () => {
+  it('pushes the target away from the contact point, not from the projectile centre line', () => {
+    const state = open();
+    place(state, 2, 5, 0.3);
+    spawnProjectile(
+      state,
+      spec({ effects: [{ type: 'knockback', distance: 2, ticks: 8, direction: 'away' }] }),
+    );
+    for (let i = 0; i < 30 && state.projectiles.length > 0; i++) step(state, []);
+    const hit = state.events.find((e) => e.type === 'projectileHit');
+    if (hit?.type !== 'projectileHit') throw new Error('no hit');
+    const dx = 5 - hit.x;
+    const dy = 0.3 - hit.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const push = champion(state, 2).statuses[0] as { dirX: number; dirY: number };
+    expect(push.dirX).toBeCloseTo(dx / len, 12);
+    expect(push.dirY).toBeCloseTo(dy / len, 12);
+  });
+
+  it('applies status effects from the owner with no slot', () => {
+    const state = open();
+    place(state, 2, 5, 0);
+    spawnProjectile(
+      state,
+      spec({
+        effects: [
+          { type: 'applyStatus', status: { type: 'slow', percent: 30, ticks: 60 } },
+          { type: 'shield', absorb: 10, ticks: 60 },
+        ],
+      }),
+    );
+    for (let i = 0; i < 30 && state.projectiles.length > 0; i++) step(state, []);
+    expect(champion(state, 2).statuses).toMatchObject([
+      { type: 'slow', sourceId: 0, slot: null, percent: 30 },
+      { type: 'shield', sourceId: 0, slot: null, absorb: 10 },
+    ]);
   });
 });
