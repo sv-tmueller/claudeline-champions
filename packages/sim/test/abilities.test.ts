@@ -12,7 +12,20 @@
 // How the committed script was generated: the inputs came from a seeded random player (a window of
 // 5 to 18 ticks of aim, walk and buttons per champion, chosen from the live state) tried for one
 // seed after another until a run satisfied every item of the coverage test below with no oracle
-// problem. The search script is not committed; the script it produced is the data. The checksums
+// problem. The search script is not committed; the script it produced is the data. The search
+// used mulberry32 (the usual 32-bit generator, seeded with the attempt number) for attempts 1, 2,
+// 3 and so on; attempt 9 was the first to cover everything, and its output is this fixture's
+// segments and actions exactly. Each attempt ran the match config below with match seed 4343 for
+// 2400 ticks, with the champions' `test/kits.ts` kits, and drew a new window per champion
+// whenever the last one ran out (5 + floor(rnd * 14) ticks), in this order of draws: the target
+// (the nearest living enemy, or in 30% of windows a random one; a random living ally for the
+// ally aim); the aim point (60% the target, up to 80% the ally, up to 92% a uniform point in
+// [-14, 14] x [-9, 9], else the champion itself), in whole centimeters; the walk (45% along the
+// axes toward the aim point, or away from it when within 3.5 m, per axis only when it is over
+// 0.5 m off; 25% a uniform axis in each of x and y; else none); each slot button M1, M2, SPACE,
+// Q, E, R, F with probability 0.5, 0.3, 0.2, 0.3, 0.3, 0.15, 0.3; and SHIFT with 0.3. In 20% of
+// windows it also added a `setEnergy` action at the current tick for a uniform champion, with an
+// energy from 0, 24, 25, 98, 99, 100 or 60. The checksums
 // were then generated as for the other fixtures: set every checksum to 0, run
 // `npx vitest run --project sim packages/sim/test/abilities.test.ts`, copy the actual values from
 // the failing checkpoint and checksum assertions into the fixture, and rerun until it is green.
