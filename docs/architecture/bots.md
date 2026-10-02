@@ -76,7 +76,7 @@ With `d` the distance to the target, `h` health over maximum health, and
 | Intent  | Score                                                | Movement                                                                                                                      |
 | ------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                         |
-| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | stand when `d >= rangeMin`, otherwise step to the first free point 1 m away: straight away, then 45, -45, 90, -90 degrees      |
+| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | stand when `d >= rangeMin`, otherwise step to the first point 1 m away in a free grid cell with a clear segment: straight away, then 45, -45, 90, -90 degrees |
 | retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there                                |
 
 Hysteresis: the bot switches only when the best other intent scores more than
@@ -142,7 +142,12 @@ seeded from `seed`), and `think` is a pure function of the state plus the bot's
 private state. A bot keeps no module-level state, iterates arrays in index
 order, never reads the wall clock or `Math.random`, never reads or writes
 `state.rng`, never mutates the state, and stores copies of numbers and ids
-rather than references into the state. Decisions use only `+ - * /`,
+rather than references into the state. The one exception is `gridArena`, the
+`state.arena` reference the bot keeps for an identity check: while the arena
+object is the same, the navigation grid and the path follower stay; a new arena
+object (for example from `cloneState` each tick) rebuilds the grid and resets
+the follower, so such a caller pays a rebuild every tick. The tier table and
+each tier are frozen and readonly. Decisions use only `+ - * /`,
 comparisons, `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`, `hypot`,
 `imul` and the sim's public exports. Bots do not use the sim's `dmath`. Review
 enforces this; a lint row for `Math.random`, `Date` and `performance` in bots
@@ -160,6 +165,9 @@ match replays exactly from its input stream.
   ally logic.
 - A ranged bot standing in kite range without line of sight waits until the
   target moves, because kite stands once `d >= rangeMin`.
+- A kiting bot pushed into a corner freezes: `kiteMove` stands when all five
+  candidate steps (straight away, plus and minus 45 degrees, plus and minus 90
+  degrees) fail. Deferred to batch 5.
 
 ## Testing
 
