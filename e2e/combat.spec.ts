@@ -34,14 +34,20 @@ const RING_SLACK_TICKS = 4;
 
 // The functions whose allocations the heap probe counts: every combat render
 // module, the pose and overlay helpers that run each frame, the loop clock, and
-// every function in main.ts (frame, stepSim, sampleAim, draw and the hook writers).
+// every function in main.ts (stepSim, sampleAim, draw and the hook writers).
+// V8 inlines main.ts's frame into three's animation callback, so the bytes of
+// frame's own body are attributed to onAnimationFrame: that one three function
+// counts too, and nothing else in three does.
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop)\.ts:|^main\.ts:/;
-// Measured in a warm steady state: 0 bytes with the code as written. Each of
-// these fails it: a template string written to a hook every frame (about 800 B),
-// a closure made per call in routeEvents (about 1500 B), and an object literal
-// per projectile per frame in draw that escapes (about 11 KB). The limit stays
-// just above zero so the small ones are caught. See the pull request.
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
+// Measured in a warm steady state: 0 bytes in every counted function but
+// onAnimationFrame, which shows 24 to 48 B per window (three's own callback and
+// the inlined frame, cause not isolated). Each of these fails the limit: a template string
+// written to a hook every frame (about 800 B), a closure made per call in
+// routeEvents (about 1500 B), an escaping array in frame (about 1300 B), and an
+// object literal per projectile per frame in draw that escapes (about 11 KB).
+// The limit stays just above the clean figure so the small ones are caught. See
+// the pull request.
 const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
 // Anything counted at all proves the profiler saw the sim's own garbage.
 const PROFILER_SANITY_BYTES = 100_000;
