@@ -16,10 +16,15 @@ export type {
 export { Button } from './input';
 export type { MoveAxis, PlayerInput } from './input';
 export type {
+  AreaState,
+  AreaTargets,
   ChampionState,
+  Effect,
   GameState,
   MatchConfig,
   PlayerConfig,
+  ProjectileEndReason,
+  ProjectileState,
   SimEvent,
   StatusInstance,
   TeamId,
@@ -28,3 +33,5 @@ export { createMatch } from './match';
 export { checksum } from './checksum';
 export { cloneState } from './state';
 export { step } from './step';
+export { hasLineOfSight } from './sight';
+export type { Point } from './geometry';

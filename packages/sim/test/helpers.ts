@@ -86,7 +86,7 @@ export function checkInvariants(state: GameState): string[] {
   }
   for (const a of state.champions) {
     for (const b of state.champions) {
-      if (b.id <= a.id) continue;
+      if (b.id <= a.id || !a.alive || !b.alive) continue;
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       if (dist < 2 * r - TOLERANCE) {
         problems.push(`tick ${state.tick}: champions ${a.id} and ${b.id} overlap (${dist})`);

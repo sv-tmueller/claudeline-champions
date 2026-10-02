@@ -1,5 +1,6 @@
 import type { RectObstacle } from './arena';
 import { CHAMPION_RADIUS } from './constants';
+import { clamp, length } from './geometry';
 import type { ChampionState, GameState } from './state';
 
 // Penetration below EPS is treated as contact. A push moves to exact contact.
@@ -11,15 +12,11 @@ interface Point {
   y: number;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return value < min ? min : value > max ? max : value;
-}
-
 /** Pushes p out of a static circle so that their centres are at least `minDist` apart. */
 export function pushOutOfCircle(p: Point, cx: number, cy: number, minDist: number): boolean {
   const dx = p.x - cx;
   const dy = p.y - cy;
-  const dist = Math.hypot(dx, dy);
+  const dist = length(dx, dy);
   if (minDist - dist <= EPS) return false;
   if (dist > 0) {
     p.x = cx + (dx * minDist) / dist;
@@ -42,7 +39,7 @@ export function pushOutOfRect(p: Point, rect: RectObstacle, r: number): boolean 
   const qy = clamp(p.y, minY, maxY);
   const dx = p.x - qx;
   const dy = p.y - qy;
-  const dist = Math.hypot(dx, dy);
+  const dist = length(dx, dy);
   if (r - dist <= EPS) return false;
   if (dist > 0) {
     p.x = qx + (dx * r) / dist;
@@ -79,7 +76,7 @@ function clampToBoundary(p: Point, width: number, height: number, r: number): bo
 function pushOutPass(state: GameState, p: Point, selfId: number): boolean {
   let pushed = false;
   for (const other of state.champions) {
-    if (other.id === selfId) continue;
+    if (other.id === selfId || !other.alive) continue;
     if (pushOutOfCircle(p, other.x, other.y, 2 * CHAMPION_RADIUS)) pushed = true;
   }
   for (const o of state.arena.obstacles) {

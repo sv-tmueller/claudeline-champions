@@ -82,4 +82,32 @@ describe('parseArenaDef', () => {
       'obstacles[0].blocksProjectiles: expected a boolean, got string',
     );
   });
+
+  it('rejects a non-positive obstacle height', () => {
+    for (const height of [0, -1]) {
+      const data = clone();
+      data['obstacles'] = [
+        { type: 'circle', x: 0, y: 0, r: 1, height, blocksProjectiles: true },
+      ];
+      expect(() => parseArenaDef(data)).toThrow('obstacles[0].height: expected a number above 0');
+    }
+  });
+
+  it('rejects a non-positive ring damagePerSecond', () => {
+    for (const damagePerSecond of [0, -5]) {
+      const data = clone();
+      data['ring'] = { startRadius: 18, endRadius: 3, damagePerSecond };
+      expect(() => parseArenaDef(data)).toThrow('ring.damagePerSecond: expected a number above 0');
+    }
+  });
+
+  it('parses a -0 coordinate as +0', () => {
+    const data = JSON.parse(
+      JSON.stringify(arena01).replace('"x":0,"y":0,"r":1.5', '"x":-0,"y":-0,"r":1.5'),
+    ) as Record<string, unknown>;
+    const parsed = parseArenaDef(data);
+    const first = parsed.obstacles[0];
+    expect(Object.is(first?.x, 0)).toBe(true);
+    expect(Object.is(first?.y, 0)).toBe(true);
+  });
 });

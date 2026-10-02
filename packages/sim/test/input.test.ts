@@ -177,3 +177,37 @@ describe('malformed input entries', () => {
     expect(c.aimY).toBe(before.aimY);
   });
 });
+
+describe('aim rounding', () => {
+  it.each([
+    [0.5, 1],
+    [-0.5, 0],
+    [1234.4, 1234],
+    [-1234.6, -1235],
+    [1e-320, 0],
+  ])('rounds an aim of %s to the integer %s', (value, expected) => {
+    const aim = resolveInput(raw({ aimX: value, aimY: value }), 9, 9);
+    expect(Object.is(aim.aimX, expected)).toBe(true);
+    expect(Object.is(aim.aimY, expected)).toBe(true);
+  });
+});
+
+describe('an input entry that throws on read', () => {
+  it('makes step throw and leaves the state unchanged', () => {
+    const state = open();
+    step(state, [input(1, 0, 500, 100)]);
+    const before = JSON.stringify(state);
+    const poisoned = {
+      moveX: 1,
+      moveY: 0,
+      get aimX(): number {
+        throw new Error('poisoned');
+      },
+      aimY: 0,
+      buttons: 0,
+    } as unknown as PlayerInput;
+    const inputs = [input(1, 0), input(0, 1), input(-1, 0), poisoned];
+    expect(() => step(state, inputs)).toThrow('poisoned');
+    expect(JSON.stringify(state)).toBe(before);
+  });
+});

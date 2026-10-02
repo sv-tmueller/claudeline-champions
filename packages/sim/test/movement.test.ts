@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_MOVE_SPEED, DT, createMatch, step } from '../src/index';
 import type { GameState, PlayerInput } from '../src/index';
+import { atan2 } from '../src/dmath';
 import { champion, config2v2, input, openArena } from './helpers';
 
 function open(): GameState {
@@ -71,7 +72,7 @@ describe('movement', () => {
     const state = open();
     step(state, [input(1, 0, -1100, 300)]);
     const c = champion(state, 0);
-    expect(c.facing).toBe(Math.atan2(3 - c.y, -11 - c.x));
+    expect(c.facing).toBe(atan2(3 - c.y, -11 - c.x));
   });
 
   it('keeps the old facing when the aim is exactly on the champion', () => {

@@ -65,7 +65,8 @@ function readNumber(value: unknown, path: string, positive = false): number {
   }
   if (!Number.isFinite(value)) return fail(path, 'expected a number, got a non-finite value');
   if (positive && value <= 0) return fail(path, 'expected a number above 0');
-  return value;
+  // JSON.parse('-0') gives -0, which would not survive a JSON round trip of the state.
+  return value + 0;
 }
 
 function readString(value: unknown, path: string): string {
@@ -103,7 +104,7 @@ function readObstacle(value: unknown, path: string): Obstacle {
   const num = (key: string, positive = false) =>
     readNumber(readField(obj, key, path), child(path, key), positive);
   const common = () => ({
-    height: num('height'),
+    height: num('height', true),
     blocksProjectiles: readBoolean(
       readField(obj, 'blocksProjectiles', path),
       child(path, 'blocksProjectiles'),
@@ -144,6 +145,7 @@ export function parseArenaDef(data: unknown): ArenaDef {
       damagePerSecond: readNumber(
         readField(ring, 'damagePerSecond', 'ring'),
         'ring.damagePerSecond',
+        true,
       ),
     },
   };

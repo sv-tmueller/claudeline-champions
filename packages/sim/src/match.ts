@@ -40,7 +40,7 @@ export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number):
       vy: 0,
       facing: player.team === 'A' ? 0 : Math.PI,
       aimX: Math.round(x * 100) + ahead,
-      aimY: Math.round(y * 100),
+      aimY: Math.round(y * 100) + 0,
       health: DEFAULT_MAX_HEALTH,
       maxHealth: DEFAULT_MAX_HEALTH,
       energy: 0,
@@ -54,6 +54,9 @@ export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number):
     rng: seed >>> 0,
     arena: JSON.parse(JSON.stringify(arena)) as ArenaDef,
     champions,
+    nextEntityId: champions.length,
+    projectiles: [],
+    areas: [],
     events: [],
   };
 }
