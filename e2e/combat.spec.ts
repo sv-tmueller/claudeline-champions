@@ -134,10 +134,12 @@ const WINDOW_FRAMES = 30;
 const WINDOW_MS = WINDOW_FRAMES * 16;
 // A shot flies 27 m at 10 m/s, 162 ticks or 5.6 windows of 29 ticks, from the spawn to the east boundary.
 const WINDOWS_PER_FLIGHT = 6;
-// Volleys the engine warms up on before the measured one. With 4 the first
-// runner run read 1164 B in one measured window, with 0 to 48 B in the next
-// run and in all of 8 more volleys after it, so the warm-up is deeper than the
-// local figure needs.
+// Volleys the engine warms up on before the measured one. On the runner the
+// figure is two-moded per run, not per window: most runs read 0 to 48 B in
+// onAnimationFrame, and about one run in three reads 970 to 1190 B in every
+// window, whatever the depth (4 or 8 volleys, 4 more volleys after the measured
+// ones: 2026-10-02, runs 36968830908, 36970012813, 36970321634 attempt 6). The
+// extra depth is kept because it costs 12 s; it is not the fix.
 const WARM_UP_VOLLEYS = 8;
 // One window after the volley, then the measured ones. All of them end before the first shot does.
 const SETTLE_WINDOWS = 1;
@@ -263,24 +265,10 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     let sawGarbage = 0;
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
-      console.log(`PROBE measured window ${window + 1}: combat ${allocations.combat} ${JSON.stringify(allocations.combatByFunction)} total ${allocations.total}`);
       sawGarbage = Math.max(sawGarbage, allocations.total);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
     }
     hooks = await readHooks(page);
-    // TEMPORARY exploration after the real measurement: does a high figure persist?
-    for (let volley = 1; volley <= 4; volley++) {
-      await runWindow(page);
-      await runWindow(page);
-      await fireVolley(page);
-      await runWindow(page);
-      for (let window = 0; window < MEASURED_WINDOWS; window++) {
-        const a = await allocationsOverAWindow(page, cdp);
-        console.log(`PROBE extra volley ${volley} window ${window + 1}: combat ${a.combat} ${JSON.stringify(a.combatByFunction)}`);
-      }
-      await runWindow(page);
-      await runWindow(page);
-    }
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
     expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);
