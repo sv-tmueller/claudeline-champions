@@ -22,11 +22,13 @@ function fail(problem: string): never {
   throw new Error(`Invalid status: ${problem}`);
 }
 
-function isTicks(value: unknown): value is number {
+/** A positive integer, as every tick count is. */
+export function isTicks(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-function isAmount(value: unknown): value is number {
+/** A finite number above 0. */
+export function isAmount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
@@ -45,10 +47,15 @@ export function checkSource(state: GameState, source: StatusSource): StatusSourc
   return { sourceId: source.sourceId, slot: source.slot };
 }
 
-function checkSpec(spec: StatusSpec): StatusSpec {
-  if (typeof spec !== 'object' || spec === null) return fail('spec must be an object');
+/**
+ * Validates and copies a status spec. `reject` throws the caller's own error, so the effect
+ * lists of projectiles and areas report `Invalid projectile: ...` and `applyStatus` reports
+ * `Invalid status: ...`.
+ */
+export function copyStatusSpec(spec: StatusSpec, reject: (problem: string) => never): StatusSpec {
+  if (typeof spec !== 'object' || spec === null) return reject('spec must be an object');
   const type: unknown = spec.type;
-  if (!isTicks(spec.ticks)) return fail(`ticks ${String(spec.ticks)} is not a positive integer`);
+  if (!isTicks(spec.ticks)) return reject(`ticks ${String(spec.ticks)} is not a positive integer`);
   const { ticks } = spec;
   switch (type) {
     case 'stun':
@@ -60,18 +67,18 @@ function checkSpec(spec: StatusSpec): StatusSpec {
     case 'haste': {
       const { percent } = spec as { percent: unknown };
       if (typeof percent !== 'number' || !Number.isInteger(percent) || percent < 1 || percent > 100) {
-        return fail(`percent ${String(percent)} is not an integer from 1 to 100`);
+        return reject(`percent ${String(percent)} is not an integer from 1 to 100`);
       }
       return { type, percent, ticks };
     }
     case 'dot':
     case 'hot': {
       const { perPulse } = spec as { perPulse: unknown };
-      if (!isAmount(perPulse)) return fail(`perPulse ${String(perPulse)} is not a number above 0`);
+      if (!isAmount(perPulse)) return reject(`perPulse ${String(perPulse)} is not a number above 0`);
       return { type, perPulse, ticks };
     }
     default:
-      return fail(`unknown status type ${String(type)}`);
+      return reject(`unknown status type ${String(type)}`);
   }
 }
 
@@ -168,7 +175,7 @@ export function applyStatus(
 ): boolean {
   const target = checkTarget(state, targetId);
   const from = checkSource(state, source);
-  const checked = checkSpec(spec);
+  const checked = copyStatusSpec(spec, fail);
   if (!target.alive) return false;
   if (isBlockedByInvulnerable(checked.type) && hasStatus(target, 'invulnerable')) return false;
   const base = { ...from, remainingTicks: checked.ticks };

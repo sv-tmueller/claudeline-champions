@@ -3,10 +3,12 @@ import { expireAreas, stepAreas } from './area';
 import { resolveChampion } from './collision';
 import { atan2 } from './dmath';
 import { length } from './geometry';
+import { upkeepStatuses } from './health';
 import { resolveInput } from './input';
 import type { PlayerInput } from './input';
 import { expireProjectiles, stepProjectiles } from './projectile';
 import type { GameState } from './state';
+import { hasStatus, speedFactor } from './status';
 
 export function step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void {
   // Read every input before anything changes, so an entry whose property read throws
@@ -24,8 +26,11 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
     const moveLength = length(input.moveX, input.moveY);
     const dirX = moveLength === 0 ? 0 : input.moveX / moveLength;
     const dirY = moveLength === 0 ? 0 : input.moveY / moveLength;
-    champion.vx = dirX * BASE_MOVE_SPEED;
-    champion.vy = dirY * BASE_MOVE_SPEED;
+    // Stun, root and a dash take walking away; `+ 0` keeps a blocked velocity from being -0.
+    const walking = !(hasStatus(champion, 'stun') || hasStatus(champion, 'root') || champion.dash);
+    const speed = walking ? BASE_MOVE_SPEED * speedFactor(champion) : 0;
+    champion.vx = dirX * speed + 0;
+    champion.vy = dirY * speed + 0;
     const prevX = champion.x;
     const prevY = champion.y;
     champion.x += champion.vx * DT;
@@ -36,6 +41,8 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
     if (toAimX !== 0 || toAimY !== 0) champion.facing = atan2(toAimY, toAimX);
 
     resolveChampion(state, champion, prevX, prevY);
+
+    upkeepStatuses(state, champion);
   }
 
   stepProjectiles(state);

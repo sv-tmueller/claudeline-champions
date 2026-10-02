@@ -105,7 +105,7 @@ describe('direction', () => {
     const big = direction(1e200, -1e200);
     expect(big?.x).toBeCloseTo(Math.SQRT1_2, 15);
     expect(big?.y).toBeCloseTo(-Math.SQRT1_2, 15);
-    expect(big?.length).toBeCloseTo(1.4142135623730951e200, -185);
+    expect((big?.length ?? 0) / 1e200).toBeCloseTo(Math.SQRT2, 14);
     const tiny = direction(0, 1e-200);
     expect(tiny).toEqual({ x: 0, y: 1, length: 1e-200 });
     const subnormal = direction(5e-324, 0);

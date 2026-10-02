@@ -88,7 +88,7 @@ export function stepAreas(state: GameState): void {
         .map((c) => c.id);
       state.events.push({ type: 'areaTick', areaId: area.id, targetIds });
       for (const targetId of targetIds) {
-        applyEffects(state, area.ownerId, targetId, area.effects);
+        applyEffects(state, area.ownerId, targetId, area.effects, area);
       }
       area.ticksToNextApply = area.intervalTicks;
     }

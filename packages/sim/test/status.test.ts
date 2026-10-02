@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createMatch } from '../src/index';
+import { DT, createMatch, step } from '../src/index';
 import type { GameState, SimEvent, StatusInstance, StatusSpec, StatusType } from '../src/index';
+import { applyDamage } from '../src/health';
 import { applyKnockback, applyShield, applyStatus } from '../src/status';
-import { champion, config2v2, openArena } from './helpers';
+import { champion, config2v2, input, openArena } from './helpers';
 
 function open(): GameState {
   return createMatch(config2v2(), openArena(), 1);
@@ -490,5 +491,307 @@ describe('applyKnockback', () => {
     const state = open();
     applyKnockback(state, 2, push(3, 10, 1e200, 1e200), NONE);
     expect((statuses(state, 2)[0] as { dirX: number }).dirX).toBeCloseTo(Math.SQRT1_2, 15);
+  });
+});
+
+function tick(state: GameState, inputs: Parameters<typeof step>[1] = []): SimEvent[] {
+  step(state, inputs);
+  return [...state.events];
+}
+
+function repeat(state: GameState, ticks: number, inputs: Parameters<typeof step>[1] = []): SimEvent[] {
+  const all: SimEvent[] = [];
+  for (let i = 0; i < ticks; i++) all.push(...tick(state, inputs));
+  return all;
+}
+
+describe('status upkeep', () => {
+  it('lets every status last exactly its ticks, then ends it as expired', () => {
+    const state = open();
+    applyStatus(state, 2, { type: 'silence', ticks: 3 }, { sourceId: 0, slot: 'Q' });
+    expect(tick(state)).toEqual([]);
+    expect(statuses(state, 2)[0]?.remainingTicks).toBe(2);
+    expect(tick(state)).toEqual([]);
+    expect(tick(state)).toEqual([
+      { type: 'statusExpired', targetId: 2, sourceId: 0, slot: 'Q', status: 'silence', reason: 'expired' },
+    ]);
+    expect(statuses(state, 2)).toEqual([]);
+    expect(tick(state)).toEqual([]);
+  });
+
+  it('ends a status of 1 tick after the first step', () => {
+    const state = open();
+    applyStatus(state, 2, { type: 'root', ticks: 1 }, NONE);
+    expect(tick(state)).toMatchObject([{ type: 'statusExpired', reason: 'expired' }]);
+  });
+
+  it('ticks down the statuses of every champion that is alive, and not a dead one', () => {
+    const state = open();
+    applyStatus(state, 1, { type: 'silence', ticks: 5 }, NONE);
+    applyStatus(state, 3, { type: 'silence', ticks: 5 }, NONE);
+    champion(state, 3).alive = false;
+    tick(state);
+    expect(statuses(state, 1)[0]?.remainingTicks).toBe(4);
+    expect(statuses(state, 3)[0]?.remainingTicks).toBe(5);
+  });
+
+  describe('damage over time', () => {
+    it('pulses every 30 ticks and gives floor(D / 30) pulses', () => {
+      for (const [ticks, pulses] of [[29, 0], [30, 1], [45, 1], [60, 2], [90, 3], [91, 3]] as const) {
+        const state = open();
+        applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks }, { sourceId: 1, slot: 'E' });
+        const events = repeat(state, ticks);
+        expect(events.filter((e) => e.type === 'damage'), `D=${ticks}`).toHaveLength(pulses);
+        expect(champion(state, 2).health).toBe(120 - 5 * pulses);
+        expect(statuses(state, 2)).toEqual([]);
+      }
+    });
+
+    it('pulses at ticks 30, 60 and 90 with the source as damage source, then expires', () => {
+      const state = open();
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 90 }, { sourceId: 1, slot: 'E' });
+      state.events.length = 0;
+      const damageTicks: number[] = [];
+      let last: SimEvent[] = [];
+      for (let i = 1; i <= 90; i++) {
+        last = tick(state);
+        if (last.some((e) => e.type === 'damage')) damageTicks.push(i);
+      }
+      expect(damageTicks).toEqual([30, 60, 90]);
+      expect(last).toEqual([
+        { type: 'damage', targetId: 2, sourceId: 1, amount: 5, health: 105 },
+        { type: 'statusExpired', targetId: 2, sourceId: 1, slot: 'E', status: 'dot', reason: 'expired' },
+      ]);
+    });
+
+    it('keeps the pulse timer between 1 and 30', () => {
+      const state = open();
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 100 }, NONE);
+      for (let i = 0; i < 99; i++) {
+        step(state, []);
+        const dot = statuses(state, 2)[0] as { ticksToNextPulse: number };
+        expect(dot.ticksToNextPulse).toBeGreaterThanOrEqual(1);
+        expect(dot.ticksToNextPulse).toBeLessThanOrEqual(30);
+      }
+    });
+
+    it('keeps its pulse timer when refreshed', () => {
+      const state = open();
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 100 }, NONE);
+      repeat(state, 10);
+      applyStatus(state, 2, { type: 'dot', perPulse: 8, ticks: 100 }, NONE);
+      const events = repeat(state, 19);
+      expect(events.some((e) => e.type === 'damage')).toBe(false);
+      expect(tick(state)).toMatchObject([{ type: 'damage', amount: 8 }]);
+    });
+
+    it('stacks pulses from different sources, each on its own timer', () => {
+      const state = open();
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 60 }, { sourceId: 0, slot: null });
+      repeat(state, 10);
+      applyStatus(state, 2, { type: 'dot', perPulse: 3, ticks: 60 }, { sourceId: 1, slot: null });
+      const damage = repeat(state, 50).filter((e) => e.type === 'damage');
+      expect(damage.map((e) => (e.type === 'damage' ? [e.sourceId, e.amount] : []))).toEqual([
+        [0, 5],
+        [1, 3],
+        [0, 5],
+      ]);
+    });
+
+    it('does nothing while the holder is invulnerable, and keeps running', () => {
+      const state = open();
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 60 }, NONE);
+      applyStatus(state, 2, { type: 'invulnerable', ticks: 60 }, NONE);
+      const events = repeat(state, 60);
+      expect(events.filter((e) => e.type === 'damage')).toEqual([]);
+      expect(champion(state, 2).health).toBe(120);
+      expect(events.filter((e) => e.type === 'statusExpired').map((e) => e.type === 'statusExpired' && e.status)).toEqual([
+        'dot',
+        'invulnerable',
+      ]);
+    });
+
+    it('kills through a pulse: death, then every status ends with the reason death', () => {
+      const state = open();
+      champion(state, 2).health = 3;
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 60 }, { sourceId: 1, slot: 'E' });
+      applyStatus(state, 2, { type: 'slow', percent: 20, ticks: 100 }, NONE);
+      const events = repeat(state, 30);
+      expect(events).toEqual([
+        { type: 'damage', targetId: 2, sourceId: 1, amount: 3, health: 0 },
+        { type: 'death', targetId: 2, sourceId: 1 },
+        { type: 'statusExpired', targetId: 2, sourceId: 1, slot: 'E', status: 'dot', reason: 'death' },
+        { type: 'statusExpired', targetId: 2, sourceId: 0, slot: null, status: 'slow', reason: 'death' },
+      ]);
+      expect(statuses(state, 2)).toEqual([]);
+      expect(repeat(state, 40)).toEqual([]);
+    });
+
+    it('is absorbed by a shield, which is then used up as depleted', () => {
+      const state = open();
+      applyShield(state, 2, { absorb: 3, ticks: 100 }, { sourceId: 2, slot: null });
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 30 }, { sourceId: 1, slot: null });
+      expect(repeat(state, 30)).toEqual([
+        { type: 'shieldAbsorbed', targetId: 2, sourceId: 1, amount: 3, absorbLeft: 0 },
+        { type: 'statusExpired', targetId: 2, sourceId: 2, slot: null, status: 'shield', reason: 'depleted' },
+        { type: 'damage', targetId: 2, sourceId: 1, amount: 2, health: 118 },
+        { type: 'statusExpired', targetId: 2, sourceId: 1, slot: null, status: 'dot', reason: 'expired' },
+      ]);
+    });
+
+    it('lets a shield on its last tick absorb the pulse due that tick before it times out', () => {
+      const state = open();
+      applyShield(state, 2, { absorb: 20, ticks: 30 }, { sourceId: 2, slot: null });
+      applyStatus(state, 2, { type: 'dot', perPulse: 5, ticks: 30 }, { sourceId: 1, slot: null });
+      const events = repeat(state, 30);
+      expect(events.map((e) => e.type)).toEqual(['shieldAbsorbed', 'statusExpired', 'statusExpired']);
+      expect(champion(state, 2).health).toBe(120);
+    });
+  });
+
+  describe('heal over time', () => {
+    it('pulses every 30 ticks with the source as heal source', () => {
+      const state = open();
+      champion(state, 2).health = 50;
+      applyStatus(state, 2, { type: 'hot', perPulse: 4, ticks: 100 }, { sourceId: 3, slot: 'R' });
+      const heals = repeat(state, 100).filter((e) => e.type === 'heal');
+      expect(heals).toEqual([
+        { type: 'heal', targetId: 2, sourceId: 3, amount: 4, health: 54 },
+        { type: 'heal', targetId: 2, sourceId: 3, amount: 4, health: 58 },
+        { type: 'heal', targetId: 2, sourceId: 3, amount: 4, health: 62 },
+      ]);
+    });
+
+    it('works through invulnerable', () => {
+      const state = open();
+      champion(state, 2).health = 50;
+      applyStatus(state, 2, { type: 'invulnerable', ticks: 60 }, NONE);
+      applyStatus(state, 2, { type: 'hot', perPulse: 4, ticks: 30 }, NONE);
+      repeat(state, 30);
+      expect(champion(state, 2).health).toBe(54);
+    });
+  });
+
+  describe('shield', () => {
+    it('loses its remaining absorb when it times out', () => {
+      const state = open();
+      applyShield(state, 2, { absorb: 20, ticks: 5 }, { sourceId: 2, slot: 'R' });
+      const events = repeat(state, 5);
+      expect(events).toEqual([
+        { type: 'statusExpired', targetId: 2, sourceId: 2, slot: 'R', status: 'shield', reason: 'expired' },
+      ]);
+      expect(applyDamage(state, 2, 10, 0)).toBe(10);
+    });
+  });
+});
+
+describe('walking under statuses', () => {
+  const east = [input(1, 0, 5000, 0)];
+  const BASE = 5.5;
+
+  it('blocks walking for exactly the ticks of a stun, then walks again', () => {
+    const state = open();
+    const x0 = champion(state, 0).x;
+    applyStatus(state, 0, { type: 'stun', ticks: 3 }, NONE);
+    repeat(state, 3, east);
+    expect(champion(state, 0).x).toBe(x0);
+    step(state, east);
+    expect(champion(state, 0).x).toBe(x0 + BASE * DT);
+  });
+
+  it('blocks walking for the ticks of a root', () => {
+    const state = open();
+    const x0 = champion(state, 0).x;
+    applyStatus(state, 0, { type: 'root', ticks: 2 }, NONE);
+    repeat(state, 2, east);
+    expect(champion(state, 0).x).toBe(x0);
+    step(state, east);
+    expect(champion(state, 0).x).toBeGreaterThan(x0);
+  });
+
+  it('does not stop a silenced champion from walking', () => {
+    const state = open();
+    const x0 = champion(state, 0).x;
+    applyStatus(state, 0, { type: 'silence', ticks: 60 }, NONE);
+    step(state, east);
+    expect(champion(state, 0).x).toBe(x0 + BASE * DT);
+  });
+
+  it('stores a walk velocity of +0 while blocked, also for a negative direction', () => {
+    const state = open();
+    step(state, [input(-1, -1, 0, 0)]);
+    expect(champion(state, 0).vx).not.toBe(0);
+    applyStatus(state, 0, { type: 'stun', ticks: 5 }, NONE);
+    step(state, [input(-1, -1, 0, 0)]);
+    expect(Object.is(champion(state, 0).vx, 0)).toBe(true);
+    expect(Object.is(champion(state, 0).vy, 0)).toBe(true);
+  });
+
+  it('still takes the aim and the facing while stunned or rooted', () => {
+    const state = open();
+    applyStatus(state, 0, { type: 'stun', ticks: 5 }, NONE);
+    step(state, [input(1, 0, -1200, 700)]);
+    const c = champion(state, 0);
+    expect([c.aimX, c.aimY]).toEqual([-1200, 700]);
+    expect(c.facing).toBeCloseTo(Math.atan2(7 - 2, -12 + 12), 12);
+  });
+
+  it('scales speed by 1 + (haste - slow) / 100', () => {
+    const cases: [string, StatusSpec[], number][] = [
+      ['no status', [], 1],
+      ['slow 30', [{ type: 'slow', percent: 30, ticks: 60 }], 0.7],
+      ['haste 20', [{ type: 'haste', percent: 20, ticks: 60 }], 1.2],
+      [
+        'haste 20 and slow 30',
+        [
+          { type: 'haste', percent: 20, ticks: 60 },
+          { type: 'slow', percent: 30, ticks: 60 },
+        ],
+        1 + (20 - 30) / 100,
+      ],
+    ];
+    for (const [name, specs, factor] of cases) {
+      const state = open();
+      specs.forEach((spec) => applyStatus(state, 0, spec, NONE));
+      step(state, east);
+      expect(champion(state, 0).vx, name).toBe(BASE * factor);
+    }
+  });
+
+  it('adds the percents of different sources and caps slow at 70 and haste at 50', () => {
+    const slowed = open();
+    applyStatus(slowed, 0, { type: 'slow', percent: 50, ticks: 60 }, { sourceId: 1, slot: null });
+    applyStatus(slowed, 0, { type: 'slow', percent: 40, ticks: 60 }, { sourceId: 2, slot: null });
+    step(slowed, east);
+    expect(champion(slowed, 0).vx).toBe(BASE * (1 + (0 - 70) / 100));
+
+    const hasty = open();
+    applyStatus(hasty, 0, { type: 'haste', percent: 30, ticks: 60 }, { sourceId: 1, slot: null });
+    applyStatus(hasty, 0, { type: 'haste', percent: 40, ticks: 60 }, { sourceId: 2, slot: null });
+    step(hasty, east);
+    expect(champion(hasty, 0).vx).toBe(BASE * (1 + 50 / 100));
+
+    const both = open();
+    for (const [type, sourceId] of [['slow', 1], ['slow', 2], ['haste', 1], ['haste', 2]] as const) {
+      applyStatus(both, 0, { type, percent: 60, ticks: 60 }, { sourceId, slot: null });
+    }
+    step(both, east);
+    expect(champion(both, 0).vx).toBe(BASE * (1 + (50 - 70) / 100));
+  });
+
+  it('moves the speed-scaled distance each tick', () => {
+    const state = open();
+    applyStatus(state, 0, { type: 'slow', percent: 50, ticks: 60 }, NONE);
+    const x0 = champion(state, 0).x;
+    step(state, east);
+    expect(champion(state, 0).x).toBe(x0 + BASE * 0.5 * DT);
+  });
+
+  it('returns to full speed when a slow ends', () => {
+    const state = open();
+    applyStatus(state, 0, { type: 'slow', percent: 50, ticks: 2 }, NONE);
+    repeat(state, 2, east);
+    step(state, east);
+    expect(champion(state, 0).vx).toBe(BASE);
   });
 });
