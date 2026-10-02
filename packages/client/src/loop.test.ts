@@ -38,10 +38,14 @@ describe('fixed-step clock', () => {
     expect(clock.advance(500 + STEP_MS)).toBe(1);
   });
 
+  it('pins the step cap at 5', () => {
+    expect(MAX_STEPS_PER_FRAME).toBe(5);
+  });
+
   it('caps the steps after a stall and drops the backlog', () => {
     const clock = createFixedStepClock();
     clock.advance(0);
-    expect(clock.advance(10_000)).toBe(MAX_STEPS_PER_FRAME);
+    expect(clock.advance(10_000)).toBe(5);
     expect(clock.alpha).toBe(0);
     expect(clock.advance(10_000 + STEP_MS)).toBe(1);
   });
