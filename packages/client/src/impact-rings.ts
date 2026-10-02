@@ -16,8 +16,6 @@ const END_RADIUS = 1.2;
  */
 export class ImpactRings {
   readonly group = new Group();
-  /** Rings spawned so far. */
-  spawned = 0;
   /** Rings showing right now. */
   visibleCount = 0;
   private readonly meshes: Mesh[] = [];
@@ -57,7 +55,6 @@ export class ImpactRings {
     // Taking the oldest ring while it still shows leaves the count as it was.
     if (!this.active[index]) this.visibleCount += 1;
     this.active[index] = true;
-    this.spawned += 1;
   }
 
   /** `tick` is the sim tick and `alpha` the fraction of the next one already elapsed. */

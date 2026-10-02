@@ -195,7 +195,7 @@ describe('routing real sim events', () => {
       if (feedback.hits === 1 && flashAtHit < 0) flashAtHit = feedback.flashMask(state.tick);
     }
     expect(feedback.hits).toBe(1);
-    expect(rings.spawned).toBe(1);
+    expect(rings.visibleCount).toBe(1);
     expect(flashAtHit).toBe(0b100);
     expect(state.projectiles).toHaveLength(0);
   });
@@ -214,7 +214,7 @@ describe('routing real sim events', () => {
       routeEvents(state, feedback);
     }
     expect(feedback.hits).toBe(0);
-    expect(rings.spawned).toBe(1);
+    expect(rings.visibleCount).toBe(1);
   });
 
   it('counts a death once the fourth hit lands', () => {

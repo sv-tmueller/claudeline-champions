@@ -82,13 +82,6 @@ describe('impact rings', () => {
     expect((rings(impact.group)[1] as Mesh).position.x).toBe(101);
   });
 
-  it('counts the rings it spawned', () => {
-    const impact = createImpactRings();
-    impact.spawn(0, 0, 1);
-    impact.spawn(0, 0, 1);
-    expect(impact.spawned).toBe(2);
-  });
-
   it('counts the rings that are showing, for the data-rings hook', () => {
     const impact = createImpactRings();
     expect(impact.visibleCount).toBe(0);
