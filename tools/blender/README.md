@@ -121,7 +121,7 @@ above its green channel in 8-bit sRGB, so nothing reads as the magenta debug
 overlay. Each roster body is at least 80 away, as an RGB distance, from the
 other roster bodies, the placeholder body, the accent, the arena floor and
 the colours the client draws near a champion (bars, projectiles, impact ring,
-hit flash and dead grey).
+hit flash, dead grey and the magenta debug overlay `#ff00ff`).
 
 ## Validator
 
