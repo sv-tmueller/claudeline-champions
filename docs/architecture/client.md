@@ -31,7 +31,9 @@ billboards. Animations come from glTF clips once rigs exist. See
 
 An HTML and CSS overlay. Health and energy bars, cooldown icons per slot,
 round score, round timer, ring warning, kill feed. A debug overlay draws
-collision circles, obstacles, projectiles and line of sight.
+collision circles, obstacles, projectiles and line of sight. It draws as lines
+in the 3D scene, not in the HTML HUD, so its shapes line up with world-space
+footprints under the perspective camera.
 
 ## Platform interface
 

@@ -17,7 +17,7 @@ npm run check                    # lint, typecheck, unit tests, asset checks, Pl
 npm run test                     # Vitest unit tests (all projects)
 npm run lint                     # ESLint, includes the package boundary rules
 npm run typecheck                # tsc for sim, bots, client and the tools/tests config
-npm run e2e                      # Playwright smoke test; screenshot at test-results/*/ground-plane.png
+npm run e2e                      # Playwright e2e; screenshots scene.png, arena.png, arena-overlay.png, walk.png in test-results/*/
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
 npm run build                    # production client bundle; CI runs it, check does not
@@ -34,9 +34,10 @@ and on main.
   `document`, `fetch` or Node built-ins.
 - `bots` imports `sim` only.
 - `client` imports `sim` and `bots`. It owns rendering, input, audio and UI.
-- Lint (`eslint.config.js`) enforces the import rules, including dynamic
-  `import()`, `import()` types and relative paths into `node_modules`,
-  `packages`, `tests` or `e2e`. In `packages/sim/src` it also bans `Date`,
+- Lint (`eslint.config.js`) enforces the import rules, including relative
+  paths into `node_modules`, `packages`, `tests` or `e2e`, and relative paths
+  from bots source into sim. In sim and bots source it also bans dynamic
+  `import()` and `import()` types. In `packages/sim/src` it also bans `Date`,
   `performance`, `Math.random`, `setTimeout`, `setInterval`, `window`,
   `document` and `fetch`. `tests/lint-boundaries.test.ts` checks that each rule
   fires.

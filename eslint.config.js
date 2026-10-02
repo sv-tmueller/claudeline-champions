@@ -34,6 +34,13 @@ const outOfPackage = {
   message: 'Relative imports must stay inside the package.',
 };
 
+// bots reaches sim through @claudeline/sim only. The relative condition keeps
+// @claudeline/sim allowed; the segment match keeps files such as ./simplify allowed.
+const relativeIntoSim = {
+  regex: '^\\.{1,2}/(.*/)?sim(/|$)',
+  message: 'bots imports sim through @claudeline/sim only, never by relative path.',
+};
+
 const simPatterns = [
   { regex: NON_RELATIVE, message: 'sim imports nothing outside itself (spec section 3.2).' },
   intoBotsOrClient,
@@ -124,7 +131,7 @@ export default defineConfig(
   {
     files: ['packages/bots/src/**'],
     rules: {
-      'no-restricted-imports': boundaryRule(botsPatterns(['@claudeline/sim'])),
+      'no-restricted-imports': boundaryRule([...botsPatterns(['@claudeline/sim']), relativeIntoSim]),
       'no-restricted-syntax': noDynamicImport,
     },
   },
