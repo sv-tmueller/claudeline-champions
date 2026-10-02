@@ -35,3 +35,4 @@ export { cloneState } from './state';
 export { step } from './step';
 export { hasLineOfSight } from './sight';
 export type { Point } from './geometry';
+export * as debug from './debug';

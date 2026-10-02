@@ -198,8 +198,11 @@ and areas use it, and the melee arc and the ring will.
 
 The sim modules `projectile.ts` and `area.ts` export `spawnProjectile(state,
 spec)` and `spawnArea(state, spec)`, which return the new entity id, and
-`health.ts` exports `applyDamage`, `applyHeal` and `applyEffects`. They are not
-part of the package index: kits will call them when abilities arrive. A spawn
+`health.ts` exports `applyDamage`, `applyHeal` and `applyEffects`. The two
+spawn functions are also exposed on the package index under the `debug`
+namespace for tests and client dev tools only; gameplay code outside the sim
+must not call them, and kits reach them from inside the sim when abilities
+arrive. A spawn
 throws `Error('Invalid projectile: ...')` or `Error('Invalid area: ...')` on an
 unknown owner, a non-finite number, a zero direction, a direction too large to
 measure (a component beyond about 1.3e154, the square root of the largest
