@@ -116,7 +116,7 @@ describe('checksum of combat state', () => {
     const mutations: [string, (s: GameState) => void][] = [
       ['projectile x', (s) => void (s.projectiles[0]!.x += 1e-9)],
       ['projectile remainingTicks', (s) => void (s.projectiles[0]!.remainingTicks -= 1)],
-      ['projectile effect amount', (s) => void (s.projectiles[0]!.effects[0]!.amount += 1)],
+      ['projectile effect amount', (s) => void ((s.projectiles[0]!.effects[0] as { amount: number }).amount += 1)],
       ['projectile hitIds entry', (s) => void (s.projectiles[0]!.hitIds[0] = 3)],
       ['area radius', (s) => void (s.areas[0]!.radius += 1e-9)],
       ['area targets', (s) => void (s.areas[0]!.targets = 'enemies')],

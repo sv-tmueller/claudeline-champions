@@ -75,7 +75,7 @@ export function applyEffects(
 ): void {
   for (const effect of effects) {
     if (effect.type === 'damage') applyDamage(state, targetId, effect.amount, sourceId);
-    else applyHeal(state, targetId, effect.amount, sourceId);
+    else if (effect.type === 'heal') applyHeal(state, targetId, effect.amount, sourceId);
   }
 }
 
@@ -88,7 +88,7 @@ export function copyEffects(
   return effects.map((effect) => {
     const type: unknown = effect.type;
     if (type !== 'damage' && type !== 'heal') return reject(`unknown effect type ${String(type)}`);
-    if (!Number.isFinite(effect.amount) || effect.amount <= 0) {
+    if (!('amount' in effect) || !Number.isFinite(effect.amount) || effect.amount <= 0) {
       return reject(`effect amount ${effect.amount} is not a number above 0`);
     }
     return { type, amount: effect.amount };

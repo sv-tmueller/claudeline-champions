@@ -1,5 +1,5 @@
 import arena01Json from '../../../data/arenas/arena01.json';
-import { CHAMPION_RADIUS, parseArenaDef } from '../src/index';
+import { CHAMPION_RADIUS, cloneState, parseArenaDef } from '../src/index';
 import type {
   ArenaDef,
   ChampionState,
@@ -7,6 +7,7 @@ import type {
   MatchConfig,
   Obstacle,
   PlayerInput,
+  SimEvent,
 } from '../src/index';
 
 export const TOLERANCE = 1e-9;
@@ -173,3 +174,43 @@ export function contactKinds(state: GameState): Set<ContactKind> {
   }
   return found;
 }
+
+/**
+ * The state as the fixtures that predate the ability toolkit saw it. Those fixtures stay byte
+ * for byte as committed, so their checksums cover the state without the fields the toolkit
+ * added. This asserts each dropped field is neutral first, so a regression that changes
+ * behavior for a match without statuses cannot hide behind the projection.
+ */
+export function legacyState(state: GameState): GameState {
+  const copy = cloneState(state);
+  for (const c of copy.champions) {
+    if (c.dash !== null) throw new Error(`champion ${c.id} has a dash`);
+    if (c.statuses.length > 0) throw new Error(`champion ${c.id} has statuses`);
+    delete (c as Partial<ChampionState>).dash;
+  }
+  return copy;
+}
+
+/**
+ * Which scripted fixture has to produce each event type. `combat` is the committed combat
+ * fixture; `ability` is the ability fixture that arrives with the kit contract. Typing it as
+ * a record makes a new event type a compile error until it is classified.
+ */
+export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability'> = {
+  projectileSpawned: 'combat',
+  projectileHit: 'combat',
+  projectileExpired: 'combat',
+  areaSpawned: 'combat',
+  areaTick: 'combat',
+  areaExpired: 'combat',
+  damage: 'combat',
+  heal: 'combat',
+  death: 'combat',
+  statusApplied: 'ability',
+  statusExpired: 'ability',
+  shieldAbsorbed: 'ability',
+  meleeArc: 'ability',
+  teleport: 'ability',
+  dashStarted: 'ability',
+  dashEnded: 'ability',
+};

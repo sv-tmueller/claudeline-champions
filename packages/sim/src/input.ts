@@ -22,7 +22,11 @@ export const Button = {
   SHIFT: 128,
 } as const;
 
-const BUTTON_MASK = Object.values(Button).reduce((mask, bit) => mask | bit, 0);
+/** The ability slots in `Button` bit order; the index is the bit position. */
+export type Slot = 'M1' | 'M2' | 'SPACE' | 'Q' | 'E' | 'R' | 'F';
+export const SLOTS: readonly Slot[] = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'];
+
+const BUTTON_MASK =Object.values(Button).reduce((mask, bit) => mask | bit, 0);
 
 /** Only exactly -1, 0 or 1 is a move axis; anything else is no movement. */
 function sanitizeAxis(value: unknown): MoveAxis {

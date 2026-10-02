@@ -1,11 +1,66 @@
 import type { ArenaDef } from './arena';
+import type { Slot } from './input';
 
 export type TeamId = 'A' | 'B';
 
-// The status union is defined with abilities in milestone 3.
-export type StatusInstance = never;
+export type StatusType =
+  | 'stun'
+  | 'root'
+  | 'silence'
+  | 'invulnerable'
+  | 'slow'
+  | 'haste'
+  | 'shield'
+  | 'dot'
+  | 'hot'
+  | 'knockback';
+export type StatusEndReason = 'expired' | 'depleted' | 'stopped' | 'replaced' | 'death';
+export type DashEndReason = 'complete' | 'blocked' | 'rooted' | 'stunned' | 'death' | 'replaced';
 
-export type Effect = { type: 'damage'; amount: number } | { type: 'heal'; amount: number };
+/** Who a status came from: the champion and the ability slot, null for a direct toolkit call. */
+export interface StatusSource {
+  sourceId: number;
+  slot: Slot | null;
+}
+
+type StatusBase = StatusSource & { remainingTicks: number };
+
+export type StatusInstance = StatusBase &
+  (
+    | { type: 'stun' | 'root' | 'silence' | 'invulnerable' }
+    | { type: 'slow' | 'haste'; percent: number }
+    | { type: 'shield'; absorb: number }
+    | { type: 'dot' | 'hot'; perPulse: number; ticksToNextPulse: number }
+    | {
+        type: 'knockback';
+        /** Unit vector. */
+        dirX: number;
+        dirY: number;
+        /** Meters of push when the instance was applied, after the cap trim. */
+        distance: number;
+        /** Ticks the push was spread over; `remainingTicks` counts down from it. */
+        totalTicks: number;
+      }
+  );
+
+/** What `applyStatus` and the `applyStatus` effect take; shield and knockback have their own. */
+export type StatusSpec =
+  | { type: 'stun' | 'root' | 'silence' | 'invulnerable'; ticks: number }
+  | { type: 'slow' | 'haste'; percent: number; ticks: number }
+  | { type: 'dot' | 'hot'; perPulse: number; ticks: number };
+
+export type Effect =
+  | { type: 'damage'; amount: number }
+  | { type: 'heal'; amount: number }
+  | { type: 'applyStatus'; status: StatusSpec }
+  | { type: 'shield'; absorb: number; ticks: number }
+  | {
+      type: 'knockback';
+      distance: number;
+      ticks: number;
+      /** `away` points from the hit origin to the target, `toward` from the target to the owner. */
+      direction: 'away' | 'toward';
+    };
 export type AreaTargets = 'enemies' | 'allies' | 'all';
 export type ProjectileEndReason = 'hit' | 'obstacle' | 'boundary' | 'lifetime';
 
@@ -79,7 +134,73 @@ export type SimEvent =
   | { type: 'areaExpired'; areaId: number }
   | { type: 'damage'; targetId: number; sourceId: number; amount: number; health: number }
   | { type: 'heal'; targetId: number; sourceId: number; amount: number; health: number }
-  | { type: 'death'; targetId: number; sourceId: number };
+  | { type: 'death'; targetId: number; sourceId: number }
+  | {
+      type: 'statusApplied';
+      targetId: number;
+      sourceId: number;
+      slot: Slot | null;
+      status: StatusType;
+      remainingTicks: number;
+    }
+  | {
+      type: 'statusExpired';
+      targetId: number;
+      sourceId: number;
+      slot: Slot | null;
+      status: StatusType;
+      reason: StatusEndReason;
+    }
+  | {
+      type: 'shieldAbsorbed';
+      targetId: number;
+      sourceId: number;
+      /** Absorbed by all shields in this one hit. */
+      amount: number;
+      /** Absorb left over all the target's shields afterwards. */
+      absorbLeft: number;
+    }
+  | {
+      type: 'meleeArc';
+      ownerId: number;
+      x: number;
+      y: number;
+      dirX: number;
+      dirY: number;
+      radius: number;
+      cosHalfAngle: number;
+      targetIds: number[];
+    }
+  | {
+      type: 'teleport';
+      championId: number;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+      blocked: boolean;
+    }
+  | {
+      type: 'dashStarted';
+      championId: number;
+      x: number;
+      y: number;
+      dirX: number;
+      dirY: number;
+      distance: number;
+      ticks: number;
+    }
+  | { type: 'dashEnded'; championId: number; x: number; y: number; reason: DashEndReason };
+
+export interface DashState {
+  /** Unit vector. */
+  dirX: number;
+  dirY: number;
+  /** Meters moved each tick. */
+  stepLength: number;
+  /** Ticks of motion left, counting the next one. */
+  ticksLeft: number;
+}
 
 export interface ChampionState {
   id: number;
@@ -100,7 +221,9 @@ export interface ChampionState {
   maxHealth: number;
   energy: number;
   alive: boolean;
+  /** In application order; see the Statuses section of simulation.md. */
   statuses: StatusInstance[];
+  dash: DashState | null;
 }
 
 export interface GameState {
@@ -136,6 +259,19 @@ export function nextId(state: GameState): number {
   const id = state.nextEntityId;
   state.nextEntityId = id + 1;
   return id;
+}
+
+/** Ends a champion's dash, if it has one, and reports it where the champion stands now. */
+export function endDash(state: GameState, champion: ChampionState, reason: DashEndReason): void {
+  if (!champion.dash) return;
+  champion.dash = null;
+  state.events.push({
+    type: 'dashEnded',
+    championId: champion.id,
+    x: champion.x,
+    y: champion.y,
+    reason,
+  });
 }
 
 // The sim's lib has no built-in deep clone, and state is plain JSON by contract.

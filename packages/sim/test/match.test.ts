@@ -131,3 +131,10 @@ describe('createMatch', () => {
     expect(createMatch(config3v3(), arena01, 1).nextEntityId).toBe(6);
   });
 });
+
+describe('createMatch toolkit state', () => {
+  it('starts every champion without a dash', () => {
+    const state = createMatch(config2v2(), arena01, 1);
+    for (const c of state.champions) expect(c.dash).toBeNull();
+  });
+});
