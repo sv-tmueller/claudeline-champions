@@ -1,11 +1,34 @@
 import arena01Json from '../../../data/arenas/arena01.json';
-import { CHAMPION_RADIUS, createMatch, parseArenaDef, step } from '@claudeline/sim';
+import { CHAMPION_RADIUS, createMatch, hasLineOfSight, parseArenaDef, step } from '@claudeline/sim';
 import type { ArenaDef, ChampionState, GameState, MatchConfig, PlayerInput } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import type { Difficulty } from '../src/difficulty';
+import { nearestFreeCell } from '../src/follow';
+import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
+import type { NavGrid } from '../src/grid';
+import type { Intent } from '../src/intent';
+import { findPath } from '../src/path';
+import { profileFor } from '../src/profile';
 
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
+
+function validAxis(v: number): boolean {
+  return (v === 1 || v === -1 || v === 0) && !Object.is(v, -0);
+}
+
+/** The input rules every bot input must meet: eight-direction axes, whole-centimetre aim, no buttons. */
+export function validInput(input: PlayerInput): boolean {
+  return (
+    validAxis(input.moveX) &&
+    validAxis(input.moveY) &&
+    Number.isInteger(input.aimX) &&
+    Number.isInteger(input.aimY) &&
+    !Object.is(input.aimX, -0) &&
+    !Object.is(input.aimY, -0) &&
+    input.buttons === 0
+  );
+}
 
 // A copy of the sim's test helper: bots tests must not reach into sim tests.
 export function config2v2(): MatchConfig {
@@ -168,4 +191,109 @@ export function runMatch(
     onTick?.(run, tick, tickInputs);
   }
   return run;
+}
+
+/**
+ * An independent oracle for the spawn point of a champion: its slot is the number of
+ * teammates with a lower id. It deliberately does not import the one in src/bot.
+ */
+export function ownSpawnOf(state: GameState, c: ChampionState): Point | undefined {
+  const slot = state.champions.filter((o) => o.team === c.team && o.id < c.id).length;
+  const spawn = (c.team === 'A' ? state.arena.spawns.teamA : state.arena.spawns.teamB)[slot];
+  return spawn === undefined ? undefined : { x: spawn[0], y: spawn[1] };
+}
+
+/** True when the intent in `acted` is a stand that bots.md documents. */
+export function holding(
+  state: GameState,
+  c: ChampionState,
+  acted: { intent: Intent; targetId: number },
+): boolean {
+  if (acted.intent === 'retreat') {
+    const spawn = ownSpawnOf(state, c);
+    return spawn !== undefined && Math.hypot(c.x - spawn.x, c.y - spawn.y) <= 0.5;
+  }
+  const target = state.champions[acted.targetId];
+  if (target === undefined || !target.alive || target.team === c.team) return false;
+  const d = Math.hypot(c.x - target.x, c.y - target.y);
+  const { rangeMin, rangeMax } = profileFor(c.championId);
+  if (acted.intent === 'engage') return d <= rangeMax && hasLineOfSight(state, c, target);
+  if (acted.intent === 'kite') {
+    return d >= rangeMin && d <= rangeMax && hasLineOfSight(state, c, target);
+  }
+  return false;
+}
+
+/** A champion's own cell when free, else its nearest free cell, as a point; null when none. */
+function walkableCellOf(grid: NavGrid, p: Point): Point | null {
+  const own = cellIndexAt(grid, p);
+  if (own >= 0 && grid.blocked[own] === false) return cellCenter(grid, own);
+  const near = nearestFreeCell(grid, p);
+  return near < 0 ? null : cellCenter(grid, near);
+}
+
+/** True when some alive enemy of c is reachable on the grid from c. */
+export function enemyReachable(grid: NavGrid, state: GameState, c: ChampionState): boolean {
+  const from = walkableCellOf(grid, c);
+  if (from === null) return false;
+  for (const enemy of state.champions) {
+    if (!enemy.alive || enemy.team === c.team) continue;
+    const to = walkableCellOf(grid, enemy);
+    if (to !== null && findPath(grid, from, to).length > 0) return true;
+  }
+  return false;
+}
+
+export interface WorstStall {
+  id: number;
+  /** The tick the run started on. */
+  from: number;
+  length: number;
+  intent: Intent;
+}
+
+export interface StallTracker {
+  /** Call after every bot thought and before `step`: it reads the state the bots thought on. */
+  observe(inputs: readonly PlayerInput[]): void;
+  worst(): WorstStall;
+}
+
+/**
+ * Counts, per bot, consecutive stall ticks: a zero-move input, not in a documented stand,
+ * while some alive enemy is reachable on the grid. Any other tick resets the run.
+ */
+export function createStallTracker(state: GameState, bots: readonly Bot[]): StallTracker {
+  const grid = buildNavGrid(state.arena);
+  const runs = bots.map(() => ({ from: 0, length: 0 }));
+  let worst: WorstStall = { id: -1, from: 0, length: 0, intent: 'idle' };
+  return {
+    observe(inputs: readonly PlayerInput[]): void {
+      bots.forEach((bot, id) => {
+        const c = state.champions[id];
+        const input = inputs[id];
+        const run = runs[id];
+        if (c === undefined || input === undefined || run === undefined) return;
+        const acted = bot.inspect();
+        const stalled =
+          c.alive &&
+          input.moveX === 0 &&
+          input.moveY === 0 &&
+          !holding(state, c, acted) &&
+          // Last, so the reachability search runs only on candidate stall ticks.
+          enemyReachable(grid, state, c);
+        if (!stalled) {
+          run.length = 0;
+          return;
+        }
+        if (run.length === 0) run.from = state.tick;
+        run.length++;
+        if (run.length > worst.length) {
+          worst = { id, from: run.from, length: run.length, intent: acted.intent };
+        }
+      });
+    },
+    worst(): WorstStall {
+      return { ...worst };
+    },
+  };
 }

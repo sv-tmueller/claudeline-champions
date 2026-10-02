@@ -5,9 +5,12 @@ import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
+import { createFollower, followPath } from '../src/follow';
 import { pointBlocked } from '../src/geometry';
 import { buildNavGrid, cellIndexAt } from '../src/grid';
+import type { Vec2 } from '../src/grid';
 import { profileFor } from '../src/profile';
+import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
 import { arena01, config2v2 } from './helpers';
@@ -269,8 +272,9 @@ describe('engage', () => {
   }
 
   it('keeps moving around a wall until it has line of sight', () => {
-    // A tall wall instead of the pillar: a ranged bot that detoured around the pillar would
-    // pass inside its kite range and stop there (see the notes in the pull request).
+    // A tall wall instead of the pillar: the detour around the pillar passes through the kite
+    // band, where the bot regains line of sight by the kite rules (see the kite tests). The
+    // wall pins the engage rule on its own: the bot stays in engage until it sees the target.
     const wall: ArenaDef = {
       ...open,
       obstacles: [{ type: 'rect', x: 0, y: 0, w: 0.5, h: 10, height: 1.5, blocksProjectiles: true }],
@@ -384,6 +388,162 @@ describe('kite step', () => {
     expect(kiteMoveBesideWall(1.6)).toEqual({ moveX: 1, moveY: 1 });
     // A face at 1.48 m blocks the point itself, and the bot also moves (1, 1).
     expect(kiteMoveBesideWall(1.48)).toEqual({ moveX: 1, moveY: 1 });
+  });
+});
+
+describe('kite corner and line of sight', () => {
+  // Quillon (id 1, team A slot 1) spawns at (-12, -2).
+  const SPAWN: Vec2 = { x: -12, y: -2 };
+  const NOT_MOVING = { moveX: 0, moveY: 0 };
+
+  /** The five points bot.ts tries, written out again: away, +45, -45, +90 and -90 degrees. */
+  function kiteCandidates(me: Vec2, target: Vec2): Vec2[] {
+    const d = Math.hypot(me.x - target.x, me.y - target.y);
+    const ax = (me.x - target.x) / d;
+    const ay = (me.y - target.y) / d;
+    const r = Math.SQRT1_2;
+    return [
+      { x: ax, y: ay },
+      { x: ax * r - ay * r, y: ax * r + ay * r },
+      { x: ax * r + ay * r, y: -ax * r + ay * r },
+      { x: -ay, y: ax },
+      { x: ay, y: -ax },
+    ].map((v) => ({ x: me.x + v.x * KITE_STEP, y: me.y + v.y * KITE_STEP }));
+  }
+
+  function expectCornered(me: Vec2, target: Vec2): void {
+    const grid = buildNavGrid(arena01);
+    for (const p of kiteCandidates(me, target)) {
+      const cell = cellIndexAt(grid, p);
+      expect(cell < 0 || grid.blocked[cell] === true, `${p.x}, ${p.y}`).toBe(true);
+    }
+  }
+
+  function stepOne(state: GameState, id: number, input: PlayerInput): void {
+    const inputs: (PlayerInput | undefined)[] = [];
+    inputs[id] = input;
+    step(state, inputs);
+  }
+
+  it('leaves a corner where all five kite steps are blocked', () => {
+    const state = setup(arena01);
+    kill(state, 0, 3);
+    const me = put(state, 1, 14.4, 9.4);
+    const target = put(state, 2, 12.4, 7.4);
+    expectCornered(me, target);
+
+    const bot = createBot(1, 'hard', 1);
+    const first = thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect()).toEqual({ intent: 'kite', targetId: 2 });
+    const grid = buildNavGrid(arena01);
+    const expected = followPath(grid, createFollower(), me, SPAWN);
+    expect(expected).not.toEqual(NOT_MOVING);
+    expect({ moveX: first.moveX, moveY: first.moveY }).toEqual(expected);
+
+    // The target stands still. Every input moves until the bot is 6 m from it.
+    let ticks = 0;
+    while (dist(me, target) < 6 && ticks < 300) {
+      const input = bot.think(state);
+      expect(input.moveX !== 0 || input.moveY !== 0, `tick ${ticks}`).toBe(true);
+      for (const v of [input.moveX, input.moveY, input.aimX, input.aimY, me.x, me.y]) {
+        expect(Number.isNaN(v)).toBe(false);
+      }
+      stepOne(state, 1, input);
+      ticks++;
+    }
+    expect(dist(me, target)).toBeGreaterThanOrEqual(6);
+    expect(dist(me, { x: 14.4, y: 9.4 })).toBeGreaterThan(1);
+  });
+
+  it('regains line of sight in the kite band', () => {
+    const state = setup(arena01);
+    kill(state, 0, 3);
+    const me = put(state, 1, -3, 0);
+    const target = put(state, 2, -3, 4);
+    expect(hasLineOfSight(state, me, target)).toBe(true);
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect().intent).toBe('kite');
+
+    // The target steps behind the pillar: 7 m away, inside the kite band, and out of sight.
+    put(state, 2, 4, 0);
+    expect(hasLineOfSight(state, me, target)).toBe(false);
+    expect(dist(me, target)).toBe(7);
+    const { rangeMin, rangeMax } = profileFor('quillon');
+    const seen = () =>
+      hasLineOfSight(state, me, target) && dist(me, target) >= rangeMin && dist(me, target) <= rangeMax;
+    let ticks = 0;
+    while (!seen() && ticks < 240) {
+      const input = bot.think(state);
+      expect(input.buttons, `tick ${ticks}`).toBe(0);
+      stepOne(state, 1, input);
+      ticks++;
+    }
+    expect(seen()).toBe(true);
+    for (let i = 0; i < 30; i++) {
+      const input = bot.think(state);
+      expect(input.buttons).toBe(0);
+      stepOne(state, 1, input);
+      expect(hasLineOfSight(state, me, target), `hold ${i}`).toBe(true);
+    }
+    expect(me.vx === 0 && me.vy === 0).toBe(true);
+  });
+
+  it('follows the path to the target when no cell within 8 has line of sight', () => {
+    const walled: ArenaDef = {
+      ...open,
+      id: 'walled',
+      obstacles: [{ type: 'rect', x: 0, y: 0, w: 0.5, h: 16, height: 1.5, blocksProjectiles: true }],
+    };
+    const state = setup(walled);
+    kill(state, 0, 3);
+    const me = put(state, 1, -3.25, 0.25);
+    const target = put(state, 2, -3.25, 4.25);
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect().intent).toBe('kite');
+
+    // Across the wall and 6.5 m away: the cells that see it are 2.5 m from it, below the band.
+    put(state, 2, 3.25, 0.25);
+    expect(hasLineOfSight(state, me, target)).toBe(false);
+    const grid = buildNavGrid(walled);
+    const { rangeMin, rangeMax } = profileFor('quillon');
+    expect(nearestSightCell(grid, state, me, target, rangeMin, rangeMax)).toBe(-1);
+
+    const input = bot.think(state);
+    expect(bot.inspect().intent).toBe('kite');
+    const expected = followPath(grid, createFollower(), me, target);
+    expect(expected).not.toEqual(NOT_MOVING);
+    expect({ moveX: input.moveX, moveY: input.moveY }).toEqual(expected);
+    expect(input.buttons).toBe(0);
+  });
+
+  it('starts a fresh plan when it is cornered again after kite steps', () => {
+    const state = setup(arena01);
+    kill(state, 0, 3);
+    const me = put(state, 1, 14.4, 9.4);
+    const target = put(state, 2, 12.4, 7.4);
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect().intent).toBe('kite');
+
+    // Open ground, 7 m from the target and in sight: the bot stands, so it never calls the path
+    // follower and the escape is over.
+    put(state, 1, 2, 3);
+    put(state, 2, 9, 3);
+    for (let i = 0; i < 5; i++) {
+      const input = bot.think(state);
+      expect(input).toMatchObject({ moveX: 0, moveY: 0 });
+    }
+
+    // Cornered again, in the other corner. The escape plan from the first corner is stale.
+    put(state, 1, 14.4, -9.4);
+    put(state, 2, 12.4, -7.4);
+    expectCornered(me, target);
+    const input = bot.think(state);
+    const expected = followPath(buildNavGrid(arena01), createFollower(), me, SPAWN);
+    expect(expected).not.toEqual(NOT_MOVING);
+    expect({ moveX: input.moveX, moveY: input.moveY }).toEqual(expected);
   });
 });
 
