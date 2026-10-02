@@ -483,6 +483,8 @@ describe('kite corner and line of sight', () => {
     for (let i = 0; i < 30; i++) {
       const input = bot.think(state);
       expect(input.buttons).toBe(0);
+      // A stand: no walking at all, not a step that happens to keep line of sight.
+      expect({ moveX: input.moveX, moveY: input.moveY }, `hold ${i}`).toEqual({ moveX: 0, moveY: 0 });
       stepOne(state, 1, input);
       expect(hasLineOfSight(state, me, target), `hold ${i}`).toBe(true);
     }
@@ -518,7 +520,7 @@ describe('kite corner and line of sight', () => {
     expect(input.buttons).toBe(0);
   });
 
-  it('starts a fresh plan when it is cornered again after kite steps', () => {
+  it('starts a fresh plan when it is cornered again after a stand in the band', () => {
     const state = setup(arena01);
     kill(state, 0, 3);
     const me = put(state, 1, 14.4, 9.4);

@@ -92,6 +92,35 @@ describe('nearestSightCell', () => {
     expect(found).toBeLessThan(positions);
   });
 
+  it('agrees with a brute-force scan at the west and east edges, where the column window is clamped', () => {
+    const state = stateOf(arena01);
+    const grid = buildNavGrid(arena01);
+    let positions = 0;
+    for (const [x, target] of [
+      [-14.25, { x: 4, y: 0 }],
+      [14.25, { x: -4, y: 0 }],
+    ] as const) {
+      for (const y of [-6, -3, 3, 6, 8]) {
+        const p = { x, y };
+        const expected = bruteForce(grid, state, p, target, 6, 13, SIGHT_RADIUS);
+        expect(nearestSightCell(grid, state, p, target, 6, 13), `${p.x}, ${p.y}`).toBe(expected);
+        positions++;
+      }
+    }
+    expect(positions).toBe(10);
+  });
+
+  it('keeps a cell exactly at both ends of the band: rangeMin 16 and rangeMax 16 find the cell 16 m away', () => {
+    const state = stateOf(wide);
+    const grid = buildNavGrid(wide);
+    const p = cellCenter(grid, cellIndexAt(grid, { x: -10.25, y: 0.25 }));
+    const target = { x: p.x + 20, y: p.y };
+    const cell = nearestSightCell(grid, state, p, target, 16, 16);
+    expect(cell).toBeGreaterThanOrEqual(0);
+    expect(cellCenter(grid, cell)).toEqual({ x: p.x + 4, y: p.y });
+    expect(Math.hypot(p.x + 4 - target.x, p.y - target.y)).toBe(16);
+  });
+
   it('keeps only cells inside the distance band', () => {
     const state = stateOf(open);
     const grid = buildNavGrid(open);
