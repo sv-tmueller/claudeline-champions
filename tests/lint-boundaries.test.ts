@@ -29,6 +29,38 @@ type Case = { name: string; file: string; code: string; rule: string | null };
 
 const simGlobalNames = ['Date', 'performance', 'window', 'document', 'fetch', 'setTimeout', 'setInterval'];
 
+// Written out here, never imported from the config, so a name dropped from the config fails a row.
+const bannedMathNames = [
+  'atan2',
+  'atan',
+  'sin',
+  'cos',
+  'tan',
+  'asin',
+  'acos',
+  'exp',
+  'log',
+  'log2',
+  'log10',
+  'pow',
+  'hypot',
+  'cbrt',
+  'expm1',
+  'log1p',
+  'sinh',
+  'cosh',
+  'tanh',
+];
+const exactMath = [
+  'Math.sqrt(2)',
+  'Math.abs(-1)',
+  'Math.round(1.5)',
+  'Math.min(1, 2)',
+  'Math.max(1, 2)',
+  'Math.imul(3, 4)',
+  'Math.PI',
+];
+
 const cases: Case[] = [
   { name: 'sim imports client', file: simFile, code: "import '@claudeline/client';", rule: IMPORTS },
   {
@@ -156,9 +188,49 @@ const cases: Case[] = [
     code: `export const x = ${name};`,
     rule: GLOBALS,
   })),
+  ...bannedMathNames.map((name) => ({
+    name: `sim calls Math.${name}`,
+    file: simFile,
+    code: `export const v = Math.${name}(0.5, 0.5);`,
+    rule: PROPERTIES,
+  })),
+  ...exactMath.map((expression) => ({
+    name: `sim uses ${expression}`,
+    file: simFile,
+    code: `export const v = ${expression};`,
+    rule: null,
+  })),
+  { name: 'sim uses the ** operator', file: simFile, code: 'export const v = 2 ** 3;', rule: SYNTAX },
+  {
+    name: 'sim uses the **= operator',
+    file: simFile,
+    code: 'let v = 2; v **= 3; export { v };',
+    rule: SYNTAX,
+  },
+  {
+    // Pins linterOptions.noInlineConfig: an inline disable must not silence the ban.
+    name: 'sim silences the Math.sin ban with an inline disable',
+    file: simFile,
+    code: '// eslint-disable-next-line no-restricted-properties\nexport const v = Math.sin(1);',
+    rule: PROPERTIES,
+  },
+  {
+    name: 'sim test uses the banned math and **',
+    file: simTestFile,
+    code: 'export const v = Math.atan2(1, 2) + Math.hypot(3, 4) + Math.sin(1) + 2 ** 3;',
+    rule: null,
+  },
+  {
+    name: 'client uses Math.sin and Math.cos',
+    file: clientFile,
+    code: 'export const v = Math.sin(1) + Math.cos(1);',
+    rule: null,
+  },
 ];
 
-describe('package boundary lint rules', () => {
+// The first row has hit Vitest's 5 s default timeout while the machine ran several e2e suites at
+// once (batch #23 decision 8). It never reproduced on CI or on an idle machine.
+describe('package boundary lint rules', { timeout: 30_000 }, () => {
   it.each(cases)('$name', async ({ file, code, rule }) => {
     const ids = await boundaryRuleIds(file, code);
     if (rule === null) {

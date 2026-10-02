@@ -1,16 +1,19 @@
 // Tests for the deterministic math port.
 //
-// How the committed bit patterns were generated: author `fixtures/dmath-atan2.json` as an
-// empty array, run `npx vitest run --project sim packages/sim/test/dmath.test.ts`, write the
-// patterns the failing fixture assertion reports (the same LCG and inputs, `atan2` from the
+// How the committed bit patterns were generated: author `fixtures/dmath-atan2.json`,
+// `fixtures/dmath-sin.json` and `fixtures/dmath-cos.json` as empty arrays, run
+// `npx vitest run --project sim packages/sim/test/dmath.test.ts`, write the patterns the
+// failing fixture assertions report (the same LCG and inputs, the function under test from the
 // port), and rerun until it is green. There is no writer script. Every CI run on another CPU
-// then proves the port gives the same bits there, which `Math.atan2` does not.
+// then proves the port gives the same bits there, which V8's `Math` functions do not.
 //
-// Comparing against `Math.atan2` and `Math.atan` is allowed in this file only: they are the
-// accuracy reference, never a source of expected bits.
+// Comparing against `Math.atan2`, `Math.atan`, `Math.sin` and `Math.cos` is allowed in this
+// file only: they are the accuracy reference, never a source of expected bits.
 import { describe, expect, it } from 'vitest';
-import bitsJson from './fixtures/dmath-atan2.json';
-import { atan, atan2 } from '../src/dmath';
+import atan2BitsJson from './fixtures/dmath-atan2.json';
+import cosBitsJson from './fixtures/dmath-cos.json';
+import sinBitsJson from './fixtures/dmath-sin.json';
+import { atan, atan2, cos, sin } from '../src/dmath';
 
 const f64 = new Float64Array(1);
 const u64 = new BigUint64Array(f64.buffer);
@@ -78,7 +81,7 @@ describe('atan2 bit patterns', () => {
   it('matches the committed bit patterns on every input', () => {
     const actual = inputs().map(([y, x]) => bits(atan2(y, x)));
     expect(actual.length).toBe(COUNT);
-    expect(actual).toEqual(bitsJson);
+    expect(actual).toEqual(atan2BitsJson);
   });
 
   it('stays within 2 ulps of Math.atan2', () => {
@@ -158,5 +161,133 @@ describe('atan', () => {
       const reference = Math.atan(x);
       expect(ulpDistance(atan(x), reference)).toBeLessThanOrEqual(2n);
     }
+  });
+});
+
+function fromBits(pattern: bigint): number {
+  u64[0] = pattern;
+  return f64[0] ?? 0;
+}
+
+/** 2^k for an integer k, by repeated doubling or halving (exact, no `**`). */
+function pow2(k: number): number {
+  let value = 1;
+  for (let i = 0; i < Math.abs(k); i++) value = k < 0 ? value / 2 : value * 2;
+  return value;
+}
+
+const BOUND = 1647099; // dmath accepts |x| below this, just under 2^20 * (pi / 2)
+const BOUND_BITS = 0x413921fb00000000n;
+
+// Three strata with exact operations only, so every CPU builds the same inputs: A is uniform
+// over four full turns, B spans the magnitudes from 2^-30 to 2^20 and C sits on multiples of
+// pi / 2, where argument reduction cancels the most. The first eight C multiples are 1 to 8, so
+// the reduction branches pinned to pi/2, pi, 3pi/2 and 2pi are certain to run.
+function trigInputs(): number[] {
+  const next = lcg(20261002);
+  const out: number[] = [];
+  for (let i = 0; i < COUNT; i++) {
+    if (i < 800) {
+      out.push((next() * 2 - 1) * (4 * Math.PI));
+    } else if (i < 1600) {
+      const k = Math.floor(next() * 50) - 30;
+      const magnitude = (1 + next()) * pow2(k);
+      out.push(next() < 0.5 ? -magnitude : magnitude);
+    } else {
+      const j = i - 1600;
+      const k = j < 8 ? j + 1 : 1 + Math.floor(next() * 2 ** 19);
+      const value = k * (Math.PI / 2);
+      out.push(next() < 0.5 ? -value : value);
+    }
+  }
+  return out;
+}
+
+const trig = [
+  { name: 'sin', fn: sin, reference: Math.sin, fixture: sinBitsJson as string[] },
+  { name: 'cos', fn: cos, reference: Math.cos, fixture: cosBitsJson as string[] },
+];
+
+describe('trigInputs', () => {
+  it('stays below the bound', () => {
+    const values = trigInputs();
+    expect(values.length).toBe(COUNT);
+    expect(Math.max(...values.map(Math.abs))).toBeLessThan(BOUND);
+  });
+});
+
+describe.each(trig)('$name', ({ fn, reference, fixture }) => {
+  it('matches the committed bit patterns on every input', () => {
+    const actual = trigInputs().map((x) => bits(fn(x)));
+    expect(actual.length).toBe(COUNT);
+    expect(actual).toEqual(fixture);
+  });
+
+  it('stays within 2 ulps of the V8 function on every fixture input', () => {
+    for (const x of trigInputs()) {
+      expect(ulpDistance(fn(x), reference(x))).toBeLessThanOrEqual(2n);
+    }
+  });
+
+  it('stays within 2 ulps on multiples of pi / 2 and on large arguments', () => {
+    const inputs = [1e5, 1.6e6];
+    for (let k = 3; k <= 8; k++) inputs.push(k * (Math.PI / 2));
+    inputs.push(1e5 * (Math.PI / 2));
+    for (const x of inputs) {
+      expect(ulpDistance(fn(x), reference(x))).toBeLessThanOrEqual(2n);
+      expect(ulpDistance(fn(-x), reference(-x))).toBeLessThanOrEqual(2n);
+    }
+  });
+
+  it('returns NaN for NaN and the infinities', () => {
+    expect(fn(NaN)).toBeNaN();
+    expect(fn(Infinity)).toBeNaN();
+    expect(fn(-Infinity)).toBeNaN();
+  });
+
+  it('throws at the bound, its negative and beyond, and accepts the double below it', () => {
+    const atBound = fromBits(BOUND_BITS);
+    expect(Math.trunc(atBound)).toBe(BOUND);
+    expect(() => fn(atBound)).toThrow(RangeError);
+    expect(() => fn(-atBound)).toThrow(RangeError);
+    expect(() => fn(2e6)).toThrow(RangeError);
+    expect(() => fn(1e300)).toThrow(`dmath: sin and cos need |x| < 1647099, got ${1e300}`);
+    const below = fromBits(BOUND_BITS - 1n);
+    expect(ulpDistance(fn(below), reference(below))).toBeLessThanOrEqual(2n);
+  });
+});
+
+describe('sin', () => {
+  it('is odd, bit for bit', () => {
+    for (const x of trigInputs()) {
+      expect(bits(sin(-x))).toBe(bits(-sin(x)));
+    }
+  });
+
+  it('gives the exact values at the anchors', () => {
+    expect(Object.is(sin(0), 0)).toBe(true);
+    expect(Object.is(sin(-0), -0)).toBe(true);
+    expect(sin(1e-300)).toBe(1e-300);
+    expect(sin(Math.PI)).toBe(1.2246467991473532e-16);
+    expect(sin(-Math.PI)).toBe(-1.2246467991473532e-16);
+    expect(sin(Math.PI / 2)).toBe(1);
+    expect(sin(2 * Math.PI)).toBe(-2.4492935982947064e-16);
+  });
+});
+
+describe('cos', () => {
+  it('is even, bit for bit', () => {
+    for (const x of trigInputs()) {
+      expect(bits(cos(-x))).toBe(bits(cos(x)));
+    }
+  });
+
+  it('gives the exact values at the anchors', () => {
+    expect(cos(0)).toBe(1);
+    expect(cos(-0)).toBe(1);
+    expect(cos(1e-300)).toBe(1);
+    expect(cos(Math.PI)).toBe(-1);
+    expect(cos(Math.PI / 2)).toBe(6.123233995736766e-17);
+    expect(cos(2 * Math.PI)).toBe(1);
   });
 });

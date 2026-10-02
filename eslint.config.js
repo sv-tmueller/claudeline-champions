@@ -71,6 +71,33 @@ const noDynamicImport = [
 
 const CLOCK = 'sim never reads the wall clock or uses timers (spec section 4.8).';
 const HOST = 'sim never touches the browser or the network (spec section 3.2).';
+// V8's transcendental Math functions are not correctly rounded and differ in the last bit
+// between CPU architectures (batch #23 decision 9).
+const TRANSCENDENTAL = [
+  'atan2',
+  'atan',
+  'sin',
+  'cos',
+  'tan',
+  'asin',
+  'acos',
+  'exp',
+  'log',
+  'log2',
+  'log10',
+  'pow',
+  'hypot',
+  'cbrt',
+  'expm1',
+  'log1p',
+  'sinh',
+  'cosh',
+  'tanh',
+];
+const MATH_PORT =
+  'differs in the last bit across CPUs; use the ports in packages/sim/src/dmath.ts (port it there first if missing) or a constant in kit data (spec section 4.8, rule 4).';
+const POW =
+  '** is V8 pow, which is not correctly rounded; multiply, or port the function to packages/sim/src/dmath.ts (spec section 4.8, rule 4).';
 const simGlobals = [
   'error',
   { name: 'Date', message: CLOCK },
@@ -90,6 +117,16 @@ const simProperties = [
   },
   { object: 'Date', property: 'now', message: CLOCK },
   { object: 'performance', property: 'now', message: CLOCK },
+  ...TRANSCENDENTAL.map((property) => ({
+    object: 'Math',
+    property,
+    message: `Math.${property} ${MATH_PORT}`,
+  })),
+];
+const simSyntax = [
+  ...noDynamicImport,
+  { selector: "BinaryExpression[operator='**']", message: POW },
+  { selector: "AssignmentExpression[operator='**=']", message: POW },
 ];
 
 export default defineConfig(
@@ -108,9 +145,11 @@ export default defineConfig(
   },
   {
     files: ['packages/sim/src/**'],
+    // An inline eslint-disable must not silence the determinism bans.
+    linterOptions: { noInlineConfig: true },
     rules: {
       'no-restricted-imports': boundaryRule(simPatterns),
-      'no-restricted-syntax': noDynamicImport,
+      'no-restricted-syntax': simSyntax,
       'no-restricted-globals': simGlobals,
       'no-restricted-properties': simProperties,
     },
