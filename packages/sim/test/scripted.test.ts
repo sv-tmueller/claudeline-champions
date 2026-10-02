@@ -29,7 +29,7 @@ import type { AreaSpec } from '../src/area';
 import { applyDamage, applyHeal } from '../src/health';
 import { spawnProjectile } from '../src/projectile';
 import type { ProjectileSpec } from '../src/projectile';
-import { EVENT_FIXTURE, arena01, checkInvariants, legacyState } from './helpers';
+import { EVENT_FIXTURE, arena01, checkInvariants, findNegativeZero, legacyState } from './helpers';
 
 type Entry = [number, number, number, number, number] | null;
 
@@ -162,12 +162,6 @@ function play(state: GameState, from = 0, observer: Observer = {}): GameState {
 
 function start(): GameState {
   return createMatch(fixture.config, arena01, fixture.seed);
-}
-
-function findNegativeZero(value: unknown, path: string): string[] {
-  if (typeof value === 'number') return Object.is(value, -0) ? [path] : [];
-  if (typeof value !== 'object' || value === null) return [];
-  return Object.entries(value).flatMap(([key, item]) => findNegativeZero(item, `${path}.${key}`));
 }
 
 interface Frozen {

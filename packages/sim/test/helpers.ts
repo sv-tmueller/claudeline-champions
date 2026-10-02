@@ -214,3 +214,53 @@ export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability'> = {
   dashStarted: 'ability',
   dashEnded: 'ability',
 };
+
+const UNIQUE_STATUSES = ['stun', 'root', 'silence', 'invulnerable'];
+
+/** Oracle for the status and dash rules. Returns one message per violation. */
+export function checkStatusInvariants(state: GameState): string[] {
+  const problems: string[] = [];
+  const bad = (c: ChampionState, what: string) =>
+    problems.push(`tick ${state.tick} champion ${c.id}: ${what}`);
+  const isInt = (v: number) => Number.isInteger(v);
+  for (const c of state.champions) {
+    if (!c.alive && (c.statuses.length > 0 || c.dash !== null)) bad(c, 'dead with statuses or a dash');
+    const seen = new Set<string>();
+    let push = 0;
+    for (const s of c.statuses) {
+      if (!isInt(s.remainingTicks) || s.remainingTicks < 1) bad(c, `${s.type} remainingTicks ${s.remainingTicks}`);
+      if (!Number.isInteger(s.sourceId) || !state.champions[s.sourceId]) bad(c, `${s.type} source ${s.sourceId}`);
+      const key = UNIQUE_STATUSES.includes(s.type) ? s.type : `${s.type}/${s.sourceId}/${s.slot}`;
+      if (seen.has(key)) bad(c, `second instance of ${key}`);
+      seen.add(key);
+      if (s.type === 'stun' && s.remainingTicks > 120) bad(c, `stun of ${s.remainingTicks} ticks`);
+      if ((s.type === 'slow' || s.type === 'haste') && (!isInt(s.percent) || s.percent < 1 || s.percent > 100)) {
+        bad(c, `${s.type} percent ${s.percent}`);
+      }
+      if (s.type === 'shield' && !(s.absorb > 0)) bad(c, `shield absorb ${s.absorb}`);
+      if ((s.type === 'dot' || s.type === 'hot') && (!isInt(s.ticksToNextPulse) || s.ticksToNextPulse < 1 || s.ticksToNextPulse > 30)) {
+        bad(c, `${s.type} pulse timer ${s.ticksToNextPulse}`);
+      }
+      if (s.type === 'knockback') {
+        const n = s.remainingTicks;
+        if (!(s.distance > 0) || !isInt(s.totalTicks) || n > s.totalTicks) bad(c, 'bad knockback record');
+        if (Math.abs(Math.sqrt(s.dirX * s.dirX + s.dirY * s.dirY) - 1) > 1e-12) bad(c, 'knockback direction is not a unit vector');
+        push += (s.distance * n * (n + 1)) / (s.totalTicks * (s.totalTicks + 1));
+      }
+    }
+    if (push > 6 + 1e-9) bad(c, `knockback push ${push} above 6 m`);
+    if (c.dash) {
+      if (!isInt(c.dash.ticksLeft) || c.dash.ticksLeft < 1) bad(c, `dash ticksLeft ${c.dash.ticksLeft}`);
+      if (!(c.dash.stepLength > 0)) bad(c, `dash stepLength ${c.dash.stepLength}`);
+      if (Math.abs(Math.sqrt(c.dash.dirX ** 2 + c.dash.dirY ** 2) - 1) > 1e-12) bad(c, 'dash direction is not a unit vector');
+    }
+  }
+  return problems;
+}
+
+/** Paths of every `-0` in a JSON-like value, since a JSON round trip would turn it into 0. */
+export function findNegativeZero(value: unknown, path: string): string[] {
+  if (typeof value === 'number') return Object.is(value, -0) ? [path] : [];
+  if (typeof value !== 'object' || value === null) return [];
+  return Object.entries(value).flatMap(([key, item]) => findNegativeZero(item, `${path}.${key}`));
+}
