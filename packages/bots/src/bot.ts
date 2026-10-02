@@ -4,8 +4,8 @@ import { NOMINAL_PROJECTILE_SPEED, leadPoint, roundAim, rotateByHalfTangent } fr
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
 import { createFollower, followPath } from './follow';
-import { pointBlocked, segmentClear } from './geometry';
-import { buildNavGrid } from './grid';
+import { segmentClear } from './geometry';
+import { buildNavGrid, cellIndexAt } from './grid';
 import type { NavGrid, Vec2 } from './grid';
 import { chooseIntent, scoreIntents } from './intent';
 import type { Intent, ScoredIntent } from './intent';
@@ -36,8 +36,6 @@ interface Decision {
 function fail(problem: string): never {
   throw new Error(`Invalid bot: ${problem}`);
 }
-
-const STAND: Readonly<MoveCommand> = { moveX: 0, moveY: 0 };
 
 function distanceBetween(a: Vec2, b: Vec2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -76,8 +74,10 @@ function ownSpawn(state: GameState, me: ChampionState): Vec2 | undefined {
   return spawn === undefined ? undefined : { x: spawn[0], y: spawn[1] };
 }
 
+/** True when the grid cell holding p is free, the cell the path follower would plan to. */
 function cellFree(grid: NavGrid, p: Vec2): boolean {
-  return !pointBlocked(grid, p);
+  const cell = cellIndexAt(grid, p);
+  return cell >= 0 && grid.blocked[cell] === false;
 }
 
 /** Turns the unit vector by 45 degrees (sign 1 or -1) with exact constants, no trigonometry. */
@@ -87,7 +87,10 @@ function turn45(v: Vec2, sign: 1 | -1): Vec2 {
   return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
 }
 
-/** The first of straight away, +45, -45, +90, -90 degrees whose point 1 m off is free and reachable. */
+/**
+ * The first of straight away, +45, -45, +90, -90 degrees whose point 1 m off lies in a free grid
+ * cell and is reached by a clear straight segment. Stands when all five fail.
+ */
 function kiteMove(grid: NavGrid, me: ChampionState, target: ChampionState): MoveCommand {
   const d = distanceBetween(me, target);
   const away: Vec2 = d === 0 ? { x: 1, y: 0 } : { x: (me.x - target.x) / d, y: (me.y - target.y) / d };
@@ -102,7 +105,7 @@ function kiteMove(grid: NavGrid, me: ChampionState, target: ChampionState): Move
     const p = { x: me.x + dir.x * KITE_STEP, y: me.y + dir.y * KITE_STEP };
     if (cellFree(grid, p) && segmentClear(grid, me, p)) return steerToward(me, p);
   }
-  return { moveX: STAND.moveX, moveY: STAND.moveY };
+  return { moveX: 0, moveY: 0 };
 }
 
 export function createBot(playerId: number, difficulty: Difficulty, seed: number): Bot {

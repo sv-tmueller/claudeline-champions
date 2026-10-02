@@ -5,6 +5,8 @@ import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
+import { pointBlocked } from '../src/geometry';
+import { buildNavGrid, cellIndexAt } from '../src/grid';
 import { profileFor } from '../src/profile';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
@@ -338,15 +340,18 @@ describe('kite', () => {
 
 describe('kite step', () => {
   /** A wall with its west face `face` metres east of the bot at the origin, target 3 m west. */
-  function kiteMoveBesideWall(face: number) {
-    const arena: ArenaDef = {
+  function wallArena(face: number): ArenaDef {
+    return {
       ...open,
       id: 'wall',
       obstacles: [
         { type: 'rect', x: face + 1, y: 0, w: 2, h: 16, height: 1.5, blocksProjectiles: true },
       ],
     };
-    const state = setup(arena);
+  }
+
+  function kiteMoveBesideWall(face: number) {
+    const state = setup(wallArena(face));
     kill(state, 0, 3);
     put(state, 1, 0, 0);
     put(state, 2, -3, 0);
@@ -358,10 +363,26 @@ describe('kite step', () => {
 
   it('pins the kite step at 1 m', () => {
     expect(KITE_STEP).toBe(1);
-    // The champion radius is 0.5, so a wall face at 1.52 m leaves the straight point 1 m away
-    // free but not one 1.05 m away: the bot steps straight east.
-    expect(kiteMoveBesideWall(1.52)).toEqual({ moveX: 1, moveY: 0 });
-    // A face at 1.48 m blocks the straight point 1 m away, so the bot takes the +45 degree one.
+    // The champion radius is 0.5 and the grid cells are 0.5 m with the bot at a cell corner,
+    // so the cell holding the point 1 m east has its centre at (1.25, 0.25) and is free only
+    // with the wall face at 1.75 m or more. A face at 1.8 m leaves the straight step free: the
+    // bot steps east. A step of 1.5 m would reach the cell centred at x 1.75, blocked at 1.8.
+    expect(kiteMoveBesideWall(1.8)).toEqual({ moveX: 1, moveY: 0 });
+    // At 1.5 m the straight cell is blocked, so the bot takes the +45 degree point. A step of
+    // 0.8 m would stay in a free cell and go straight; one of 1.5 m would turn north.
+    expect(kiteMoveBesideWall(1.5)).toEqual({ moveX: 1, moveY: 1 });
+  });
+
+  it('skips a point that is free when its grid cell is blocked', () => {
+    // With the face at 1.6 m the point (1, 0) is free, since 1 + 0.5 < 1.6, but its cell is
+    // blocked, because the cell centre (1.25, 0.25) has 1.25 + 0.5 > 1.6. The path follower
+    // cannot plan to a blocked cell, so the bot takes the next candidate and moves (1, 1).
+    const grid = buildNavGrid(wallArena(1.6));
+    const point = { x: KITE_STEP, y: 0 };
+    expect(pointBlocked(grid, point)).toBe(false);
+    expect(grid.blocked[cellIndexAt(grid, point)]).toBe(true);
+    expect(kiteMoveBesideWall(1.6)).toEqual({ moveX: 1, moveY: 1 });
+    // A face at 1.48 m blocks the point itself, and the bot also moves (1, 1).
     expect(kiteMoveBesideWall(1.48)).toEqual({ moveX: 1, moveY: 1 });
   });
 });
