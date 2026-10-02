@@ -13,6 +13,8 @@ interface Hooks {
   flashing: string[];
   bars: string[];
   debugShots: number;
+  /** The visible kill-feed lines, "killer > victim", oldest first. */
+  killFeed: string[];
 }
 
 // Playwright's clock fires a frame every 16 ms of fake time and the sim ticks
@@ -33,13 +35,15 @@ const RING_TICKS = 18;
 const RING_SLACK_TICKS = 4;
 
 // The functions whose allocations the heap probe counts: every combat render
-// module, the pose and overlay helpers that run each frame, the loop clock, and
-// every function in main.ts (stepSim, sampleAim, draw and the hook writers).
+// module, the pose and overlay helpers that run each frame, the loop clock, the
+// input sampler, the HUD writer with its views and the kill feed, the champion
+// names, and every function in main.ts (stepSim, sampleAim, draw and the hook
+// writers). The HUD builder, hud-dom.ts, runs once at startup and is not counted.
 // V8 inlines main.ts's frame into three's animation callback, so the bytes of
 // frame's own body are attributed to onAnimationFrame: that one three function
 // counts too, and nothing else in three does.
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
 // Measured in a warm steady state: 0 bytes in every counted function but
 // onAnimationFrame, which shows 24 to 48 B per window (three's own callback and
 // the inlined frame, cause not isolated). Each of these fails the limit: a template string
@@ -68,6 +72,10 @@ async function readHooks(page: Page): Promise<Hooks> {
       flashing: list(d['flashing']),
       bars: list(d['bars']),
       debugShots: Number(d['debugShots']),
+      killFeed: [...document.querySelectorAll('[data-line][data-visible="true"]')].map(
+        (line) =>
+          `${line.querySelector('[data-part="killer"]')?.textContent} > ${line.querySelector('[data-part="victim"]')?.textContent}`,
+      ),
     };
   });
 }
@@ -107,18 +115,24 @@ interface ProfileNode {
 interface Allocations {
   total: number;
   combat: number;
+  /** Bytes in three's onAnimationFrame, where the inlined frame function lands. */
+  onAnimationFrame: number;
   /** Bytes per "file:function" for the combat code, for the failure message. */
   combatByFunction: Record<string, number>;
 }
 
 function summarise(root: ProfileNode): Allocations {
-  const result: Allocations = { total: 0, combat: 0, combatByFunction: {} };
+  const result: Allocations = { total: 0, combat: 0, onAnimationFrame: 0, combatByFunction: {} };
   const pending = [root];
   for (let node = pending.pop(); node; node = pending.pop()) {
     result.total += node.selfSize;
-    const key = `${node.callFrame.url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
+    // The sim has an input.ts of its own (resolveInput), so its files get a prefix
+    // and never match a client module of the same name.
+    const prefix = node.callFrame.url.includes('/packages/sim/') ? 'sim/' : '';
+    const key = `${prefix}${node.callFrame.url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
     if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
       result.combat += node.selfSize;
+      if (key.endsWith(':onAnimationFrame')) result.onAnimationFrame += node.selfSize;
       result.combatByFunction[key] = (result.combatByFunction[key] ?? 0) + node.selfSize;
     }
     pending.push(...node.children);
@@ -132,15 +146,13 @@ function summarise(root: ProfileNode): Allocations {
 // or 32. A window is one runFor call with no hook read between its frames.
 const WINDOW_FRAMES = 30;
 const WINDOW_MS = WINDOW_FRAMES * 16;
-// A shot flies 27 m at 10 m/s, 162 ticks or 5.6 windows of 29 ticks, from the spawn to the east boundary.
+// A window is 28 to 29 ticks. A shot flies 27 m at 10 m/s, 162 ticks or 5.6 to
+// 5.8 windows, from the spawn to the east boundary.
 const WINDOWS_PER_FLIGHT = 6;
-// Volleys the engine warms up on before the measured one. On the runner the
-// figure is two-moded per run, not per window: most runs read 0 to 48 B in
-// onAnimationFrame, and about one run in three reads 970 to 1190 B in every
-// window, whatever the depth (4 or 8 volleys, 4 more volleys after the measured
-// ones: 2026-10-02, runs 36968830908, 36970012813, 36970321634 attempt 6). The
-// extra depth is kept because it costs 12 s; it is not the fix.
-const WARM_UP_VOLLEYS = 8;
+// Volleys the engine warms up on before the measured one. The depth does not
+// change the bad mode of the heap probe (decision 9 of batch #32: 4 and 8
+// volleys read alike), so the warm-up is the short one, 12 s less on the runner.
+const WARM_UP_VOLLEYS = 4;
 // One window after the volley, then the measured ones. All of them end before the first shot does.
 const SETTLE_WINDOWS = 1;
 const MEASURED_WINDOWS = 3;
@@ -148,9 +160,10 @@ const MEASURED_WINDOWS = 3;
 const PROBE_VIEWPORT = { width: 320, height: 180 };
 // The CI job timed out at the default 30 s on 2026-10-02 (run 36967340392).
 // On the runner (2 cores, SwiftShader) steps 1 to 7 take about 45 s, because a
-// frame renders in 150 to 190 ms at 1280x720 and each tick-exact frame also
-// pays a hook read of 40 to 70 ms. Step 8 takes about 30 s at 320x180, where a
-// frame is 17 to 24 ms. 75 s in all, so 240 s is a 3x margin.
+// frame renders in 105 to 210 ms at 1280x720 and each tick-exact frame also
+// pays a hook read of 32 to 75 ms. Step 8 took about 30 s at 320x180 with 8
+// warm-up volleys, where a frame is 17 to 24 ms, and about 18 s with 4. That is
+// about 63 s in all, so 240 s is a margin of more than 3x.
 const TEST_TIMEOUT_MS = 240_000;
 
 /** Runs one window of frames, 480 ms of fake time, in one call. */
@@ -242,6 +255,9 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     hooks = await runUntil(page, 'the death', 60, (h) => h.deaths >= 1);
     expect(hooks.deaths).toBe(1);
     expect(hooks.bars[TARGET]).toBe('x');
+    // The kill feed names the killer (champion 0, Hargrim) and the victim (champion 2, Lumeth).
+    expect(hooks.killFeed).toEqual(['Hargrim > Lumeth']);
+    const deathTick = hooks.tick;
 
     // 6. The other shots pass through the dead champion and end at the east
     // boundary, and their views end with them.
@@ -275,12 +291,21 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
     let worst: Allocations | undefined;
     let sawGarbage = 0;
+    const figures: string[] = [];
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
       sawGarbage = Math.max(sawGarbage, allocations.total);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
+      figures.push(`${allocations.total}/${allocations.onAnimationFrame}`);
     }
+    // One line per attempt, so every log shows which mode the run was in.
+    console.log(
+      `heap probe attempt ${test.info().retry}: bytes per window, total/onAnimationFrame: ${figures.join(' ')}`,
+    );
     hooks = await readHooks(page);
+    // The death line is long gone: the kill feed expires after 300 ticks.
+    expect(hooks.tick - deathTick).toBeGreaterThanOrEqual(300);
+    expect(hooks.killFeed).toEqual([]);
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
     expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);

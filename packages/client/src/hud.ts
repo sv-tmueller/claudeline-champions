@@ -115,7 +115,7 @@ export class Hud {
       this.updateEnergy(champion.energy);
       this.updateSlots(champion);
     }
-    this.updateRound(state.tick);
+    this.updateRound(state);
     this.updateKillFeed(state.tick);
   }
 
@@ -175,9 +175,9 @@ export class Hud {
     }
   }
 
-  private updateRound(tick: number): void {
+  private updateRound(state: HudState): void {
     const round = this.round;
-    readRoundView({ tick }, round);
+    readRoundView(state, round);
     if (round.scoreA !== this.scoreA || round.scoreB !== this.scoreB) {
       this.scoreA = round.scoreA;
       this.scoreB = round.scoreB;
