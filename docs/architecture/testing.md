@@ -39,7 +39,9 @@ port 5173, which Playwright starts itself.
 - Run them with `CI=1`. Without it Playwright reuses whatever listens on 5173,
   which can be a sibling session's dev server serving other code. With `CI=1`
   it always starts its own, and fails with "already used" when something holds
-  the port. `npm run check` and CI set it.
+  the port. `npm run check` does not set it (its last step is `npm run e2e`,
+  which is plain `playwright test`), so run `CI=1 npm run check`. CI sets it
+  itself.
 - Check the port before every e2e command, for example
   `lsof -nP -iTCP:5173 -sTCP:LISTEN`, which must print nothing. When a parallel
   session takes the port, wait until it is free and run again. That failure says
@@ -50,9 +52,12 @@ port 5173, which Playwright starts itself.
   spec installs a paused Playwright clock and runs it frame by frame.
 - Global retries are 0 in `playwright.config.ts`. A flaky spec is a bug.
 - `combat.spec.ts` has file-scoped retries of 2, for the heap probe's bad mode
-  described below. A "flaky" combat.spec in a CI log (passed on a retry) means the
-  first attempt hit the bad mode; the log line of each attempt shows it. A
-  regression fails all three attempts.
+  described below. When a combat.spec shows "flaky" in a CI log (passed on a
+  retry), check that the failed attempt failed at the probe assertion and that
+  its log line reads the bad mode (`onAnimationFrame` near 1100 B, the fake
+  `requestAnimationFrame` at 0 B). A failure anywhere else is a real failure. A
+  regression fails all three attempts; only a marginal one near the limit can
+  pass on a retry.
 
 ### The heap probe
 
@@ -69,7 +74,7 @@ a plain heap delta is not needed.
   its views, the kill feed, the champion names, everything in `main.ts`, and
   three's `onAnimationFrame`, which holds the bytes of the `frame` function
   that V8 inlines into it. A new module on the frame path goes into the pattern.
-- The limit is 256 B per window. The clean figure is 24 to 48 B, in
+- The limit is 256 B per window. The clean figure is 0 to 48 B, in
   `onAnimationFrame` only, and every other counted function reads 0 B.
 - The mutation rule: a change to the probe, its pattern or the frame path is
   checked by applying each of these alone and seeing the spec fail on every

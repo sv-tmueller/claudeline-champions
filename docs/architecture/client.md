@@ -21,8 +21,10 @@ that keeps inputs (a replay, a bot) must copy them. `step` copies it through
 Two keys are not game input. F3 toggles the debug overlay. F4 fires a debug
 shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
-production build contains neither the key nor the module; the check for that
-greps `dist` for them.
+production build contains neither the key nor the module. No CI step checks
+that; it is a review step: run `npm run build`, then
+`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile' packages/client/dist`,
+which must print nothing.
 
 ## Camera
 
@@ -63,7 +65,8 @@ fields. The combat spec measures it with a heap probe, see
 
 The colours that the world view draws are constants in these files. Champion
 model colours must stay clear of them, and `tools/blender/test_champion_models.py`
-copies them, so a change here changes that list in the same commit.
+copies them, except `BAR_BACK_COLOUR`, which it does not copy, so a change here
+changes that list in the same commit.
 
 | File | Constants |
 |------|-----------|
@@ -99,9 +102,11 @@ It has six elements, named by `data-hud` after
 Not built yet: the ring warning, the shield segment on the health bar and the
 silence state of a slot.
 
-`Hud.update` runs after every sim step. It compares integers and booleans held
-in cache fields with the new values and writes the DOM only when one changed, so
-a steady frame writes and allocates nothing. The e2e specs read the states from
+`Hud.update` runs once per stepping frame, after all of that frame's sim steps.
+It compares integers and booleans held in cache fields with the new values and
+writes the DOM only when one changed, so a steady frame writes and allocates
+nothing. The kill feed counts its pushes and expiries, and the HUD skips its
+line loop while that count has not moved. The e2e specs read the states from
 data attributes: `data-ready`, `data-windup` and `data-blocked` on a slot,
 `data-ready` on an energy mark, `data-visible` on a kill-feed line and
 `data-team` on its names.
