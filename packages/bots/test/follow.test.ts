@@ -114,6 +114,23 @@ function bruteNearestFreeCell(g: NavGrid, p: Vec2, radius: number): number {
   return best;
 }
 
+describe('spec constants', () => {
+  it('pins the replan interval, minimum age and fallback radius at the spec values', () => {
+    expect(REPLAN_INTERVAL).toBe(30);
+    expect(REPLAN_MIN_AGE).toBe(6);
+    expect(FALLBACK_RADIUS).toBe(4);
+  });
+
+  it('keeps moving toward a point 0.12 m away and stops 0.09 m from it', () => {
+    const goal = { x: -11.8, y: 2.2 };
+    const centre = cellCenter(grid, cellIndexAt(grid, goal));
+    const far = followPath(grid, createFollower(), { x: centre.x + 0.12, y: centre.y }, goal);
+    expect(far).toEqual({ moveX: -1, moveY: 0 });
+    const near = followPath(grid, createFollower(), { x: centre.x + 0.09, y: centre.y }, goal);
+    expect(near).toEqual({ moveX: 0, moveY: 0 });
+  });
+});
+
 describe('createFollower', () => {
   it('starts with no plan', () => {
     expect(createFollower()).toEqual({ goal: null, points: [], index: 0, age: 0 });
@@ -211,13 +228,13 @@ describe('replanning', () => {
     expect(result.distanceToGoal).toBeLessThanOrEqual(grid.cellSize * Math.SQRT2);
   });
 
-  it('does not replan before the interval for a goal that moved 0.3 m', () => {
+  it('does not replan before 30 calls for a goal that moved 0.3 m, and replans at age 30 exactly', () => {
     const state = soloMatch();
     const follower = createFollower();
     const w = walker(state);
     followPath(grid, follower, w, { x: 0, y: 9 });
     const planned = follower.points;
-    for (let i = 1; i < REPLAN_INTERVAL; i++) {
+    for (let i = 1; i < 30; i++) {
       followPath(grid, follower, w, { x: 0.3, y: 9 });
       expect(follower.points).toBe(planned);
       expect(follower.age).toBe(i);
@@ -232,11 +249,33 @@ describe('replanning', () => {
     const w = { x: -12, y: 2 };
     followPath(grid, follower, w, { x: 0, y: 9 });
     const planned = follower.points;
-    for (let i = 1; i < REPLAN_MIN_AGE; i++) {
+    // Calls at ages 1 to 5 keep the plan, the call at age 6 replans.
+    for (let i = 1; i < 6; i++) {
       followPath(grid, follower, w, { x: -10, y: -8 });
       expect(follower.points).toBe(planned);
+      expect(follower.age).toBe(i);
     }
     followPath(grid, follower, w, { x: -10, y: -8 });
+    expect(follower.points).not.toBe(planned);
+    expect(follower.age).toBe(0);
+  });
+
+  it('ignores a clipped next point until age 6 and then replans', () => {
+    const w = { x: -12, y: 2 };
+    const goal = { x: 0, y: 9 };
+    const follower = createFollower();
+    followPath(grid, follower, w, goal);
+    // A point behind the obstacle pillar at the centre, so segmentClear to it fails.
+    const behind = { x: 0, y: 0 };
+    expect(segmentClear(grid, w, behind)).toBe(false);
+    follower.points = [behind];
+    follower.index = 0;
+    const planned = follower.points;
+    for (let i = 1; i < 6; i++) {
+      followPath(grid, follower, w, goal);
+      expect(follower.points).toBe(planned);
+    }
+    followPath(grid, follower, w, goal);
     expect(follower.points).not.toBe(planned);
     expect(follower.age).toBe(0);
   });
@@ -247,8 +286,8 @@ describe('replanning', () => {
     const result = walk(state, { x: 12, y: -2 }, 400, createFollower(), (_tick, f) => {
       maxAge = Math.max(maxAge, f.age);
     });
-    expect(result.ticks).toBeGreaterThan(REPLAN_INTERVAL);
-    expect(maxAge).toBeLessThanOrEqual(REPLAN_INTERVAL);
+    expect(result.ticks).toBeGreaterThan(30);
+    expect(maxAge).toBeLessThanOrEqual(30);
   });
 
   it('replans when a displacement leaves the next point behind an obstacle, and still arrives', () => {
@@ -257,8 +296,8 @@ describe('replanning', () => {
     const goal = { x: 12, y: -2 };
     const follower = createFollower();
     walk(state, goal, 40, follower);
-    expect(follower.age).toBeGreaterThanOrEqual(REPLAN_MIN_AGE);
-    expect(follower.age).toBeLessThan(REPLAN_INTERVAL - 1);
+    expect(follower.age).toBeGreaterThanOrEqual(6);
+    expect(follower.age).toBeLessThan(29);
 
     const next = follower.points[follower.index];
     if (!next) throw new Error('no next point');

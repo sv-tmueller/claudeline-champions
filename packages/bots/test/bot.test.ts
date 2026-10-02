@@ -6,6 +6,8 @@ import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
 import { profileFor } from '../src/profile';
+import { KITE_STEP, TARGET_SWITCH_MARGIN } from '../src/bot';
+import { NOMINAL_PROJECTILE_SPEED, leadPoint, roundAim } from '../src/aim';
 import { arena01, config2v2 } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -181,6 +183,28 @@ describe('target choice', () => {
     expect(bot.inspect().targetId).toBe(3);
   });
 
+  it('pins the switch margin at 1 m: exactly 1 m nearer stays, 1.01 m switches, 0.99 m stays', () => {
+    expect(TARGET_SWITCH_MARGIN).toBe(1);
+    // Enemy 2 is 10 m from the bot. Enemy 3 starts further away, then moves to the given distance.
+    const cases: [number, number][] = [
+      [9, 2], // exactly 1 m nearer: strict greater-than keeps the target
+      [8.99, 3], // 1.01 m nearer
+      [9.01, 2], // 0.99 m nearer
+    ];
+    for (const [d3, expected] of cases) {
+      const state = setup();
+      put(state, 0, -5, 0);
+      put(state, 2, 5, 0);
+      put(state, 3, 5.5, 0);
+      const bot = createBot(0, 'hard', 1);
+      thinkTimes(bot, state, 10);
+      expect(bot.inspect().targetId, `start ${d3}`).toBe(2);
+      put(state, 3, -5 + d3, 0);
+      thinkTimes(bot, state, 10);
+      expect(bot.inspect().targetId, `enemy 3 at ${d3} m`).toBe(expected);
+    }
+  });
+
   it('skips a dead enemy', () => {
     const state = setup();
     put(state, 0, -5, 0);
@@ -312,6 +336,36 @@ describe('kite', () => {
   });
 });
 
+describe('kite step', () => {
+  /** A wall with its west face `face` metres east of the bot at the origin, target 3 m west. */
+  function kiteMoveBesideWall(face: number) {
+    const arena: ArenaDef = {
+      ...open,
+      id: 'wall',
+      obstacles: [
+        { type: 'rect', x: face + 1, y: 0, w: 2, h: 16, height: 1.5, blocksProjectiles: true },
+      ],
+    };
+    const state = setup(arena);
+    kill(state, 0, 3);
+    put(state, 1, 0, 0);
+    put(state, 2, -3, 0);
+    const bot = createBot(1, 'hard', 1);
+    const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect().intent).toBe('kite');
+    return { moveX: input.moveX, moveY: input.moveY };
+  }
+
+  it('pins the kite step at 1 m', () => {
+    expect(KITE_STEP).toBe(1);
+    // The champion radius is 0.5, so a wall face at 1.52 m leaves the straight point 1 m away
+    // free but not one 1.05 m away: the bot steps straight east.
+    expect(kiteMoveBesideWall(1.52)).toEqual({ moveX: 1, moveY: 0 });
+    // A face at 1.48 m blocks the straight point 1 m away, so the bot takes the +45 degree one.
+    expect(kiteMoveBesideWall(1.48)).toEqual({ moveX: 1, moveY: 1 });
+  });
+});
+
 describe('retreat', () => {
   it('walks to its own spawn away from the target and stops there', () => {
     const state = setup(arena01);
@@ -367,6 +421,35 @@ describe('reaction delay', () => {
       expect(first).toBe(n + TIERS[tier].delay);
     });
   }
+});
+
+describe('aim lead', () => {
+  it('leads a target walking across the line of fire, to the centimetre', () => {
+    const tier = TIERS.hard;
+    const savedMaxU = tier.maxU;
+    // A test-only path to a zero aim error: the tier's error range is emptied for this test.
+    tier.maxU = 0;
+    try {
+      const state = setup();
+      kill(state, 0, 3);
+      const me = put(state, 1, -5, 0);
+      const target = put(state, 2, 5, 0);
+      target.vx = 0;
+      target.vy = 5.5;
+      const bot = createBot(1, 'hard', 3);
+      const input = thinkTimes(bot, state, tier.delay + 1);
+      expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
+
+      const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, NOMINAL_PROJECTILE_SPEED);
+      expect(input.aimX).toBe(roundAim(lead.x));
+      expect(input.aimY).toBe(roundAim(lead.y));
+      // The lead is well ahead of the target, not at its current position.
+      expect(Math.hypot(input.aimX / 100 - target.x, input.aimY / 100 - target.y)).toBeGreaterThan(1);
+      expect(input.aimY).toBeGreaterThan(100);
+    } finally {
+      tier.maxU = savedMaxU;
+    }
+  });
 });
 
 describe('aim error', () => {
