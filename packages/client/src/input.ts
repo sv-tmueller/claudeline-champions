@@ -10,6 +10,8 @@ const KEY_BUTTONS: Readonly<Record<string, number>> = {
   ShiftLeft: Button.SHIFT,
   ShiftRight: Button.SHIFT,
 };
+// The codes of KEY_BUTTONS in a plain array, so a frame walks it by index.
+const KEY_CODES: readonly string[] = Object.keys(KEY_BUTTONS);
 const MOVE_CODES = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
 const MOUSE_BUTTONS: Readonly<Record<number, number>> = { 0: Button.M1, 2: Button.M2 };
 
@@ -31,6 +33,12 @@ export interface InputCore {
   pointerMove(clientX: number, clientY: number): void;
   /** Focus loss: drops every held key and mouse button. The pointer stays. */
   releaseAll(): void;
+  /**
+   * The input for this frame. Every call overwrites and returns the same
+   * object, so a frame allocates nothing. `step` copies it through
+   * `resolveInput`, so sharing is safe there; a caller that keeps inputs
+   * (a replay, a bot) must copy them.
+   */
   toPlayerInput(aimX: number, aimY: number): PlayerInput;
 }
 
@@ -52,6 +60,7 @@ export function createInputCore(): InputCore {
   const held = new Set<string>();
   let mouseBits = 0;
   let pointer: { clientX: number; clientY: number } | null = null;
+  const out: PlayerInput = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0 };
 
   const axis = (positive: string, negative: string): MoveAxis =>
     ((held.has(positive) ? 1 : 0) - (held.has(negative) ? 1 : 0)) as MoveAxis;
@@ -84,15 +93,17 @@ export function createInputCore(): InputCore {
     },
     toPlayerInput(aimX, aimY) {
       let buttons = mouseBits;
-      for (const code of held) buttons |= KEY_BUTTONS[code] ?? 0;
-      return {
-        // The subtraction of two 0/1 values is never -0.
-        moveX: axis('KeyD', 'KeyA'),
-        moveY: axis('KeyW', 'KeyS'),
-        aimX,
-        aimY,
-        buttons,
-      };
+      for (let i = 0; i < KEY_CODES.length; i++) {
+        const code = KEY_CODES[i] as string;
+        if (held.has(code)) buttons |= KEY_BUTTONS[code] ?? 0;
+      }
+      // The subtraction of two 0/1 values is never -0.
+      out.moveX = axis('KeyD', 'KeyA');
+      out.moveY = axis('KeyW', 'KeyS');
+      out.aimX = aimX;
+      out.aimY = aimY;
+      out.buttons = buttons;
+      return out;
     },
   };
 }

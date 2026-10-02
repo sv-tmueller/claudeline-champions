@@ -111,6 +111,21 @@ describe('input core: buttons', () => {
   });
 });
 
+describe('input core: the shared input object', () => {
+  it('returns one object per core and overwrites it on the next call', () => {
+    const core = createInputCore();
+    const first = core.toPlayerInput(1, 2);
+    press(core, 'KeyD', 'KeyQ');
+    const second = core.toPlayerInput(3, 4);
+    expect(second).toBe(first);
+    expect(first).toEqual({ moveX: 1, moveY: 0, aimX: 3, aimY: 4, buttons: Button.Q });
+  });
+
+  it('gives each core its own object', () => {
+    expect(createInputCore().toPlayerInput(0, 0)).not.toBe(createInputCore().toPlayerInput(0, 0));
+  });
+});
+
 describe('input core: aim', () => {
   it('passes the aim through unchanged', () => {
     const input = createInputCore().toPlayerInput(-1100, 250);

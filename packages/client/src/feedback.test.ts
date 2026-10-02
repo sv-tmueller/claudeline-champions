@@ -17,6 +17,7 @@ import {
   type FeedbackHandlers,
 } from './feedback';
 import { createImpactRings } from './impact-rings';
+import { createKillFeed } from './kill-feed';
 
 interface Call {
   kind: string;
@@ -96,7 +97,7 @@ describe('routeEvents', () => {
 
 describe('combat feedback', () => {
   it('flashes for exactly FLASH_TICKS ticks from the tick of the damage', () => {
-    const feedback = new CombatFeedback(4, createImpactRings());
+    const feedback = new CombatFeedback(4, createImpactRings(), createKillFeed());
     feedback.damage(100, 2);
     expect(FLASH_TICKS).toBe(8);
     let flashing = 0;
@@ -108,7 +109,7 @@ describe('combat feedback', () => {
   });
 
   it('restarts the flash on a second hit', () => {
-    const feedback = new CombatFeedback(4, createImpactRings());
+    const feedback = new CombatFeedback(4, createImpactRings(), createKillFeed());
     feedback.damage(100, 2);
     feedback.damage(105, 2);
     expect(feedback.isFlashing(2, 112)).toBe(true);
@@ -116,15 +117,23 @@ describe('combat feedback', () => {
   });
 
   it('counts hits and deaths', () => {
-    const feedback = new CombatFeedback(4, createImpactRings());
+    const feedback = new CombatFeedback(4, createImpactRings(), createKillFeed());
     feedback.hit(1, 0, 0);
     feedback.hit(1, 0, 0);
-    feedback.death();
+    feedback.death(1, 2, 0);
     expect([feedback.hits, feedback.deaths]).toEqual([2, 1]);
   });
 
+  it('pushes a death onto the kill feed as killer then victim', () => {
+    const feed = createKillFeed();
+    const feedback = new CombatFeedback(4, createImpactRings(), feed);
+    feedback.death(40, 2, 0);
+    expect(feed.count).toBe(1);
+    expect(feed.line(0)).toEqual({ tick: 40, killerId: 0, victimId: 2 });
+  });
+
   it('lists flashing ids as a mask and as text', () => {
-    const feedback = new CombatFeedback(4, createImpactRings());
+    const feedback = new CombatFeedback(4, createImpactRings(), createKillFeed());
     expect(feedback.flashMask(100)).toBe(0);
     feedback.damage(100, 2);
     feedback.damage(100, 0);
@@ -134,7 +143,7 @@ describe('combat feedback', () => {
   });
 
   it('ignores a champion id it does not know', () => {
-    const feedback = new CombatFeedback(2, createImpactRings());
+    const feedback = new CombatFeedback(2, createImpactRings(), createKillFeed());
     expect(() => feedback.damage(1, 9)).not.toThrow();
     expect(feedback.isFlashing(9, 1)).toBe(false);
   });
@@ -173,9 +182,9 @@ describe('routing real sim events', () => {
     });
   }
 
-  function run(state: GameState, ticks: number): CombatFeedback {
+  function run(state: GameState, ticks: number, feed = createKillFeed()): CombatFeedback {
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(state.champions.length, rings);
+    const feedback = new CombatFeedback(state.champions.length, rings, feed);
     for (let i = 0; i < ticks; i++) {
       step(state, []);
       routeEvents(state, feedback);
@@ -187,7 +196,7 @@ describe('routing real sim events', () => {
     const state = match();
     shoot(state, 10, 2, 1, 0);
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(4, rings);
+    const feedback = new CombatFeedback(4, rings, createKillFeed());
     let flashAtHit = -1;
     for (let i = 0; i < 30; i++) {
       step(state, []);
@@ -195,7 +204,7 @@ describe('routing real sim events', () => {
       if (feedback.hits === 1 && flashAtHit < 0) flashAtHit = feedback.flashMask(state.tick);
     }
     expect(feedback.hits).toBe(1);
-    expect(rings.spawned).toBe(1);
+    expect(rings.visibleCount).toBe(1);
     expect(flashAtHit).toBe(0b100);
     expect(state.projectiles).toHaveLength(0);
   });
@@ -208,20 +217,23 @@ describe('routing real sim events', () => {
     const state = match();
     shoot(state, x as number, y as number, dirX as number, dirY as number, lifetime as number);
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(4, rings);
+    const feedback = new CombatFeedback(4, rings, createKillFeed());
     for (let i = 0; i < 60; i++) {
       step(state, []);
       routeEvents(state, feedback);
     }
     expect(feedback.hits).toBe(0);
-    expect(rings.spawned).toBe(1);
+    expect(rings.visibleCount).toBe(1);
   });
 
   it('counts a death once the fourth hit lands', () => {
     const state = match();
     for (let i = 0; i < 4; i++) shoot(state, 10 - 0.001 * i, 2, 1, 0);
-    const feedback = run(state, 40);
+    const feed = createKillFeed();
+    const feedback = run(state, 40, feed);
     expect(feedback.hits).toBe(4);
     expect(feedback.deaths).toBe(1);
+    expect(feed.count).toBe(1);
+    expect(feed.line(0)).toMatchObject({ killerId: 0, victimId: 2 });
   });
 });

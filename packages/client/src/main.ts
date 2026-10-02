@@ -16,12 +16,16 @@ import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
 import { createAreaViews, createProjectileViews } from './entity-views';
 import { CombatFeedback, flashText, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
+import { Hud } from './hud';
+import { buildHud } from './hud-dom';
 import { createImpactRings } from './impact-rings';
+import { createKillFeed } from './kill-feed';
 import { bindInput, createInputCore } from './input';
 import { capturePoses, createPoses, interpolatePoses } from './interpolate';
 import { createFixedStepClock } from './loop';
 import { PLACEHOLDER_CHAMPION_URL, arenaModelUrl } from './models';
 import './style.css';
+import './hud.css';
 
 const HUMAN_ID = 0;
 const LOCAL_SEED = 1;
@@ -43,6 +47,8 @@ const state = createMatch(
 
 const container = document.getElementById('app');
 if (!container) throw new Error('missing #app container');
+const hudRoot = document.getElementById('hud');
+if (!hudRoot) throw new Error('missing #hud container');
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setClearColor(new Color('#1b2230'));
@@ -68,8 +74,12 @@ const projectileViews = createProjectileViews(human.team);
 const areaViews = createAreaViews(human.team);
 const impactRings = createImpactRings();
 const healthBars = createHealthBars(state.champions, human.team);
-const feedback = new CombatFeedback(state.champions.length, impactRings);
+const killFeed = createKillFeed();
+const feedback = new CombatFeedback(state.champions.length, impactRings, killFeed);
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
+
+// Built before the models load, so the HUD shows while they do.
+const hud = new Hud(buildHud(hudRoot), state.champions, HUMAN_ID, killFeed);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 
@@ -123,9 +133,11 @@ function sampleAim(): void {
 }
 
 // The text of every tick up to ten minutes, made once at startup. The tick
-// hook changes on every tick and the e2e tests read it to pace themselves, and
-// a number-to-string per tick cost about 2.9 KB of garbage per 500 ms in the
-// heap probe in e2e/combat.spec.ts. Past the table it falls back to String().
+// hook changes on every tick and the e2e tests read it to pace themselves. A
+// change-guarded String(state.tick) instead read about 256 B of garbage per
+// measurement window in the heap probe in e2e/combat.spec.ts (PR #42 tester
+// round 2), right at its limit, so the table stays. It costs about 1.24 MB once.
+// Past the table it falls back to String().
 const TICK_TEXT_COUNT = 36_000;
 const TICK_TEXT: string[] = [];
 for (let tick = 0; tick < TICK_TEXT_COUNT; tick++) TICK_TEXT.push(String(tick));
@@ -201,6 +213,7 @@ function stepSim(steps: number): void {
   areaViews.sync(state.areas);
   writeHooks();
   writeCombatHooks();
+  hud.update(state);
 }
 
 // Created after the champion views exist, in loadModels. draw never runs before then.
@@ -257,6 +270,7 @@ await loadModels();
 capturePoses(state.champions, previousPoses);
 writeHooks();
 writeCombatHooks();
+hud.update(state);
 if (import.meta.env.DEV) {
   // Dev builds only: Vite replaces the flag with false in a build and drops the
   // branch and the chunk, so F4 never ships.

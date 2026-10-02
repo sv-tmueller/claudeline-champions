@@ -1,5 +1,6 @@
 import type { GameState } from '@claudeline/sim';
 import type { ImpactRings } from './impact-rings';
+import type { KillFeed } from './kill-feed';
 
 /** A hit flash lasts this many sim ticks. */
 export const FLASH_TICKS = 8;
@@ -52,17 +53,18 @@ export function flashText(mask: number): string {
   return ids.join(',');
 }
 
-/** Flash windows, hit and death counters, and the impact rings. */
+/** Flash windows, hit and death counters, the impact rings and the kill feed. */
 export class CombatFeedback implements FeedbackHandlers {
   /** Running total of projectile hits. */
   hits = 0;
-  /** Running total of deaths. The kill feed arrives with the HUD. */
+  /** Running total of deaths. */
   deaths = 0;
   private readonly flashEndTick: number[];
 
   constructor(
     championCount: number,
     private readonly rings: ImpactRings,
+    private readonly killFeed: KillFeed,
   ) {
     this.flashEndTick = Array.from({ length: championCount }, () => 0);
   }
@@ -82,8 +84,9 @@ export class CombatFeedback implements FeedbackHandlers {
     this.rings.spawn(x, y, tick);
   }
 
-  death(): void {
+  death(tick: number, targetId: number, sourceId: number): void {
     this.deaths += 1;
+    this.killFeed.push(tick, sourceId, targetId);
   }
 
   isFlashing(id: number, tick: number): boolean {

@@ -13,6 +13,8 @@ interface Hooks {
   flashing: string[];
   bars: string[];
   debugShots: number;
+  /** The visible kill-feed lines, "killer > victim", oldest first. */
+  killFeed: string[];
 }
 
 // Playwright's clock fires a frame every 16 ms of fake time and the sim ticks
@@ -33,16 +35,19 @@ const RING_TICKS = 18;
 const RING_SLACK_TICKS = 4;
 
 // The functions whose allocations the heap probe counts: every combat render
-// module, the pose and overlay helpers that run each frame, the loop clock, and
-// every function in main.ts (stepSim, sampleAim, draw and the hook writers).
+// module, the pose and overlay helpers that run each frame, the loop clock, the
+// input sampler, the HUD writer with its views and the kill feed, the champion
+// names, and every function in main.ts (stepSim, sampleAim, draw and the hook
+// writers). The HUD builder, hud-dom.ts, runs once at startup and is not counted.
 // V8 inlines main.ts's frame into three's animation callback, so the bytes of
 // frame's own body are attributed to onAnimationFrame: that one three function
 // counts too, and nothing else in three does.
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
 // Measured in a warm steady state: 0 bytes in every counted function but
-// onAnimationFrame, which shows 24 to 48 B per window (three's own callback and
-// the inlined frame, cause not isolated). Each of these fails the limit: a template string
+// onAnimationFrame, which shows 0 to 48 B per window in the clean mode (three's
+// own callback and the inlined frame, cause not isolated) and about 1100 B in the
+// bad mode (see the retries below). Each of these fails the limit: a template string
 // written to a hook every frame (about 800 B), a closure made per call in
 // routeEvents (about 1500 B), an escaping array in frame (about 1300 B), and an
 // object literal per projectile per frame in draw that escapes (about 11 KB).
@@ -68,6 +73,10 @@ async function readHooks(page: Page): Promise<Hooks> {
       flashing: list(d['flashing']),
       bars: list(d['bars']),
       debugShots: Number(d['debugShots']),
+      killFeed: [...document.querySelectorAll('[data-line][data-visible="true"]')].map(
+        (line) =>
+          `${line.querySelector('[data-part="killer"]')?.textContent} > ${line.querySelector('[data-part="victim"]')?.textContent}`,
+      ),
     };
   });
 }
@@ -107,18 +116,27 @@ interface ProfileNode {
 interface Allocations {
   total: number;
   combat: number;
+  /** Bytes in three's onAnimationFrame, where the inlined frame function lands. */
+  onAnimationFrame: number;
+  /** Bytes in the fake clock's own requestAnimationFrame, which holds them when it is not inlined. */
+  fakeRequestAnimationFrame: number;
   /** Bytes per "file:function" for the combat code, for the failure message. */
   combatByFunction: Record<string, number>;
 }
 
 function summarise(root: ProfileNode): Allocations {
-  const result: Allocations = { total: 0, combat: 0, combatByFunction: {} };
+  const result: Allocations = { total: 0, combat: 0, onAnimationFrame: 0, fakeRequestAnimationFrame: 0, combatByFunction: {} };
   const pending = [root];
   for (let node = pending.pop(); node; node = pending.pop()) {
     result.total += node.selfSize;
-    const key = `${node.callFrame.url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
+    // The sim has an input.ts of its own (resolveInput), so its files get a prefix
+    // and never match a client module of the same name.
+    const prefix = node.callFrame.url.includes('/packages/sim/') ? 'sim/' : '';
+    const key = `${prefix}${node.callFrame.url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
+    if (key === ':requestAnimationFrame') result.fakeRequestAnimationFrame += node.selfSize;
     if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
       result.combat += node.selfSize;
+      if (key.endsWith(':onAnimationFrame')) result.onAnimationFrame += node.selfSize;
       result.combatByFunction[key] = (result.combatByFunction[key] ?? 0) + node.selfSize;
     }
     pending.push(...node.children);
@@ -132,15 +150,13 @@ function summarise(root: ProfileNode): Allocations {
 // or 32. A window is one runFor call with no hook read between its frames.
 const WINDOW_FRAMES = 30;
 const WINDOW_MS = WINDOW_FRAMES * 16;
-// A shot flies 27 m at 10 m/s, 162 ticks or 5.6 windows of 29 ticks, from the spawn to the east boundary.
+// A window is 28 to 29 ticks. A shot flies 27 m at 10 m/s, 162 ticks or 5.6 to
+// 5.8 windows, from the spawn to the east boundary.
 const WINDOWS_PER_FLIGHT = 6;
-// Volleys the engine warms up on before the measured one. On the runner the
-// figure is two-moded per run, not per window: most runs read 0 to 48 B in
-// onAnimationFrame, and about one run in three reads 970 to 1190 B in every
-// window, whatever the depth (4 or 8 volleys, 4 more volleys after the measured
-// ones: 2026-10-02, runs 36968830908, 36970012813, 36970321634 attempt 6). The
-// extra depth is kept because it costs 12 s; it is not the fix.
-const WARM_UP_VOLLEYS = 8;
+// Volleys the engine warms up on before the measured one. The depth does not
+// change the bad mode of the heap probe (decision 9 of batch #32: 4 and 8
+// volleys read alike), so the warm-up is the short one, 12 s less on the runner.
+const WARM_UP_VOLLEYS = 4;
 // One window after the volley, then the measured ones. All of them end before the first shot does.
 const SETTLE_WINDOWS = 1;
 const MEASURED_WINDOWS = 3;
@@ -148,9 +164,10 @@ const MEASURED_WINDOWS = 3;
 const PROBE_VIEWPORT = { width: 320, height: 180 };
 // The CI job timed out at the default 30 s on 2026-10-02 (run 36967340392).
 // On the runner (2 cores, SwiftShader) steps 1 to 7 take about 45 s, because a
-// frame renders in 150 to 190 ms at 1280x720 and each tick-exact frame also
-// pays a hook read of 40 to 70 ms. Step 8 takes about 30 s at 320x180, where a
-// frame is 17 to 24 ms. 75 s in all, so 240 s is a 3x margin.
+// frame renders in 105 to 210 ms at 1280x720 and each tick-exact frame also
+// pays a hook read of 32 to 75 ms. Step 8 took about 30 s at 320x180 with 8
+// warm-up volleys, where a frame is 17 to 24 ms, and about 18 s with 4. That is
+// about 63 s in all, so 240 s is a margin of more than 3x.
 const TEST_TIMEOUT_MS = 240_000;
 
 /** Runs one window of frames, 480 ms of fake time, in one call. */
@@ -179,16 +196,29 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
   return summarise(profile.head as ProfileNode);
 }
 
-// Decision 9 of batch #32 (2026-10-02): the heap probe has two modes on the CI
-// runner. In about 3 runs in 10 the page reads about 36 B per frame in
-// onAnimationFrame (970 to 1190 B per window, in every window of the run); the
-// other runs read 0 to 48 B. It is set by page history before step 8, and
-// nothing in the test controls it: a fresh page, a fresh browser and a real-time
-// pause did not remove it in local runs with four workers (fresh page 3 of 15
-// attempts bad, fresh browser 9 of 19, against 0 of 12 for this single page).
-// Two retries are a net while the cause is investigated. A real regression
-// allocates at least 1304 B per window in every attempt, so it still fails after
-// the retries. The global retries stay 0 in playwright.config.ts.
+// The heap probe has two modes, on the CI runner (about 3 runs in 10, decision 9
+// of batch #32) and, with a fresh browser for step 8 under four parallel
+// workers, locally (decision 10; the investigation of package #41 measured 12 of
+// 20 attempts). In the clean mode onAnimationFrame reads 0 to 48 B per window.
+// In the bad mode it reads 970 to 1200 B (about 36 B per frame), in every window
+// of the run. The bytes only move. Playwright's fake clock hands out ids of 1e12
+// and up, which are not small integers, so each requestAnimationFrame call boxes
+// about three heap numbers (36 B). In the clean mode the fake clock's own
+// requestAnimationFrame function holds them (about 1075 B per window); in the bad
+// mode Maglev inlines it into three's onAnimationFrame and that function holds
+// them, while the fake function reads 0. The totals are equal (about 790 KB per
+// window in both modes), and turning Maglev's inlining off removes the mode (0 of
+// 16 attempts), so the client allocates nothing in either mode. Making the loop
+// clock's fields doubles from creation (10 of 20 bad) and having draw read the
+// clock itself (9 of 20) changed nothing, and neither was kept. Nothing in the
+// client or the test controls the inlining. Each attempt logs total,
+// onAnimationFrame and fake requestAnimationFrame bytes per window, so a log
+// shows which mode it was in.
+// Two retries are a net. The bad mode only adds bytes, so a regression of more
+// than 256 B fails every clean attempt, and every bad attempt fails anyway; only
+// a marginal one near the limit can pass on a retry. A regression of the sizes
+// measured (1304 B and up) fails all three attempts. The global retries stay 0 in
+// playwright.config.ts.
 test.describe.configure({ retries: 2 });
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
@@ -242,6 +272,9 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     hooks = await runUntil(page, 'the death', 60, (h) => h.deaths >= 1);
     expect(hooks.deaths).toBe(1);
     expect(hooks.bars[TARGET]).toBe('x');
+    // The kill feed names the killer (champion 0, Hargrim) and the victim (champion 2, Lumeth).
+    expect(hooks.killFeed).toEqual(['Hargrim > Lumeth']);
+    const deathTick = hooks.tick;
 
     // 6. The other shots pass through the dead champion and end at the east
     // boundary, and their views end with them.
@@ -261,8 +294,8 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     // on an empty arena is thrown away when the first projectile arrives, so
     // the engine warms up on volleys. The measured windows hold no spawn and no
     // end of a shot, only frames with eight shots in flight, and in them the
-    // combat code allocates nothing. On the CI runner every frame costs 150 to
-    // 190 ms of software rendering at 1280x720 whether or not hooks are read
+    // combat code allocates nothing. On the CI runner every frame costs 105 to
+    // 210 ms of software rendering at 1280x720 whether or not hooks are read
     // between frames, and the heap probe counts JavaScript allocations and
     // never looks at pixels, so the canvas shrinks first. The resize is
     // outside every measured window.
@@ -275,12 +308,21 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
     let worst: Allocations | undefined;
     let sawGarbage = 0;
+    const figures: string[] = [];
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
       sawGarbage = Math.max(sawGarbage, allocations.total);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
+      figures.push(`${allocations.total}/${allocations.onAnimationFrame}/${allocations.fakeRequestAnimationFrame}`);
     }
+    // One line per attempt, so every log shows which mode the run was in.
+    console.log(
+      `heap probe attempt ${test.info().retry}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame: ${figures.join(' ')}`,
+    );
     hooks = await readHooks(page);
+    // The death line is long gone: the kill feed expires after 300 ticks.
+    expect(hooks.tick - deathTick).toBeGreaterThanOrEqual(300);
+    expect(hooks.killFeed).toEqual([]);
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
     expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);
