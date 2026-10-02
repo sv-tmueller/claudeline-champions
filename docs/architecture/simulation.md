@@ -34,19 +34,18 @@ interface PlayerInput {
 
 Aim is quantized to integer centimeters so the record is small and stable on
 the wire later. The sim rounds a finite aim coordinate to the nearest integer
-(`Math.round`, so 0.5 becomes 1 and -0.5 becomes 0). A missing input for a player on a tick is treated as "no
-movement, no buttons, aim unchanged".
+(`Math.round`, so 0.5 becomes 1 and -0.5 becomes 0). A missing input for a
+player on a tick is treated as "no movement, no buttons, aim unchanged".
 
 The sim sanitizes every input at runtime because inputs will later arrive over
 the network. `step` reads and sanitizes every input before it changes the
 state. A JSON-decoded input never makes it throw; an entry whose property read
 throws makes `step` throw with the state unchanged. An entry that is not an
-object (`null`, a number, a string)
-counts as missing. A move axis that is not exactly -1, 0 or 1 becomes 0. A
-non-finite aim coordinate keeps the stored aim, and `-0` is stored as `+0` so
-every stored number survives a JSON round trip. Buttons that are not a
-non-negative integer become 0, with valid buttons masked to the eight defined
-bits.
+object (`null`, a number, a string) counts as missing. A move axis that is not
+exactly -1, 0 or 1 becomes 0. A non-finite aim coordinate keeps the stored
+aim, and `-0` is stored as `+0` so every stored number survives a JSON round
+trip. Buttons that are not a non-negative integer become 0, with valid buttons
+masked to the eight defined bits.
 
 ## State and API surface
 
@@ -177,13 +176,17 @@ matter because the arena is convex.
 ## Damage, healing and death
 
 - Damage removes `min(health, amount)`, emits `damage` with the amount actually
-  removed and the health afterwards, and at 0 health sets `alive = false`,
-  zeroes the velocity and emits `death` once, right after that damage event.
-  Damage to a dead champion does nothing.
+  removed (health before minus health after) and the health afterwards, and at
+  0 health sets `alive = false`, zeroes the velocity and emits `death` once,
+  right after that damage event. Damage to a dead champion does nothing, and
+  an amount too small to change the health (below half an ulp of it) emits
+  nothing.
 - Healing restores up to `maxHealth`, emits `heal` with the amount actually
-  restored, and emits nothing when that amount is 0. A dead champion is not
-  revived.
-- A non-finite or negative amount throws; 0 does nothing.
+  restored (health after minus health before), and emits nothing when that
+  amount is 0, also when the amount is too small to change the health. A dead
+  champion is not revived.
+- A non-finite or negative amount throws; 0 does nothing. An unknown target id
+  throws `Error('Invalid damage: ...')` or `Error('Invalid heal: ...')`.
 - A dead champion is skipped in the movement loop (no input, aim, facing or
   move), is no obstacle for other champions and is never touched by
   projectiles or areas.
@@ -199,8 +202,10 @@ spec)` and `spawnArea(state, spec)`, which return the new entity id, and
 part of the package index: kits will call them when abilities arrive. A spawn
 throws `Error('Invalid projectile: ...')` or `Error('Invalid area: ...')` on an
 unknown owner, a non-finite number, a zero direction, a speed or radius at or
-below 0, a lifetime, duration or interval that is not a positive integer, or an
-effect amount at or below 0. A dead owner may still spawn.
+below 0, a lifetime, duration or interval that is not a positive integer, a
+projectile `pierce` that is not a boolean, `effects` that is not an array, an
+effect of an unknown type, or an effect amount at or below 0. A dead owner may
+still spawn.
 
 ## Statuses
 
