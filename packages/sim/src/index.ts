@@ -16,10 +16,15 @@ export type {
 export { Button } from './input';
 export type { MoveAxis, PlayerInput } from './input';
 export type {
+  AreaState,
+  AreaTargets,
   ChampionState,
+  Effect,
   GameState,
   MatchConfig,
   PlayerConfig,
+  ProjectileEndReason,
+  ProjectileState,
   SimEvent,
   StatusInstance,
   TeamId,

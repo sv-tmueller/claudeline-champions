@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { checksum, cloneState, createMatch } from '../src/index';
 import type { GameState } from '../src/index';
 import { fnv1a32 } from '../src/checksum';
+import { spawnArea } from '../src/area';
+import { spawnProjectile } from '../src/projectile';
 import { arena01, config2v2 } from './helpers';
 
 function fresh(): GameState {
@@ -88,6 +90,56 @@ describe('checksum', () => {
     expect(() => checksum(state as unknown as GameState)).toThrow('function');
     champion['extra'] = 1n;
     expect(() => checksum(state as unknown as GameState)).toThrow('bigint');
+  });
+});
+
+describe('checksum of combat state', () => {
+  function armed(): GameState {
+    const state = fresh();
+    spawnProjectile(state, {
+      ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2,
+      lifetimeTicks: 60, pierce: true, effects: [{ type: 'damage', amount: 10 }],
+    });
+    spawnArea(state, {
+      ownerId: 2, x: 3, y: 4, radius: 2, durationTicks: 60, intervalTicks: 30,
+      targets: 'all', effects: [{ type: 'heal', amount: 5 }],
+    });
+    const projectile = state.projectiles[0];
+    if (!projectile) throw new Error('missing projectile');
+    projectile.hitIds.push(2);
+    return state;
+  }
+
+  it('is stable for equal states and changes with each new field', () => {
+    const base = checksum(armed());
+    expect(checksum(armed())).toBe(base);
+    const mutations: [string, (s: GameState) => void][] = [
+      ['projectile x', (s) => void (s.projectiles[0]!.x += 1e-9)],
+      ['projectile remainingTicks', (s) => void (s.projectiles[0]!.remainingTicks -= 1)],
+      ['projectile effect amount', (s) => void (s.projectiles[0]!.effects[0]!.amount += 1)],
+      ['projectile hitIds entry', (s) => void (s.projectiles[0]!.hitIds[0] = 3)],
+      ['area radius', (s) => void (s.areas[0]!.radius += 1e-9)],
+      ['area targets', (s) => void (s.areas[0]!.targets = 'enemies')],
+      ['area ticksToNextApply', (s) => void (s.areas[0]!.ticksToNextApply += 1)],
+      ['nextEntityId', (s) => void (s.nextEntityId += 1)],
+      ['events', (s) => void s.events.push({ type: 'areaExpired', areaId: 5 })],
+    ];
+    for (const [name, mutate] of mutations) {
+      const state = armed();
+      mutate(state);
+      expect(checksum(state), name).not.toBe(base);
+    }
+  });
+
+  it('throws on a NaN projectile coordinate', () => {
+    const state = armed();
+    state.projectiles[0]!.y = NaN;
+    expect(() => checksum(state)).toThrow('non-finite');
+  });
+
+  it('survives a clone with live projectiles and areas', () => {
+    const state = armed();
+    expect(checksum(cloneState(state))).toBe(checksum(state));
   });
 });
 
