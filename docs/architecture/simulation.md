@@ -274,9 +274,10 @@ bad input before it changes anything.
   that is not a positive integer, a projectile `pierce` that is not a boolean,
   `effects` that is not an array, an effect of an unknown type or with a bad
   field (an amount at or below 0, a status spec that `applyStatus` would
-  reject, a shield with no absorb from above 0 to 1e6 or ticks from 1 to 36000, a
-  knockback with a distance outside 0 to 1e6, ticks outside 1 to 36000 or a
-  direction other than `away` or `toward`). A dead owner may still spawn.
+  reject, a shield with an absorb not above 0 and at most 1e6 or ticks outside 1
+  to 36000, a knockback with a distance not above 0 and at most 1e6, ticks
+  outside 1 to 36000 or a direction other than `away` or `toward`). A dead owner
+  may still spawn.
 - `meleeArc` hits every alive enemy of `ownerId` whose body overlaps the circle
   of `radius` around `(x, y)`, `dist <= radius + 0.5` inclusive, and whose
   centre lies inside the arc. The arc is the half-angle stored as its cosine,
@@ -296,10 +297,15 @@ bad input before it changes anything.
   all to a dead target. `applyStatus` takes a spec per type and has no shield or
   knockback: those have their own calls.
 - `startDash` throws `Invalid dash: ...` on an unknown champion, a direction that
-  is zero or not finite, a distance that is not a number above 0 and at most
-  1000 m, or ticks that are not a positive integer. A dead champion is a no-op.
-- `teleport` throws `Invalid teleport: ...` on an unknown champion or a point
-  that is not finite. A dead champion is a no-op with no event.
+  is zero or not finite, a distance that is not a number from 0.000001 to 1000 m
+  (`MIN_DASH_DISTANCE`, `MAX_DASH_DISTANCE`), or ticks that are not an integer
+  from 1 to 36000 (`MAX_STATUS_TICKS`, as for a knockback). A dead champion is a
+  no-op.
+- `teleport` throws `Invalid teleport: ...` on an unknown champion, a point that
+  is not finite, or a point more than 1e9 m from the champion along either axis
+  (`MAX_TELEPORT_METERS`; the line of sight test squares the span, so a span
+  beyond about 1.3e154 would overflow it and skip obstacles). A dead champion is
+  a no-op with no event.
 
 ## Statuses
 
@@ -414,7 +420,9 @@ abilities) a locked windup. They are step 3.3 of the tick.
 `champion.dash` is `null` or `{ dirX, dirY, stepLength, ticksLeft }`.
 `startDash(state, id, { dirX, dirY, distance, ticks })` sets it with
 `stepLength = distance / ticks`, emits `dashStarted` and ends a running dash as
-`replaced`. A dash moves `stepLength` meters a tick for `ticks` ticks.
+`replaced`. A dash moves `stepLength` meters a tick for `ticks` ticks. Its
+distance is at least 1e-6 m and its ticks at most 36000, so `stepLength` is
+always above 0 and the tick count always counts down to the end.
 
 Each tick, in step 3.3:
 
@@ -455,7 +463,12 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
 - Forced motion substeps are at most 0.25 m, and the first push stops all forced
   motion that tick.
 - Stun cancels a running dash when it is applied; root ends it in the next step.
-- A dash may not be longer than 1000 m, to keep the substep loop short.
+- A dash may not be longer than 1000 m, to keep the substep loop short, and not
+  shorter than 1e-6 m, so its step length cannot underflow to 0.
+- Dash, status, shield and knockback `ticks` are at most 36000 (ten minutes), an
+  absorb, a pulse or a push distance at most 1e6, and a teleport spans at most
+  1e9 m per axis. These keep every number in the state and the events finite;
+  no rule states them.
 - Shield absorption emits one `shieldAbsorbed` per hit, not one per shield.
 - A refresh of any status emits `statusExpired` (`replaced`) then `statusApplied`,
   also for damage over time, where the instance keeps its pulse timer.
@@ -518,12 +531,12 @@ Enforced by review, lint and tests.
 3. Iterate arrays in index order; never iterate object keys for gameplay logic.
 4. The sim uses only correctly rounded operations (`+ - * /`, `Math.sqrt`),
    the exact helpers `Math.abs`, `Math.round`, `Math.min`, `Math.max` and
-   `Math.imul`, the constant `Math.PI`, and the deterministic ports in `dmath.ts`. V8's `Math.atan2`,
-   `Math.sin` and `Math.cos` differ in the last bit across CPU architectures
-   (x86 Linux and ARM macOS) and are never used in the sim; a committed
-   bit-pattern fixture checks the `atan2` port on every CI run. Guard against
-   `NaN`: tests assert `checksum` is finite and that no position or health is
-   `NaN`.
+   `Math.imul`, the constant `Math.PI`, and the deterministic ports in
+   `dmath.ts`. V8's `Math.atan2`, `Math.sin` and `Math.cos` differ in the last
+   bit across CPU architectures (x86 Linux and ARM macOS) and are never used in
+   the sim; a committed bit-pattern fixture checks the `atan2` port on every CI
+   run. Guard against `NaN`: tests assert `checksum` is finite and that no
+   position or health is `NaN`.
 5. Recorded input replays with expected checksums are committed as fixtures.
    Changing gameplay intentionally means regenerating the fixture in the same
    change.
