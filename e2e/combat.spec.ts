@@ -195,6 +195,8 @@ const WARM_UP_VOLLEYS = 4;
 // One window after the volley, then the measured ones. All of them end before the first shot does.
 const SETTLE_WINDOWS = 1;
 const MEASURED_WINDOWS = 3;
+// A sixteenth of the pixels of the 1280x720 viewport the screenshots need.
+const PROBE_VIEWPORT = { width: 320, height: 180 };
 
 /** Runs one window of frames, 480 ms of fake time, in one call. */
 async function runWindow(page: Page): Promise<void> {
@@ -304,7 +306,11 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     // on an empty arena is thrown away when the first projectile arrives, so
     // the engine warms up on volleys. The measured windows hold no spawn and no
     // end of a shot, only frames with eight shots in flight, and in them the
-    // combat code allocates nothing.
+    // combat code allocates nothing. On the CI runner every frame costs about
+    // 190 ms of software rendering at 1280x720 whatever the batching, and the
+    // heap probe does not look at pixels, so the canvas shrinks first. The
+    // resize is outside every measured window.
+    await page.setViewportSize(PROBE_VIEWPORT);
     for (let volley = 0; volley < WARM_UP_VOLLEYS; volley++) {
       await fireVolley(page);
       for (let window = 0; window < WINDOWS_PER_FLIGHT; window++) await runWindow(page);
