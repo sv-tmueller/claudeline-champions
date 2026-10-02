@@ -4,6 +4,7 @@ import { resolveChampion } from './collision';
 import { atan2 } from './dmath';
 import { length } from './geometry';
 import { upkeepStatuses } from './health';
+import { stepForcedMotion } from './motion';
 import { resolveInput } from './input';
 import type { PlayerInput } from './input';
 import { expireProjectiles, stepProjectiles } from './projectile';
@@ -42,6 +43,7 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
 
     resolveChampion(state, champion, prevX, prevY);
 
+    stepForcedMotion(state, champion);
     upkeepStatuses(state, champion);
   }
 
