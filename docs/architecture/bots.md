@@ -46,7 +46,11 @@ local steering to avoid champions and projectiles.
     is more than one cell from the goal it planned for, when the segment to the
     next point is no longer clear, or when the plan is 30 ticks old. A moved
     goal and a blocked segment count only from 6 ticks of age on, so a
-    shoved bot does not plan every tick. At most one plan per call.
+    shoved bot does not plan every tick. At most one plan per call. The bot
+    controller starts a fresh follower when the acted intent, the target or the
+    goal kind (target, spawn, sight cell) changes, and after a think that did
+    not follow a path: the follower ages only when it is called, so without
+    this a plan made before a run of kite steps would be walked stale.
   - Fallback: when the bot's own cell or the goal's cell is blocked (a legal
     position can lie in a blocked cell), the follower searches the cells within
     4 cells for the nearest free cell whose centre a clear segment reaches. Ties
@@ -73,17 +77,37 @@ id.
 With `d` the distance to the target, `h` health over maximum health, and
 `[rangeMin, rangeMax]` from the profile, scores are clamped to 0 to 1:
 
-| Intent  | Score                                                | Movement                                                                                                                      |
-| ------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                         |
-| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | stand when `d >= rangeMin`, otherwise step to the first point 1 m away in a free grid cell with a clear segment: straight away, then 45, -45, 90, -90 degrees |
-| retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there                                |
+| Intent  | Score                                                | Movement                                                                                               |
+| ------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target |
+| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                   |
+| retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there        |
 
 Hysteresis: the bot switches only when the best other intent scores more than
 the current one plus 0.1. Ties go to retreat, then kite, then engage. This
 makes kite start at `d < rangeMin` and end at `d > 1.2 rangeMin`, and retreat
 start at `h < 0.3` and end at `h > 0.36`. After idle the next decision starts
 again from engage.
+
+Kite movement, from the acted intent, with `rangeMin` from the profile:
+
+- Closer than `rangeMin`: the first of five points 1 m away (straight away, then
+  45, -45, 90, -90 degrees) that lies in a free grid cell and is reached by a
+  clear segment.
+- Cornered, all five points failing: the bot follows the path to its own spawn,
+  as retreat does. Once it has started, it keeps walking that path while it is
+  closer than `rangeMin` and the path gives a move; the five points are not
+  tried again meanwhile. Trying them on every think made the bot alternate
+  between one step along the wall and the step back into the corner, so it
+  never left. At the spawn, or when no path exists, it stands for one think and
+  then tries the five points again.
+- At `rangeMin` or farther: stand when the target is in line of sight. Without
+  line of sight the bot follows the path to the nearest sight cell: a free cell
+  within 8 cells (4 m) of the bot, not the bot's own, whose centre has line of
+  sight at a distance in `[rangeMin, rangeMax]`. Ties go to the smaller squared
+  distance from the bot, then the lower cell index. With no such cell it follows
+  the path to the target, which ends in line of sight.
+- No randomness: the aim draw stays the only use of the bot's rng.
 
 Profiles live in `packages/bots/src/profile.ts`, keyed by champion id. Until
 kits exist they are plain constants with a default; the roster-kit package
@@ -163,11 +187,6 @@ match replays exactly from its input stream.
   a fixed 3600 ticks.
 - Local steering around champions and projectiles, dodging, abilities and
   ally logic.
-- A ranged bot standing in kite range without line of sight waits until the
-  target moves, because kite stands once `d >= rangeMin`.
-- A kiting bot pushed into a corner freezes: `kiteMove` stands when all five
-  candidate steps (straight away, plus and minus 45 degrees, plus and minus 90
-  degrees) fail. Deferred to batch 5.
 
 ## Testing
 
@@ -178,3 +197,16 @@ input rules every tick, and checks that `think` leaves the state's checksum
 unchanged. The determinism test runs the same match twice, and two matches
 stepped in turn, and compares input streams and final checksums in memory. See
 [testing](testing.md).
+
+A stall tracker in the test helpers counts, per bot, consecutive ticks whose
+input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the
+grid (a path exists between the free cells nearest the two champions) and the
+bot is not in a stand this document describes: engage in range with line of
+sight, kite in `[rangeMin, rangeMax]` with line of sight, or retreat within 0.5
+m of its own spawn. Idle counts as standing, and a cornered kiter closer than
+`rangeMin` counts. Any other tick resets the run. No bot may stall for more
+than 120 ticks, in the headless run and in a corner-start run: the same match
+with one bot in the north-east corner of arena 1 and a melee champion 2.83 m
+away on the diagonal, which the old stand rule left frozen for the whole 3600
+ticks. A bot pushed by another champion keeps a non-zero input and is not
+counted: local avoidance is not built.
