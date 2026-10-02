@@ -12,8 +12,8 @@ lists are candidates, sliced batch by batch at dispatch time.
 | Milestone | Scope | Status |
 |-----------|-------|--------|
 | 1. Foundations | Monorepo scaffold, check suite and CI, architecture docs, roadmap, rules and roster docs, Blender bootstrap | done ([batch #6](https://github.com/sv-tmueller/claudeline-champions/issues/6) merged) |
-| 2. Walking in the arena | Champion movement and collision in the sim, scene and input in the client | in progress: sim core and client scene merged ([batch #12](https://github.com/sv-tmueller/claudeline-champions/issues/12)); walking and bot navigation in [batch #23](https://github.com/sv-tmueller/claudeline-champions/issues/23) |
-| 3. First blood | Effects toolkit, combat, match flow with sudden death, HUD, two champions | planned |
+| 2. Walking in the arena | Champion movement and collision in the sim, scene and input in the client | done ([batch #12](https://github.com/sv-tmueller/claudeline-champions/issues/12) and [batch #23](https://github.com/sv-tmueller/claudeline-champions/issues/23) merged) |
+| 3. First blood | Effects toolkit, combat, match flow with sudden death, HUD, two champions | in progress: projectiles, areas, health, line of sight and deterministic atan2 merged ([batch #23](https://github.com/sv-tmueller/claudeline-champions/issues/23)); statuses, abilities, combat rendering and the first HUD in [batch #32](https://github.com/sv-tmueller/claudeline-champions/issues/32) |
 | 4. Bots 2v2, the first playable | Bot AI, champions three and four, champion select, match setup, result screen | planned |
 | 5. Feel and breadth | Rigs and animation, menus and keybinding, second arena, 3v3, roster to six, balance pass | planned |
 | 6. Online | Protocol, match server, WebSocket transport, prediction, reconnect, deployment | planned |
