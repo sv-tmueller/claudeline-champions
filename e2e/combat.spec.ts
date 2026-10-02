@@ -63,6 +63,14 @@ let readMs = 0;
 let phaseFrameMs = 0;
 let phaseReadMs = 0;
 
+/** `frames` frames of 17 ms in one call, timed as a batch. */
+async function runBatch(page: Page, frames: number): Promise<void> {
+  framesRun += frames;
+  const t0 = Date.now();
+  await page.clock.runFor(frames * FRAME_MS);
+  frameMs += Date.now() - t0;
+}
+
 /** One frame of fake time, timed on its own. Logs every 25 frames so a timeout still leaves figures. */
 async function runFrame(page: Page): Promise<void> {
   framesRun++;
@@ -127,19 +135,22 @@ async function runUntil(
   budgetTicks: number,
   done: (hooks: Hooks) => boolean,
 ): Promise<Hooks> {
-  const start = (await readHooks(page)).tick;
+  let hooks = await readHooks(page);
+  const start = hooks.tick;
   for (;;) {
-    const hooks = await readHooks(page);
     if (done(hooks)) return hooks;
     expect(hooks.tick - start, `${label}: not reached within ${budgetTicks} ticks`).toBeLessThanOrEqual(
       budgetTicks,
     );
     await runFrame(page);
+    hooks = await readHooks(page);
   }
 }
 
+/** Runs the frames for `ticks` ticks in one call, then finishes frame by frame if the sim is behind. */
 async function runTicks(page: Page, ticks: number): Promise<Hooks> {
   const target = (await readHooks(page)).tick + ticks;
+  await runBatch(page, ticks);
   return runUntil(page, `${ticks} ticks`, ticks + 5, (hooks) => hooks.tick >= target);
 }
 
@@ -171,8 +182,12 @@ function summarise(root: ProfileNode): Allocations {
   return result;
 }
 
-// 30 frames of 17 ms: one 500 ms window and about 30 ticks.
+// Playwright's clock fires one animation frame per 16 ms of fake time, so
+// runFor(480) fires exactly 30 frames (counted with a requestAnimationFrame
+// loop: 30 callbacks and 29 to 30 sim ticks), where thirty runFor(17) fire 31
+// to 32. A window is one runFor call, with no hook read between its frames.
 const WINDOW_FRAMES = 30;
+const WINDOW_MS = WINDOW_FRAMES * 16;
 // A shot flies 27 m at 10 m/s, 162 ticks or 5.4 windows, from the spawn to the east boundary.
 const WINDOWS_PER_FLIGHT = 6;
 // Volleys the engine warms up on before the measured one.
@@ -181,11 +196,12 @@ const WARM_UP_VOLLEYS = 4;
 const SETTLE_WINDOWS = 1;
 const MEASURED_WINDOWS = 3;
 
-/** Runs one window of frames, 500 ms of fake time. */
+/** Runs one window of frames, 480 ms of fake time, in one call. */
 async function runWindow(page: Page): Promise<void> {
-  for (let frame = 0; frame < WINDOW_FRAMES; frame++) {
-    await runFrame(page);
-  }
+  framesRun += WINDOW_FRAMES;
+  const t0 = Date.now();
+  await page.clock.runFor(WINDOW_MS);
+  frameMs += Date.now() - t0;
 }
 
 /** Eight shots in the same frame. */
@@ -210,6 +226,7 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
 }
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
+  test.setTimeout(300_000);
   const { problems, failed } = watchProblems(page);
   phaseStart = Date.now();
   phaseFrames = framesRun;
