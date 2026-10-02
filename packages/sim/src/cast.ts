@@ -252,7 +252,7 @@ export function startCast(
     if ((buttons & Button[slot]) === 0) continue;
     const spec = kit.slots[slot];
     const ex = shift && spec.ex !== undefined;
-    const ability = ex && spec.ex !== undefined ? spec.ex : spec;
+    const ability = abilityOf(kit, slot, ex);
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if ((champion.cooldowns[i] as number) > 0 || champion.energy < cost) continue;
     if (rooted && ability.effects.some((e) => e.type === 'dash')) continue;

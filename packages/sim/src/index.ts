@@ -34,7 +34,6 @@ export type {
 } from './arena';
 export { Button, SLOTS } from './input';
 export type { MoveAxis, PlayerInput, Slot } from './input';
-export { validateKit } from './kit';
 export type {
   AbilityEffect,
   AbilitySpec,
