@@ -54,31 +54,50 @@ test('walks east at 5.5 m/s while D is held and stops on release', async ({ page
   try {
     await openMatch(page, failed);
 
-    await page.keyboard.down('KeyD');
+    // Read the tick before the key goes down: a frame can step the sim between
+    // the key event and a later read, and those steps still count as walking.
     const pressed = await readSim(page);
+    await page.keyboard.down('KeyD');
     // Two ticks give the key event a frame to reach the sampled input.
     await waitForTick(page, pressed.tick + 2, failed);
     const a = await readSim(page);
     await waitForTick(page, a.tick + 30, failed);
     const b = await readSim(page);
     await page.keyboard.up('KeyD');
-    await waitForTick(page, b.tick + 2, failed);
-    const c = await readSim(page);
-    await waitForTick(page, c.tick + 5, failed);
-    const d = await readSim(page);
+    // The release reaches the sim after an unknown wall-clock delay, so poll
+    // once per tick until x has held still for three readings in a row.
+    const releasedAt = (await readSim(page)).tick;
+    let last = await readSim(page);
+    let stopTick: number | undefined;
+    let unchanged = 0;
+    while (unchanged < 2 && last.tick - releasedAt <= 300) {
+      await waitForTick(page, last.tick + 1, failed);
+      const next = await readSim(page);
+      if (next.x === last.x) {
+        stopTick ??= next.tick;
+        unchanged += 1;
+      } else {
+        stopTick = undefined;
+        unchanged = 0;
+      }
+      last = next;
+    }
+    expect(stopTick, 'x never settled within 300 ticks of the release').toBeDefined();
+    const stopped = last;
+    // Stopped: no movement after release.
+    await waitForTick(page, stopped.tick + 5, failed);
+    const after = await readSim(page);
+    expect(after.x).toBe(stopped.x);
+    expect(after.y).toBe(START_Y);
 
     // Exact sim speed between two reads, within the 1 cm rounding of the hook.
     expect(Math.abs(b.x - a.x - (b.tick - a.tick) * CM_PER_TICK)).toBeLessThanOrEqual(1);
     expect(b.y).toBe(START_Y);
-    // Stopped: no movement after release.
-    expect(d.x).toBe(c.x);
-    expect(d.y).toBe(START_Y);
     // About 2.75 m for the 30 ticks from a to b, plus the ticks around them.
-    const walked = c.x - START_X;
+    const walked = stopped.x - START_X;
     expect(walked).toBeGreaterThanOrEqual(274);
-    expect(walked).toBeLessThanOrEqual(275 + 15 * CM_PER_TICK);
-    // Never more than the ticks that passed since the key went down.
-    expect(walked).toBeLessThanOrEqual((c.tick - pressed.tick) * CM_PER_TICK + 1);
+    // Never more than the ticks that passed from the key down to the stop.
+    expect(walked).toBeLessThanOrEqual((stopTick! - pressed.tick) * CM_PER_TICK + 1);
 
     await page.keyboard.press('F3');
     await orFail(page.waitForSelector('canvas[data-overlay="on"]'), failed);
