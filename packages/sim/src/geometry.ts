@@ -5,7 +5,15 @@ export interface Point {
   y: number;
 }
 
-/** Euclidean length from `+ - *` and `Math.sqrt`, which round correctly on every platform. */
+/**
+ * Euclidean length from `+ - *` and `Math.sqrt`, which round correctly on every platform.
+ *
+ * It is only accurate while the squares stay normal doubles. Above `sqrt(MAX_VALUE)`, about
+ * 1.34e154 on one axis, a square overflows to Infinity. Below the square root of the smallest
+ * normal double, about 1.49e-154, a square turns subnormal and loses precision, then flushes
+ * to 0 (so `length(1e-170, 0)` is 0). Callers that take outside vectors reject both ends,
+ * see `spawnProjectile`.
+ */
 export function length(x: number, y: number): number {
   return Math.sqrt(x * x + y * y);
 }

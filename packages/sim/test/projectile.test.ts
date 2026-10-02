@@ -140,6 +140,8 @@ describe('spawnProjectile', () => {
     ['a NaN direction', { dirX: NaN }],
     ['a zero direction', { dirX: 0, dirY: 0 }],
     ['a direction too large to measure', { dirX: 1e200, dirY: 1e200 }],
+    ['a direction too small to measure', { dirX: 1e-160, dirY: 0 }],
+    ['a direction far too small to measure', { dirX: 1e-170, dirY: 0 }],
     ['a zero speed', { speed: 0 }],
     ['a negative speed', { speed: -1 }],
     ['a zero radius', { radius: 0 }],
@@ -157,6 +159,25 @@ describe('spawnProjectile', () => {
     expect(state.nextEntityId).toBe(4);
     expect(state.projectiles).toEqual([]);
     expect(state.events).toEqual([]);
+  });
+});
+
+describe('projectile direction bounds', () => {
+  it.each([
+    ['1e200 on both axes', { dirX: 1e200, dirY: 1e200 }, 'direction is too large to measure'],
+    ['1e-160 on one axis', { dirX: 1e-160, dirY: 0 }, 'direction is too small to measure'],
+    ['1e-170 on one axis', { dirX: 1e-170, dirY: 0 }, 'direction is too small to measure'],
+    ['1e-160 on both axes', { dirX: -1e-160, dirY: 1e-160 }, 'direction is too small to measure'],
+    ['an exact zero', { dirX: 0, dirY: 0 }, 'direction is zero'],
+  ])('names the problem for %s', (_name, over, message) => {
+    expect(() => spawnProjectile(open(), spec(over))).toThrow(message);
+  });
+
+  it('still accepts a small direction above the bound and normalizes it', () => {
+    const state = open();
+    spawnProjectile(state, spec({ dirX: 1e-140, dirY: 0, speed: 10 }));
+    expect(state.projectiles[0]?.vx).toBe(10);
+    expect(state.projectiles[0]?.vy).toBe(0);
   });
 });
 

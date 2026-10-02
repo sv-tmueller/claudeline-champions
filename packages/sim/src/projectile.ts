@@ -22,6 +22,9 @@ export interface ProjectileSpec {
   effects: readonly Effect[];
 }
 
+/** Smallest direction component, in magnitude, that `length` measures without underflow. */
+const MIN_DIRECTION = 1e-150;
+
 function fail(problem: string): never {
   throw new Error(`Invalid projectile: ${problem}`);
 }
@@ -36,9 +39,16 @@ export function spawnProjectile(state: GameState, spec: ProjectileSpec): number 
   for (const key of ['x', 'y', 'dirX', 'dirY', 'speed', 'radius'] as const) {
     if (!Number.isFinite(spec[key])) return fail(`${key} is not a finite number`);
   }
+  if (spec.dirX === 0 && spec.dirY === 0) return fail('direction is zero');
+  // `length` squares its arguments, so a direction is only measurable while the squares are
+  // normal doubles. The upper bound is `sqrt(MAX_VALUE)` (1.34e154) on an axis. The lower
+  // bound is the square root of the smallest normal double (1.49e-154), below which the
+  // squares are subnormal and the length is wrong; 1e-150 is a round number safely above it.
   const dirLength = length(spec.dirX, spec.dirY);
-  if (dirLength === 0) return fail('direction is zero');
   if (!Number.isFinite(dirLength)) return fail('direction is too large to measure');
+  if (Math.abs(spec.dirX) < MIN_DIRECTION && Math.abs(spec.dirY) < MIN_DIRECTION) {
+    return fail('direction is too small to measure');
+  }
   if (spec.speed <= 0) return fail('speed must be above 0');
   if (spec.radius <= 0) return fail('radius must be above 0');
   if (!isPositiveInteger(spec.lifetimeTicks)) {
