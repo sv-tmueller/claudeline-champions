@@ -7,6 +7,7 @@ import contextlib
 import io
 import json
 import struct
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,7 +18,7 @@ import validate_glb
 REPO = Path(__file__).resolve().parents[2]
 ARENA_JSON = REPO / "data" / "arenas" / "arena01.json"
 ARENA_GLB = REPO / "assets" / "models" / "arenas" / "arena01.glb"
-CHAMPION_GLB = REPO / "assets" / "models" / "champions" / "placeholder.glb"
+CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
@@ -243,6 +244,7 @@ class ArenaNodeTests(ValidatorCase):
             "two components": (with_translation(1, [-8, 0]), "translation must be"),
             "nan component": (with_translation(1, [float("nan"), 0, 0]), "translation must be"),
             "bool components": (with_translation(0, [False, 0, False]), "translation must be"),
+            "huge int component": (with_translation(1, [10**400, 0, 0]), "translation must be"),
         }
         for label, (doc, reason) in cases.items():
             with self.subTest(case=label):
@@ -441,12 +443,36 @@ class Arena01ContentTests(unittest.TestCase):
         )
 
 
+class NumberTests(unittest.TestCase):
+    def test_accepts_finite_numbers_up_to_the_float_range(self):
+        for value in (0, -8, 7.5, int(sys.float_info.max)):
+            with self.subTest(value=value):
+                self.assertTrue(validate_glb.is_finite_number(value))
+
+    def test_rejects_non_finite_and_non_numbers(self):
+        cases = {
+            "huge int": 10**400,
+            "huge negative int": -(10**400),
+            "nan": float("nan"),
+            "infinity": float("inf"),
+            "bool": True,
+            "string": "1",
+        }
+        for label, value in cases.items():
+            with self.subTest(case=label):
+                self.assertFalse(validate_glb.is_finite_number(value))
+
+
 class CommittedModelTests(unittest.TestCase):
     def test_committed_arena_glb_passes(self):
         self.assertIsNone(validate_glb.validate_file(ARENA_GLB))
 
-    def test_committed_champion_glb_passes(self):
-        self.assertIsNone(validate_glb.validate_file(CHAMPION_GLB))
+    def test_committed_champion_glbs_pass(self):
+        paths = sorted(CHAMPIONS_DIR.glob("*.glb"))
+        self.assertTrue(paths, "no champion glb under %s" % CHAMPIONS_DIR)
+        for path in paths:
+            with self.subTest(file=path.name):
+                self.assertIsNone(validate_glb.validate_file(path))
 
 
 class CommandLineTests(ValidatorCase):
@@ -488,7 +514,9 @@ class CommandLineTests(ValidatorCase):
             return doc
 
         def set_translation(doc):
-            doc["nodes"][5]["translation"] = ["a", 0, 0]
+            for node in doc["nodes"]:
+                if node["name"] == "Obstacle_0":
+                    node["translation"] = ["a", 0, 0]
 
         cases = {
             "non-dict node": (

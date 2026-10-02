@@ -14,12 +14,16 @@ Run these from the repo root. Each must exit 0.
 ```
 tools/blender/run.sh tools/blender/gen_arena.py -- --arena data/arenas/arena01.json --out assets/models/arenas/arena01.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion placeholder --out assets/models/champions/placeholder.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion hargrim --out assets/models/champions/hargrim.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion quillon --out assets/models/champions/quillon.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion lumeth --out assets/models/champions/lumeth.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion skerrow --out assets/models/champions/skerrow.glb
 python3 tools/blender/validate_glb.py assets/models
 python3 -B -m unittest discover -s tools/blender -p 'test_*.py'
 ```
 
-The first two need Blender. The last two need only Python 3.9 or newer and no
-packages, so they can run in CI.
+The generators need Blender. The last two commands need only Python 3.9 or
+newer and no packages, so they can run in CI.
 
 ## Files
 
@@ -27,9 +31,10 @@ packages, so they can run in CI.
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json` |
-| `gen_champion.py` | Builds a placeholder champion glb |
+| `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs |
 | `blender_common.py` | Scene clearing, materials and export, shared by the generators |
-| `test_export_determinism.py` | Regenerates each model four times and compares it to the committed glb. Needs Blender, skips without it |
+| `test_export_determinism.py` | Regenerates each model four times and compares it to the committed glb. Needs Blender, skips without it. One test, without Blender, checks that every committed champion glb has a case |
+| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, feet, facing, height, footprint, budgets and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator. The tests that read the committed models need `assets/models` to exist |
 
@@ -83,17 +88,40 @@ not vertical.
 
 ### Champion
 
-- `--champion placeholder` writes `assets/models/champions/placeholder.glb`.
-  Roster ids come later with the roster document.
+- `--champion <id>` writes `assets/models/champions/<id>.glb`. The ids are
+  `placeholder`, the generic model, and the four roster ids below.
 - One mesh node named `Champion`, built in one bmesh with a material per part.
-  The head sphere is built from explicit vertices and faces, because
-  `bmesh.ops.create_uvsphere` changes its face vertex order between runs and
-  would make the export differ each time.
+  The head sphere and the halo ring are built from explicit vertices and
+  faces, because `bmesh.ops.create_uvsphere` changes its face vertex order
+  between runs and would make the export differ each time.
 - Origin at the feet, footprint inside a 0.5 m radius, about 1.7 m tall.
 - It faces +X in both Blender and glTF, so the client can set
   `rotation.y = aimAngle` directly. An accent-coloured visor and chest plate
   mark the front.
 - Body and accent are flat colours. No rig, no animation.
+- All five files share the node layout, the origin, the facing, the body
+  geometry and the accent. A roster champion differs only in the body colour
+  and one cue mesh, which is in the body colour so the accent still marks
+  only the front.
+- The top of every model is at most 1.90 m, because the health bar starts
+  above 1.97 m, and the ground radius is at most 0.50 m. Each file is at most
+  48 KiB and 600 triangles.
+
+| id | archetype | body colour (linear) | about | cue |
+|----|-----------|----------------------|-------|-----|
+| `placeholder` | generic | (0.20, 0.35, 0.60) | `#7ca0cb` | none |
+| `hargrim` | bruiser | (0.38, 0.03, 0.02) | `#a63027` | two shoulder blocks, top at 1.53 m |
+| `quillon` | ranged | (0.00, 0.30, 0.25) | `#009589` | staff in the right hand, top at 1.85 m |
+| `lumeth` | healer | (0.30, 0.58, 0.02) | `#95c827` | halo ring above the head, top at 1.815 m |
+| `skerrow` | assassin | (0.03, 0.03, 0.03) | `#303030` | short blade forward from the right hand |
+
+The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
+checked by `test_champion_models.py`. No body has a blue channel more than 45
+above its green channel in 8-bit sRGB, so nothing reads as the magenta debug
+overlay. Each roster body is at least 80 away, as an RGB distance, from the
+other roster bodies, the placeholder body, the accent, the arena floor and
+the colours the client draws near a champion (bars, projectiles, impact ring,
+hit flash, dead grey and the magenta debug overlay `#ff00ff`).
 
 ## Validator
 
@@ -105,7 +133,7 @@ reported as that file's FAIL line, and the remaining files still run.
 - Structure: magic `glTF`, version 2, header length equal to the file size
   (this catches every truncation), a JSON chunk first, an optional BIN chunk,
   chunk lengths that are multiples of 4, and `asset.version` 2.0. `nodes` is
-  a list of objects with string names.
+  a list of objects, and a node's `name`, if present, is a string.
 - The parent folder decides the rules. `arenas/<id>.glb` is checked against
   `data/arenas/<id>.json`, and `champions/*.glb` needs a `Champion` node. Any
   other folder fails.

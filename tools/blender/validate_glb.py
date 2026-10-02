@@ -86,7 +86,13 @@ def is_number(value):
 
 def is_finite_number(value):
     # Only floats can be NaN or infinite. math.isfinite on a huge int raises.
-    return is_number(value) and (not isinstance(value, float) or math.isfinite(value))
+    # An int beyond the float range also overflows in the tolerance check, so
+    # it is rejected here too.
+    if not is_number(value):
+        return False
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return abs(value) <= sys.float_info.max
 
 
 def check_keys(obj, expected, where):
