@@ -10,7 +10,7 @@ export interface Tier {
 }
 
 // The maxU literals are tan(6), tan(3) and tan(1) degrees, written out so the bots need no
-// trigonometry at runtime. A test checks them against Math.tan.
+// trigonometry at runtime. A test checks them against the tangent.
 export const TIERS: Readonly<Record<Difficulty, Tier>> = {
   easy: { delay: 30, errorDegrees: 12, maxU: 0.10510423526567646 },
   normal: { delay: 15, errorDegrees: 6, maxU: 0.0524077792830412 },
