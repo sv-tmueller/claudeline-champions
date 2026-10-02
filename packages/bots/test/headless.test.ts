@@ -1,27 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { checksum, step } from '@claudeline/sim';
-import type { PlayerInput } from '@claudeline/sim';
 import type { Intent } from '../src/intent';
-import { checkInvariants, createRun } from './helpers';
+import { checkInvariants, createRun, createStallTracker, validInput } from './helpers';
 
 const TICKS = 3600;
 const LOW_HEALTH_TICK = 1800;
-
-function validAxis(v: number): boolean {
-  return (v === 1 || v === -1 || v === 0) && !Object.is(v, -0);
-}
-
-function validInput(input: PlayerInput): boolean {
-  return (
-    validAxis(input.moveX) &&
-    validAxis(input.moveY) &&
-    Number.isInteger(input.aimX) &&
-    Number.isInteger(input.aimY) &&
-    !Object.is(input.aimX, -0) &&
-    !Object.is(input.aimY, -0) &&
-    input.buttons === 0
-  );
-}
 
 describe('headless 2v2 match of bots', () => {
   it('runs 3600 ticks with every invariant intact and every bot active', () => {
@@ -33,6 +16,7 @@ describe('headless 2v2 match of bots', () => {
     const lastIntent: Intent[] = bots.map(() => 'idle');
     const seen = bots.map(() => new Set<Intent>());
     let intentChanges = 0;
+    const tracker = createStallTracker(state, bots);
 
     for (let t = 0; t < TICKS; t++) {
       if (t === LOW_HEALTH_TICK) {
@@ -48,6 +32,7 @@ describe('headless 2v2 match of bots', () => {
         return input;
       });
       for (const input of inputs) expect(validInput(input), `tick ${t}`).toBe(true);
+      tracker.observe(inputs);
 
       const previous = state.champions.map((c) => ({ x: c.x, y: c.y }));
       step(state, inputs);
@@ -83,5 +68,10 @@ describe('headless 2v2 match of bots', () => {
     expect(seen[1]?.has('retreat')).toBe(true);
     expect(seen[2]?.has('retreat')).toBe(true);
     expect(state.tick).toBe(TICKS);
+    const worst = tracker.worst();
+    expect(
+      worst.length,
+      `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent}`,
+    ).toBeLessThanOrEqual(120);
   }, 30_000);
 });
