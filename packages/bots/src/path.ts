@@ -2,7 +2,8 @@ import { segmentClear } from './geometry';
 import { cellCenter, cellIndexAt, isBlocked } from './grid';
 import type { NavGrid, Vec2 } from './grid';
 
-// Fixed neighbour order is part of the tie-breaking: E, N, W, S, NE, NW, SW, SE.
+// Neighbour order E, N, W, S, NE, NW, SW, SE. It does not change the result: the open set's
+// (f, h, cell) total order breaks every tie.
 const NEIGHBOURS: readonly (readonly [number, number])[] = [
   [1, 0],
   [0, 1],
@@ -127,10 +128,16 @@ export function lineOfWalk(grid: NavGrid, a: number, b: number): boolean {
   return segmentClear(grid, cellCenter(grid, a), cellCenter(grid, b));
 }
 
-function canStep(grid: NavGrid, from: number, col: number, row: number, dc: number, dr: number) {
+function canStep(
+  grid: NavGrid,
+  from: number,
+  col: number,
+  row: number,
+  dc: number,
+  dr: number,
+): boolean {
   const nextCol = col + dc;
   const nextRow = row + dr;
-  if (isBlocked(grid, nextCol, nextRow)) return false;
   if (dc !== 0 && dr !== 0 && (isBlocked(grid, nextCol, row) || isBlocked(grid, col, nextRow))) {
     return false;
   }
@@ -160,9 +167,12 @@ function searchCells(grid: NavGrid, start: number, goal: number): number[] {
     const row = Math.floor(cell / grid.cols);
     const cost = g[cell] ?? Infinity;
     for (const [dc, dr] of NEIGHBOURS) {
-      if (!canStep(grid, cell, col, row, dc, dr)) continue;
-      const next = (row + dr) * grid.cols + (col + dc);
+      const nextCol = col + dc;
+      const nextRow = row + dr;
+      if (isBlocked(grid, nextCol, nextRow)) continue;
+      const next = nextRow * grid.cols + nextCol;
       if (closed[next] === 1) continue;
+      if (!canStep(grid, cell, col, row, dc, dr)) continue;
       const nextCost = cost + (dc !== 0 && dr !== 0 ? Math.SQRT2 : 1);
       if (nextCost < (g[next] ?? Infinity)) {
         g[next] = nextCost;

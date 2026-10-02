@@ -25,7 +25,7 @@ export interface NavGrid {
 
 export const NAV_CELL_SIZE = 0.5;
 
-// The epsilon keeps float noise (0.3 * 3 / 0.3) from adding a whole extra cell.
+// The epsilon keeps float noise (0.1 * 3 / 0.1) from adding a whole extra cell.
 function cellCount(extent: number, cellSize: number): number {
   return Math.ceil(extent / cellSize - 1e-9);
 }
