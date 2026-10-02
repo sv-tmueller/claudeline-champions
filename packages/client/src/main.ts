@@ -16,6 +16,8 @@ import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
 import { createAreaViews, createProjectileViews } from './entity-views';
 import { CombatFeedback, flashText, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
+import { Hud } from './hud';
+import { buildHud } from './hud-dom';
 import { createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
 import { bindInput, createInputCore } from './input';
@@ -23,6 +25,7 @@ import { capturePoses, createPoses, interpolatePoses } from './interpolate';
 import { createFixedStepClock } from './loop';
 import { PLACEHOLDER_CHAMPION_URL, arenaModelUrl } from './models';
 import './style.css';
+import './hud.css';
 
 const HUMAN_ID = 0;
 const LOCAL_SEED = 1;
@@ -44,6 +47,8 @@ const state = createMatch(
 
 const container = document.getElementById('app');
 if (!container) throw new Error('missing #app container');
+const hudRoot = document.getElementById('hud');
+if (!hudRoot) throw new Error('missing #hud container');
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setClearColor(new Color('#1b2230'));
@@ -72,6 +77,9 @@ const healthBars = createHealthBars(state.champions, human.team);
 const killFeed = createKillFeed();
 const feedback = new CombatFeedback(state.champions.length, impactRings, killFeed);
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
+
+// Built before the models load, so the HUD shows while they do.
+const hud = new Hud(buildHud(hudRoot), state.champions, HUMAN_ID, killFeed);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 
@@ -205,6 +213,7 @@ function stepSim(steps: number): void {
   areaViews.sync(state.areas);
   writeHooks();
   writeCombatHooks();
+  hud.update(state);
 }
 
 // Created after the champion views exist, in loadModels. draw never runs before then.
@@ -261,6 +270,7 @@ await loadModels();
 capturePoses(state.champions, previousPoses);
 writeHooks();
 writeCombatHooks();
+hud.update(state);
 if (import.meta.env.DEV) {
   // Dev builds only: Vite replaces the flag with false in a build and drops the
   // branch and the chunk, so F4 never ships.
