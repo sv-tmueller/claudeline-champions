@@ -62,9 +62,10 @@ describe('spawnArea', () => {
 
   it('stores -0 coordinates as +0 and copies the effects', () => {
     const state = open();
-    const effects = [{ type: 'damage' as const, amount: 5 }];
+    const effect = { type: 'damage' as const, amount: 5 };
+    const effects = [effect];
     spawnArea(state, spec({ x: -0, y: -0, effects }));
-    effects[0] = { type: 'damage', amount: 99 };
+    effect.amount = 99;
     const area = state.areas[0];
     expect(Object.is(area?.x, 0)).toBe(true);
     expect(Object.is(area?.y, 0)).toBe(true);

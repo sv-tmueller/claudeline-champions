@@ -112,9 +112,10 @@ describe('spawnProjectile', () => {
 
   it('copies the effects so the caller keeps no alias into the state', () => {
     const state = open();
-    const effects = [{ type: 'damage' as const, amount: 10 }];
+    const effect = { type: 'damage' as const, amount: 10 };
+    const effects = [effect];
     spawnProjectile(state, spec({ effects }));
-    effects[0] = { type: 'damage', amount: 99 };
+    effect.amount = 99;
     expect(state.projectiles[0]?.effects).toEqual([{ type: 'damage', amount: 10 }]);
   });
 
