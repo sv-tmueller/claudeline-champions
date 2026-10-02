@@ -9,7 +9,7 @@ import {
 } from './constants';
 import { direction } from './geometry';
 import { SLOTS } from './input';
-import { endDash } from './state';
+import { endDash, interruptCast } from './state';
 import type {
   ChampionState,
   GameState,
@@ -29,7 +29,7 @@ export function isTicks(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-/** A tick count a status, shield or knockback may have: 1 to `MAX_STATUS_TICKS`. */
+/** A tick count a status, shield, knockback or dash may have: 1 to `MAX_STATUS_TICKS`. */
 export function isStatusTicks(value: unknown): value is number {
   return isTicks(value) && value <= MAX_STATUS_TICKS;
 }
@@ -173,7 +173,8 @@ export function isBlockedByInvulnerable(type: StatusType): boolean {
 }
 
 /**
- * Applies a status to a champion and returns whether anything changed. Rules per type are in
+ * Applies a status to a champion and returns whether anything changed. A stun that lands also
+ * cancels the dash and the windup the champion has, in that order. Rules per type are in
  * the Statuses section of simulation.md. Returns false, with no event, for a dead target, for
  * a hostile status on an invulnerable one and for a stun, root, silence or invulnerable that
  * does not outlast the one already running. Throws `Invalid status: ...` for an unknown target
@@ -205,7 +206,10 @@ export function applyStatus(
         endStatus(state, target, old, 'replaced');
       }
       addStatus(state, target, { ...base, type, remainingTicks });
-      if (type === 'stun') endDash(state, target, 'stunned');
+      if (type === 'stun') {
+        endDash(state, target, 'stunned');
+        interruptCast(state, target, 'stun');
+      }
       return true;
     }
     case 'slow':

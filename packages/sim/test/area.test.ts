@@ -53,6 +53,7 @@ describe('spawnArea', () => {
         intervalTicks: 30,
         ticksToNextApply: 0,
         effects: [{ type: 'damage', amount: 5 }],
+        castId: null,
       },
     ]);
     expect(state.events).toEqual([

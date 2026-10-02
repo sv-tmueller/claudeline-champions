@@ -8,7 +8,8 @@ import {
 import { direction } from './geometry';
 import { hasLineOfSight } from './sight';
 import { endDash } from './state';
-import type { ChampionState, GameState } from './state';
+import type { ThenEffect } from './kit';
+import type { ChampionState, DashState, GameState } from './state';
 import { TICKS_PROBLEM, endStatus, hasStatus, isStatusTicks } from './status';
 
 export interface DashSpec {
@@ -19,6 +20,13 @@ export interface DashSpec {
   distance: number;
   /** Ticks the dash lasts, from 1 to `MAX_STATUS_TICKS`. */
   ticks: number;
+}
+
+/** What a cast adds to a dash; a direct `startDash` has neither. */
+export interface DashCast {
+  castId: number | null;
+  /** Copied. Effects that fire where the dash ends. */
+  then: readonly ThenEffect[];
 }
 
 function fail(what: 'dash' | 'teleport', problem: string): never {
@@ -32,12 +40,19 @@ function champion(state: GameState, what: 'dash' | 'teleport', id: number): Cham
 }
 
 /**
- * Starts a dash for a champion: `distance` meters in even steps over `ticks` ticks, moving from the
- * next `step` on. A running dash ends as `replaced`. Stun and root do not stop it from starting:
- * stun cancels a dash when it lands, and root ends it in the next step. Returns false, with no
- * event, for a dead champion.
+ * Starts a dash for a champion: `distance` meters in even steps over `ticks` ticks. It first moves
+ * in step 3f of the holder's next turn, or of the same turn when a cast starts it. A running dash
+ * ends as `replaced`, and its `then` effects are dropped with it. Stun and root do not stop it
+ * from starting: stun cancels a dash when it lands, and root ends it in the next step. Returns
+ * false, with no event, for a dead champion. `cast` is for `cast.ts`: a direct call stores no cast
+ * id and no `then` effects.
  */
-export function startDash(state: GameState, championId: number, spec: DashSpec): boolean {
+export function startDash(
+  state: GameState,
+  championId: number,
+  spec: DashSpec,
+  cast: DashCast = { castId: null, then: [] },
+): boolean {
   const target = champion(state, 'dash', championId);
   if (typeof spec !== 'object' || spec === null) return fail('dash', 'spec must be an object');
   if (!Number.isFinite(spec.dirX) || !Number.isFinite(spec.dirY)) {
@@ -61,6 +76,8 @@ export function startDash(state: GameState, championId: number, spec: DashSpec):
     dirY: dir.y,
     stepLength: spec.distance / spec.ticks,
     ticksLeft: spec.ticks,
+    castId: cast.castId,
+    then: [...cast.then],
   };
   state.events.push({
     type: 'dashStarted',
@@ -117,13 +134,16 @@ export function teleport(state: GameState, championId: number, toX: number, toY:
  * windup. Root ends a running dash first. The summed displacement is cut into substeps of at most
  * `MOTION_SUBSTEP_METERS`, with collision resolved after each; the first push ends the dash as
  * `blocked` and every knockback as `stopped`, and nothing moves on, so forced motion does not
- * slide. A dash whose ticks run out ends as `complete`.
+ * slide. A dash whose ticks run out ends as `complete`. Returns the dash record that ended in this
+ * call, as `rooted`, `blocked` or `complete`, so `step` can fire its `then` effects; this module
+ * cannot, because `cast.ts` imports it.
  */
-export function stepForcedMotion(state: GameState, champion: ChampionState): void {
-  if (champion.dash && hasStatus(champion, 'root')) endDash(state, champion, 'rooted');
+export function stepForcedMotion(state: GameState, champion: ChampionState): DashState | null {
+  const rooted = champion.dash && hasStatus(champion, 'root') ? champion.dash : null;
+  if (rooted) endDash(state, champion, 'rooted');
   const { dash } = champion;
   const knockbacks = champion.statuses.filter((s) => s.type === 'knockback');
-  if (!dash && knockbacks.length === 0) return;
+  if (!dash && knockbacks.length === 0) return rooted;
 
   let dx = 0;
   let dy = 0;
@@ -143,7 +163,7 @@ export function stepForcedMotion(state: GameState, champion: ChampionState): voi
   const total = direction(dx, dy)?.length ?? 0;
   if (total > 0) {
     // The substep count is the rounded quotient, plus one when that leaves a substep too long; it
-    // equals the ceiling of the quotient and needs no `Math.ceil`.
+    // equals the ceiling of the quotient and needs no ceiling function.
     let count = Math.max(1, Math.round(total / MOTION_SUBSTEP_METERS));
     if (total / count > MOTION_SUBSTEP_METERS) count += 1;
     const startX = champion.x;
@@ -157,11 +177,17 @@ export function stepForcedMotion(state: GameState, champion: ChampionState): voi
     }
   }
 
+  let ended: DashState | null = rooted;
   if (pushed) {
+    if (dash) ended = dash;
     endDash(state, champion, 'blocked');
     for (const k of knockbacks) endStatus(state, champion, k, 'stopped');
   } else if (dash) {
     dash.ticksLeft -= 1;
-    if (dash.ticksLeft === 0) endDash(state, champion, 'complete');
+    if (dash.ticksLeft === 0) {
+      ended = dash;
+      endDash(state, champion, 'complete');
+    }
   }
+  return ended;
 }

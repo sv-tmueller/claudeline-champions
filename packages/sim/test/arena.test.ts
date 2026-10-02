@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import arena01 from '../../../data/arenas/arena01.json';
-import { parseArenaDef } from '../src/index';
+import { MAX_ARENA_METERS, parseArenaDef } from '../src/index';
 
 function clone(): Record<string, unknown> {
   return JSON.parse(JSON.stringify(arena01)) as Record<string, unknown>;
@@ -109,5 +109,72 @@ describe('parseArenaDef', () => {
     const first = parsed.obstacles[0];
     expect(Object.is(first?.x, 0)).toBe(true);
     expect(Object.is(first?.y, 0)).toBe(true);
+  });
+
+  it('rejects a size above the arena bound and names the path', () => {
+    const data = clone();
+    data['size'] = { width: 1e6 + 1, height: 20 };
+    expect(() => parseArenaDef(data)).toThrow(
+      'Invalid arena definition: size.width: expected a number at most 1000000',
+    );
+    data['size'] = { width: 30, height: 1e300 };
+    expect(() => parseArenaDef(data)).toThrow(
+      'Invalid arena definition: size.height: expected a number at most 1000000',
+    );
+  });
+
+  it('rejects a spawn coordinate beyond the arena bound in either sign', () => {
+    for (const value of [1e6 + 1, -1e6 - 1]) {
+      const data = clone();
+      data['spawns'] = { teamA: [[value, 0]], teamB: [[0, value]] };
+      expect(() => parseArenaDef(data)).toThrow(
+        'Invalid arena definition: spawns.teamA[0][0]: expected a number with magnitude at most 1000000',
+      );
+      data['spawns'] = { teamA: [[0, 0]], teamB: [[0, value]] };
+      expect(() => parseArenaDef(data)).toThrow(
+        'Invalid arena definition: spawns.teamB[0][1]: expected a number with magnitude at most 1000000',
+      );
+    }
+  });
+
+  it('rejects an obstacle x, y, r, w or h beyond the arena bound', () => {
+    const over = 1e6 + 1;
+    const circle = (fields: Record<string, number>) => ({
+      type: 'circle', x: 0, y: 0, r: 1, height: 1, blocksProjectiles: true, ...fields,
+    });
+    const rect = (fields: Record<string, number>) => ({
+      type: 'rect', x: 0, y: 0, w: 1, h: 1, height: 1, blocksProjectiles: true, ...fields,
+    });
+    const cases: [unknown, string][] = [
+      [circle({ x: over }), 'obstacles[0].x: expected a number with magnitude at most 1000000'],
+      [circle({ y: -over }), 'obstacles[0].y: expected a number with magnitude at most 1000000'],
+      [circle({ r: over }), 'obstacles[0].r: expected a number at most 1000000'],
+      [rect({ x: -over }), 'obstacles[0].x: expected a number with magnitude at most 1000000'],
+      [rect({ y: over }), 'obstacles[0].y: expected a number with magnitude at most 1000000'],
+      [rect({ w: over }), 'obstacles[0].w: expected a number at most 1000000'],
+      [rect({ h: over }), 'obstacles[0].h: expected a number at most 1000000'],
+    ];
+    for (const [obstacle, message] of cases) {
+      const data = clone();
+      data['obstacles'] = [obstacle];
+      expect(() => parseArenaDef(data), message).toThrow(
+        `Invalid arena definition: ${message}`,
+      );
+    }
+  });
+
+  it('accepts values exactly at the arena bound', () => {
+    expect(MAX_ARENA_METERS).toBe(1e6);
+    const data = clone();
+    data['size'] = { width: 1e6, height: 1e6 };
+    data['spawns'] = { teamA: [[-1e6, 1e6]], teamB: [[1e6, -1e6]] };
+    data['obstacles'] = [
+      { type: 'circle', x: 1e6, y: -1e6, r: 1e6, height: 1, blocksProjectiles: true },
+      { type: 'rect', x: -1e6, y: 1e6, w: 1e6, h: 1e6, height: 1, blocksProjectiles: false },
+    ];
+    const parsed = parseArenaDef(data);
+    expect(parsed.size).toEqual({ width: 1e6, height: 1e6 });
+    expect(parsed.spawns.teamA).toEqual([[-1e6, 1e6]]);
+    expect(parsed.obstacles).toHaveLength(2);
   });
 });

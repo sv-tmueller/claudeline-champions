@@ -53,9 +53,16 @@ masked to the eight defined bits.
 `Map`, no `Set`, no closures. Entities live in arrays ordered by ascending id.
 Iteration order is always id order. This gives:
 
-- `createMatch(config: MatchConfig, arena: ArenaDef, seed: number): GameState`
-  takes the parsed arena, because the sim does no I/O. `parseArenaDef` turns
-  arena JSON into an `ArenaDef`.
+- `createMatch(config: MatchConfig, arena: ArenaDef, seed: number, kits:
+  readonly KitDef[] = []): GameState` takes the parsed arena, because the sim
+  does no I/O. `parseArenaDef` turns arena JSON into an `ArenaDef`. It rejects
+  a size, a spawn coordinate or an obstacle `x`, `y`, `r`, `w` or `h` above 1e6
+  m in magnitude (`MAX_ARENA_METERS`; exactly 1e6 is accepted), because a
+  champion stands at its spawn until the first step, and a teleport from there
+  feeds the squares of the collision tests. `kits` are the ability kits (see
+  [Abilities](#abilities-and-the-effects-toolkit)); with none, no champion has
+  abilities. The optional fourth argument extends the three-argument signature
+  of the design spec, section 4.3, compatibly.
 - `step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void`
   advances one tick in place. `inputs[i]` belongs to champion id `i`; an
   `undefined` or absent entry is a missing input.
@@ -87,10 +94,14 @@ Iteration order is always id order. This gives:
   | `teleport` | `championId`, `fromX`, `fromY`, `toX`, `toY` (where the champion ended up), `blocked` |
   | `dashStarted` | `championId`, `x`, `y`, `dirX`, `dirY` (unit), `distance`, `ticks` |
   | `dashEnded` | `championId`, `x`, `y`, `reason` (`complete`, `blocked`, `rooted`, `stunned`, `death`, `replaced`) |
+  | `castStarted` | `championId`, `castId`, `slot`, `ex`, `windupTicks`, `cost` (energy paid: 100 for F, 25 for an EX variant, else 0) |
+  | `castFired` | `championId`, `castId`, `slot`, `ex` |
+  | `castInterrupted` | `championId`, `castId`, `slot`, `ex`, `reason` (`stun`, `death`) |
+  | `energyGained` | `championId` (the caster), `castId`, `targetId`, `amount` (what was added, after the cap trimmed it, always above 0), `energy` (the caster's after) |
 
-  Cast and energy events join with the kit contract, round and match events
-  with match flow. Hit and expired positions are the projectile centre at
-  contact (the final position for `lifetime`).
+  Round and match events join with match flow, which also adds the reason
+  `roundEnd` to `castInterrupted`. Hit and expired positions are the projectile
+  centre at contact (the final position for `lifetime`).
 
 Randomness goes through a seeded PRNG stored in the state. Given the same seed
 and the same input stream, `checksum` after N ticks is identical on every run.
@@ -100,18 +111,26 @@ and the same input stream, `checksum` after N ticks is identical on every run.
 - Champion: team, champion id, position, velocity (the walk velocity), facing
   (aim angle), health, max health, energy 0..100, `statuses` (a list of
   `StatusInstance` records in application order, see [Statuses](#statuses)),
-  `dash` (`null` or a record, see [Forced motion](#forced-motion)) and the alive
-  flag. Per-slot cooldowns and the cast state join with the kit contract.
+  `dash` (`null` or a record, see [Forced motion](#forced-motion)), `cooldowns`
+  (seven integers in `SLOTS` order, the ticks until each slot may cast), `cast`
+  (`null` or the windup in progress, `{ castId, slot, ex, windupTicks,
+  windupLeft }`, see [Abilities](#abilities-and-the-effects-toolkit)) and the
+  alive flag.
 - Projectile: id, owner, team (copied from the owner at spawn), position,
   velocity, radius, remaining lifetime ticks, pierce flag, the champions it has
-  already hit (`hitIds`, in hit order) and an inline `effects` list.
+  already hit (`hitIds`, in hit order), an inline `effects` list and `castId`
+  (the cast that fired it, or `null` for a dev tool spawn).
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
-  the next application and an inline `effects` list.
+  the next application, an inline `effects` list and `castId` as for a
+  projectile.
+- Kits and casts: `state.kits` holds the kits of the match, plain data, and
+  `state.casts` the records of casts that something still refers to, in
+  ascending id order (see [Abilities](#abilities-and-the-effects-toolkit)).
 - Obstacle: static, from the arena definition.
 - Ring (sudden death): center, current radius, damage per second.
 
-Projectiles and areas share one id space with `state.nextEntityId`. Champion
+Projectiles, areas and casts share one id space with `state.nextEntityId`. Champion
 ids are `0` to `n-1` (so `inputs[i]` is champion `i`), and the counter starts at
 `champions.length`. Ids are never reused. `state.projectiles` and `state.areas`
 hold the entities in ascending id order; removed ones are filtered out after a
@@ -120,12 +139,14 @@ phase, never spliced during iteration.
 An effect is plain data and the entity holds its own copy, so kit constants are
 never aliased into the state. The `Effect` union is `damage { amount }`, `heal
 { amount }`, `applyStatus { status }` (a status spec: the type, `ticks` and the
-strength field of that type), `shield { absorb, ticks }` and `knockback
-{ distance, ticks, direction: 'away' | 'toward' }`. A hit applies its effects in
-list order to each champion it lands on, with the owner as the source and no
-slot. `away` points from the hit origin (the projectile contact point, the area
-centre, the arc origin) to the target, `toward` from the target to the owner's
-current position, and a zero vector means no push.
+strength field of that type), `shield { absorb, ticks }`, `knockback
+{ distance, ticks, direction: 'away' | 'toward' }` and `energyGain { amount }`
+(an integer from 1 to 100; only `landHit` reads it). A hit applies its effects
+in list order to each champion it lands on, with the owner as the source and
+the slot of the cast that made it, or no slot for a dev tool spawn. `away`
+points from the hit origin (the projectile contact point, the area centre, the
+arc origin) to the target, `toward` from the target to the owner's current
+position, and a zero vector means no push.
 
 `Slot` (`M1`, `M2`, `SPACE`, `Q`, `E`, `R`, `F`) and `SLOTS` in `input.ts` list the
 slots in `Button` bit order.
@@ -136,16 +157,26 @@ slots in `Button` bit order.
 
 1. Read and sanitize every input into an array, with no mutation.
 2. Clear `state.events`.
-3. For each champion in id order, skipping a dead one:
-   1. Store the aim.
-   2. Walk: the walk velocity is the move direction times the speed, where the
-      speed is the base speed times the speed factor (see
-      [Statuses](#statuses)); it is `+0` while the champion is stunned, rooted
-      or dashing. Move, face the aim and resolve collision, exactly as before.
-   3. Forced motion (see [Forced motion](#forced-motion)): if rooted, a running
-      dash ends first (`rooted`); then the dash step and each knockback impulse
-      move the champion in substeps. Stun and root do not stop this step.
-   4. Status upkeep: due pulses of damage over time and heal over time, then
+3. For each champion in id order, skipping a dead one and ending its turn if it
+   dies:
+   - 3a. Store the aim.
+   - 3b. Cooldowns: every cooldown above 0 drops by 1.
+   - 3c. Windup: a cast in progress loses a turn (`windupLeft - 1`) and fires at
+      0.
+   - 3d. Cast start: at most one cast starts from the held buttons; a windup of 0
+      fires at once (see [Abilities](#abilities-and-the-effects-toolkit)).
+   - 3e. Walk: the walk velocity is the move direction times the speed, where the
+      speed is the kit move speed (5.5 without a kit) times the speed factor
+      (see [Statuses](#statuses)), halved during a `slowed` windup; it is `+0`
+      while the champion is stunned, rooted, dashing or in a `locked` windup.
+      Move, face the aim and resolve collision.
+   - 3f. Forced motion (see [Forced motion](#forced-motion)): if rooted, a
+      running dash ends first (`rooted`); then the dash step and each knockback
+      impulse move the champion in substeps. Stun, root and a locked windup do
+      not stop this step. A dash that ended `complete`, `blocked` or `rooted`
+      fires its `then` effects here, after all of the step, from where the
+      champion is.
+   - 3g. Status upkeep: due pulses of damage over time and heal over time, then
       every status loses a tick and ends at 0 (reason `expired`). A pulse that
       kills the champion ends the turn.
 4. For each projectile in id order: sweep it (see below), hit, and remove it if
@@ -156,7 +187,12 @@ slots in `Button` bit order.
 6. Expiries: each projectile in id order loses a tick of lifetime and ends with
    `lifetime` at 0; then each area loses a tick of duration and ends with
    `areaExpired` at 0.
-7. `tick++`.
+7. Drop the cast records nothing refers to: no windup, projectile, area or dash
+   of that cast is left. A match with no kits allocates nothing in steps 3b to 3d
+   or here (the combat e2e counts per-tick allocations), so these hold no
+   closure: V8 allocates a closure's context on every call, before an early
+   return.
+8. `tick++`.
 
 A projectile with lifetime L makes exactly L sweeps. An area with duration D
 and interval I applies `ceil(D / I)` times, on its ticks 0, I, 2I and so on;
@@ -164,12 +200,15 @@ with D = 1 and I = 1 it applies once and expires in the same step. Entities
 spawned between steps act from the next step on.
 
 A status lasting D ticks affects exactly D turns of its holder, whether it was
-applied between steps or by a hit in steps 4 and 5 (those reach the holder's
-upkeep in the next tick). Entities must never be spawned during steps 4 to 6,
-because those steps replace the entity arrays with `filter`. Casting joins
-between 3.1 and 3.2 with the kit contract: cooldowns count down, a windup
-runs, and a cast that fires in a champion's turn spawns entities that act in
-steps 4 and 5 of the same tick.
+applied between steps, by a hit in steps 4 and 5 (those reach the holder's
+upkeep in the next tick) or by a cast in step 3. A cast fires in its caster's
+turn, so a status or knockback it lands on a champion with a higher id takes
+effect in that champion's turn of the same tick, and on one with a lower id
+from the next tick. A dash or teleport a cast starts moves the caster in the
+same turn. Entities a cast spawns in step 3 act in steps 4 and 5 of the same
+tick. Entities must never be spawned during steps 4 to 6, because those steps
+replace the entity arrays with `filter`; this is also why root does not end a
+dash when it is applied, and why dash `then` effects fire in step 3.
 
 ## Projectiles
 
@@ -221,7 +260,8 @@ matter because the arena is convex.
   afterwards, and at 0 health sets `alive = false`, zeroes the velocity and
   emits `death` once, right after that damage event. After `death`, every
   status ends in application order with reason `death`, then a running dash
-  ends with `dashEnded` reason `death`. Damage to a dead champion does nothing,
+  ends with `dashEnded` reason `death`, then a windup in progress ends with
+  `castInterrupted` reason `death`. Damage to a dead champion does nothing,
   and an amount too small to change the health (below about half an ulp of it)
   emits nothing. A hit fully absorbed by shields emits no `damage` event.
 - An invulnerable target takes no damage: `applyDamage` returns 0, emits
@@ -243,25 +283,32 @@ areas, melee arcs and damage over time use it, and the ring will.
 ## Toolkit entry points
 
 These are module exports of the sim, not part of the package index. Kits reach
-them from inside the sim when abilities arrive.
+them from inside the sim, through `cast.ts`.
 
 | Module | Export | Returns |
 | --- | --- | --- |
-| `projectile.ts` | `spawnProjectile(state, spec)` | the new entity id |
-| `area.ts` | `spawnArea(state, spec)` | the new entity id |
-| `melee.ts` | `meleeArc(state, spec)` | the target ids |
+| `projectile.ts` | `spawnProjectile(state, spec, castId = null)` | the new entity id |
+| `area.ts` | `spawnArea(state, spec, castId = null)` | the new entity id |
+| `melee.ts` | `meleeArc(state, spec)`, with an optional `castId` in the spec | the target ids |
 | `status.ts` | `applyStatus(state, targetId, spec, source)` | whether anything changed |
 | `status.ts` | `applyShield(state, targetId, { absorb, ticks }, source)` | whether a shield was added |
 | `status.ts` | `applyKnockback(state, targetId, { dirX, dirY, distance, ticks }, source)` | whether a push was added |
-| `motion.ts` | `startDash(state, championId, { dirX, dirY, distance, ticks })` | whether the dash started |
+| `motion.ts` | `startDash(state, championId, { dirX, dirY, distance, ticks }, cast = { castId: null, then: [] })` | whether the dash started |
 | `motion.ts` | `teleport(state, championId, toX, toY)` | false when blocked |
-| `health.ts` | `applyDamage`, `applyHeal`, `applyEffects` | |
+| `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null)` | `applyEffects` returns the health its `heal` effects restored |
+| `energy.ts` | `landHit(state, { ownerId, castId }, targetId, effects, origin)` | |
+| `cast.ts` | `tickCooldowns`, `advanceWindup`, `startCast`, `fireDashThen`, `dropUnusedCasts`, `resetAbilityState` | what `step` calls, see [Abilities](#abilities-and-the-effects-toolkit) |
 
-`source` is `{ sourceId, slot }`, with a null slot for a direct call. The two
-spawn functions are also exposed on the package index under the `debug`
-namespace for tests and client dev tools only; gameplay code outside the sim
-must not call them. Every function throws `Error('Invalid <thing>: ...')` for
-bad input before it changes anything.
+`source` is `{ sourceId, slot }`, with a null slot for a direct call. Projectiles,
+areas and melee arcs land their hits through `landHit`, which wraps
+`applyEffects` and gives energy. The `castId` of the two spawn functions and of
+`meleeArc` is for `cast.ts`: a cast id that is not in `state.casts` throws
+`Invalid projectile: ...`, `Invalid area: ...` or `Invalid melee arc: ...`. The
+two spawn functions are also exposed on the package index under the `debug`
+namespace for tests and client dev tools only, as two-argument wrappers that
+always store `castId: null`; gameplay code outside the sim must not call them,
+and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
+<thing>: ...')` for bad input before it changes anything.
 
 - `spawnProjectile` and `spawnArea` throw `Invalid projectile: ...` or
   `Invalid area: ...` on an unknown owner, a non-finite number, a zero
@@ -300,12 +347,14 @@ bad input before it changes anything.
   is zero or not finite, a distance that is not a number from 0.000001 to 1000 m
   (`MIN_DASH_DISTANCE`, `MAX_DASH_DISTANCE`), or ticks that are not an integer
   from 1 to 36000 (`MAX_STATUS_TICKS`, as for a knockback). A dead champion is a
-  no-op.
+  no-op. `cast` (not for callers outside `cast.ts`) stores the cast id and a
+  copy of the `then` effects on the dash.
 - `teleport` throws `Invalid teleport: ...` on an unknown champion, a point that
   is not finite, or a point more than 1e9 m from the champion along either axis
-  (`MAX_TELEPORT_METERS`; the line of sight test squares the span, so a span
-  beyond about 1.3e154 would overflow it and skip obstacles). A dead champion is
-  a no-op with no event.
+  (`MAX_TELEPORT_METERS`; the line of sight test squares the span, so the bound
+  keeps the sum of squares at 2e18, far from overflow, and every arena value
+  and spawn is within 1e6 m, so the squares of a position stay small as well).
+  A dead champion is a no-op with no event.
 
 ## Statuses
 
@@ -358,10 +407,13 @@ which stays finite because each is at most 1e6.
 
 ### Speed
 
-Walk speed is `BASE_MOVE_SPEED * (1 + (haste - slow) / 100)`, with the capped
-totals. With no slow or haste the factor is exactly 1, so the speed stays
-exactly 5.5 m/s. Stun, root and a running dash zero the walk velocity, which is
-then stored as `+0`; the stored velocity is the walk velocity only, never the
+Walk speed is the kit's `moveSpeed` (`BASE_MOVE_SPEED`, 5.5, for a champion
+without a kit, with the same expression as before kits) times `(1 + (haste -
+slow) / 100)`, with the capped totals, and times 0.5 more during a `slowed`
+windup (`SLOWED_WINDUP_FACTOR`; the product, so it multiplies after slow and
+haste). With no slow or haste the factor is exactly 1, so the speed stays
+exactly 5.5 m/s. Stun, root, a running dash and a `locked` windup zero the walk
+velocity, which is then stored as `+0`; the stored velocity is the walk velocity only, never the
 displacement left after collision or forced motion. Dash and knockback ignore
 the speed factor.
 
@@ -393,7 +445,8 @@ champion, never exceeds 6 m (`KNOCKBACK_CAP_METERS`): a new push becomes `D' =
 min(D, 6 - the remaining push of the other instances)`, the instance of the
 same source not counted. If `D' <= 0` the new push is dropped, with no event and
 nothing changed. Otherwise it replaces the instance of the same source. The
-first push happens in the next step after it was applied.
+first push happens in the holder's next turn after it was applied: in the same
+tick for a cast of a lower-numbered champion, from the next tick otherwise.
 
 ### Invulnerable
 
@@ -410,21 +463,25 @@ Death ends every status, in application order, with reason `death`. Otherwise a
 status ends when its ticks run out (`expired`), a shield is used up
 (`depleted`), a knockback is stopped by contact (`stopped`) or it is replaced
 (`replaced`). Stun does one more thing when it lands: it cancels a running dash
-(`dashEnded` reason `stunned`, after `statusApplied`).
+(`dashEnded` reason `stunned`, after `statusApplied`) and a windup in progress
+(`castInterrupted` reason `stun`, after the dash end).
 
 ## Forced motion
 
-A dash and knockback impulses move a champion regardless of stun, root and (with
-abilities) a locked windup. They are step 3.3 of the tick.
+A dash and knockback impulses move a champion regardless of stun, root and a
+locked windup. They are step 3f of the tick.
 
-`champion.dash` is `null` or `{ dirX, dirY, stepLength, ticksLeft }`.
-`startDash(state, id, { dirX, dirY, distance, ticks })` sets it with
-`stepLength = distance / ticks`, emits `dashStarted` and ends a running dash as
-`replaced`. A dash moves `stepLength` meters a tick for `ticks` ticks. Its
+`champion.dash` is `null` or `{ dirX, dirY, stepLength, ticksLeft, castId, then
+}`: the cast that started it (`null` for a direct call) and the effects that
+fire where it ends. `startDash(state, id, { dirX, dirY, distance, ticks })` sets
+it with `stepLength = distance / ticks`, emits `dashStarted` and ends a running
+dash as `replaced`, which drops that dash's `then`. A dash first moves in step
+3f of the holder's next turn, or of the same turn when a cast starts it, and
+moves `stepLength` meters a tick for `ticks` ticks. Its
 distance is at least 1e-6 m and its ticks at most 36000, so `stepLength` is
 always above 0 and the tick count always counts down to the end.
 
-Each tick, in step 3.3:
+Each tick, in step 3f:
 
 1. If the champion is rooted, a running dash ends first (`dashEnded` reason
    `rooted`). Root does not end a dash when it is applied; the check is here, so
@@ -440,6 +497,14 @@ Each tick, in step 3.3:
    every knockback ends with `statusExpired` reason `stopped`, in that order. The
    champion rests at contact and does not slide along the surface.
 5. Otherwise the dash loses a tick and ends as `complete` at 0.
+
+`stepForcedMotion` returns the dash record that ended in the call as `rooted`,
+`blocked` or `complete`, and `step` hands it to `cast.ts`, which fires its `then`
+effects after the whole of step 3f (so after a knockback of the same turn has
+moved the champion). The motion module cannot do it itself because `cast.ts`
+imports it. The other ends (`stunned`, `death`, `replaced`) happen in `status.ts`,
+`health.ts` and `startDash`, which discard the record, so their `then` effects
+are dropped.
 
 A contact on the last tick of a dash is `blocked`, not `complete`. The upkeep
 that follows then ends knockbacks that ran out as `expired`.
@@ -468,14 +533,42 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
 - Dash, status, shield and knockback `ticks` are at most 36000 (ten minutes), an
   absorb, a pulse or a push distance at most 1e6, and a teleport spans at most
   1e9 m per axis. These keep every number in the state and the events finite;
-  no rule states them.
+  no rule states them. The 1e9 bound exists so that the line of sight test,
+  which squares the span, cannot overflow; arena values stay within 1e6 m.
 - Shield absorption emits one `shieldAbsorbed` per hit, not one per shield.
 - A refresh of any status emits `statusExpired` (`replaced`) then `statusApplied`,
   also for damage over time, where the instance keeps its pulse timer.
-- Statuses applied by a hit carry no slot until casting provides one.
+- A status a cast lands carries the slot of the cast (its EX variant shares the
+  slot); a status from a dev tool spawn or a direct call carries none.
 - A pulse due on the last tick of a status lands before the status ends.
 - `teleport` reports the end position, and a teleport that cannot be resolved
   reports `blocked: false` with the start as the end position.
+- Invulnerable blocks none of the holder's own actions (rules.md says "No
+  actions"; the sim reads it as blocking incoming effects only).
+- Casting is not blocked while dashing, so a champion can have a dash and a
+  windup at once.
+- A hit that qualifies for energy marks its target in `credited` even when the
+  cap trims the gain to 0, and then no `energyGained` event is emitted. A dead
+  caster earns nothing and gets no event, though its projectiles and areas
+  still hit.
+- A windup that fires clears `champion.cast` and emits `castFired` before its
+  first effect runs, and a new cast may start in the turn the previous one
+  fires. Only one cast starts per tick.
+- A cast fires its effects from where the caster stands when each effect runs:
+  each top-level effect reads the caster position and the aim again, so a
+  teleport followed by an arc swings where the teleport arrives. An effect
+  listed after a dash still acts at the dash start; `then` is how an effect
+  acts at the dash end.
+- The `then` effects of a dash take the dash direction and the aim of the tick
+  the dash ends: a placement `aim` goes the dash direction for the smaller of
+  the range and the distance to that aim.
+- A `then` list of a dash that ended `rooted`, `blocked` or `complete` fires
+  after the whole of step 3f; one that a stun, a death or a new dash ended is
+  dropped.
+- Kit data is checked at `createMatch` so that no number can make a toolkit call
+  throw inside `step`. A teleport range in a kit stops at 1e6, not 1e9, because
+  near 1e9 the rounded `origin + dir * range` can land an ulp past the per-axis
+  check of `teleport`.
 
 ## Abilities and the effects toolkit
 
@@ -484,21 +577,159 @@ Slots follow the Bloodline layout: `M1` (basic), `M2` (secondary), `SPACE`
 `SHIFT` with a slot casts that slot's EX variant where the kit defines one.
 Each kit defines exactly two EX variants.
 
-- EX variants cost 25 energy. The ultimate costs 100 energy. Energy is earned
-  only by landing abilities on enemies and, for support kits, by healing
-  allies. Energy resets to 0 at the start of each round.
+- EX variants cost 25 energy (`EX_ENERGY_COST`). The ultimate costs 100
+  (`ULTIMATE_ENERGY_COST`). Energy is earned only by landing abilities on enemies
+  and, for support kits, by healing allies, and runs from 0 to 100
+  (`MAX_ENERGY`). Energy resets to 0 at the start of each round.
 - Every ability has: cooldown ticks, windup ticks (0 for instant), movement
   rule during windup (free, slowed, locked), and a list of effects.
 - Effects toolkit (the only primitives kits may use): `projectile`, `dash`,
   `meleeArc`, `area`, `applyStatus`, `heal`, `shield`, `teleport`,
   `knockback`, `energyGain`. New primitives are added to the toolkit through
-  the design doc first, then the sim. Statuses, forced motion and all of these
-  but `energyGain` exist as the primitives in
-  [Toolkit entry points](#toolkit-entry-points); the kit contract that calls
-  them arrives next.
+  the design doc first, then the sim.
 - No global cooldown. Casting is blocked while another windup is in progress,
   while stunned, and while silenced (mobility slot included).
 - Health does not regenerate during a round except through healing effects.
+
+### Kit contract and registration
+
+A kit is typed plain data in `kit.ts`, stored in the state like `state.arena`
+and run by a `switch` in `cast.ts`. A closed union of effects run by a switch is
+the toolkit, not a scripting language, so ADR-003 holds: there is no expression
+evaluator, no kit code and no kit-defined control flow. `step(state, inputs)`
+is unchanged.
+
+```ts
+interface KitDef {
+  id: string;                  // matches PlayerConfig.championId
+  maxHealth: number;
+  moveSpeed: number;           // m/s before statuses
+  support: boolean;            // healing allies earns energy
+  slots: Record<Slot, SlotSpec>;
+  ex: [Slot, Slot];            // the two slots with an EX variant, never F
+}
+type SlotSpec = AbilitySpec & { cooldownTicks: number; ex?: AbilitySpec };
+interface AbilitySpec { windupTicks: number; movement: 'free' | 'slowed' | 'locked'; effects: AbilityEffect[] }
+```
+
+All times are integer ticks. `AbilityEffect` is one of:
+
+| Effect | Fields | What it does |
+| --- | --- | --- |
+| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects` | spawns a projectile from the caster along the fire direction |
+| `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects` | spawns an area; `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
+| `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
+| `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
+| `teleport` | `range`, `fixed` | goes exactly `range` m along the fire direction, or only as far as the aim when not `fixed` |
+| `applyStatus`, `shield`, `heal` | as the toolkit calls | land on the caster, never give energy |
+
+`effects` inside a projectile, area or arc are hit effects (the `Effect` union,
+including `energyGain`) that land on each champion the entity touches.
+
+`createMatch(config, arena, seed, kits = [])` validates every kit it is given
+(an invalid one throws `Invalid kit: <path>: <problem>`), rejects a duplicate id
+(`Invalid match: duplicate kit id "..."`), gives a player whose `championId`
+equals a kit id that kit's `maxHealth` and `moveSpeed` and its abilities, and
+stores a deep copy of the kits the players use in `state.kits`, in the order they
+were given. A player with no kit has no abilities, `DEFAULT_MAX_HEALTH` and
+`BASE_MOVE_SPEED`. There is no default kit: the committed replay and scripted
+fixtures press buttons with roster ids and the client and bots tests call
+`createMatch` without kits, and all of them must keep behaving as before.
+
+`validateKit` keeps every number inside what the primitive that receives it
+accepts: cooldown 1 to 36000 ticks, windup 0 to 36000, lifetime, duration,
+interval, dash ticks and status ticks 1 to 36000; projectile speed and radius,
+area radius, placement distance and range, arc radius, teleport range, shield
+absorb, heal amount, `maxHealth` and `moveSpeed` above 0 and at most 1e6; dash
+distance 0.000001 to 1000; `cosHalfAngle` from -1 to 1; `energyGain` an integer
+from 1 to 100; hit effects and status specs as the toolkit accepts them. It also
+checks the structure: every slot present, non-empty effect lists, a known
+movement rule, exactly two distinct EX slots (never F) that match the slots
+carrying an `ex`. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
+not checked here; roster tests do that. The bounds keep `step` from throwing, not
+cheap: the live entities of a kit grow with lifetime over cooldown, step 7
+(`dropUnusedCasts`) is quadratic in them, and the catalog ranges keep them small.
+
+### Casting
+
+State: `champion.cooldowns` (seven integers in `SLOTS` order), `champion.cast`
+(the windup in progress) and `state.casts` (`{ id, casterId, slot, ex, credited
+}`, ids from `nextEntityId`). A slot's cooldown is set when its cast starts and
+keeps counting during the windup; its EX variant shares it. Holding a button
+with cooldown C casts every C ticks.
+
+Step 3d resolves a cast for a champion that is alive, has no windup in
+progress, and is neither stunned nor silenced. Slots are tried in the order F, R,
+E, Q, SPACE, M2, M1, for the buttons held. With SHIFT held and an EX variant on
+the slot, the EX variant is the ability. The cost is 100 for F, 25 for an EX
+variant and 0 otherwise. A slot is passed over when its cooldown is above 0,
+when the energy is below the cost (an EX with too little energy is rejected
+without falling back to the normal ability, and the next slot is tried), or when
+the champion is rooted and the ability has a top-level `dash`. The first slot
+that passes pays the cost, sets the cooldown, creates the cast record and emits
+`castStarted`. Rejections emit nothing. SHIFT on a slot without an EX variant
+casts the normal ability. One cast starts per tick.
+
+### Windup, movement and interruption
+
+A windup of W ticks fires W turns after the start: the cast is stored with
+`windupLeft = W`, step 3c lowers it by 1 and fires at 0, with the aim of that
+tick. A windup of 0 emits `castFired` and runs the effects in the turn it starts,
+and is never stored. The movement rule applies for W turns, the start tick
+counting and the fire tick not: `free` walks at the normal speed, `slowed` at
+half of it after slow and haste, `locked` not at all. Knockback and a dash still
+move a champion in a locked windup.
+
+Only stun and death interrupt a windup (`castInterrupted` reasons `stun` and
+`death`; the event order is in [Statuses](#statuses) and
+[Damage](#damage-healing-and-death)). Nothing is refunded, and the cooldown keeps
+running. Silence, root, slow and knockback do not interrupt it. A rooted champion
+whose windup fires skips the `dash` effect of the cast, fires that dash's `then`
+effects at once and applies the rest of the ability.
+
+### Firing
+
+`castFired` is emitted first, then the effects run in list order. Each top-level
+effect builds its own context when it runs: the origin is the caster's position
+then, the direction is `direction(aim - origin)` for the aim stored this tick (in
+centimeters, divided by 100), and a zero vector falls back to +x for team A and
+-x for team B. A dash only moves the caster in step 3f, so effects listed after
+it still act at the start point, and `then` is how an effect acts at the dash
+end. When a dash ends `complete`, `blocked` or `rooted`, `step` fires its `then`
+effects from the champion's position then, along the dash direction, with that
+tick's aim.
+
+### Energy
+
+`landHit(state, { ownerId, castId }, targetId, effects, origin)` wraps
+`applyEffects` for projectiles, areas and arcs, and gives the caster energy:
+
+| Slot | Gain |
+| --- | --- |
+| F | 15 per target |
+| any EX variant | 10 |
+| M1 | 5 |
+| M2, SPACE, Q, E, R | 10 |
+
+An enemy target counts when, before the effects, it is alive and not invulnerable
+and the effect list holds a `damage`: a hit that a shield absorbs completely
+counts, and a status, a shield or a push alone does not. An ally target counts
+when the caster's kit has `support`, the target is not the caster and the heals of
+this application restored more than 0 health. A target gives energy once per cast
+(`credited`), however many pulses of an area or effects touch it. The gain is the
+table value plus every `energyGain` in the list, which only adds to a qualifying
+gain, cut to the room under 100; `energyGained` is emitted when the amount is
+above 0. Damage over time and heal over time pulses give nothing, and neither
+does a hit with no cast id, which a dev tool spawn makes.
+
+Cast records are dropped in step 7 once no windup, projectile, area or dash of
+the cast refers to them.
+
+`resetAbilityState(state)` in `cast.ts` is the hook match flow will call between
+rounds. It sets every champion's energy and cooldowns to 0, drops its windup and
+dash, empties `statuses` and `state.casts`, sets `castId` to null on the
+projectiles and areas still alive and emits nothing. It is not in the index.
+Match flow wraps it in its round event.
 
 ## Match flow
 
@@ -535,8 +766,10 @@ Enforced by review, lint and tests.
    `dmath.ts`. V8's `Math.atan2`, `Math.sin` and `Math.cos` differ in the last
    bit across CPU architectures (x86 Linux and ARM macOS) and are never used in
    the sim; a committed bit-pattern fixture checks the `atan2` port on every CI
-   run. Guard against `NaN`: tests assert `checksum` is finite and that no
-   position or health is `NaN`.
+   run. Kit cosines are decimal literals in the kit data, never computed, and
+   the sim uses no `Math.floor`, `Math.ceil`, `Math.trunc` or `Math.sign` either
+   (grep for them; lint does not). Guard against `NaN`: tests assert `checksum`
+   is finite and that no position or health is `NaN`.
 5. Recorded input replays with expected checksums are committed as fixtures.
    Changing gameplay intentionally means regenerating the fixture in the same
    change.

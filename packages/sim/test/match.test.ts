@@ -137,4 +137,15 @@ describe('createMatch toolkit state', () => {
     const state = createMatch(config2v2(), arena01, 1);
     for (const c of state.champions) expect(c.dash).toBeNull();
   });
+
+  it('starts every champion with seven zero cooldowns and no cast, and no kits or casts', () => {
+    const state = createMatch(config2v2(), arena01, 1);
+    for (const c of state.champions) {
+      expect(c.cooldowns).toEqual([0, 0, 0, 0, 0, 0, 0]);
+      expect(c.cast).toBeNull();
+    }
+    expect(state.champions[0]?.cooldowns).not.toBe(state.champions[1]?.cooldowns);
+    expect(state.kits).toEqual([]);
+    expect(state.casts).toEqual([]);
+  });
 });

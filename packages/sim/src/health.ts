@@ -1,7 +1,8 @@
-import { STATUS_PULSE_TICKS } from './constants';
+import { MAX_ENERGY, STATUS_PULSE_TICKS } from './constants';
 import { direction } from './geometry';
 import type { Point } from './geometry';
-import { endDash } from './state';
+import type { Slot } from './input';
+import { endDash, interruptCast } from './state';
 import type { ChampionState, Effect, GameState } from './state';
 import {
   applyKnockback,
@@ -82,6 +83,7 @@ export function applyDamage(
     state.events.push({ type: 'death', targetId, sourceId });
     clearStatuses(state, champion, 'death');
     endDash(state, champion, 'death');
+    interruptCast(state, champion, 'death');
   }
   return removed;
 }
@@ -134,9 +136,11 @@ export function upkeepStatuses(state: GameState, champion: ChampionState): void 
 }
 
 /**
- * Applies the effects in order to one champion hit by `sourceId`. `origin` is where the hit
- * came from (projectile contact point, area centre, arc origin), which `away` knockback points
- * away from. Statuses it applies carry no slot.
+ * Applies the effects in order to one champion hit by `sourceId` and returns the health its
+ * `heal` effects restored. `origin` is where the hit came from (projectile contact point, area
+ * centre, arc origin), which `away` knockback points away from. The statuses it applies carry
+ * `slot`, the slot of the cast that landed the hit, or none. `energyGain` is skipped: `landHit`
+ * reads it.
  */
 export function applyEffects(
   state: GameState,
@@ -144,15 +148,17 @@ export function applyEffects(
   targetId: number,
   effects: readonly Effect[],
   origin: Point,
-): void {
-  const source = { sourceId, slot: null };
+  slot: Slot | null = null,
+): number {
+  const source = { sourceId, slot };
+  let restored = 0;
   for (const effect of effects) {
     switch (effect.type) {
       case 'damage':
         applyDamage(state, targetId, effect.amount, sourceId);
         break;
       case 'heal':
-        applyHeal(state, targetId, effect.amount, sourceId);
+        restored += applyHeal(state, targetId, effect.amount, sourceId);
         break;
       case 'applyStatus':
         applyStatus(state, targetId, effect.status, source);
@@ -179,8 +185,11 @@ export function applyEffects(
         }
         break;
       }
+      case 'energyGain':
+        break;
     }
   }
+  return restored;
 }
 
 /** Shared by the projectile, area and melee arc specs. */
@@ -226,6 +235,13 @@ export function copyEffects(
           return reject(`knockback direction ${String(way)} is not away or toward`);
         }
         return { type, distance, ticks, direction: way };
+      }
+      case 'energyGain': {
+        const { amount } = effect as { amount: number };
+        if (!Number.isInteger(amount) || amount < 1 || amount > MAX_ENERGY) {
+          return reject(`effect energyGain amount ${amount} is not an integer from 1 to ${MAX_ENERGY}`);
+        }
+        return { type, amount };
       }
       default:
         return reject(`unknown effect type ${String(type)}`);

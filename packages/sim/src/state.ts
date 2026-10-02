@@ -1,5 +1,6 @@
 import type { ArenaDef } from './arena';
 import type { Slot } from './input';
+import type { KitDef, ThenEffect } from './kit';
 
 export type TeamId = 'A' | 'B';
 
@@ -16,6 +17,8 @@ export type StatusType =
   | 'knockback';
 export type StatusEndReason = 'expired' | 'depleted' | 'stopped' | 'replaced' | 'death';
 export type DashEndReason = 'complete' | 'blocked' | 'rooted' | 'stunned' | 'death' | 'replaced';
+/** Only stun and death interrupt a windup; a round end joins with match flow. */
+export type CastInterruptReason = 'stun' | 'death';
 
 /** Who a status came from: the champion and the ability slot, null for a direct toolkit call. */
 export interface StatusSource {
@@ -60,7 +63,12 @@ export type Effect =
       ticks: number;
       /** `away` points from the hit origin to the target, `toward` from the target to the owner. */
       direction: 'away' | 'toward';
-    };
+    }
+  /**
+   * Extra energy for the caster on top of the table gain, when this hit qualifies for one. Only
+   * `landHit` reads it, so `applyEffects` skips it.
+   */
+  | { type: 'energyGain'; amount: number };
 export type AreaTargets = 'enemies' | 'allies' | 'all';
 export type ProjectileEndReason = 'hit' | 'obstacle' | 'boundary' | 'lifetime';
 
@@ -82,6 +90,8 @@ export interface ProjectileState {
   hitIds: number[];
   /** Applied in order to each champion hit. */
   effects: Effect[];
+  /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
+  castId: number | null;
 }
 
 export interface AreaState {
@@ -99,6 +109,8 @@ export interface AreaState {
   /** 0 means the area applies this tick. */
   ticksToNextApply: number;
   effects: Effect[];
+  /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
+  castId: number | null;
 }
 
 // `amount` on damage and heal is what was actually removed or restored and `health` is
@@ -190,7 +202,38 @@ export type SimEvent =
       distance: number;
       ticks: number;
     }
-  | { type: 'dashEnded'; championId: number; x: number; y: number; reason: DashEndReason };
+  | { type: 'dashEnded'; championId: number; x: number; y: number; reason: DashEndReason }
+  | {
+      type: 'castStarted';
+      championId: number;
+      castId: number;
+      slot: Slot;
+      ex: boolean;
+      windupTicks: number;
+      /** Energy paid: 100 for F, 25 for an EX variant, else 0. */
+      cost: number;
+    }
+  | { type: 'castFired'; championId: number; castId: number; slot: Slot; ex: boolean }
+  | {
+      type: 'castInterrupted';
+      championId: number;
+      castId: number;
+      slot: Slot;
+      ex: boolean;
+      reason: CastInterruptReason;
+    }
+  | {
+      type: 'energyGained';
+      /** The caster who earned it. */
+      championId: number;
+      castId: number;
+      /** The champion the hit or heal landed on. */
+      targetId: number;
+      /** Energy added, after the cap trimmed it; always above 0. */
+      amount: number;
+      /** The caster's energy afterwards. */
+      energy: number;
+    };
 
 export interface DashState {
   /** Unit vector. */
@@ -200,6 +243,35 @@ export interface DashState {
   stepLength: number;
   /** Ticks of motion left, counting the next one. */
   ticksLeft: number;
+  /** The cast that started it, or null for a direct `startDash`. */
+  castId: number | null;
+  /** Effects that fire where the dash ends, unless a stun, a death or a new dash ends it. */
+  then: ThenEffect[];
+}
+
+/** A cast in its windup. A cast with no windup fires at once and is never stored. */
+export interface CastState {
+  castId: number;
+  slot: Slot;
+  /** Whether the EX variant is the one casting. */
+  ex: boolean;
+  windupTicks: number;
+  /** Turns of the caster until the effects fire, from `windupTicks` down to 1. */
+  windupLeft: number;
+}
+
+/**
+ * What energy bookkeeping needs of a cast after it started: who cast it and which targets it has
+ * already earned energy from. Kept while the champion's windup, a projectile, an area or a dash of
+ * the cast still refers to it.
+ */
+export interface CastRecord {
+  id: number;
+  casterId: number;
+  slot: Slot;
+  ex: boolean;
+  /** Champions this cast has already given energy for, in the order it did. */
+  credited: number[];
 }
 
 export interface ChampionState {
@@ -224,6 +296,10 @@ export interface ChampionState {
   /** In application order; see the Statuses section of simulation.md. */
   statuses: StatusInstance[];
   dash: DashState | null;
+  /** Ticks left until each slot may cast, in `SLOTS` order. */
+  cooldowns: number[];
+  /** The windup in progress, or null. */
+  cast: CastState | null;
 }
 
 export interface GameState {
@@ -232,11 +308,15 @@ export interface GameState {
   rng: number;
   arena: ArenaDef;
   champions: ChampionState[];
-  /** Next id for a projectile or area. Champions use 0 to n-1; ids are never reused. */
+  /** Next id for a projectile, area or cast. Champions use 0 to n-1; ids are never reused. */
   nextEntityId: number;
   /** Ascending id order. */
   projectiles: ProjectileState[];
   areas: AreaState[];
+  /** The kits of the champions in this match, plain data, in the order `createMatch` got them. */
+  kits: KitDef[];
+  /** Casts something still refers to, in ascending id order; ids come from `nextEntityId`. */
+  casts: CastRecord[];
   /**
    * Cleared at the start of each `step`. Toolkit calls between steps append to it, and the
    * next `step` drops them.
@@ -270,6 +350,25 @@ export function endDash(state: GameState, champion: ChampionState, reason: DashE
     championId: champion.id,
     x: champion.x,
     y: champion.y,
+    reason,
+  });
+}
+
+/** Drops a champion's windup, if it has one, and reports it. Nothing is refunded. */
+export function interruptCast(
+  state: GameState,
+  champion: ChampionState,
+  reason: CastInterruptReason,
+): void {
+  const { cast } = champion;
+  if (!cast) return;
+  champion.cast = null;
+  state.events.push({
+    type: 'castInterrupted',
+    championId: champion.id,
+    castId: cast.castId,
+    slot: cast.slot,
+    ex: cast.ex,
     reason,
   });
 }
