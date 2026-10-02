@@ -11,10 +11,6 @@ interface Sim {
 
 const START_X = -1200;
 const START_Y = 200;
-// Where the champion circle stops against the east wall, in cm.
-const EAST_WALL_X = 1100;
-// Upper bound for x once the champion has stopped after the release, in cm.
-const RELEASE_X_CAP = 500;
 // 5.5 m/s at 60 ticks per second, in centimeters per tick.
 const CM_PER_TICK = 550 / 60;
 
@@ -58,6 +54,22 @@ test('walks east at 5.5 m/s while D is held and stops on release', async ({ page
   try {
     await openMatch(page, failed);
 
+    // Record the sim tick at which the browser delivers the KeyD release. The
+    // listener is capture-phase on window, so it runs before the app's own
+    // listener: the tick it reads is when the release arrived, not when the app
+    // honoured it. That makes the bound below free of input-delivery latency.
+    await page.evaluate(() => {
+      window.addEventListener(
+        'keyup',
+        (event) => {
+          if (event.code !== 'KeyD') return;
+          const canvas = document.querySelector('canvas');
+          (window as unknown as { __keyUpTick?: number }).__keyUpTick = Number(canvas?.dataset['tick']);
+        },
+        true,
+      );
+    });
+
     // Read the tick before the key goes down: a frame can step the sim between
     // the key event and a later read, and those steps still count as walking.
     const pressed = await readSim(page);
@@ -70,23 +82,20 @@ test('walks east at 5.5 m/s while D is held and stops on release', async ({ page
     await page.keyboard.up('KeyD');
     // The release reaches the sim after an unknown wall-clock delay, so poll
     // once per tick until x has held still for three readings in a row.
-    const releasedAt = (await readSim(page)).tick;
     let last = await readSim(page);
-    let stopTick: number | undefined;
+    const releasedAt = last.tick;
     let unchanged = 0;
     while (unchanged < 2 && last.tick - releasedAt <= 300) {
       await waitForTick(page, last.tick + 1, failed);
       const next = await readSim(page);
       if (next.x === last.x) {
-        stopTick ??= next.tick;
         unchanged += 1;
       } else {
-        stopTick = undefined;
         unchanged = 0;
       }
       last = next;
     }
-    expect(stopTick, 'x never settled within 300 ticks of the release').toBeDefined();
+    expect(unchanged, 'x never settled within 300 ticks of the release').toBe(2);
     const stopped = last;
     // Stopped: no movement after release.
     await waitForTick(page, stopped.tick + 5, failed);
@@ -100,18 +109,16 @@ test('walks east at 5.5 m/s while D is held and stops on release', async ({ page
     // About 2.75 m for the 30 ticks from a to b, plus the ticks around them.
     const walked = stopped.x - START_X;
     expect(walked).toBeGreaterThanOrEqual(274);
-    // Never more than the ticks that passed from the key down to the stop.
-    expect(walked).toBeLessThanOrEqual((stopTick! - pressed.tick) * CM_PER_TICK + 1);
-    // The tick bound grows with the stop tick, so a stuck key that walks into
-    // the east wall would satisfy it. Two absolute checks close that gap.
-    // The settle must not be the wall: x is strictly short of the wall stop.
-    expect(stopped.x).toBeLessThan(EAST_WALL_X);
-    // And x stays below a cap a stuck key cannot meet but a slow runner can.
-    // From the start at -1200 cm, 30 held ticks cover about 275 cm and a
-    // prompt release stops near -925 cm. The cap of 500 cm allows 1700 cm of
-    // walking, about 185 ticks (3 s), so a release up to about 150 ticks late
-    // still passes, while the wall at 1100 cm sits 2300 cm (251 ticks) away.
-    expect(stopped.x).toBeLessThan(RELEASE_X_CAP);
+    // Never more than the ticks from the key down to the tick at which the
+    // browser delivered the release, plus one tick. A slow runner delays both
+    // ends alike, so this holds at any latency. A stuck or late-honoured key
+    // keeps walking past upTick and fails: it walks into champion 2 at
+    // (1200, 200) and settles at 1100 cm, 2300 cm from the start.
+    const upTick = await page.evaluate(
+      () => (window as unknown as { __keyUpTick?: number }).__keyUpTick,
+    );
+    expect(typeof upTick, 'the KeyD release never reached the page').toBe('number');
+    expect(walked).toBeLessThanOrEqual((upTick! - pressed.tick + 1) * CM_PER_TICK + 1);
 
     await page.keyboard.press('F3');
     await orFail(page.waitForSelector('canvas[data-overlay="on"]'), failed);
