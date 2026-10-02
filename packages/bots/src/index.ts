@@ -5,3 +5,7 @@ export { ARRIVAL_RADIUS, steerToward } from './steer';
 export type { MoveCommand } from './steer';
 export { createFollower, followPath } from './follow';
 export type { PathFollower } from './follow';
+export { createBot } from './bot';
+export type { Bot } from './bot';
+export type { Difficulty } from './difficulty';
+export type { Intent } from './intent';
