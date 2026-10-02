@@ -63,6 +63,11 @@ The commands and file list are in `tools/blender/README.md`.
 - The origin is at the feet. The footprint stays inside a 0.5 m radius and the
   model is about 1.7 m tall.
 - Flat colours only, no rig and no animation until milestone 5.
+- Each of the four roster ids has `champions/<id>.glb` with the placeholder's
+  node, origin, facing, body geometry and accent. They differ only in body
+  colour and one silhouette cue that stays below 1.9 m. `placeholder.glb` stays
+  the generic model. The ids, colours and cues are in
+  [`tools/blender/README.md`](../../tools/blender/README.md).
 
 ## Validator
 

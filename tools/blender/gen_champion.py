@@ -129,7 +129,7 @@ def add_shoulder_blocks(bm):  # hargrim, bruiser
 
 
 def add_staff(bm):  # quillon, ranged
-    common.add_box(bm, (0.04, -0.44, 0.95), (0.05, 0.05, 1.80), BODY)
+    common.add_box(bm, (0.04, -0.44, 0.95), (0.07, 0.07, 1.80), BODY)
 
 
 def add_halo(bm):  # lumeth, healer
@@ -137,7 +137,7 @@ def add_halo(bm):  # lumeth, healer
 
 
 def add_blade(bm):  # skerrow, assassin, pointing forward from the right hand
-    common.add_box(bm, (0.19, -0.34, 0.86), (0.28, 0.03, 0.08), BODY)
+    common.add_box(bm, (0.18, -0.34, 0.86), (0.28, 0.05, 0.10), BODY)
 
 
 CUES = {
