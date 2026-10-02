@@ -1,6 +1,6 @@
 # Roster v1: four champions
 
-Status: v1 roster, pre-implementation
+Status: v1 roster. Hargrim and Quillon are implemented as data in `data/kits/`; Lumeth and Skerrow are pre-implementation
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.5, 4.6, 6 and 10
 
 This document defines the four champions of roster v1, one per archetype: melee bruiser, ranged skillshot, healer and support, mobile assassin. The sim, the client and the bots implement these kits. Arena layouts and match rules are covered elsewhere.
@@ -17,6 +17,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 - An EX variant costs 25 energy, uses the same cooldown as its base ability and lists only what changes. Each kit has exactly two EX variants. The ultimate costs 100 energy and has no EX variant.
 - The ultimate cooldown is 10 s for every champion. Energy is the real limit.
 - All four champions have move speed 5.5 m/s and collision radius 0.5 m. No kit changes base speed.
+- **Kit data.** Hargrim and Quillon are implemented as `data/kits/hargrim.json` and `data/kits/quillon.json`: one file per champion, named after its id, holding exactly the `KitDef` fields. Display names stay in this document and in the client. A table row becomes data by these rules. Ticks are seconds times 60. "One hit" means `durationTicks` 1 and `intervalTicks` 1. "Around caster" is the placement `self`, and "N m ahead" is `ahead` N. "On self" is a top-level `applyStatus` or `shield`, and "on allies" is `targets` `allies`, which includes the caster. "At the dash end" is the `then` list of the dash. A hit lists `damage` first, then the statuses and pushes in the order the table names them. A projectile's `lifetimeTicks` is its range times 60 divided by its speed, rounded to a whole tick, and its reach is its speed times its lifetime divided by 60, so Quillon's M1, M2 and Lance reach 13.93, 11.9 and 17.92 m, where 14, 12 and 18 m would need 38.18, 51.43 and 43.2 ticks. An arc of A degrees is a `cosHalfAngle` of cos(A/2), written as a 10-decimal literal. An EX variant in the data is a complete ability, while the tables list only what differs from the base ability, and a test checks that nothing else differs. An area or an arc reaches a champion whose centre is within its radius plus 0.5 m. Changing a number means changing `data/kits/<id>.json`, this document and that kit's scripted fixture (`scripted-roster-<id>-arena01-2v2.json`) in the same change.
 - The names were checked by hand against the Bloodline Champions and Battlerite rosters. They are original.
 
 ## 1. Hargrim, the melee bruiser
@@ -37,10 +38,10 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Maul Swing: `meleeArc` (100 degree arc) | 12 damage | 2.5 m | n/a | 0.6 s | 0.15 s, slowed | none |
+| M1 | Maul Swing: `meleeArc` (100 degree arc, `cosHalfAngle` 0.6427876097) | 12 damage | 2.5 m | n/a | 0.6 s | 0.15 s, slowed | none |
 | M2 | Ground Slam: `area` (circle, radius 2.0 m, centred 2.5 m ahead, one hit), `applyStatus` | 18 damage | 2.5 m to centre | n/a | 6 s | 0.4 s, slowed | slow 30 percent for 1.5 s |
 | SPACE | Rush: `dash` (5 m in 0.25 s), `applyStatus` | none | 5 m | n/a | 7 s | 0, free | haste 20 percent for 1.5 s on self |
-| Q | Rally Cry: `area` (circle, radius 4 m around caster), `applyStatus` | none | 4 m radius | n/a | 14 s | 0.2 s, slowed | haste 30 percent for 2.0 s on allies in the area, including self |
+| Q | Rally Cry: `area` (circle, radius 4 m around caster, one hit), `applyStatus` | none | 4 m radius | n/a | 14 s | 0.2 s, slowed | haste 30 percent for 2.0 s on allies in the area, including self |
 | E | Chain Hook: `projectile`, `knockback` (pull toward caster, up to 4 m in 12 ticks, stops at contact), `applyStatus` | 14 damage | 9 m | 20 m/s / 0.4 m | 9 s | 0.3 s, locked | slow 30 percent for 1.0 s |
 | R | Iron Hide: `shield` on self, `applyStatus` | 40 absorb for 4 s | self | n/a | 12 s | 0, free | haste 20 percent for 1.5 s on self |
 | F | Quarry Break (ultimate): `dash` (6 m in 0.3 s), `area` (circle, radius 3.5 m, at the dash end), `applyStatus`, `knockback` (3 m outward in 10 ticks) | 40 damage | 6 m dash, 3.5 m radius | n/a | 10 s | 0.5 s, locked | stun 1.0 s |
@@ -56,7 +57,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 - Beats Skerrow. Iron Hide absorbs the opening Rend, the slow from Ground Slam stops a dash-away, and 160 health outlasts her 130. Her Vanish Step is one 0.5 s window every 16 s.
 - Beats Lumeth. Chain Hook pulls Lumeth 4 m closer and slows her, and she has only a short Glide (4 m) to answer it. Her heals cannot keep up with a bruiser she cannot escape.
-- Loses to Quillon. Quillon outranges every Hargrim tool, the hook included. Bind Shot and Snare Orb keep Hargrim slow or rooted while bolts land from 14 m.
+- Loses to Quillon. Quillon outranges every Hargrim tool, the hook included. Bind Shot and Snare Orb keep Hargrim slow or rooted while bolts land from about 14 m.
 
 **Bot profile sketch.**
 
@@ -85,11 +86,11 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Rod Bolt: `projectile` | 11 damage | 14 m | 22 m/s / 0.25 m | 0.5 s | 0.1 s, free | none |
-| M2 | Bind Shot: `projectile`, `applyStatus` | 14 damage | 12 m | 14 m/s / 0.4 m | 6 s | 0.3 s, slowed | slow 40 percent for 1.5 s |
-| SPACE | Skip: `teleport` (4 m toward the aim point) | none | 4 m | n/a | 9 s | 0, free | none |
+| M1 | Rod Bolt: `projectile` | 11 damage | 13.93 m | 22 m/s / 0.25 m | 0.5 s | 0.1 s, free | none |
+| M2 | Bind Shot: `projectile`, `applyStatus` | 14 damage | 11.9 m | 14 m/s / 0.4 m | 6 s | 0.3 s, slowed | slow 40 percent for 1.5 s |
+| SPACE | Skip: `teleport` (exactly 4 m toward the aim point, fixed) | none | 4 m | n/a | 9 s | 0, free | none |
 | Q | Snare Orb: `projectile`, `applyStatus` | 8 damage | 10 m | 12 m/s / 0.6 m | 12 s | 0.4 s, locked | root 1.0 s |
-| E | Lance: `projectile` | 28 damage | 18 m | 25 m/s / 0.2 m | 8 s | 0.6 s, locked | none |
+| E | Lance: `projectile` | 28 damage | 17.92 m | 25 m/s / 0.2 m | 8 s | 0.6 s, locked | none |
 | R | Hush Ward: `shield` on self, `applyStatus` | 30 absorb for 3 s | self | n/a | 14 s | 0, free | haste 30 percent for 1.5 s on self |
 | F | Sunspear (ultimate): `projectile` (pierces every champion in its path), `applyStatus` | 45 damage | 20 m | 25 m/s / 0.6 m | 10 s | 0.8 s, locked | slow 40 percent for 2.0 s |
 
@@ -150,7 +151,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 
 **Intended counters.**
 
-- Beats Quillon. Aegis Veil absorbs a full Lance, Soothing Surge outheals Rod Bolt, and Binding Sigil roots her where Skip lands. Lumeth's M1 reaches 12 m, close to Quillon's 14 m.
+- Beats Quillon. Aegis Veil absorbs a full Lance, Soothing Surge outheals Rod Bolt, and Binding Sigil roots her where Skip lands. Lumeth's M1 reaches 12 m, close to Quillon's M1 range of about 14 m.
 - Loses to Hargrim. Chain Hook pulls her 4 m closer and slows her, so Ground Slam lands next. Lantern Burst pushes him 2 m, and he walks it back in under half a second.
 - Loses to Skerrow. Quiet Dart silences every Lumeth ability, shield included, and 120 health dies to Lunge, Rend and Twin Cut inside four seconds.
 
@@ -220,7 +221,7 @@ Each pairing has a plan and a weakness. No pairing is a flat loss against anothe
 | Pairing | Why it works | Its weakness |
 |---------|--------------|--------------|
 | Hargrim and Quillon | Hargrim holds the front with Iron Hide and Rally Cry while Quillon pokes from behind with slows and roots. | A fast dive on Quillon past Hargrim. |
-| Hargrim and Lumeth | Hargrim pulls and slams, Lumeth heals him with Soothing Surge and shields both with Aegis Veil. | Quillon kiting the pair from 14 m. |
+| Hargrim and Lumeth | Hargrim pulls and slams, Lumeth heals him with Soothing Surge and shields both with Aegis Veil. | Quillon kiting the pair from about 14 m. |
 | Hargrim and Skerrow | Chain Hook and Ground Slam pin a target, Quiet Dart silences it and Rend finishes. | No healing, so a long fight favours the other team. |
 | Quillon and Lumeth | Binding Sigil and Snare Orb chain roots, and Aegis Veil protects Quillon from a dive. | Hargrim pulling Lumeth out of position. |
 | Quillon and Skerrow | Bind Shot slows the target and Skerrow dives onto it, with Lance as the follow-up. | Two low-health champions with no shield beyond Hush Ward. |
