@@ -15,12 +15,12 @@ information.
 A-star over a coarse grid (0.5 m cells) baked from the arena definition, plus
 local steering to avoid champions and projectiles.
 
-- Cells: a cell is blocked when a champion centred on the cell centre would
-  overlap an obstacle inflated by the champion radius or leave the boundary.
-  Touching counts as free, and every obstacle blocks whatever its
-  `blocksProjectiles` flag. A free cell can still lie partly inside an
-  inflated obstacle, so every path edge also passes an exact segment test
-  against the inflated obstacles and the boundary.
+- Cells: a cell is blocked when its centre lies inside an obstacle inflated by
+  the champion radius or outside the boundary shrunk by it. Touching counts as
+  free, and every obstacle blocks whatever its `blocksProjectiles` flag. A
+  free cell can still lie partly inside an inflated obstacle, so every path
+  edge also passes an exact segment test against the inflated obstacles and
+  the boundary.
 - Search: eight neighbours, no corner cutting, octile heuristic. The open set
   breaks ties by f, then h, then cell index, so a grid and two endpoints
   always give the same path. String pulling keeps the farthest waypoint still
