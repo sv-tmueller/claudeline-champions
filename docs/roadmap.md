@@ -12,7 +12,7 @@ lists are candidates, sliced batch by batch at dispatch time.
 | Milestone | Scope | Status |
 |-----------|-------|--------|
 | 1. Foundations | Monorepo scaffold, check suite and CI, architecture docs, roadmap, rules and roster docs, Blender bootstrap | done ([batch #6](https://github.com/sv-tmueller/claudeline-champions/issues/6) merged) |
-| 2. Walking in the arena | Champion movement and collision in the sim, scene and input in the client | [in progress](https://github.com/sv-tmueller/claudeline-champions/issues/12) |
+| 2. Walking in the arena | Champion movement and collision in the sim, scene and input in the client | in progress: sim core and client scene merged ([batch #12](https://github.com/sv-tmueller/claudeline-champions/issues/12)); walking and bot navigation in [batch #23](https://github.com/sv-tmueller/claudeline-champions/issues/23) |
 | 3. First blood | Effects toolkit, combat, match flow with sudden death, HUD, two champions | planned |
 | 4. Bots 2v2, the first playable | Bot AI, champions three and four, champion select, match setup, result screen | planned |
 | 5. Feel and breadth | Rigs and animation, menus and keybinding, second arena, 3v3, roster to six, balance pass | planned |
