@@ -74,6 +74,14 @@ describe('applyDamage', () => {
   it('throws on an unknown target', () => {
     expect(() => applyDamage(open(), 9, 5, 0)).toThrow('Invalid damage');
   });
+
+  it('emits nothing when the amount is too small to change the health', () => {
+    const state = open();
+    champion(state, 2).health = 50;
+    expect(applyDamage(state, 2, 1e-20, 0)).toBe(0);
+    expect(champion(state, 2).health).toBe(50);
+    expect(state.events).toEqual([]);
+  });
 });
 
 describe('applyHeal', () => {
@@ -90,6 +98,14 @@ describe('applyHeal', () => {
   it('emits no event at full health', () => {
     const state = open();
     expect(applyHeal(state, 2, 10, 0)).toBe(0);
+    expect(state.events).toEqual([]);
+  });
+
+  it('emits nothing when the amount is too small to change the health', () => {
+    const state = open();
+    champion(state, 2).health = 50;
+    expect(applyHeal(state, 2, 1e-20, 0)).toBe(0);
+    expect(champion(state, 2).health).toBe(50);
     expect(state.events).toEqual([]);
   });
 

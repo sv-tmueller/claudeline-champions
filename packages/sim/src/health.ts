@@ -17,8 +17,9 @@ function checkAmount(what: 'damage' | 'heal', amount: number): void {
 }
 
 /**
- * Removes up to `amount` health and returns what was removed. Not a kit primitive: it is the
- * building block projectiles, areas and later melee arcs and the ring call.
+ * Removes up to `amount` health and returns what was removed. An amount too small to change
+ * the health emits nothing. Not a kit primitive: it is the building block projectiles, areas
+ * and later melee arcs and the ring call.
  */
 export function applyDamage(
   state: GameState,
@@ -29,9 +30,11 @@ export function applyDamage(
   const champion = target(state, 'damage', targetId);
   checkAmount('damage', amount);
   if (!champion.alive || amount === 0) return 0;
-  const removed = Math.min(champion.health, amount);
-  champion.health = champion.health - removed;
+  const before = champion.health;
+  champion.health = before - Math.min(before, amount);
   const { health } = champion;
+  const removed = before - health;
+  if (removed === 0) return 0;
   state.events.push({ type: 'damage', targetId, sourceId, amount: removed, health });
   if (champion.health === 0) {
     champion.alive = false;
@@ -42,7 +45,10 @@ export function applyDamage(
   return removed;
 }
 
-/** Restores up to `amount` health and returns what was restored. A dead champion stays dead. */
+/**
+ * Restores up to `amount` health and returns what was restored. A dead champion stays dead, and
+ * an amount too small to change the health emits nothing.
+ */
 export function applyHeal(
   state: GameState,
   targetId: number,
@@ -52,10 +58,11 @@ export function applyHeal(
   const champion = target(state, 'heal', targetId);
   checkAmount('heal', amount);
   if (!champion.alive) return 0;
-  const restored = Math.min(champion.maxHealth - champion.health, amount);
-  if (restored <= 0) return 0;
-  champion.health = champion.health + restored;
+  const before = champion.health;
+  champion.health = before + Math.min(champion.maxHealth - before, amount);
   const { health } = champion;
+  const restored = health - before;
+  if (restored === 0) return 0;
   state.events.push({ type: 'heal', targetId, sourceId, amount: restored, health });
   return restored;
 }
