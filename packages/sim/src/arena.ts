@@ -150,6 +150,33 @@ function readObstacle(value: unknown, path: string): Obstacle {
   return fail(child(path, 'type'), `unknown obstacle type ${JSON.stringify(type)}`);
 }
 
+/**
+ * The radii stay within `MAX_ARENA_METERS` so that the shrink arithmetic, `(end - start) * tick`,
+ * stays far from overflow, and the end radius is below the start, which `validate_glb.py` also
+ * requires.
+ */
+function readRing(ring: JsonObject): ArenaDef['ring'] {
+  const startRadius = readNumber(
+    readField(ring, 'startRadius', 'ring'),
+    'ring.startRadius',
+    true,
+    true,
+  );
+  const endRadius = readNumber(readField(ring, 'endRadius', 'ring'), 'ring.endRadius', true, true);
+  if (endRadius >= startRadius) {
+    return fail('ring.endRadius', 'expected a number below ring.startRadius');
+  }
+  return {
+    startRadius,
+    endRadius,
+    damagePerSecond: readNumber(
+      readField(ring, 'damagePerSecond', 'ring'),
+      'ring.damagePerSecond',
+      true,
+    ),
+  };
+}
+
 export function parseArenaDef(data: unknown): ArenaDef {
   const root = readObject(data, '(root)');
 
@@ -170,14 +197,6 @@ export function parseArenaDef(data: unknown): ArenaDef {
       teamB: readPoints(readField(spawns, 'teamB', 'spawns'), 'spawns.teamB'),
     },
     obstacles: obstacles.map((o, i) => readObstacle(o, `obstacles[${i}]`)),
-    ring: {
-      startRadius: readNumber(readField(ring, 'startRadius', 'ring'), 'ring.startRadius'),
-      endRadius: readNumber(readField(ring, 'endRadius', 'ring'), 'ring.endRadius'),
-      damagePerSecond: readNumber(
-        readField(ring, 'damagePerSecond', 'ring'),
-        'ring.damagePerSecond',
-        true,
-      ),
-    },
+    ring: readRing(ring),
   };
 }

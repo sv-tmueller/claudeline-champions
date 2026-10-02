@@ -101,6 +101,36 @@ describe('parseArenaDef', () => {
     }
   });
 
+  it('rejects a ring radius at or below 0 or above the arena bound, with the full message', () => {
+    const cases: [number, number, string][] = [
+      [0, 3, 'Invalid arena definition: ring.startRadius: expected a number above 0'],
+      [18, 0, 'Invalid arena definition: ring.endRadius: expected a number above 0'],
+      [1e6 + 1, 3, 'Invalid arena definition: ring.startRadius: expected a number at most 1000000'],
+      [18, 1e6 + 1, 'Invalid arena definition: ring.endRadius: expected a number at most 1000000'],
+    ];
+    for (const [startRadius, endRadius, message] of cases) {
+      const data = clone();
+      data['ring'] = { startRadius, endRadius, damagePerSecond: 10 };
+      expect(() => parseArenaDef(data)).toThrow(message);
+    }
+  });
+
+  it('rejects an end radius that is not below the start radius', () => {
+    for (const endRadius of [18, 19]) {
+      const data = clone();
+      data['ring'] = { startRadius: 18, endRadius, damagePerSecond: 10 };
+      expect(() => parseArenaDef(data)).toThrow(
+        'Invalid arena definition: ring.endRadius: expected a number below ring.startRadius',
+      );
+    }
+  });
+
+  it('accepts a start radius of exactly the arena bound', () => {
+    const data = clone();
+    data['ring'] = { startRadius: 1e6, endRadius: 3, damagePerSecond: 10 };
+    expect(parseArenaDef(data).ring.startRadius).toBe(1e6);
+  });
+
   it('parses a -0 coordinate as +0', () => {
     const data = JSON.parse(
       JSON.stringify(arena01).replace('"x":0,"y":0,"r":1.5', '"x":-0,"y":-0,"r":1.5'),
