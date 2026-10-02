@@ -294,3 +294,60 @@ describe('checksum of ability state', () => {
     expect(checksum(cloneState(state))).toBe(checksum(state));
   });
 });
+
+describe('checksum of match state', () => {
+  function playing(): GameState {
+    const state = createMatch({ ...config2v2(), roundsToWin: 3 }, arena01, 1337);
+    state.match = {
+      phase: 'round',
+      phaseTicks: 5700,
+      round: 2,
+      roundsToWin: 3,
+      score: { A: 1, B: 0 },
+      ring: { x: 0, y: 0, radius: 17, damagePerTick: 10 / 60 },
+    };
+    return state;
+  }
+
+  it('is stable for equal states and changes with each match field', () => {
+    const base = checksum(playing());
+    expect(checksum(playing())).toBe(base);
+    const mutations: [string, (s: GameState) => void][] = [
+      ['phase', (s) => void (s.match!.phase = 'roundEnd')],
+      ['phaseTicks', (s) => void (s.match!.phaseTicks += 1)],
+      ['round', (s) => void (s.match!.round += 1)],
+      ['roundsToWin', (s) => void (s.match!.roundsToWin += 1)],
+      ['score A', (s) => void (s.match!.score.A += 1)],
+      ['score B', (s) => void (s.match!.score.B += 1)],
+      ['ring null', (s) => void (s.match!.ring = null)],
+      ['ring radius', (s) => void (s.match!.ring!.radius += 1e-9)],
+      ['ring x', (s) => void (s.match!.ring!.x += 1e-9)],
+      ['ring y', (s) => void (s.match!.ring!.y += 1e-9)],
+      ['ring damagePerTick', (s) => void (s.match!.ring!.damagePerTick += 1e-9)],
+      ['no match', (s) => void delete (s as Partial<GameState>).match],
+    ];
+    for (const [name, mutate] of mutations) {
+      const state = playing();
+      mutate(state);
+      expect(checksum(state), name).not.toBe(base);
+    }
+  });
+
+  it('tells a ring from none', () => {
+    const none = playing();
+    none.match!.ring = null;
+    expect(checksum(none)).not.toBe(checksum(playing()));
+  });
+
+  it('throws on a non-finite ring radius', () => {
+    const state = playing();
+    state.match!.ring!.radius = NaN;
+    expect(() => checksum(state)).toThrow('non-finite');
+  });
+
+  it('survives a clone with a ring', () => {
+    const state = playing();
+    expect(cloneState(state)).toEqual(state);
+    expect(checksum(cloneState(state))).toBe(checksum(state));
+  });
+});

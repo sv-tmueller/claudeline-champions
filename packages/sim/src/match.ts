@@ -13,7 +13,9 @@ function fail(problem: string): never {
  * Starts a match. `kits` are the ability kits, plain data: a player whose `championId` equals a
  * kit's id gets that kit's health, speed and abilities, and any other player gets none and the
  * default health and base speed. Every kit given is validated and an id may appear once; the state
- * keeps a copy of the kits the players use, in the order they were given.
+ * keeps a copy of the kits the players use, in the order they were given. With `roundsToWin` the
+ * match starts in its warmup (see `flow.ts`); without it the match is free play and the state has
+ * no `match` key.
  */
 export function createMatch(
   config: MatchConfig,
@@ -21,12 +23,15 @@ export function createMatch(
   seed: number,
   kits: readonly KitDef[] = [],
 ): GameState {
-  const { teamSize, players } = config;
+  const { teamSize, players, roundsToWin } = config;
   if (teamSize !== 2 && teamSize !== 3) fail('teamSize must be 2 or 3');
   if (players.length !== 2 * teamSize) {
     fail(`expected ${2 * teamSize} players, got ${players.length}`);
   }
   if (!Number.isInteger(seed)) fail('seed must be an integer');
+  if (roundsToWin !== undefined && !(Number.isSafeInteger(roundsToWin) && roundsToWin >= 1)) {
+    fail('roundsToWin must be a positive integer');
+  }
 
   const checked = kits.map((kit) => validateKit(kit));
   const ids = new Set<string>();
@@ -76,7 +81,7 @@ export function createMatch(
     };
   });
 
-  return {
+  const state: GameState = {
     tick: 0,
     rng: seed >>> 0,
     arena: JSON.parse(JSON.stringify(arena)) as ArenaDef,
@@ -88,4 +93,16 @@ export function createMatch(
     casts: [],
     events: [],
   };
+  // A key that is missing, not undefined, marks free play: checksum and JSON both see the difference.
+  if (roundsToWin !== undefined) {
+    state.match = {
+      phase: 'warmup',
+      phaseTicks: 0,
+      round: 0,
+      roundsToWin,
+      score: { A: 0, B: 0 },
+      ring: null,
+    };
+  }
+  return state;
 }

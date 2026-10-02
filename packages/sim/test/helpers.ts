@@ -200,6 +200,7 @@ export function legacyState(state: GameState): GameState {
   }
   if (copy.kits.length > 0) throw new Error('state has kits');
   if (copy.casts.length > 0) throw new Error('state has casts');
+  if ('match' in copy) throw new Error('state has match flow');
   delete (copy as Partial<GameState>).kits;
   delete (copy as Partial<GameState>).casts;
   return copy;
@@ -207,10 +208,11 @@ export function legacyState(state: GameState): GameState {
 
 /**
  * Which scripted fixture has to produce each event type. `combat` is the committed combat
- * fixture; `ability` is the ability fixture that arrives with the kit contract. Typing it as
- * a record makes a new event type a compile error until it is classified.
+ * fixture; `ability` is the ability fixture that arrives with the kit contract; `match` is the
+ * rounds fixture, the only one with match flow. Typing it as a record makes a new event type a
+ * compile error until it is classified.
  */
-export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability'> = {
+export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability' | 'match'> = {
   projectileSpawned: 'combat',
   projectileHit: 'combat',
   projectileExpired: 'combat',
@@ -231,6 +233,10 @@ export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability'> = {
   castFired: 'ability',
   castInterrupted: 'ability',
   energyGained: 'ability',
+  roundStarted: 'match',
+  suddenDeathStarted: 'match',
+  roundEnded: 'match',
+  matchEnded: 'match',
 };
 
 const UNIQUE_STATUSES = ['stun', 'root', 'silence', 'invulnerable'];
