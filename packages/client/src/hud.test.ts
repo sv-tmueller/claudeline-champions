@@ -179,6 +179,18 @@ describe('HUD health', () => {
     expect(writeCount(elements)).toBe(0);
   });
 
+  it('writes the text and the fill once when only the maximum health changes', () => {
+    const { hud, state, elements } = rig();
+    local(state).health = 91;
+    hud.update(state);
+    clearLogs(elements);
+    local(state).maxHealth = 130;
+    hud.update(state);
+    expect(elements.healthText.log).toEqual(['text=91 / 130']);
+    expect(elements.healthFill.log).toEqual([`transform=scaleX(${91 / 130})`]);
+    expect(writeCount(elements)).toBe(2);
+  });
+
   it('shows 1 for health 0.2 and 0 for none', () => {
     const { hud, state, elements } = rig();
     hud.update(state);
