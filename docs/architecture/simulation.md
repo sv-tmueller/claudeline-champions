@@ -143,9 +143,10 @@ strength field of that type), `shield { absorb, ticks }`, `knockback
 { distance, ticks, direction: 'away' | 'toward' }` and `energyGain { amount }`
 (an integer from 1 to 100; only `landHit` reads it). A hit applies its effects
 in list order to each champion it lands on, with the owner as the source and
-the slot of the cast that made it, or no slot for a dev tool spawn. `away` points from the hit origin (the projectile contact point, the area
-centre, the arc origin) to the target, `toward` from the target to the owner's
-current position, and a zero vector means no push.
+the slot of the cast that made it, or no slot for a dev tool spawn. `away`
+points from the hit origin (the projectile contact point, the area centre, the
+arc origin) to the target, `toward` from the target to the owner's current
+position, and a zero vector means no push.
 
 `Slot` (`M1`, `M2`, `SPACE`, `Q`, `E`, `R`, `F`) and `SLOTS` in `input.ts` list the
 slots in `Button` bit order.
@@ -158,22 +159,24 @@ slots in `Button` bit order.
 2. Clear `state.events`.
 3. For each champion in id order, skipping a dead one and ending its turn if it
    dies:
-   1. Store the aim.
-   2. Cooldowns: every cooldown above 0 drops by 1.
-   3. Windup: a cast in progress loses a turn (`windupLeft - 1`) and fires at 0.
-   4. Cast start: at most one cast starts from the held buttons; a windup of 0
+   - 3a. Store the aim.
+   - 3b. Cooldowns: every cooldown above 0 drops by 1.
+   - 3c. Windup: a cast in progress loses a turn (`windupLeft - 1`) and fires at
+      0.
+   - 3d. Cast start: at most one cast starts from the held buttons; a windup of 0
       fires at once (see [Abilities](#abilities-and-the-effects-toolkit)).
-   5. Walk: the walk velocity is the move direction times the speed, where the
+   - 3e. Walk: the walk velocity is the move direction times the speed, where the
       speed is the kit move speed (5.5 without a kit) times the speed factor
       (see [Statuses](#statuses)), halved during a `slowed` windup; it is `+0`
       while the champion is stunned, rooted, dashing or in a `locked` windup.
       Move, face the aim and resolve collision.
-   6. Forced motion (see [Forced motion](#forced-motion)): if rooted, a running
-      dash ends first (`rooted`); then the dash step and each knockback impulse
-      move the champion in substeps. Stun, root and a locked windup do not stop
-      this step. A dash that ended `complete`, `blocked` or `rooted` fires its
-      `then` effects here, after all of the step, from where the champion is.
-   7. Status upkeep: due pulses of damage over time and heal over time, then
+   - 3f. Forced motion (see [Forced motion](#forced-motion)): if rooted, a
+      running dash ends first (`rooted`); then the dash step and each knockback
+      impulse move the champion in substeps. Stun, root and a locked windup do
+      not stop this step. A dash that ended `complete`, `blocked` or `rooted`
+      fires its `then` effects here, after all of the step, from where the
+      champion is.
+   - 3g. Status upkeep: due pulses of damage over time and heal over time, then
       every status loses a tick and ends at 0 (reason `expired`). A pulse that
       kills the champion ends the turn.
 4. For each projectile in id order: sweep it (see below), hit, and remove it if
@@ -643,7 +646,9 @@ from 1 to 100; hit effects and status specs as the toolkit accepts them. It also
 checks the structure: every slot present, non-empty effect lists, a known
 movement rule, exactly two distinct EX slots (never F) that match the slots
 carrying an `ex`. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
-not checked here; roster tests do that.
+not checked here; roster tests do that. The bounds keep `step` from throwing, not
+cheap: the live entities of a kit grow with lifetime over cooldown, step 7
+(`dropUnusedCasts`) is quadratic in them, and the catalog ranges keep them small.
 
 ### Casting
 
@@ -763,8 +768,8 @@ Enforced by review, lint and tests.
    the sim; a committed bit-pattern fixture checks the `atan2` port on every CI
    run. Kit cosines are decimal literals in the kit data, never computed, and
    the sim uses no `Math.floor`, `Math.ceil`, `Math.trunc` or `Math.sign` either
-   (grep for them; lint does not). Guard against `NaN`: tests assert `checksum` is finite and that no
-   position or health is `NaN`.
+   (grep for them; lint does not). Guard against `NaN`: tests assert `checksum`
+   is finite and that no position or health is `NaN`.
 5. Recorded input replays with expected checksums are committed as fixtures.
    Changing gameplay intentionally means regenerating the fixture in the same
    change.
