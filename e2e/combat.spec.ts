@@ -52,63 +52,7 @@ const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
 // Anything counted at all proves the profiler saw the sim's own garbage.
 const PROFILER_SANITY_BYTES = 100_000;
 
-// Phase timing for the CI investigation: frames run and hook reads so far.
-let framesRun = 0;
-let hookReads = 0;
-let phaseStart = Date.now();
-let phaseFrames = 0;
-let phaseReads = 0;
-let frameMs = 0;
-let readMs = 0;
-let phaseFrameMs = 0;
-let phaseReadMs = 0;
-
-/** `frames` frames of 17 ms in one call, timed as a batch. */
-async function runBatch(page: Page, frames: number): Promise<void> {
-  framesRun += frames;
-  const t0 = Date.now();
-  await page.clock.runFor(frames * FRAME_MS);
-  frameMs += Date.now() - t0;
-}
-
-/** One frame of fake time, timed on its own. Logs every 25 frames so a timeout still leaves figures. */
-async function runFrame(page: Page): Promise<void> {
-  framesRun++;
-  const t0 = Date.now();
-  await page.clock.runFor(FRAME_MS);
-  frameMs += Date.now() - t0;
-  if (framesRun % 25 === 0) {
-    console.log(`PROGRESS frame ${framesRun}: frames ${frameMs} ms, reads ${readMs} ms over ${hookReads} reads`);
-  }
-}
-
-/** Logs the wall-clock ms, frames and hook reads since the last phase line. */
-function phase(label: string): void {
-  const now = Date.now();
-  const ms = now - phaseStart;
-  const frames = framesRun - phaseFrames;
-  const reads = hookReads - phaseReads;
-  const fMs = frameMs - phaseFrameMs;
-  const rMs = readMs - phaseReadMs;
-  console.log(
-    `PHASE ${label}: ${ms} ms, ${frames} frames (${fMs} ms, ${frames ? (fMs / frames).toFixed(1) : '-'} ms/frame), ${reads} reads (${rMs} ms, ${reads ? (rMs / reads).toFixed(1) : '-'} ms/read)`,
-  );
-  phaseFrameMs = frameMs;
-  phaseReadMs = readMs;
-  phaseStart = now;
-  phaseFrames = framesRun;
-  phaseReads = hookReads;
-}
-
 async function readHooks(page: Page): Promise<Hooks> {
-  hookReads++;
-  const t0 = Date.now();
-  const result = await readHooksRaw(page);
-  readMs += Date.now() - t0;
-  return result;
-}
-
-async function readHooksRaw(page: Page): Promise<Hooks> {
   return page.evaluate(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) throw new Error('no canvas');
@@ -142,7 +86,7 @@ async function runUntil(
     expect(hooks.tick - start, `${label}: not reached within ${budgetTicks} ticks`).toBeLessThanOrEqual(
       budgetTicks,
     );
-    await runFrame(page);
+    await page.clock.runFor(FRAME_MS);
     hooks = await readHooks(page);
   }
 }
@@ -150,7 +94,7 @@ async function runUntil(
 /** Runs the frames for `ticks` ticks in one call, then finishes frame by frame if the sim is behind. */
 async function runTicks(page: Page, ticks: number): Promise<Hooks> {
   const target = (await readHooks(page)).tick + ticks;
-  await runBatch(page, ticks);
+  await page.clock.runFor(ticks * FRAME_MS);
   return runUntil(page, `${ticks} ticks`, ticks + 5, (hooks) => hooks.tick >= target);
 }
 
@@ -185,25 +129,31 @@ function summarise(root: ProfileNode): Allocations {
 // Playwright's clock fires one animation frame per 16 ms of fake time, so
 // runFor(480) fires exactly 30 frames (counted with a requestAnimationFrame
 // loop: 30 callbacks and 29 to 30 sim ticks), where thirty runFor(17) fire 31
-// to 32. A window is one runFor call, with no hook read between its frames.
+// or 32. A window is one runFor call with no hook read between its frames.
 const WINDOW_FRAMES = 30;
 const WINDOW_MS = WINDOW_FRAMES * 16;
-// A shot flies 27 m at 10 m/s, 162 ticks or 5.4 windows, from the spawn to the east boundary.
+// A shot flies 27 m at 10 m/s, 162 ticks or 5.6 windows of 29 ticks, from the spawn to the east boundary.
 const WINDOWS_PER_FLIGHT = 6;
-// Volleys the engine warms up on before the measured one.
-const WARM_UP_VOLLEYS = 4;
+// Volleys the engine warms up on before the measured one. With 4 the first
+// runner run read 1164 B in one measured window, with 0 to 48 B in the next
+// run and in all of 8 more volleys after it, so the warm-up is deeper than the
+// local figure needs.
+const WARM_UP_VOLLEYS = 8;
 // One window after the volley, then the measured ones. All of them end before the first shot does.
 const SETTLE_WINDOWS = 1;
 const MEASURED_WINDOWS = 3;
-// A sixteenth of the pixels of the 1280x720 viewport the screenshots need.
+// A sixteenth of the pixels of the 1280x720 viewport that the screenshots need.
 const PROBE_VIEWPORT = { width: 320, height: 180 };
+// The CI job timed out at the default 30 s on 2026-10-02 (run 36967340392).
+// On the runner (2 cores, SwiftShader) steps 1 to 7 take about 45 s, because a
+// frame renders in 150 to 190 ms at 1280x720 and each tick-exact frame also
+// pays a hook read of 40 to 70 ms. Step 8 takes about 30 s at 320x180, where a
+// frame is 17 to 24 ms. 75 s in all, so 240 s is a 3x margin.
+const TEST_TIMEOUT_MS = 240_000;
 
 /** Runs one window of frames, 480 ms of fake time, in one call. */
 async function runWindow(page: Page): Promise<void> {
-  framesRun += WINDOW_FRAMES;
-  const t0 = Date.now();
   await page.clock.runFor(WINDOW_MS);
-  frameMs += Date.now() - t0;
 }
 
 /** Eight shots in the same frame. */
@@ -228,11 +178,8 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
 }
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(TEST_TIMEOUT_MS);
   const { problems, failed } = watchProblems(page);
-  phaseStart = Date.now();
-  phaseFrames = framesRun;
-  phaseReads = hookReads;
 
   try {
     // 1. A paused clock, so every frame below is one the test ran.
@@ -242,7 +189,6 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     await page.clock.pauseAt(PAUSE_AT_MS);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.enable');
-    phase('load');
 
     // 2. The baseline picture has no flash and no ring.
     const baseline = await countPixels(page, await page.screenshot(), [WHITE, RING]);
@@ -265,7 +211,6 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     hooks = await readHooks(page);
     expect(hooks.projectiles).toBe(SHOTS);
     expect(hooks.debugShots).toBe(SHOTS);
-    phase('eight shots');
 
     // 4. The first hit: the picture shows a white champion and a yellow ring.
     hooks = await runUntil(page, 'the first hit', 200, (h) => h.hits >= 1);
@@ -278,20 +223,17 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.flashing).toContain(String(TARGET));
     expect(hooks.bars[TARGET]).toBe(String(100 - 25 * hooks.hits));
     expect(hooks.rings, 'a ring shows right after the hit').toBeGreaterThanOrEqual(1);
-    phase('first hit');
 
     // 5. The fourth hit kills it, and its bar goes away.
     hooks = await runUntil(page, 'the death', 60, (h) => h.deaths >= 1);
     expect(hooks.deaths).toBe(1);
     expect(hooks.bars[TARGET]).toBe('x');
-    phase('death');
 
     // 6. The other shots pass through the dead champion and end at the east
     // boundary, and their views end with them.
     hooks = await runUntil(page, 'the last projectile', 60, (h) => h.projectiles === 0);
     expect(hooks.hits).toBe(4);
     expect(hooks.areas).toBe(0);
-    phase('last projectile');
 
     // 7. Every ring ends. Only the draw call retires a ring, so a ring that
     // never grows and fades stays on screen and this fails. The last shot just
@@ -299,49 +241,32 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.rings, 'a ring shows for the last shot').toBeGreaterThanOrEqual(1);
     hooks = await runUntil(page, 'the rings to end', RING_TICKS + RING_SLACK_TICKS, (h) => h.rings === 0);
     expect(hooks.rings).toBe(0);
-    phase('rings');
 
     // 8. Steady state: eight shots in flight and nothing to hit, the loop at
     // its busiest. The shots pass through the dead champion 2. Code warmed up
     // on an empty arena is thrown away when the first projectile arrives, so
     // the engine warms up on volleys. The measured windows hold no spawn and no
     // end of a shot, only frames with eight shots in flight, and in them the
-    // combat code allocates nothing. On the CI runner every frame costs about
-    // 190 ms of software rendering at 1280x720 whatever the batching, and the
-    // heap probe does not look at pixels, so the canvas shrinks first. The
-    // resize is outside every measured window.
+    // combat code allocates nothing. On the CI runner every frame costs 150 to
+    // 190 ms of software rendering at 1280x720 whether or not hooks are read
+    // between frames, and the heap probe counts JavaScript allocations and
+    // never looks at pixels, so the canvas shrinks first. The resize is
+    // outside every measured window.
     await page.setViewportSize(PROBE_VIEWPORT);
     for (let volley = 0; volley < WARM_UP_VOLLEYS; volley++) {
       await fireVolley(page);
       for (let window = 0; window < WINDOWS_PER_FLIGHT; window++) await runWindow(page);
-      phase(`warm-up volley ${volley + 1}`);
     }
     await fireVolley(page);
     for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
-    phase('settle');
     let worst: Allocations | undefined;
     let sawGarbage = 0;
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
-      phase(`measured window ${window + 1}`);
-      console.log(`PROBE volley ${WARM_UP_VOLLEYS + 1} window ${window + 1}: combat ${allocations.combat} ${JSON.stringify(allocations.combatByFunction)} total ${allocations.total}`);
       sawGarbage = Math.max(sawGarbage, allocations.total);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
     }
     hooks = await readHooks(page);
-    // EXPLORATION, to be removed: how many more volleys until the figure is clean.
-    for (let volley = WARM_UP_VOLLEYS + 2; volley <= 12; volley++) {
-      await runWindow(page);
-      await runWindow(page);
-      await fireVolley(page);
-      await runWindow(page);
-      for (let window = 0; window < MEASURED_WINDOWS; window++) {
-        const a = await allocationsOverAWindow(page, cdp);
-        console.log(`PROBE volley ${volley} window ${window + 1}: combat ${a.combat} ${JSON.stringify(a.combatByFunction)} total ${a.total}`);
-      }
-      await runWindow(page);
-      await runWindow(page);
-    }
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
     expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);
