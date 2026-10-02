@@ -46,6 +46,7 @@ export function createMatch(config: MatchConfig, arena: ArenaDef, seed: number):
       energy: 0,
       alive: true,
       statuses: [],
+      dash: null,
     };
   });
 

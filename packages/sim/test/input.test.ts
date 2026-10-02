@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Button, checksum, cloneState, createMatch, step } from '../src/index';
-import { resolveInput } from '../src/input';
+import { SLOTS, resolveInput } from '../src/input';
 import type { GameState, PlayerInput } from '../src/index';
 import { champion, config2v2, input, openArena } from './helpers';
 
@@ -209,5 +209,12 @@ describe('an input entry that throws on read', () => {
     const inputs = [input(1, 0), input(0, 1), input(-1, 0), poisoned];
     expect(() => step(state, inputs)).toThrow('poisoned');
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+describe('SLOTS', () => {
+  it('lists the slots in Button bit order, so the index is the bit position', () => {
+    expect(SLOTS).toEqual(['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F']);
+    SLOTS.forEach((slot, i) => expect(Button[slot]).toBe(1 << i));
   });
 });

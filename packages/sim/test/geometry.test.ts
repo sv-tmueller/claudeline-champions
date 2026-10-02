@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RectObstacle } from '../src/arena';
-import { length, sweepCircle, sweepRect } from '../src/geometry';
+import { direction, length, sweepCircle, sweepRect } from '../src/geometry';
 
 function rect(w: number, h: number, x = 0, y = 0): RectObstacle {
   return { type: 'rect', x, y, w, h, height: 1, blocksProjectiles: true };
@@ -85,5 +85,36 @@ describe('sweepRect', () => {
 
   it('misses a segment that stops short', () => {
     expect(sweepRect({ x: -5, y: 0 }, 2, 0, rect(2, 2), 0.5)).toBe(Infinity);
+  });
+});
+
+describe('direction', () => {
+  it('returns the unit vector and the length', () => {
+    const d = direction(3, 4);
+    expect(d?.x).toBeCloseTo(0.6, 15);
+    expect(d?.y).toBeCloseTo(0.8, 15);
+    expect(d?.length).toBeCloseTo(5, 12);
+  });
+
+  it('has no direction for a zero vector', () => {
+    expect(direction(0, 0)).toBeNull();
+    expect(direction(-0, 0)).toBeNull();
+  });
+
+  it('measures vectors beyond the range of length', () => {
+    const big = direction(1e200, -1e200);
+    expect(big?.x).toBeCloseTo(Math.SQRT1_2, 15);
+    expect(big?.y).toBeCloseTo(-Math.SQRT1_2, 15);
+    expect((big?.length ?? 0) / 1e200).toBeCloseTo(Math.SQRT2, 14);
+    const tiny = direction(0, 1e-200);
+    expect(tiny).toEqual({ x: 0, y: 1, length: 1e-200 });
+    const subnormal = direction(5e-324, 0);
+    expect(subnormal).toEqual({ x: 1, y: 0, length: 5e-324 });
+  });
+
+  it('stores +0 for a zero component', () => {
+    const d = direction(-5, -0);
+    expect(Object.is(d?.y, 0)).toBe(true);
+    expect(d?.x).toBe(-1);
   });
 });

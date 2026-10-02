@@ -164,7 +164,7 @@ function sweep(state: GameState, p: ProjectileState): boolean {
       x: pos.x,
       y: pos.y,
     });
-    applyEffects(state, p.ownerId, contact.id, p.effects);
+    applyEffects(state, p.ownerId, contact.id, p.effects, pos);
   };
   const expire = (reason: ProjectileEndReason, t: number) => {
     const pos = at(t);

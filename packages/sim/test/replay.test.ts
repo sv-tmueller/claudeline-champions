@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 import fixtureJson from './fixtures/replay-arena01-2v2.json';
 import { checksum, cloneState, createMatch, step } from '../src/index';
 import type { GameState, MatchConfig, PlayerInput } from '../src/index';
-import { ALL_CONTACT_KINDS, arena01, checkInvariants, contactKinds } from './helpers';
+import { ALL_CONTACT_KINDS, arena01, checkInvariants, contactKinds, legacyState } from './helpers';
 import type { ContactKind } from './helpers';
 
 type Entry = [number, number, number, number, number] | null;
@@ -120,7 +120,7 @@ describe('replay fixture', () => {
   });
 
   it('reproduces the committed checksum', () => {
-    const { projectiles, areas, nextEntityId, ...movement } = replay();
+    const { projectiles, areas, nextEntityId, ...movement } = legacyState(replay());
     // The fixture predates these fields, so its checksum covers the state without them.
     expect(projectiles).toEqual([]);
     expect(areas).toEqual([]);
