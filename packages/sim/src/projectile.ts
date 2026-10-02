@@ -1,6 +1,7 @@
 import type { Obstacle } from './arena';
+import { isPositiveInteger } from './area';
 import { CHAMPION_RADIUS, DT } from './constants';
-import { sweepCircle, sweepRect } from './geometry';
+import { clamp, sweepCircle, sweepRect } from './geometry';
 import type { Point } from './geometry';
 import { applyEffects, copyEffects } from './health';
 import { nextId } from './state';
@@ -23,10 +24,6 @@ export interface ProjectileSpec {
 
 function fail(problem: string): never {
   throw new Error(`Invalid projectile: ${problem}`);
-}
-
-function isPositiveInteger(value: number): boolean {
-  return Number.isInteger(value) && value > 0;
 }
 
 /**
@@ -75,10 +72,6 @@ export function spawnProjectile(state: GameState, spec: ProjectileSpec): number 
     radius: projectile.radius,
   });
   return projectile.id;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return value < min ? min : value > max ? max : value;
 }
 
 /**

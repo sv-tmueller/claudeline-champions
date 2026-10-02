@@ -1,5 +1,6 @@
 import type { RectObstacle } from './arena';
 import { CHAMPION_RADIUS } from './constants';
+import { clamp } from './geometry';
 import type { ChampionState, GameState } from './state';
 
 // Penetration below EPS is treated as contact. A push moves to exact contact.
@@ -9,10 +10,6 @@ const MAX_PASSES = 4;
 interface Point {
   x: number;
   y: number;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return value < min ? min : value > max ? max : value;
 }
 
 /** Pushes p out of a static circle so that their centres are at least `minDist` apart. */

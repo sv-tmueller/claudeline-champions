@@ -1,7 +1,7 @@
 import { CHAMPION_RADIUS } from './constants';
 import { applyEffects, copyEffects } from './health';
 import { nextId } from './state';
-import type { AreaState, AreaTargets, Effect, GameState } from './state';
+import type { AreaState, AreaTargets, Effect, GameState, TeamId } from './state';
 
 export interface AreaSpec {
   ownerId: number;
@@ -19,7 +19,7 @@ function fail(problem: string): never {
   throw new Error(`Invalid area: ${problem}`);
 }
 
-function isPositiveInteger(value: number): boolean {
+export function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
@@ -68,7 +68,7 @@ export function spawnArea(state: GameState, spec: AreaSpec): number {
   return area.id;
 }
 
-function affects(area: AreaState, team: string): boolean {
+function affects(area: AreaState, team: TeamId): boolean {
   if (area.targets === 'all') return true;
   return area.targets === 'allies' ? team === area.team : team !== area.team;
 }

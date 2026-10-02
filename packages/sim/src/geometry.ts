@@ -5,6 +5,10 @@ export interface Point {
   y: number;
 }
 
+export function clamp(value: number, min: number, max: number): number {
+  return value < min ? min : value > max ? max : value;
+}
+
 /**
  * Earliest t in [0, 1] at which the point p0 + t * (dx, dy) is within r of the centre
  * (cx, cy), or Infinity. Contact is inclusive, so a tangent counts, and a start inside
