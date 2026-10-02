@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 const eslint = new ESLint();
 
-const BOUNDARY_RULES = [
-  'no-restricted-imports',
-  'no-restricted-syntax',
-  'no-restricted-globals',
-  'no-restricted-properties',
-];
+const IMPORTS = 'no-restricted-imports';
+const SYNTAX = 'no-restricted-syntax';
+const GLOBALS = 'no-restricted-globals';
+const PROPERTIES = 'no-restricted-properties';
+
+const BOUNDARY_RULES = [IMPORTS, SYNTAX, GLOBALS, PROPERTIES];
 
 async function boundaryRuleIds(filePath: string, code: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath });
@@ -24,11 +24,6 @@ const simTestFile = 'packages/sim/test/virtual.test.ts';
 const botsFile = 'packages/bots/src/virtual.ts';
 const botsCtsFile = 'packages/bots/src/virtual.cts';
 const clientFile = 'packages/client/src/virtual.ts';
-
-const IMPORTS = 'no-restricted-imports';
-const SYNTAX = 'no-restricted-syntax';
-const GLOBALS = 'no-restricted-globals';
-const PROPERTIES = 'no-restricted-properties';
 
 type Case = { name: string; file: string; code: string; rule: string | null };
 
@@ -62,7 +57,7 @@ const cases: Case[] = [
   {
     name: 'sim imports from e2e by relative path',
     file: simFile,
-    code: "import '../../../e2e/smoke.spec';",
+    code: "import '../../../e2e/scene.spec';",
     rule: IMPORTS,
   },
   {
@@ -75,6 +70,30 @@ const cases: Case[] = [
   { name: 'bots imports three', file: botsFile, code: "import 'three';", rule: IMPORTS },
   { name: 'bots imports sim', file: botsFile, code: "import '@claudeline/sim';", rule: null },
   { name: 'bots imports from tests by relative path', file: botsFile, code: "import '../../../tests/x';", rule: IMPORTS },
+  {
+    name: 'bots imports sim through packages by relative path',
+    file: botsFile,
+    code: "import '../../../packages/sim/src/index';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'bots imports a future package through packages by relative path',
+    file: botsFile,
+    code: "import '../../../packages/protocol/src/index';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'bots imports sim internals by relative path',
+    file: botsFile,
+    code: "import '../../sim/src/collision';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'bots imports a sibling file with sim in its name',
+    file: botsFile,
+    code: "import './simplify';",
+    rule: null,
+  },
   {
     name: 'sim test imports from tests by relative path',
     file: simTestFile,
