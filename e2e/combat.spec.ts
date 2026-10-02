@@ -324,10 +324,24 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
       phase(`measured window ${window + 1}`);
+      console.log(`PROBE volley ${WARM_UP_VOLLEYS + 1} window ${window + 1}: combat ${allocations.combat} ${JSON.stringify(allocations.combatByFunction)} total ${allocations.total}`);
       sawGarbage = Math.max(sawGarbage, allocations.total);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
     }
     hooks = await readHooks(page);
+    // EXPLORATION, to be removed: how many more volleys until the figure is clean.
+    for (let volley = WARM_UP_VOLLEYS + 2; volley <= 12; volley++) {
+      await runWindow(page);
+      await runWindow(page);
+      await fireVolley(page);
+      await runWindow(page);
+      for (let window = 0; window < MEASURED_WINDOWS; window++) {
+        const a = await allocationsOverAWindow(page, cdp);
+        console.log(`PROBE volley ${volley} window ${window + 1}: combat ${a.combat} ${JSON.stringify(a.combatByFunction)} total ${a.total}`);
+      }
+      await runWindow(page);
+      await runWindow(page);
+    }
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
     expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);
