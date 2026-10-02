@@ -98,7 +98,7 @@ describe('buildNavGrid on arena01', () => {
 
   it('keeps all six spawn points in free cells', () => {
     const spawns = [...arena01.spawns.teamA, ...arena01.spawns.teamB];
-    const expected = [
+    const expected: [number, number][] = [
       [6, 24],
       [6, 16],
       [6, 20],
