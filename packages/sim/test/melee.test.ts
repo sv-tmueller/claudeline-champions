@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch } from '../src/index';
 import type { Effect, GameState } from '../src/index';
+import { direction } from '../src/geometry';
 import { meleeArc } from '../src/melee';
 import type { MeleeArcSpec } from '../src/melee';
 import { champion, config2v2, openArena, place } from './helpers';
@@ -99,6 +100,18 @@ describe('meleeArc targets', () => {
     place(state, 0, 0, 0);
     place(state, 2, 2, 0);
     expect(meleeArc(state, arc())).toEqual([2]);
+  });
+
+  it('hits a target exactly behind the owner with a cosine of -1, whatever the direction', () => {
+    const state = open();
+    // The dot product with this oblique unit direction is -|d| only up to rounding: at 1.3 and
+    // 1.9 m a plain `dot >= -1 * |d|` test misses the target, so the -1 shortcut must stay.
+    const dir = direction(0.3, 0.7)!;
+    place(state, 3, 9, 9);
+    for (const behind of [1.3, 1.9]) {
+      place(state, 2, -behind * dir.x, -behind * dir.y);
+      expect(meleeArc(state, arc({ dirX: 0.3, dirY: 0.7, cosHalfAngle: -1 })), `${behind} m`).toEqual([2]);
+    }
   });
 
   it('may be swung by a dead owner', () => {
