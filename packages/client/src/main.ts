@@ -123,9 +123,11 @@ function sampleAim(): void {
 }
 
 // The text of every tick up to ten minutes, made once at startup. The tick
-// hook changes on every tick and the e2e tests read it to pace themselves, and
-// a number-to-string per tick cost about 2.9 KB of garbage per 500 ms in the
-// heap probe in e2e/combat.spec.ts. Past the table it falls back to String().
+// hook changes on every tick and the e2e tests read it to pace themselves. A
+// change-guarded String(state.tick) instead read about 256 B of garbage per
+// measurement window in the heap probe in e2e/combat.spec.ts (PR #42 tester
+// round 2), right at its limit, so the table stays. It costs about 1.24 MB once.
+// Past the table it falls back to String().
 const TICK_TEXT_COUNT = 36_000;
 const TICK_TEXT: string[] = [];
 for (let tick = 0; tick < TICK_TEXT_COUNT; tick++) TICK_TEXT.push(String(tick));
