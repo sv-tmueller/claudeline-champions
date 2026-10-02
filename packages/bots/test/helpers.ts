@@ -1,6 +1,21 @@
 import arena01Json from '../../../data/arenas/arena01.json';
-import { CHAMPION_RADIUS, createMatch, hasLineOfSight, parseArenaDef, step } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, MatchConfig, PlayerInput } from '@claudeline/sim';
+import {
+  Button,
+  CHAMPION_RADIUS,
+  SLOTS,
+  createMatch,
+  hasLineOfSight,
+  parseArenaDef,
+  step,
+} from '@claudeline/sim';
+import type {
+  ArenaDef,
+  ChampionState,
+  GameState,
+  KitDef,
+  MatchConfig,
+  PlayerInput,
+} from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import type { Difficulty } from '../src/difficulty';
@@ -17,8 +32,14 @@ function validAxis(v: number): boolean {
   return (v === 1 || v === -1 || v === 0) && !Object.is(v, -0);
 }
 
-/** The input rules every bot input must meet: eight-direction axes, whole-centimetre aim, no buttons. */
-export function validInput(input: PlayerInput): boolean {
+const SLOT_BITS: readonly number[] = SLOTS.map((slot) => Button[slot]);
+
+/**
+ * The input rules every bot input must meet: eight-direction axes, whole-centimetre aim, and
+ * buttons. Without a kit the buttons are 0. With the champion's kit they are 0 or exactly one slot
+ * bit, with SHIFT only together with a slot of `kit.ex` that has an EX variant, never with F.
+ */
+export function validInput(input: PlayerInput, kit?: KitDef): boolean {
   return (
     validAxis(input.moveX) &&
     validAxis(input.moveY) &&
@@ -26,8 +47,26 @@ export function validInput(input: PlayerInput): boolean {
     Number.isInteger(input.aimY) &&
     !Object.is(input.aimX, -0) &&
     !Object.is(input.aimY, -0) &&
-    input.buttons === 0
+    validButtons(input.buttons, kit)
   );
+}
+
+function validButtons(buttons: number, kit: KitDef | undefined): boolean {
+  if (kit === undefined) return buttons === 0;
+  if (buttons === 0) return true;
+  const shift = (buttons & Button.SHIFT) !== 0;
+  const pressed = SLOTS.filter((slot) => (buttons & Button[slot]) !== 0);
+  const known = SLOT_BITS.reduce((mask, bit) => mask | bit, Button.SHIFT);
+  if ((buttons & ~known) !== 0 || pressed.length !== 1) return false;
+  const slot = pressed[0];
+  if (slot === undefined) return false;
+  if (!shift) return true;
+  return slot !== 'F' && kit.ex.includes(slot) && kit.slots[slot].ex !== undefined;
+}
+
+/** The kit of a champion, found by championId as the sim does; undefined for a champion without one. */
+export function kitOf(state: GameState, c: ChampionState): KitDef | undefined {
+  return state.kits.find((kit) => kit.id === c.championId);
 }
 
 // A copy of the sim's test helper: bots tests must not reach into sim tests.
@@ -39,6 +78,19 @@ export function config2v2(): MatchConfig {
       { championId: 'quillon', team: 'A' },
       { championId: 'lumeth', team: 'B' },
       { championId: 'skerrow', team: 'B' },
+    ],
+  };
+}
+
+/** Hargrim A, Quillon A, Hargrim B, Quillon B: both kits on both teams. */
+export function configMirror(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'quillon', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
     ],
   };
 }
@@ -149,12 +201,18 @@ export interface MatchRun {
   advance(): PlayerInput[];
 }
 
+export interface RunOptions {
+  config?: MatchConfig;
+  kits?: readonly KitDef[];
+}
+
 export function createRun(
   botSeeds: readonly number[],
   tiers: readonly Difficulty[],
   matchSeed = 7,
+  options: RunOptions = {},
 ): MatchRun {
-  const state = createMatch(config2v2(), arena01, matchSeed);
+  const state = createMatch(options.config ?? config2v2(), arena01, matchSeed, options.kits ?? []);
   const bots = state.champions.map((c) => {
     const seed = botSeeds[c.id];
     const tier = tiers[c.id];
@@ -183,8 +241,9 @@ export function runMatch(
   onTick?: (run: MatchRun, tick: number, tickInputs: PlayerInput[]) => void,
   before?: (run: MatchRun, tick: number) => void,
   matchSeed = 7,
+  options: RunOptions = {},
 ): MatchRun {
-  const run = createRun(botSeeds, tiers, matchSeed);
+  const run = createRun(botSeeds, tiers, matchSeed, options);
   for (let tick = 0; tick < ticks; tick++) {
     before?.(run, tick);
     const tickInputs = run.advance();
