@@ -52,7 +52,55 @@ const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
 // Anything counted at all proves the profiler saw the sim's own garbage.
 const PROFILER_SANITY_BYTES = 100_000;
 
+// Phase timing for the CI investigation: frames run and hook reads so far.
+let framesRun = 0;
+let hookReads = 0;
+let phaseStart = Date.now();
+let phaseFrames = 0;
+let phaseReads = 0;
+let frameMs = 0;
+let readMs = 0;
+let phaseFrameMs = 0;
+let phaseReadMs = 0;
+
+/** One frame of fake time, timed on its own. Logs every 25 frames so a timeout still leaves figures. */
+async function runFrame(page: Page): Promise<void> {
+  framesRun++;
+  const t0 = Date.now();
+  await page.clock.runFor(FRAME_MS);
+  frameMs += Date.now() - t0;
+  if (framesRun % 25 === 0) {
+    console.log(`PROGRESS frame ${framesRun}: frames ${frameMs} ms, reads ${readMs} ms over ${hookReads} reads`);
+  }
+}
+
+/** Logs the wall-clock ms, frames and hook reads since the last phase line. */
+function phase(label: string): void {
+  const now = Date.now();
+  const ms = now - phaseStart;
+  const frames = framesRun - phaseFrames;
+  const reads = hookReads - phaseReads;
+  const fMs = frameMs - phaseFrameMs;
+  const rMs = readMs - phaseReadMs;
+  console.log(
+    `PHASE ${label}: ${ms} ms, ${frames} frames (${fMs} ms, ${frames ? (fMs / frames).toFixed(1) : '-'} ms/frame), ${reads} reads (${rMs} ms, ${reads ? (rMs / reads).toFixed(1) : '-'} ms/read)`,
+  );
+  phaseFrameMs = frameMs;
+  phaseReadMs = readMs;
+  phaseStart = now;
+  phaseFrames = framesRun;
+  phaseReads = hookReads;
+}
+
 async function readHooks(page: Page): Promise<Hooks> {
+  hookReads++;
+  const t0 = Date.now();
+  const result = await readHooksRaw(page);
+  readMs += Date.now() - t0;
+  return result;
+}
+
+async function readHooksRaw(page: Page): Promise<Hooks> {
   return page.evaluate(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) throw new Error('no canvas');
@@ -86,7 +134,7 @@ async function runUntil(
     expect(hooks.tick - start, `${label}: not reached within ${budgetTicks} ticks`).toBeLessThanOrEqual(
       budgetTicks,
     );
-    await page.clock.runFor(FRAME_MS);
+    await runFrame(page);
   }
 }
 
@@ -135,7 +183,9 @@ const MEASURED_WINDOWS = 3;
 
 /** Runs one window of frames, 500 ms of fake time. */
 async function runWindow(page: Page): Promise<void> {
-  for (let frame = 0; frame < WINDOW_FRAMES; frame++) await page.clock.runFor(FRAME_MS);
+  for (let frame = 0; frame < WINDOW_FRAMES; frame++) {
+    await runFrame(page);
+  }
 }
 
 /** Eight shots in the same frame. */
@@ -161,6 +211,9 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
   const { problems, failed } = watchProblems(page);
+  phaseStart = Date.now();
+  phaseFrames = framesRun;
+  phaseReads = hookReads;
 
   try {
     // 1. A paused clock, so every frame below is one the test ran.
@@ -170,6 +223,7 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     await page.clock.pauseAt(PAUSE_AT_MS);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.enable');
+    phase('load');
 
     // 2. The baseline picture has no flash and no ring.
     const baseline = await countPixels(page, await page.screenshot(), [WHITE, RING]);
@@ -192,6 +246,7 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     hooks = await readHooks(page);
     expect(hooks.projectiles).toBe(SHOTS);
     expect(hooks.debugShots).toBe(SHOTS);
+    phase('eight shots');
 
     // 4. The first hit: the picture shows a white champion and a yellow ring.
     hooks = await runUntil(page, 'the first hit', 200, (h) => h.hits >= 1);
@@ -204,17 +259,20 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.flashing).toContain(String(TARGET));
     expect(hooks.bars[TARGET]).toBe(String(100 - 25 * hooks.hits));
     expect(hooks.rings, 'a ring shows right after the hit').toBeGreaterThanOrEqual(1);
+    phase('first hit');
 
     // 5. The fourth hit kills it, and its bar goes away.
     hooks = await runUntil(page, 'the death', 60, (h) => h.deaths >= 1);
     expect(hooks.deaths).toBe(1);
     expect(hooks.bars[TARGET]).toBe('x');
+    phase('death');
 
     // 6. The other shots pass through the dead champion and end at the east
     // boundary, and their views end with them.
     hooks = await runUntil(page, 'the last projectile', 60, (h) => h.projectiles === 0);
     expect(hooks.hits).toBe(4);
     expect(hooks.areas).toBe(0);
+    phase('last projectile');
 
     // 7. Every ring ends. Only the draw call retires a ring, so a ring that
     // never grows and fades stays on screen and this fails. The last shot just
@@ -222,6 +280,7 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.rings, 'a ring shows for the last shot').toBeGreaterThanOrEqual(1);
     hooks = await runUntil(page, 'the rings to end', RING_TICKS + RING_SLACK_TICKS, (h) => h.rings === 0);
     expect(hooks.rings).toBe(0);
+    phase('rings');
 
     // 8. Steady state: eight shots in flight and nothing to hit, the loop at
     // its busiest. The shots pass through the dead champion 2. Code warmed up
@@ -232,13 +291,16 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     for (let volley = 0; volley < WARM_UP_VOLLEYS; volley++) {
       await fireVolley(page);
       for (let window = 0; window < WINDOWS_PER_FLIGHT; window++) await runWindow(page);
+      phase(`warm-up volley ${volley + 1}`);
     }
     await fireVolley(page);
     for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
+    phase('settle');
     let worst: Allocations | undefined;
     let sawGarbage = 0;
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
+      phase(`measured window ${window + 1}`);
       sawGarbage = Math.max(sawGarbage, allocations.total);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
     }
