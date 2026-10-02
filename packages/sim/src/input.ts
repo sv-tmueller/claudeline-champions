@@ -56,8 +56,9 @@ export function resolveInput(
   aimY: number,
 ): PlayerInput {
   // Anything that is not an object (null, a number, a string) counts as missing.
-  if (typeof input !== 'object' || input === null)
+  if (typeof input !== 'object' || input === null) {
     return { moveX: 0, moveY: 0, aimX, aimY, buttons: 0 };
+  }
   return {
     moveX: sanitizeAxis(input.moveX),
     moveY: sanitizeAxis(input.moveY),
