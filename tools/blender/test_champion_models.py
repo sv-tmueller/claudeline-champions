@@ -22,7 +22,9 @@ CHUNK_BIN = 0x004E4942
 IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow"}
 ROSTER = ("hargrim", "quillon", "lumeth", "skerrow")
 
-MAX_TOP = 1.90  # the health bar's back starts at about 1.97 m
+# The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
+# = 1.97 m (health-bars.ts), so a model must end below that.
+MAX_TOP = 1.90
 MAX_GROUND_RADIUS = 0.50
 MAX_BYTES = 48 * 1024
 MAX_TRIANGLES = 600
@@ -35,7 +37,8 @@ MIN_DISTANCE = 80
 # packages/client/src: ALLY_BAR_COLOUR and ENEMY_BAR_COLOUR (health-bars.ts),
 # RING_COLOUR (impact-rings.ts), DEAD_COLOUR (champion-look.ts),
 # PROJECTILE_ALLY_COLOUR and PROJECTILE_ENEMY_COLOUR (entity-views.ts), the
-# white hit flash (champion-look.ts) and the debug overlay line (debug-overlay.ts).
+# FLASH_COLOUR (champion-look.ts, the white hit flash) and the debug overlay line
+# (debug-overlay.ts).
 # The client may change them, so update this list in the same change.
 CLIENT_COLOURS = {
     "ally bar": (0x3D, 0xDC, 0x84),
@@ -69,20 +72,6 @@ def split_glb(data):
     return doc, bin_chunk
 
 
-def pack_glb(doc, bin_chunk):
-    text = json.dumps(doc).encode("utf-8")
-    text += b" " * (-len(text) % 4)
-    binary = bytes(bin_chunk) + b"\0" * (-len(bin_chunk) % 4)
-    total = 12 + 8 + len(text) + 8 + len(binary)
-    return (
-        struct.pack("<4sII", b"glTF", 2, total)
-        + struct.pack("<II", len(text), CHUNK_JSON)
-        + text
-        + struct.pack("<II", len(binary), CHUNK_BIN)
-        + binary
-    )
-
-
 def accessor_location(doc, index):
     """Return (byte offset in the BIN chunk, count) of a POSITION accessor."""
     accessor = doc["accessors"][index]
@@ -111,7 +100,12 @@ def triangle_count(doc):
 
 
 def material_name(doc, primitive):
-    return doc["materials"][primitive["material"]]["name"]
+    """The material's name, or None when the primitive has no valid material."""
+    index = primitive.get("material")
+    materials = doc.get("materials", [])
+    if not isinstance(index, int) or not 0 <= index < len(materials):
+        return None
+    return materials[index].get("name")
 
 
 def srgb8(linear):
@@ -123,6 +117,12 @@ def material_rgb8(doc, name):
     material = next(m for m in doc["materials"] if m["name"] == name)
     factor = material["pbrMetallicRoughness"]["baseColorFactor"]
     return tuple(srgb8(c) for c in factor[:3])
+
+
+def base_color_factor(doc, name):
+    """The raw linear baseColorFactor of a material, not 8-bit values."""
+    material = next(m for m in doc["materials"] if m["name"] == name)
+    return tuple(material["pbrMetallicRoughness"]["baseColorFactor"])
 
 
 def distance(a, b):
@@ -160,6 +160,10 @@ def contract_problems(doc, bin_chunk):
 
     ys, radii, accent_xs = [], [], []
     for primitive in primitives(doc):
+        if "material" not in primitive:
+            problems.append("a primitive has no material")
+        elif material_name(doc, primitive) is None:
+            problems.append("a primitive's material index out of range")
         is_accent = material_name(doc, primitive) == "accent"
         for x, y, z in positions(doc, bin_chunk, primitive):
             ys.append(y)
@@ -231,7 +235,7 @@ class CommittedChampionTests(unittest.TestCase):
                 self.assertLessEqual(path.stat().st_size, MAX_BYTES)
 
     def test_the_accent_is_the_same_in_every_file(self):
-        accents = {path.name: material_rgb8_exact(load(path)[0], "accent") for path in champion_paths()}
+        accents = {path.name: base_color_factor(load(path)[0], "accent") for path in champion_paths()}
         self.assertEqual(len(set(accents.values())), 1, accents)
 
     def test_no_body_colour_can_read_as_the_debug_overlay(self):
@@ -260,11 +264,6 @@ class CommittedChampionTests(unittest.TestCase):
                     )
 
 
-def material_rgb8_exact(doc, name):
-    material = next(m for m in doc["materials"] if m["name"] == name)
-    return tuple(material["pbrMetallicRoughness"]["baseColorFactor"])
-
-
 class ContractCheckTests(unittest.TestCase):
     """Each check must be able to fail, so a broken model cannot pass in CI."""
 
@@ -280,9 +279,13 @@ class ContractCheckTests(unittest.TestCase):
     def test_placeholder_has_no_problems(self):
         self.assertEqual(contract_problems(self.doc, self.bin), [])
 
-    def test_survives_a_pack_and_split_round_trip(self):
-        doc, bin_chunk = split_glb(pack_glb(self.doc, self.bin))
-        self.assertEqual(contract_problems(doc, bin_chunk), [])
+    def test_rejects_a_dangling_material_index(self):
+        primitives(self.doc)[0]["material"] = 7
+        self.assertProblem("material index out of range")
+
+    def test_rejects_a_primitive_without_a_material(self):
+        del primitives(self.doc)[0]["material"]
+        self.assertProblem("primitive has no material")
 
     def test_rejects_a_translation_on_the_node(self):
         self.doc["nodes"][0]["translation"] = [1, 0, 0]
