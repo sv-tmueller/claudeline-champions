@@ -201,11 +201,14 @@ spec)` and `spawnArea(state, spec)`, which return the new entity id, and
 `health.ts` exports `applyDamage`, `applyHeal` and `applyEffects`. They are not
 part of the package index: kits will call them when abilities arrive. A spawn
 throws `Error('Invalid projectile: ...')` or `Error('Invalid area: ...')` on an
-unknown owner, a non-finite number, a zero direction or one too large to
-measure (beyond about 1e154), a speed or radius at or below 0, a lifetime,
-duration or interval that is not a positive integer, a projectile `pierce` that
-is not a boolean, `effects` that is not an array, an effect of an unknown type,
-or an effect amount at or below 0. A dead owner may still spawn.
+unknown owner, a non-finite number, a zero direction, a direction too large to
+measure (a component beyond about 1.3e154, the square root of the largest
+double) or too small to measure (both components below 1e-150 in magnitude but
+not both zero, since the squares inside the length turn subnormal below about
+1.5e-154), a speed or radius at or below 0, a lifetime, duration or interval
+that is not a positive integer, a projectile `pierce` that is not a boolean,
+`effects` that is not an array, an effect of an unknown type, or an effect
+amount at or below 0. A dead owner may still spawn.
 
 ## Statuses
 
@@ -266,12 +269,14 @@ Enforced by review, lint and tests.
 2. All time is integer ticks. All durations in config are converted to ticks
    once, at `createMatch`.
 3. Iterate arrays in index order; never iterate object keys for gameplay logic.
-4. The sim uses only correctly rounded operations (`+ - * /`, `Math.sqrt`) and
-   the deterministic ports in `dmath.ts`. V8's `Math.atan2`, `Math.sin` and
-   `Math.cos` differ in the last bit across CPU architectures (x86 Linux and
-   ARM macOS) and are never used in the sim; a committed bit-pattern fixture
-   checks the `atan2` port on every CI run. Guard against `NaN`: tests assert
-   `checksum` is finite and that no position or health is `NaN`.
+4. The sim uses only correctly rounded operations (`+ - * /`, `Math.sqrt`),
+   the exact helpers `Math.abs`, `Math.round`, `Math.min`, `Math.max` and
+   `Math.imul`, and the deterministic ports in `dmath.ts`. V8's `Math.atan2`,
+   `Math.sin` and `Math.cos` differ in the last bit across CPU architectures
+   (x86 Linux and ARM macOS) and are never used in the sim; a committed
+   bit-pattern fixture checks the `atan2` port on every CI run. Guard against
+   `NaN`: tests assert `checksum` is finite and that no position or health is
+   `NaN`.
 5. Recorded input replays with expected checksums are committed as fixtures.
    Changing gameplay intentionally means regenerating the fixture in the same
    change.
