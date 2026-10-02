@@ -2,7 +2,7 @@ import { CHAMPION_RADIUS } from './constants';
 import { direction, length } from './geometry';
 import { landHit } from './energy';
 import { copyEffects } from './health';
-import type { Effect, GameState } from './state';
+import type { CastRecord, Effect, GameState } from './state';
 
 export interface MeleeArcSpec {
   ownerId: number;
@@ -46,8 +46,16 @@ export function meleeArc(state: GameState, spec: MeleeArcSpec): number[] {
   }
   const effects = copyEffects(spec.effects, fail);
   const castId = spec.castId ?? null;
-  if (castId !== null && !state.casts.some((c) => c.id === castId)) {
-    return fail(`unknown cast ${castId}`);
+  if (castId !== null) {
+    // A plain loop: a closure over `castId` here would allocate on every arc.
+    const { casts } = state;
+    let known = false;
+    for (let i = 0; i < casts.length; i++) {
+      if ((casts[i] as CastRecord).id !== castId) continue;
+      known = true;
+      break;
+    }
+    if (!known) return fail(`unknown cast ${castId}`);
   }
 
   const reach = spec.radius + CHAMPION_RADIUS;
