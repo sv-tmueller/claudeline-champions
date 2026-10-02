@@ -1,0 +1,45 @@
+{
+  "format": 1,
+  "arena": "arena01",
+  "seed": 4242,
+  "config": {
+    "teamSize": 2,
+    "players": [
+      { "championId": "hargrim", "team": "A" },
+      { "championId": "quillon", "team": "A" },
+      { "championId": "lumeth", "team": "B" },
+      { "championId": "skerrow", "team": "B" }
+    ]
+  },
+  "ticks": 600,
+  "segments": [
+    { "ticks": 40, "inputs": [[0,0,1100,200,0],[0,0,1100,-200,1],[0,0,-1100,200,0],[0,0,-1100,-200,0]] },
+    { "ticks": 33, "inputs": [[0,0,1100,200,0],[0,0,1100,-200,0],[0,1,-1100,500,2],[0,0,-1100,-200,0]] },
+    { "ticks": 48, "inputs": [[0,0,1100,200,0],null,[0,0,-1100,500,0],[0,0,-1100,-200,0]] },
+    { "ticks": 100, "inputs": [[1,0,1100,200,0],[1,1,1100,-200,0],[-1,0,-1100,500,0],[-1,1,-1100,-200,4]] },
+    { "ticks": 120, "inputs": [[1,1,0,900,1],[0,-1,300,-900,0],[0,-1,-1400,100,0],[1,0,500,500,0]] },
+    { "ticks": 140, "inputs": [[-1,0,-300,0,0],null,[1,1,0,0,2],[-1,-1,0,0,0]] },
+    { "ticks": 119, "inputs": [[0,1,0,500,0],[1,0,500,0,0],[0,0,0,0,0],[1,-1,0,0,8]] }
+  ],
+  "actions": [
+    { "tick": 0, "type": "projectile", "spec": { "ownerId": 0, "x": 12, "y": -8, "dirX": 0, "dirY": 1, "speed": 25, "radius": 0.2, "lifetimeTicks": 90, "pierce": true, "effects": [{ "type": "damage", "amount": 15 }] } },
+    { "tick": 5, "type": "area", "spec": { "ownerId": 0, "x": 0, "y": -9, "radius": 1, "durationTicks": 60, "intervalTicks": 30, "targets": "enemies", "effects": [{ "type": "damage", "amount": 4 }] } },
+    { "tick": 10, "type": "area", "spec": { "ownerId": 0, "x": -12, "y": 0, "radius": 3, "durationTicks": 40, "intervalTicks": 20, "targets": "all", "effects": [{ "type": "damage", "amount": 3 }] } },
+    { "tick": 14, "type": "projectile", "spec": { "ownerId": 1, "x": -9, "y": -5, "dirX": 1, "dirY": 0, "speed": 25, "radius": 0.2, "lifetimeTicks": 60, "pierce": false, "effects": [{ "type": "damage", "amount": 10 }] } },
+    { "tick": 20, "type": "projectile", "spec": { "ownerId": 0, "x": -12, "y": -8, "dirX": 1, "dirY": 0, "speed": 10, "radius": 0.2, "lifetimeTicks": 30, "pierce": false, "effects": [{ "type": "damage", "amount": 10 }] } },
+    { "tick": 50, "type": "projectile", "spec": { "ownerId": 1, "x": -10, "y": 5, "dirX": 1, "dirY": 0, "speed": 25, "radius": 0.2, "lifetimeTicks": 120, "pierce": false, "effects": [{ "type": "damage", "amount": 10 }] } },
+    { "tick": 110, "type": "heal", "spec": { "targetId": 2, "amount": 50, "sourceId": 3 } },
+    { "tick": 120, "type": "damage", "spec": { "targetId": 3, "amount": 200, "sourceId": 0 } },
+    { "tick": 130, "type": "projectile", "spec": { "ownerId": 0, "x": 4, "y": -2, "dirX": 1, "dirY": 0, "speed": 25, "radius": 0.2, "lifetimeTicks": 60, "pierce": false, "effects": [{ "type": "damage", "amount": 10 }] } },
+    { "tick": 200, "type": "area", "spec": { "ownerId": 2, "x": 12, "y": 5, "radius": 4, "durationTicks": 60, "intervalTicks": 20, "targets": "allies", "effects": [{ "type": "heal", "amount": 5 }] } }
+  ],
+  "checkpoints": [
+    { "tick": 100, "checksum": 2358508535 },
+    { "tick": 200, "checksum": 3369567957 },
+    { "tick": 300, "checksum": 2315406940 },
+    { "tick": 400, "checksum": 2231492004 },
+    { "tick": 500, "checksum": 4006117541 },
+    { "tick": 600, "checksum": 1791505886 }
+  ],
+  "checksum": 1791505886
+}
