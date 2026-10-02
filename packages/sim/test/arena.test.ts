@@ -82,6 +82,7 @@ describe('parseArenaDef', () => {
       'obstacles[0].blocksProjectiles: expected a boolean, got string',
     );
   });
+
   it('rejects a non-positive obstacle height', () => {
     for (const height of [0, -1]) {
       const data = clone();
