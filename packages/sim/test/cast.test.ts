@@ -443,16 +443,20 @@ describe('interrupts', () => {
     expect(state.casts).toEqual([]);
   });
 
-  it('death drops the cast', () => {
+  it('death drops the cast with no refund', () => {
     const state = windingQ();
-    run(state, 3, (tick) => [input(0, 0, 1000, 0, tick === 0 ? Q : 0)]);
+    champion(state, 0).energy = 50;
+    run(state, 3, (tick) => [input(0, 0, 1000, 0, tick === 0 ? Q | SHIFT : 0)]);
+    expect(champion(state, 0).energy).toBe(25);
     state.events.length = 0;
     applyDamage(state, 0, 1000, 2);
     expect(state.events.map((e) => e.type)).toEqual(['damage', 'death', 'castInterrupted']);
-    expect(state.events[2]).toMatchObject({ reason: 'death', slot: 'Q', ex: false, castId: 4 });
+    expect(state.events[2]).toMatchObject({ reason: 'death', slot: 'Q', ex: true, castId: 4 });
     expect(champion(state, 0).cast).toBeNull();
+    expect(champion(state, 0).energy).toBe(25);
     const log = run(state, 20, hold(0));
     expect(of(log, 'castFired')).toEqual([]);
+    expect(champion(state, 0).energy).toBe(25);
     expect(state.casts).toEqual([]);
   });
 
@@ -853,8 +857,12 @@ describe('resetAbilityState', () => {
     const projectile: AbilityEffect = {
       type: 'projectile', speed: 10, radius: 0.3, lifetimeTicks: 50, pierce: false, effects: [{ type: 'damage', amount: 1 }],
     };
+    const area: AbilityEffect = {
+      type: 'area', placement: { type: 'self' }, radius: 1, durationTicks: 50, intervalTicks: 10, targets: 'enemies',
+      effects: [{ type: 'damage', amount: 1 }],
+    };
     const state = solo({
-      E: quiet({ effects: [projectile] }),
+      E: quiet({ effects: [projectile, area] }),
       Q: quiet({ windupTicks: 20 }),
       SPACE: quiet({ effects: [{ type: 'dash', distance: 9, ticks: 9, then: [] }] }),
     });
@@ -864,6 +872,7 @@ describe('resetAbilityState', () => {
     expect(champion(state, 0).cast).not.toBeNull();
     expect(champion(state, 0).dash).not.toBeNull();
     expect(state.projectiles[0]?.castId).toBe(4);
+    expect(state.areas[0]?.castId).toBe(4);
     const { x, health } = champion(state, 0);
     state.events.length = 0;
 
@@ -877,11 +886,14 @@ describe('resetAbilityState', () => {
     expect(state.casts).toEqual([]);
     expect(state.projectiles).toHaveLength(1);
     expect(state.projectiles[0]?.castId).toBeNull();
+    expect(state.areas).toHaveLength(1);
+    expect(state.areas[0]?.castId).toBeNull();
     expect(state.kits).toHaveLength(1);
     expect(state.events).toEqual([]);
     expect([champion(state, 0).x, champion(state, 0).health]).toEqual([x, health]);
     // The state still runs: nothing refers to a dropped cast.
     for (let i = 0; i < 60; i++) step(state, []);
     expect(state.projectiles).toEqual([]);
+    expect(state.areas).toEqual([]);
   });
 });

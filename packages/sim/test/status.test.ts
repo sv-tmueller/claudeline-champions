@@ -905,7 +905,7 @@ describe('stun and a windup', () => {
     expect(state.events.some((e) => e.type === 'castInterrupted')).toBe(false);
   });
 
-  it('is not interrupted by a stun that invulnerable blocks or a shorter stun does not replace', () => {
+  it('is not interrupted by a stun that invulnerable blocks or that lands on a dead champion', () => {
     const blocked = winding();
     applyStatus(blocked, 2, { type: 'invulnerable', ticks: 40 }, NONE);
     expect(applyStatus(blocked, 2, { type: 'stun', ticks: 40 }, NONE)).toBe(false);
