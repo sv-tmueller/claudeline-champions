@@ -87,12 +87,49 @@ describe('startDash', () => {
       dashOf(3, 0),
       dashOf(3, 1.5),
       dashOf(3, NaN),
+      dashOf(3, 36001),
+      dashOf(3, 1e300),
+      dashOf(5e-324, 2),
+      dashOf(1e-7, 6),
     ];
     for (const spec of bad) {
       expect(() => startDash(state, 0, spec), JSON.stringify(spec)).toThrow(/^Invalid dash: /);
     }
     expect(champion(state, 0).dash).toBeNull();
     expect(state.events).toEqual([]);
+  });
+});
+
+describe('dash bounds', () => {
+  it('rejects ticks above the status bound with the same message as a knockback', () => {
+    const state = open();
+    for (const ticks of [36001, 9007199254740994, 1e300]) {
+      expect(() => startDash(state, 0, dashOf(3, ticks))).toThrow(
+        `Invalid dash: ticks ${String(ticks)} is not an integer from 1 to 36000`,
+      );
+    }
+    expect(champion(state, 0).dash).toBeNull();
+    expect(state.events).toEqual([]);
+  });
+
+  it('runs a dash of 36000 ticks to the end', () => {
+    const state = open();
+    expect(startDash(state, 0, dashOf(3, 36000))).toBe(true);
+    state.events.length = 0;
+    for (let i = 1; i < 36000; i++) step(state, []);
+    expect(champion(state, 0).dash).toMatchObject({ ticksLeft: 1 });
+    step(state, []);
+    expect(champion(state, 0).dash).toBeNull();
+    expect(state.events).toMatchObject([{ type: 'dashEnded', reason: 'complete' }]);
+    expect(champion(state, 0).x).toBeCloseTo(3, 9);
+  });
+
+  it('accepts the smallest distance and keeps a positive step length at the most ticks', () => {
+    const state = open();
+    expect(startDash(state, 0, dashOf(1e-6, 36000))).toBe(true);
+    expect(champion(state, 0).dash!.stepLength).toBeGreaterThan(0);
+    expect(champion(state, 0).dash!.stepLength).toBe(1e-6 / 36000);
+    expect(checkInvariants(state)).toEqual([]);
   });
 });
 
@@ -439,6 +476,34 @@ describe('teleport', () => {
     for (const [x, y] of [[NaN, 0], [0, Infinity], [-Infinity, 0]] as const) {
       expect(() => teleport(state, 0, x, y)).toThrow(/^Invalid teleport: /);
     }
+  });
+
+  it('throws Invalid teleport for a point farther than 1e9 m along an axis', () => {
+    const pillar: Obstacle = { type: 'circle', x: 5, y: 0, r: 1, height: 1, blocksProjectiles: true };
+    const state = open([pillar]);
+    expect(teleport(state, 0, 10, 0)).toBe(false);
+    state.events.length = 0;
+    for (const [x, y] of [[1e200, 0], [0, -1e200], [1e9 + 1, 0], [0, -(1e9 + 1)], [1e308, 1e308]] as const) {
+      expect(() => teleport(state, 0, x, y), `${x}, ${y}`).toThrow(
+        /^Invalid teleport: point is more than 1000000000 m away$/,
+      );
+    }
+    expect(champion(state, 0).x).toBe(0);
+    expect(state.events).toEqual([]);
+  });
+
+  it('measures the bound from the champion, so an offset start cannot overflow', () => {
+    const state = open();
+    place(state, 0, -9, 0);
+    expect(() => teleport(state, 0, 1e9 - 8, 0)).toThrow(/^Invalid teleport: /);
+    expect(teleport(state, 0, 1e9 - 9, 0)).toBe(true);
+  });
+
+  it('accepts a point exactly 1e9 m away and clamps it inside the arena', () => {
+    const state = open();
+    expect(teleport(state, 0, 0, 1e9)).toBe(true);
+    expect(champion(state, 0).y).toBeLessThan(100);
+    expect(checkInvariants(state)).toEqual([]);
   });
 
   it('keeps a running dash and the velocity, and stores +0', () => {

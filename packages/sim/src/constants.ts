@@ -20,3 +20,16 @@ export const MOTION_SUBSTEP_METERS = 0.25;
 export const MAX_STATUS_TICKS = 36000;
 /** Largest absorb, damage or heal per pulse, or knockback distance a spec may ask for. */
 export const MAX_MAGNITUDE = 1e6;
+/** No dash is longer than this; it keeps the substep loop short for any input. */
+export const MAX_DASH_DISTANCE = 1000;
+/**
+ * No dash is shorter than this. With at most `MAX_STATUS_TICKS` ticks the step length stays far
+ * above the subnormal range, so a running dash always moves.
+ */
+export const MIN_DASH_DISTANCE = 1e-6;
+/**
+ * A teleport may span at most this many meters along each axis, measured from the champion. The
+ * line of sight test squares each span, so the sum of squares is at most 2e18, far below the
+ * largest double (about 1.8e308), whatever the arena.
+ */
+export const MAX_TELEPORT_METERS = 1e9;

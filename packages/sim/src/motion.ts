@@ -1,22 +1,25 @@
 import { resolveChampion } from './collision';
-import { MOTION_SUBSTEP_METERS } from './constants';
+import {
+  MAX_DASH_DISTANCE,
+  MAX_TELEPORT_METERS,
+  MIN_DASH_DISTANCE,
+  MOTION_SUBSTEP_METERS,
+} from './constants';
 import { direction } from './geometry';
 import { hasLineOfSight } from './sight';
 import { endDash } from './state';
 import type { ChampionState, GameState } from './state';
-import { endStatus, hasStatus, isTicks } from './status';
+import { TICKS_PROBLEM, endStatus, hasStatus, isStatusTicks } from './status';
 
 export interface DashSpec {
   /** Direction of the dash; it is normalized here, so it must not be zero. */
   dirX: number;
   dirY: number;
-  /** Total meters over `ticks`, at most `MAX_DASH_DISTANCE`. */
+  /** Total meters over `ticks`, from `MIN_DASH_DISTANCE` to `MAX_DASH_DISTANCE`. */
   distance: number;
+  /** Ticks the dash lasts, from 1 to `MAX_STATUS_TICKS`. */
   ticks: number;
 }
-
-/** No dash is longer than this; it keeps the substep loop short for any input. */
-export const MAX_DASH_DISTANCE = 1000;
 
 function fail(what: 'dash' | 'teleport', problem: string): never {
   throw new Error(`Invalid ${what}: ${problem}`);
@@ -42,10 +45,14 @@ export function startDash(state: GameState, championId: number, spec: DashSpec):
   }
   const dir = direction(spec.dirX, spec.dirY);
   if (!dir) return fail('dash', 'direction is zero');
-  if (!Number.isFinite(spec.distance) || spec.distance <= 0 || spec.distance > MAX_DASH_DISTANCE) {
-    return fail('dash', `distance ${String(spec.distance)} is not a number from 0 to ${MAX_DASH_DISTANCE}`);
+  const { distance } = spec;
+  if (typeof distance !== 'number' || !(distance >= MIN_DASH_DISTANCE && distance <= MAX_DASH_DISTANCE)) {
+    return fail(
+      'dash',
+      `distance ${String(spec.distance)} is not a number from ${MIN_DASH_DISTANCE} to ${MAX_DASH_DISTANCE}`,
+    );
   }
-  if (!isTicks(spec.ticks)) return fail('dash', `ticks ${String(spec.ticks)} is not a positive integer`);
+  if (!isStatusTicks(spec.ticks)) return fail('dash', `ticks ${String(spec.ticks)} ${TICKS_PROBLEM}`);
   if (!target.alive) return false;
 
   endDash(state, target, 'replaced');
@@ -70,7 +77,8 @@ export function startDash(state: GameState, championId: number, spec: DashSpec):
 
 /**
  * Moves a champion to (toX, toY) at once if the straight line there clears every obstacle that
- * blocks projectiles; low walls do not block. Collision is then resolved at the destination with
+ * blocks projectiles; low walls do not block. The point may be at most `MAX_TELEPORT_METERS` away
+ * from the champion along each axis, or this throws. Collision is then resolved at the destination with
  * the start as the previous position, so the champion is pushed out of bodies and obstacles,
  * clamped inside the boundary, or left at the start when it cannot be cleared. The event carries
  * the position the champion ends at, which is the start for a blocked teleport. Returns false
@@ -79,9 +87,13 @@ export function startDash(state: GameState, championId: number, spec: DashSpec):
 export function teleport(state: GameState, championId: number, toX: number, toY: number): boolean {
   const target = champion(state, 'teleport', championId);
   if (!Number.isFinite(toX) || !Number.isFinite(toY)) return fail('teleport', 'point is not finite');
-  if (!target.alive) return false;
   const fromX = target.x;
   const fromY = target.y;
+  // Written as a negated comparison so that an infinite or NaN span fails too.
+  if (!(Math.abs(toX - fromX) <= MAX_TELEPORT_METERS && Math.abs(toY - fromY) <= MAX_TELEPORT_METERS)) {
+    return fail('teleport', `point is more than ${MAX_TELEPORT_METERS} m away`);
+  }
+  if (!target.alive) return false;
   const clear = hasLineOfSight(state, { x: fromX, y: fromY }, { x: toX, y: toY });
   if (clear) {
     target.x = toX + 0;
@@ -130,6 +142,8 @@ export function stepForcedMotion(state: GameState, champion: ChampionState): voi
   let pushed = false;
   const total = direction(dx, dy)?.length ?? 0;
   if (total > 0) {
+    // The substep count is the rounded quotient, plus one when that leaves a substep too long; it
+    // equals the ceiling of the quotient and needs no `Math.ceil`.
     let count = Math.max(1, Math.round(total / MOTION_SUBSTEP_METERS));
     if (total / count > MOTION_SUBSTEP_METERS) count += 1;
     const startX = champion.x;

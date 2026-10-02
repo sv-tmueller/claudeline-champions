@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   HASTE_CAP_PERCENT,
   KNOCKBACK_CAP_METERS,
+  MAX_DASH_DISTANCE,
   MAX_MAGNITUDE,
   MAX_STATUS_TICKS,
+  MAX_TELEPORT_METERS,
+  MIN_DASH_DISTANCE,
   MOTION_SUBSTEP_METERS,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
@@ -23,5 +26,11 @@ describe('status and motion constants', () => {
   it('holds the bounds on status, shield and knockback specs', () => {
     expect(MAX_STATUS_TICKS).toBe(36000);
     expect(MAX_MAGNITUDE).toBe(1e6);
+  });
+
+  it('holds the bounds on dash and teleport specs', () => {
+    expect(MAX_DASH_DISTANCE).toBe(1000);
+    expect(MIN_DASH_DISTANCE).toBe(1e-6);
+    expect(MAX_TELEPORT_METERS).toBe(1e9);
   });
 });
