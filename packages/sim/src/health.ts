@@ -37,15 +37,17 @@ function checkAmount(what: 'damage' | 'heal', amount: number): void {
 /**
  * Takes up to `amount` from the target and returns the health removed. Shields absorb first, in
  * array order, with one `shieldAbsorbed` event for the whole hit; a used-up shield ends as
- * `depleted`. An invulnerable target takes nothing. An amount too small to change the health
- * emits no damage event. Not a kit primitive: it is the building block projectiles, areas, melee
- * arcs and damage over time use.
+ * `depleted`. `ignoreShields` skips them all, for the ring (rules.md 1.1). An invulnerable target
+ * takes nothing either way. An amount too small to change the health emits no damage event. Not a
+ * kit primitive: it is the building block projectiles, areas, melee arcs, damage over time and the
+ * ring use.
  */
 export function applyDamage(
   state: GameState,
   targetId: number,
   amount: number,
   sourceId: number,
+  ignoreShields = false,
 ): number {
   const champion = target(state, 'damage', targetId);
   checkAmount('damage', amount);
@@ -53,21 +55,29 @@ export function applyDamage(
   if (hasStatus(champion, 'invulnerable')) return 0;
 
   let rest = amount;
-  let absorbed = 0;
-  let absorbLeft = 0;
-  const depleted: ChampionState['statuses'] = [];
-  for (const status of champion.statuses) {
-    if (status.type !== 'shield') continue;
-    const take = Math.min(status.absorb, rest);
-    status.absorb -= take;
-    rest -= take;
-    absorbed += take;
-    absorbLeft += status.absorb;
-    if (status.absorb === 0) depleted.push(status);
-  }
-  if (absorbed > 0) {
-    state.events.push({ type: 'shieldAbsorbed', targetId, sourceId, amount: absorbed, absorbLeft });
-    for (const shield of depleted) endStatus(state, champion, shield, 'depleted');
+  if (!ignoreShields) {
+    let absorbed = 0;
+    let absorbLeft = 0;
+    const depleted: ChampionState['statuses'] = [];
+    for (const status of champion.statuses) {
+      if (status.type !== 'shield') continue;
+      const take = Math.min(status.absorb, rest);
+      status.absorb -= take;
+      rest -= take;
+      absorbed += take;
+      absorbLeft += status.absorb;
+      if (status.absorb === 0) depleted.push(status);
+    }
+    if (absorbed > 0) {
+      state.events.push({
+        type: 'shieldAbsorbed',
+        targetId,
+        sourceId,
+        amount: absorbed,
+        absorbLeft,
+      });
+      for (const shield of depleted) endStatus(state, champion, shield, 'depleted');
+    }
   }
 
   const before = champion.health;

@@ -273,6 +273,69 @@ describe('damage and shields', () => {
   });
 });
 
+describe('damage that ignores shields', () => {
+  it('leaves a shield and its absorb alone and sends the whole amount to health', () => {
+    const state = open();
+    applyShield(state, 2, { absorb: 50, ticks: 200 }, SRC(2));
+    state.events.length = 0;
+    expect(applyDamage(state, 2, 20, -1, true)).toBe(20);
+    expect(champion(state, 2).health).toBe(100);
+    expect(champion(state, 2).statuses).toMatchObject([{ type: 'shield', absorb: 50 }]);
+    expect(state.events).toEqual([
+      { type: 'damage', targetId: 2, sourceId: -1, amount: 20, health: 100 },
+    ]);
+  });
+
+  it('emits no shieldAbsorbed and ends no shield, even one smaller than the hit', () => {
+    const state = open();
+    applyShield(state, 2, { absorb: 5, ticks: 200 }, SRC(2));
+    state.events.length = 0;
+    applyDamage(state, 2, 20, -1, true);
+    expect(state.events.map((e) => e.type)).toEqual(['damage']);
+    expect(champion(state, 2).statuses).toMatchObject([{ type: 'shield', absorb: 5 }]);
+  });
+
+  it('still kills, with the death carrying the source', () => {
+    const state = open();
+    applyShield(state, 2, { absorb: 500, ticks: 200 }, SRC(2));
+    champion(state, 2).health = 3;
+    state.events.length = 0;
+    expect(applyDamage(state, 2, 10, -1, true)).toBe(3);
+    expect(state.events.map((e) => e.type)).toEqual(['damage', 'death', 'statusExpired']);
+    expect(state.events[1]).toEqual({ type: 'death', targetId: 2, sourceId: -1 });
+    expect(champion(state, 2).alive).toBe(false);
+  });
+
+  it('is still blocked by invulnerable', () => {
+    const state = open();
+    applyStatus(state, 2, { type: 'invulnerable', ticks: 60 }, SRC(2));
+    state.events.length = 0;
+    expect(applyDamage(state, 2, 20, -1, true)).toBe(0);
+    expect(champion(state, 2).health).toBe(120);
+    expect(state.events).toEqual([]);
+  });
+
+  it('keeps the checks for an amount and a target', () => {
+    const state = open();
+    expect(() => applyDamage(state, 2, -1, -1, true)).toThrow('Invalid damage');
+    expect(() => applyDamage(state, 9, 1, -1, true)).toThrow('Invalid damage: unknown target 9');
+  });
+
+  it('absorbs as before when the flag is false or left out', () => {
+    for (const call of [
+      (s: GameState) => applyDamage(s, 2, 20, 0),
+      (s: GameState) => applyDamage(s, 2, 20, 0, false),
+    ]) {
+      const state = open();
+      applyShield(state, 2, { absorb: 50, ticks: 200 }, SRC(2));
+      state.events.length = 0;
+      expect(call(state)).toBe(0);
+      expect(champion(state, 2).statuses).toMatchObject([{ absorb: 30 }]);
+      expect(state.events.map((e) => e.type)).toEqual(['shieldAbsorbed']);
+    }
+  });
+});
+
 describe('invulnerable', () => {
   it('takes no damage: 0 back, no event, shields and health untouched', () => {
     const state = open();
