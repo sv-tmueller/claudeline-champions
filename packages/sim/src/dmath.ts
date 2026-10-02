@@ -7,10 +7,28 @@
 // rounds correctly on every platform and V8 never fuses, so the results are identical
 // everywhere by construction.
 //
-// The Sun copyright notice for the algorithms:
+// The Sun notices of the two files this is ported from, preserved as in the fdlibm sources
+// (FreeBSD msun copies), as the license requires.
+//
+// s_atan.c (`atan`):
+//   ====================================================
 //   Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
-//   Permission to use, copy, modify, and distribute this software is freely granted,
-//   provided that this notice is preserved.
+//
+//   Developed at SunPro, a Sun Microsystems, Inc. business.
+//   Permission to use, copy, modify, and distribute this
+//   software is freely granted, provided that this notice
+//   is preserved.
+//   ====================================================
+//
+// e_atan2.c (`atan2`):
+//   ====================================================
+//   Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+//   Developed at SunSoft, a Sun Microsystems, Inc. business.
+//   Permission to use, copy, modify, and distribute this
+//   software is freely granted, provided that this notice
+//   is preserved.
+//   ====================================================
 
 const f64 = new Float64Array(1);
 const u32 = new Uint32Array(f64.buffer);
