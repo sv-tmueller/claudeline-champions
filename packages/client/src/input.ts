@@ -35,7 +35,7 @@ export interface InputCore {
 }
 
 function isMapped(code: string): boolean {
-  return MOVE_CODES.has(code) || code in KEY_BUTTONS;
+  return MOVE_CODES.has(code) || Object.hasOwn(KEY_BUTTONS, code);
 }
 
 function hasCommandModifier(mods: KeyMods): boolean {

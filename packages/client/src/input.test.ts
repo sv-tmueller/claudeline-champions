@@ -128,7 +128,7 @@ describe('input core: preventing the browser default', () => {
     },
   );
 
-  it.each(['F3', 'F5', 'F12', 'Tab', 'Escape', 'KeyX'])('never prevents %s', (code) => {
+  it.each(['F3', 'F5', 'F12', 'Tab', 'Escape', 'KeyX', 'toString', 'constructor'])('never prevents %s', (code) => {
     const core = createInputCore();
     expect(core.keyDown(code, NO_MODS)).toBe(false);
     expect(core.keyUp(code, NO_MODS)).toBe(false);
