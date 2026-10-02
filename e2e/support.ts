@@ -44,6 +44,8 @@ export interface ColourRange {
 
 export interface PixelCounts {
   distinctColours: number;
+  /** Pixels of the magenta debug overlay: red and blue both more than 50 above green. */
+  overlayPixels: number;
   /** One count per range, in the order given. */
   matches: number[];
 }
@@ -59,7 +61,8 @@ export function colourNear(rgb: readonly [number, number, number], tolerance: nu
 
 /**
  * Decodes a PNG in the page, so the test needs no image library, and counts
- * the distinct colours and the pixels inside each colour range.
+ * the distinct colours, the magenta overlay pixels and the pixels inside each
+ * colour range.
  */
 export async function countPixels(
   page: Page,
@@ -79,11 +82,13 @@ export async function countPixels(
       const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
       const colours = new Set<number>();
       const matches = boxes.map(() => 0);
+      let overlayPixels = 0;
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i] ?? 0;
         const g = data[i + 1] ?? 0;
         const b = data[i + 2] ?? 0;
         colours.add((r << 16) | (g << 8) | b);
+        if (r - g > 50 && b - g > 50) overlayPixels++;
         for (let k = 0; k < boxes.length; k++) {
           const box = boxes[k];
           if (!box) continue;
@@ -96,7 +101,7 @@ export async function countPixels(
           }
         }
       }
-      return { distinctColours: colours.size, matches };
+      return { distinctColours: colours.size, overlayPixels, matches };
     },
     { base64: png.toString('base64'), boxes: ranges },
   );
