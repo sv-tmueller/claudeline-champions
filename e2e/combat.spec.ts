@@ -179,6 +179,18 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
   return summarise(profile.head as ProfileNode);
 }
 
+// Decision 9 of batch #32 (2026-10-02): the heap probe has two modes on the CI
+// runner. In about 3 runs in 10 the page reads about 36 B per frame in
+// onAnimationFrame (970 to 1190 B per window, in every window of the run); the
+// other runs read 0 to 48 B. It is set by page history before step 8, and
+// nothing in the test controls it: a fresh page, a fresh browser and a real-time
+// pause did not remove it in local runs with four workers (fresh page 3 of 15
+// attempts bad, fresh browser 9 of 19, against 0 of 12 for this single page).
+// Two retries are a net while the cause is investigated. A real regression
+// allocates at least 1304 B per window in every attempt, so it still fails after
+// the retries. The global retries stay 0 in playwright.config.ts.
+test.describe.configure({ retries: 2 });
+
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
   test.setTimeout(TEST_TIMEOUT_MS);
   const { problems, failed } = watchProblems(page);
