@@ -1,6 +1,8 @@
 import {
   HASTE_CAP_PERCENT,
   KNOCKBACK_CAP_METERS,
+  MAX_MAGNITUDE,
+  MAX_STATUS_TICKS,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
   STUN_CAP_TICKS,
@@ -27,10 +29,18 @@ export function isTicks(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-/** A finite number above 0. */
-export function isAmount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+/** A tick count a status, shield or knockback may have: 1 to `MAX_STATUS_TICKS`. */
+export function isStatusTicks(value: unknown): value is number {
+  return isTicks(value) && value <= MAX_STATUS_TICKS;
 }
+
+/** A number above 0 and at most `MAX_MAGNITUDE`: an absorb, a pulse or a push distance. */
+export function isMagnitude(value: unknown): value is number {
+  return typeof value === 'number' && value > 0 && value <= MAX_MAGNITUDE;
+}
+
+export const TICKS_PROBLEM = `is not an integer from 1 to ${MAX_STATUS_TICKS}`;
+export const MAGNITUDE_PROBLEM = `is not a number above 0 and at most ${MAX_MAGNITUDE}`;
 
 export function checkTarget(state: GameState, targetId: number): ChampionState {
   const champion = state.champions[targetId];
@@ -55,7 +65,7 @@ export function checkSource(state: GameState, source: StatusSource): StatusSourc
 export function copyStatusSpec(spec: StatusSpec, reject: (problem: string) => never): StatusSpec {
   if (typeof spec !== 'object' || spec === null) return reject('spec must be an object');
   const type: unknown = spec.type;
-  if (!isTicks(spec.ticks)) return reject(`ticks ${String(spec.ticks)} is not a positive integer`);
+  if (!isStatusTicks(spec.ticks)) return reject(`ticks ${String(spec.ticks)} ${TICKS_PROBLEM}`);
   const { ticks } = spec;
   switch (type) {
     case 'stun':
@@ -74,7 +84,7 @@ export function copyStatusSpec(spec: StatusSpec, reject: (problem: string) => ne
     case 'dot':
     case 'hot': {
       const { perPulse } = spec as { perPulse: unknown };
-      if (!isAmount(perPulse)) return reject(`perPulse ${String(perPulse)} is not a number above 0`);
+      if (!isMagnitude(perPulse)) return reject(`perPulse ${String(perPulse)} ${MAGNITUDE_PROBLEM}`);
       return { type, perPulse, ticks };
     }
     default:
@@ -148,15 +158,17 @@ export function addStatus(
   });
 }
 
-/** Invulnerable blocks these when they are applied; running ones are left alone. */
+/**
+ * Invulnerable blocks these when they are applied; running ones are left alone. Knockback is
+ * not here: `applyStatus` never gets one, and `applyKnockback` makes the same check itself.
+ */
 export function isBlockedByInvulnerable(type: StatusType): boolean {
   return (
     type === 'stun' ||
     type === 'root' ||
     type === 'silence' ||
     type === 'slow' ||
-    type === 'dot' ||
-    type === 'knockback'
+    type === 'dot'
   );
 }
 
@@ -228,8 +240,8 @@ export function applyShield(
   const target = checkTarget(state, targetId);
   const from = checkSource(state, source);
   if (typeof spec !== 'object' || spec === null) return fail('spec must be an object');
-  if (!isAmount(spec.absorb)) return fail(`absorb ${String(spec.absorb)} is not a number above 0`);
-  if (!isTicks(spec.ticks)) return fail(`ticks ${String(spec.ticks)} is not a positive integer`);
+  if (!isMagnitude(spec.absorb)) return fail(`absorb ${String(spec.absorb)} ${MAGNITUDE_PROBLEM}`);
+  if (!isStatusTicks(spec.ticks)) return fail(`ticks ${String(spec.ticks)} ${TICKS_PROBLEM}`);
   if (!target.alive) return false;
   const old = target.statuses.find((s) => s.type === 'shield' && sameSource(s, from));
   if (old) endStatus(state, target, old, 'replaced');
@@ -271,8 +283,10 @@ export function applyKnockback(
   }
   const dir = direction(spec.dirX, spec.dirY);
   if (!dir) return fail('direction is zero');
-  if (!isAmount(spec.distance)) return fail(`distance ${String(spec.distance)} is not a number above 0`);
-  if (!isTicks(spec.ticks)) return fail(`ticks ${String(spec.ticks)} is not a positive integer`);
+  if (!isMagnitude(spec.distance)) {
+    return fail(`distance ${String(spec.distance)} ${MAGNITUDE_PROBLEM}`);
+  }
+  if (!isStatusTicks(spec.ticks)) return fail(`ticks ${String(spec.ticks)} ${TICKS_PROBLEM}`);
   if (!target.alive || hasStatus(target, 'invulnerable')) return false;
 
   const old = target.statuses.find((s) => s.type === 'knockback' && sameSource(s, from));

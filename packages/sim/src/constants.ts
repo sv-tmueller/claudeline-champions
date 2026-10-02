@@ -16,3 +16,7 @@ export const KNOCKBACK_CAP_METERS = 6;
 export const STATUS_PULSE_TICKS = 30;
 /** Forced motion is resolved against collision in steps of at most this many meters. */
 export const MOTION_SUBSTEP_METERS = 0.25;
+/** Longest status, shield or knockback a spec may ask for: ten minutes of ticks. */
+export const MAX_STATUS_TICKS = 36000;
+/** Largest absorb, damage or heal per pulse, or knockback distance a spec may ask for. */
+export const MAX_MAGNITUDE = 1e6;

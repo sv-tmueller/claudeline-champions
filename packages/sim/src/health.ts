@@ -11,8 +11,10 @@ import {
   copyStatusSpec,
   endStatus,
   hasStatus,
-  isAmount,
-  isTicks,
+  isMagnitude,
+  isStatusTicks,
+  MAGNITUDE_PROBLEM,
+  TICKS_PROBLEM,
 } from './status';
 
 function fail(what: 'damage' | 'heal', problem: string): never {
@@ -206,8 +208,8 @@ export function copyEffects(
         };
       case 'shield': {
         const { absorb, ticks } = effect as { absorb: number; ticks: number };
-        if (!isAmount(absorb)) return reject(`shield absorb ${absorb} is not a number above 0`);
-        if (!isTicks(ticks)) return reject(`shield ticks ${ticks} is not a positive integer`);
+        if (!isMagnitude(absorb)) return reject(`shield absorb ${absorb} ${MAGNITUDE_PROBLEM}`);
+        if (!isStatusTicks(ticks)) return reject(`shield ticks ${ticks} ${TICKS_PROBLEM}`);
         return { type, absorb, ticks };
       }
       case 'knockback': {
@@ -216,10 +218,10 @@ export function copyEffects(
           ticks,
           direction: way,
         } = effect as { distance: number; ticks: number; direction: unknown };
-        if (!isAmount(distance)) {
-          return reject(`knockback distance ${distance} is not a number above 0`);
+        if (!isMagnitude(distance)) {
+          return reject(`knockback distance ${distance} ${MAGNITUDE_PROBLEM}`);
         }
-        if (!isTicks(ticks)) return reject(`knockback ticks ${ticks} is not a positive integer`);
+        if (!isStatusTicks(ticks)) return reject(`knockback ticks ${ticks} ${TICKS_PROBLEM}`);
         if (way !== 'away' && way !== 'toward') {
           return reject(`knockback direction ${String(way)} is not away or toward`);
         }

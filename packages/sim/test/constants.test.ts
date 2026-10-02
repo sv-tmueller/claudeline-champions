@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   HASTE_CAP_PERCENT,
   KNOCKBACK_CAP_METERS,
+  MAX_MAGNITUDE,
+  MAX_STATUS_TICKS,
   MOTION_SUBSTEP_METERS,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
@@ -16,5 +18,10 @@ describe('status and motion constants', () => {
     expect(KNOCKBACK_CAP_METERS).toBe(6);
     expect(STATUS_PULSE_TICKS).toBe(30);
     expect(MOTION_SUBSTEP_METERS).toBe(0.25);
+  });
+
+  it('holds the bounds on status, shield and knockback specs', () => {
+    expect(MAX_STATUS_TICKS).toBe(36000);
+    expect(MAX_MAGNITUDE).toBe(1e6);
   });
 });

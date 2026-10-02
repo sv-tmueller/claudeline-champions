@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMatch, step } from '../src/index';
+import { MAX_MAGNITUDE, MAX_STATUS_TICKS, createMatch, step } from '../src/index';
 import type { Effect, GameState } from '../src/index';
 import { applyDamage, applyEffects, applyHeal, copyEffects } from '../src/health';
 import { applyShield, applyStatus } from '../src/status';
@@ -404,6 +404,28 @@ describe('copyEffects', () => {
     ];
     for (const effect of bad) {
       expect(() => copyEffects([effect as Effect], reject), JSON.stringify(effect)).toThrow(/^Rejected: /);
+    }
+  });
+
+  it('accepts ticks and magnitudes at the bounds and rejects one past them', () => {
+    const atBound: Effect[] = [
+      { type: 'applyStatus', status: { type: 'stun', ticks: MAX_STATUS_TICKS } },
+      { type: 'applyStatus', status: { type: 'dot', perPulse: MAX_MAGNITUDE, ticks: MAX_STATUS_TICKS } },
+      { type: 'shield', absorb: MAX_MAGNITUDE, ticks: MAX_STATUS_TICKS },
+      { type: 'knockback', distance: MAX_MAGNITUDE, ticks: MAX_STATUS_TICKS, direction: 'away' },
+    ];
+    expect(copyEffects(atBound, reject)).toEqual(atBound);
+    const past: Effect[] = [
+      { type: 'applyStatus', status: { type: 'root', ticks: MAX_STATUS_TICKS + 1 } },
+      { type: 'applyStatus', status: { type: 'hot', perPulse: MAX_MAGNITUDE + 1, ticks: 60 } },
+      { type: 'shield', absorb: MAX_MAGNITUDE + 1, ticks: 60 },
+      { type: 'shield', absorb: 20, ticks: MAX_STATUS_TICKS + 1 },
+      { type: 'knockback', distance: MAX_MAGNITUDE + 1, ticks: 8, direction: 'away' },
+      { type: 'knockback', distance: 2, ticks: MAX_STATUS_TICKS + 1, direction: 'toward' },
+      { type: 'knockback', distance: 1, ticks: 1e200, direction: 'away' },
+    ];
+    for (const effect of past) {
+      expect(() => copyEffects([effect], reject), JSON.stringify(effect)).toThrow(/^Rejected: /);
     }
   });
 

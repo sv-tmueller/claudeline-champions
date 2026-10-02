@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DT, createMatch, step } from '../src/index';
+import { DT, MAX_MAGNITUDE, MAX_STATUS_TICKS, createMatch, step } from '../src/index';
 import type { GameState, SimEvent, StatusInstance, StatusSpec, StatusType } from '../src/index';
 import { applyDamage } from '../src/health';
 import { applyKnockback, applyShield, applyStatus } from '../src/status';
@@ -349,6 +349,78 @@ describe('status validation', () => {
     applyStatus(state, 2, spec, NONE);
     spec.percent = 99;
     expect(statuses(state, 2)[0]).toMatchObject({ percent: 30 });
+  });
+});
+
+describe('status bounds', () => {
+  const SRC = (sourceId: number) => ({ sourceId, slot: null }) as const;
+  const push = (distance: number, ticks: number) => ({ dirX: 1, dirY: 0, distance, ticks });
+
+  // Each call applies one spec with the given tick count to a fresh match.
+  const withTicks: [string, (ticks: number) => boolean][] = [
+    ['stun', (ticks) => applyStatus(open(), 2, { type: 'stun', ticks }, NONE)],
+    ['root', (ticks) => applyStatus(open(), 2, { type: 'root', ticks }, NONE)],
+    ['silence', (ticks) => applyStatus(open(), 2, { type: 'silence', ticks }, NONE)],
+    ['invulnerable', (ticks) => applyStatus(open(), 2, { type: 'invulnerable', ticks }, NONE)],
+    ['slow', (ticks) => applyStatus(open(), 2, { type: 'slow', percent: 20, ticks }, NONE)],
+    ['haste', (ticks) => applyStatus(open(), 2, { type: 'haste', percent: 20, ticks }, NONE)],
+    ['dot', (ticks) => applyStatus(open(), 2, { type: 'dot', perPulse: 1, ticks }, NONE)],
+    ['hot', (ticks) => applyStatus(open(), 2, { type: 'hot', perPulse: 1, ticks }, NONE)],
+    ['shield', (ticks) => applyShield(open(), 2, { absorb: 10, ticks }, NONE)],
+    ['knockback', (ticks) => applyKnockback(open(), 2, push(1, ticks), NONE)],
+  ];
+
+  for (const [name, apply] of withTicks) {
+    it(`${name}: accepts ${MAX_STATUS_TICKS} ticks and rejects one more`, () => {
+      expect(apply(MAX_STATUS_TICKS)).toBe(true);
+      expect(() => apply(MAX_STATUS_TICKS + 1)).toThrow(/^Invalid status: ticks 36001 /);
+      expect(() => apply(1e200)).toThrow(/^Invalid status: /);
+    });
+  }
+
+  const withMagnitude: [string, (value: number) => boolean][] = [
+    ['dot perPulse', (value) => applyStatus(open(), 2, { type: 'dot', perPulse: value, ticks: 60 }, NONE)],
+    ['hot perPulse', (value) => applyStatus(open(), 2, { type: 'hot', perPulse: value, ticks: 60 }, NONE)],
+    ['shield absorb', (value) => applyShield(open(), 2, { absorb: value, ticks: 60 }, NONE)],
+    ['knockback distance', (value) => applyKnockback(open(), 2, push(value, 10), NONE)],
+  ];
+
+  for (const [name, apply] of withMagnitude) {
+    it(`${name}: accepts ${MAX_MAGNITUDE} and rejects one more`, () => {
+      expect(apply(MAX_MAGNITUDE)).toBe(true);
+      expect(() => apply(MAX_MAGNITUDE + 1)).toThrow(/^Invalid status: .* 1000001 /);
+      expect(() => apply(1.7e308)).toThrow(/^Invalid status: /);
+    });
+  }
+
+  it('still takes percent from 1 to 100 only', () => {
+    expect(() => applyStatus(open(), 2, { type: 'slow', percent: 101, ticks: 60 }, NONE)).toThrow(
+      /^Invalid status: percent 101 /,
+    );
+  });
+
+  it('rejects a knockback of 1e200 ticks, so a second push never meets NaN', () => {
+    const state = open();
+    expect(() => applyKnockback(state, 0, push(1, 1e200), SRC(2))).toThrow(/^Invalid status: /);
+    expect(applyKnockback(state, 0, push(1, 10), SRC(3))).toBe(true);
+    expect(statuses(state, 0)).toMatchObject([{ type: 'knockback', sourceId: 3, distance: 1, totalTicks: 10 }]);
+  });
+
+  it('keeps absorbLeft finite with two shields at the bound', () => {
+    const state = open();
+    applyShield(state, 0, { absorb: MAX_MAGNITUDE, ticks: 5 }, SRC(2));
+    applyShield(state, 0, { absorb: MAX_MAGNITUDE, ticks: 5 }, SRC(3));
+    fresh(state);
+    applyDamage(state, 0, 1, 2);
+    expect(state.events).toEqual([
+      { type: 'shieldAbsorbed', targetId: 0, sourceId: 2, amount: 1, absorbLeft: 2 * MAX_MAGNITUDE - 1 },
+    ]);
+  });
+
+  it('rejects two shields of 1.7e308, the overflow that gave absorbLeft Infinity', () => {
+    const state = open();
+    expect(() => applyShield(state, 0, { absorb: 1.7e308, ticks: 5 }, SRC(2))).toThrow(/^Invalid status: /);
+    expect(statuses(state, 0)).toEqual([]);
   });
 });
 
