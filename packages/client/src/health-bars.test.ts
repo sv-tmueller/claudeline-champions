@@ -65,6 +65,14 @@ describe('health bars', () => {
     expect((fillOf(bars.group, 0).material as SpriteMaterial).depthTest).toBe(false);
   });
 
+  it('draws back and fill in the transparent pass, so the render order puts the fill on top', () => {
+    const bars = createHealthBars(four(), 'A');
+    // An opaque fill would be drawn before the transparent back and be tinted by it.
+    for (const sprite of sprites(bars.group)) {
+      expect((sprite.material as SpriteMaterial).transparent).toBe(true);
+    }
+  });
+
   it('scales the fill by health and keeps its left edge in place', () => {
     const champions = four();
     const bars = createHealthBars(champions, 'A');

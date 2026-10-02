@@ -18,7 +18,8 @@ const BORDER = 0.04;
 
 function barMaterial(color: string, opacity: number): SpriteMaterial {
   // No depth test: a bar is never hidden by an obstacle or a champion in front.
-  return new SpriteMaterial({ color, transparent: opacity < 1, opacity, depthTest: false });
+  // Always transparent, so back and fill share a pass and renderOrder decides which is on top.
+  return new SpriteMaterial({ color, transparent: true, opacity, depthTest: false });
 }
 
 /**
