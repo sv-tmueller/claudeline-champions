@@ -1,4 +1,5 @@
 import { CHAMPION_RADIUS } from './constants';
+import { length } from './geometry';
 import { applyEffects, copyEffects } from './health';
 import { nextId } from './state';
 import type { AreaState, AreaTargets, Effect, GameState, TeamId } from './state';
@@ -82,7 +83,7 @@ export function stepAreas(state: GameState): void {
       const targetIds = state.champions
         .filter(
           (c) =>
-            c.alive && affects(area, c.team) && Math.hypot(c.x - area.x, c.y - area.y) <= reach,
+            c.alive && affects(area, c.team) && length(c.x - area.x, c.y - area.y) <= reach,
         )
         .map((c) => c.id);
       state.events.push({ type: 'areaTick', areaId: area.id, targetIds });

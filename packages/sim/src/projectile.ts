@@ -1,7 +1,7 @@
 import type { Obstacle } from './arena';
 import { isPositiveInteger } from './area';
 import { CHAMPION_RADIUS, DT } from './constants';
-import { clamp, sweepCircle, sweepRect } from './geometry';
+import { clamp, length, sweepCircle, sweepRect } from './geometry';
 import type { Point } from './geometry';
 import { applyEffects, copyEffects } from './health';
 import { nextId } from './state';
@@ -11,7 +11,7 @@ export interface ProjectileSpec {
   ownerId: number;
   x: number;
   y: number;
-  /** Direction of flight; it is normalized here and must not be zero. */
+  /** Direction of flight; it is normalized here, so it must not be zero or beyond about 1e154. */
   dirX: number;
   dirY: number;
   /** Meters per second. */
@@ -36,8 +36,9 @@ export function spawnProjectile(state: GameState, spec: ProjectileSpec): number 
   for (const key of ['x', 'y', 'dirX', 'dirY', 'speed', 'radius'] as const) {
     if (!Number.isFinite(spec[key])) return fail(`${key} is not a finite number`);
   }
-  const length = Math.hypot(spec.dirX, spec.dirY);
-  if (length === 0) return fail('direction is zero');
+  const dirLength = length(spec.dirX, spec.dirY);
+  if (dirLength === 0) return fail('direction is zero');
+  if (!Number.isFinite(dirLength)) return fail('direction is too large to measure');
   if (spec.speed <= 0) return fail('speed must be above 0');
   if (spec.radius <= 0) return fail('radius must be above 0');
   if (!isPositiveInteger(spec.lifetimeTicks)) {
@@ -52,8 +53,8 @@ export function spawnProjectile(state: GameState, spec: ProjectileSpec): number 
     team: owner.team,
     x: spec.x + 0,
     y: spec.y + 0,
-    vx: (spec.dirX / length) * spec.speed + 0,
-    vy: (spec.dirY / length) * spec.speed + 0,
+    vx: (spec.dirX / dirLength) * spec.speed + 0,
+    vy: (spec.dirY / dirLength) * spec.speed + 0,
     radius: spec.radius,
     remainingTicks: spec.lifetimeTicks,
     pierce: spec.pierce,

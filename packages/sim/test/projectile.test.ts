@@ -139,6 +139,7 @@ describe('spawnProjectile', () => {
     ['an infinite y', { y: Infinity }],
     ['a NaN direction', { dirX: NaN }],
     ['a zero direction', { dirX: 0, dirY: 0 }],
+    ['a direction too large to measure', { dirX: 1e200, dirY: 1e200 }],
     ['a zero speed', { speed: 0 }],
     ['a negative speed', { speed: -1 }],
     ['a zero radius', { radius: 0 }],

@@ -13,7 +13,9 @@
 // to 0, run `npx vitest run --project sim packages/sim/test/scripted.test.ts`, copy the actual
 // values from the failing checkpoint and checksum assertions into the fixture, and rerun
 // until it is green. There is no writer script. Changing gameplay on purpose means
-// regenerating it the same way in the same change.
+// regenerating it the same way in the same change. The checkpoints at ticks 200 to 600 and
+// the final checksum were regenerated once for batch #23 decision 9 (CI run 36947793538),
+// when facing moved to `dmath.atan2`.
 //
 // "Replay once in a separate process" is met by the committed checksums, which the authoring
 // run produced, plus every CI run that replays them again. The coverage test fails if the

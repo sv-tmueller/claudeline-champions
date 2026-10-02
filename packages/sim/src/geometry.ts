@@ -5,6 +5,11 @@ export interface Point {
   y: number;
 }
 
+/** Euclidean length from `+ - *` and `Math.sqrt`, which round correctly on every platform. */
+export function length(x: number, y: number): number {
+  return Math.sqrt(x * x + y * y);
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
 }

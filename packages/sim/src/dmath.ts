@@ -37,21 +37,33 @@ function fabs(x: number): number {
   return Math.abs(x);
 }
 
-const atanhi = [
+const atanhi: readonly [number, number, number, number] = [
   4.63647609000806093515e-1, // atan(0.5)hi 0x3FDDAC67, 0x0561BB4F
   7.85398163397448278999e-1, // atan(1.0)hi 0x3FE921FB, 0x54442D18
   9.82793723247329054082e-1, // atan(1.5)hi 0x3FEF730B, 0xD281F69B
   1.570796326794896558e0, // atan(inf)hi 0x3FF921FB, 0x54442D18
 ];
 
-const atanlo = [
+const atanlo: readonly [number, number, number, number] = [
   2.26987774529616870924e-17, // atan(0.5)lo 0x3C7A2B7F, 0x222F65E2
   3.06161699786838301793e-17, // atan(1.0)lo 0x3C81A626, 0x33145C07
   1.39033110312309984516e-17, // atan(1.5)lo 0x3C700788, 0x7AF0CBBD
   6.12323399573676603587e-17, // atan(inf)lo 0x3C91A626, 0x33145C07
 ];
 
-const aT = [
+const aT: readonly [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+] = [
   3.33333333333329318027e-1,
   -1.99999999998764832476e-1,
   1.42857142725034663711e-1,
@@ -72,7 +84,7 @@ const huge = 1.0e300;
 export function atan(x: number): number {
   const hx = highWord(x);
   const ix = hx & 0x7fffffff;
-  let id: number;
+  let id: -1 | 0 | 1 | 2 | 3;
   if (ix >= 0x44100000) {
     // |x| >= 2^66, or x is infinite or NaN
     if (ix > 0x7ff00000 || (ix === 0x7ff00000 && lowWord(x) !== 0)) return x + x;
@@ -118,7 +130,7 @@ export function atan(x: number): number {
     (aT[0] +
       w * (aT[2] + w * (aT[4] + w * (aT[6] + w * (aT[8] + w * aT[10])))));
   const s2 = w * (aT[1] + w * (aT[3] + w * (aT[5] + w * (aT[7] + w * aT[9]))));
-  if (id < 0) return x - x * (s1 + s2);
+  if (id === -1) return x - x * (s1 + s2);
   z = atanhi[id] - ((x * (s1 + s2) - atanlo[id]) - x);
   return hx < 0 ? -z : z;
 }
@@ -128,7 +140,7 @@ const zero = 0.0;
 const pi_o_4 = 7.853981633974482790e-1; // 0x3FE921FB, 0x54442D18
 const pi_o_2 = 1.570796326794896558e0; // 0x3FF921FB, 0x54442D18
 const pi = 3.141592653589793116e0; // 0x400921FB, 0x54442D18
-const pi_lo = 1.2246467991473531772e-16; // 0x3CA1A626, 0x33145C07
+const pi_lo = 1.2246467991473532e-16; // 0x3CA1A626, 0x33145C07
 
 /** The angle in radians of the point (x, y) from +x, in [-pi, pi], the fdlibm algorithm. */
 export function atan2(y: number, x: number): number {

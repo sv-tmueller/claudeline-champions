@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { RectObstacle } from '../src/arena';
-import { sweepCircle, sweepRect } from '../src/geometry';
+import { length, sweepCircle, sweepRect } from '../src/geometry';
 
 function rect(w: number, h: number, x = 0, y = 0): RectObstacle {
   return { type: 'rect', x, y, w, h, height: 1, blocksProjectiles: true };
 }
+
+describe('length', () => {
+  it('measures a vector with only correctly rounded operations', () => {
+    expect(length(3, 4)).toBe(5);
+    expect(length(-3, 4)).toBe(5);
+    expect(length(0, 0)).toBe(0);
+    expect(length(1, 1)).toBe(Math.sqrt(2));
+  });
+});
 
 describe('sweepCircle', () => {
   it('returns the time of first contact head on', () => {

@@ -8,7 +8,11 @@
 // "checksum": 0, run `npx vitest run --project sim packages/sim/test/replay.test.ts`,
 // copy the actual value from the failing checksum assertion into the fixture,
 // and rerun until it is green. There is no writer script. Changing gameplay on
-// purpose means regenerating it the same way in the same change.
+// purpose means regenerating it the same way in the same change. It was regenerated once
+// without a gameplay change (batch #23 decision 9, CI run 36947793538): facing moved to the
+// deterministic `dmath.atan2` and lengths to `Math.sqrt`, because V8's `Math.atan2` differs
+// in the last bit between x86 Linux and ARM macOS. Only the checksum moved; the inputs and
+// segments are unchanged.
 //
 // "Replay once in a separate process" is met by the committed checksum, which
 // the authoring run produced, plus every CI run that replays it again.

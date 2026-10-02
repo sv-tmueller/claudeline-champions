@@ -1,6 +1,8 @@
 import { BASE_MOVE_SPEED, DT } from './constants';
 import { expireAreas, stepAreas } from './area';
 import { resolveChampion } from './collision';
+import { atan2 } from './dmath';
+import { length } from './geometry';
 import { resolveInput } from './input';
 import type { PlayerInput } from './input';
 import { expireProjectiles, stepProjectiles } from './projectile';
@@ -19,9 +21,9 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
     champion.aimX = input.aimX;
     champion.aimY = input.aimY;
 
-    const length = Math.hypot(input.moveX, input.moveY);
-    const dirX = length === 0 ? 0 : input.moveX / length;
-    const dirY = length === 0 ? 0 : input.moveY / length;
+    const moveLength = length(input.moveX, input.moveY);
+    const dirX = moveLength === 0 ? 0 : input.moveX / moveLength;
+    const dirY = moveLength === 0 ? 0 : input.moveY / moveLength;
     champion.vx = dirX * BASE_MOVE_SPEED;
     champion.vy = dirY * BASE_MOVE_SPEED;
     const prevX = champion.x;
@@ -31,7 +33,7 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
 
     const toAimX = champion.aimX / 100 - champion.x;
     const toAimY = champion.aimY / 100 - champion.y;
-    if (toAimX !== 0 || toAimY !== 0) champion.facing = Math.atan2(toAimY, toAimX);
+    if (toAimX !== 0 || toAimY !== 0) champion.facing = atan2(toAimY, toAimX);
 
     resolveChampion(state, champion, prevX, prevY);
   }

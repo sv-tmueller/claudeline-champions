@@ -35,11 +35,11 @@
   ],
   "checkpoints": [
     { "tick": 100, "checksum": 2358508535 },
-    { "tick": 200, "checksum": 3369567957 },
+    { "tick": 200, "checksum": 3047533862 },
     { "tick": 300, "checksum": 2315406940 },
-    { "tick": 400, "checksum": 2231492004 },
-    { "tick": 500, "checksum": 4006117541 },
-    { "tick": 600, "checksum": 1791505886 }
+    { "tick": 400, "checksum": 308737297 },
+    { "tick": 500, "checksum": 931992276 },
+    { "tick": 600, "checksum": 1979187871 }
   ],
-  "checksum": 1791505886
+  "checksum": 1979187871
 }

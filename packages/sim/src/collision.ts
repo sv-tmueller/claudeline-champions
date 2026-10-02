@@ -1,6 +1,6 @@
 import type { RectObstacle } from './arena';
 import { CHAMPION_RADIUS } from './constants';
-import { clamp } from './geometry';
+import { clamp, length } from './geometry';
 import type { ChampionState, GameState } from './state';
 
 // Penetration below EPS is treated as contact. A push moves to exact contact.
@@ -16,7 +16,7 @@ interface Point {
 export function pushOutOfCircle(p: Point, cx: number, cy: number, minDist: number): boolean {
   const dx = p.x - cx;
   const dy = p.y - cy;
-  const dist = Math.hypot(dx, dy);
+  const dist = length(dx, dy);
   if (minDist - dist <= EPS) return false;
   if (dist > 0) {
     p.x = cx + (dx * minDist) / dist;
@@ -39,7 +39,7 @@ export function pushOutOfRect(p: Point, rect: RectObstacle, r: number): boolean 
   const qy = clamp(p.y, minY, maxY);
   const dx = p.x - qx;
   const dy = p.y - qy;
-  const dist = Math.hypot(dx, dy);
+  const dist = length(dx, dy);
   if (r - dist <= EPS) return false;
   if (dist > 0) {
     p.x = qx + (dx * r) / dist;
