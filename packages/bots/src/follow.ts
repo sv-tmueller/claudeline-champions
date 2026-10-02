@@ -25,12 +25,6 @@ export function createFollower(): PathFollower {
   return { goal: null, points: [], index: 0, age: 0 };
 }
 
-const STAND: Readonly<MoveCommand> = { moveX: 0, moveY: 0 };
-
-function stand(): MoveCommand {
-  return { moveX: STAND.moveX, moveY: STAND.moveY };
-}
-
 /**
  * The free cell nearest to p within `radius` cells of p's own cell, or -1. Candidates are
  * ordered by squared distance from p to the cell centre, ties by lower cell index, and a
@@ -147,5 +141,5 @@ export function followPath(
     advance(follower, position);
   }
   const point = follower.points[follower.index];
-  return point === undefined ? stand() : steerToward(position, point);
+  return point === undefined ? { moveX: 0, moveY: 0 } : steerToward(position, point);
 }
