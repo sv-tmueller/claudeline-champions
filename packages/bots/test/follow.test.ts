@@ -188,21 +188,14 @@ describe('walking with the real sim step', () => {
       const start = { x: walker(state).x, y: walker(state).y };
       expect(start).toEqual({ x: -12, y: 2 });
 
-      let target = goal;
-      const goalCell = cellIndexAt(grid, goal);
-      if (grid.blocked[goalCell] !== false) {
-        const free = nearestFreeCell(grid, goal);
-        expect(free).toBeGreaterThanOrEqual(0);
-        target = cellCenter(grid, free);
-      }
-      const route = findPath(grid, start, target);
-      expect(route.length).toBeGreaterThanOrEqual(2);
+      const route = findPath(grid, start, goal);
+      expect(route.length).toBeGreaterThanOrEqual(3);
       const maxTicks = Math.ceil((1.3 * pathLength(route)) / (BASE_MOVE_SPEED * DT));
 
       const result = walk(state, goal, maxTicks);
       expect(result.finite).toBe(true);
       expect(result.arrived, `not arrived after ${result.ticks} of ${maxTicks} ticks`).toBe(true);
-      expect(result.distanceToGoal).toBeLessThanOrEqual(grid.cellSize * Math.SQRT2);
+      expect(result.distanceToGoal).toBeLessThanOrEqual(grid.cellSize);
       expect(result.longestPushedRun).toBeLessThanOrEqual(5);
     });
   }
@@ -393,17 +386,22 @@ describe('start and goal fallback', () => {
   });
 
   it('gives no move for non-finite inputs and never throws', () => {
-    const follower = createFollower();
     const bad = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    // A fresh follower per call, so each call plans: a reused follower would skip planning
+    // at ages 1 to 5 and the bad values would never reach the planner.
+    const calls: { position: Vec2; goal: Vec2 }[] = [];
     for (const v of bad) {
-      expect(followPath(grid, follower, { x: v, y: 2 }, { x: 0, y: 9 })).toEqual({
-        moveX: 0,
-        moveY: 0,
-      });
-      expect(followPath(grid, follower, { x: -12, y: 2 }, { x: 0, y: v })).toEqual({
-        moveX: 0,
-        moveY: 0,
-      });
+      calls.push({ position: { x: v, y: 2 }, goal: { x: 0, y: 9 } });
+      calls.push({ position: { x: -12, y: 2 }, goal: { x: 0, y: v } });
+    }
+    expect(calls).toHaveLength(6);
+    for (const { position, goal } of calls) {
+      const follower = createFollower();
+      expect(followPath(grid, follower, position, goal)).toEqual({ moveX: 0, moveY: 0 });
+      // It planned, found no route and holds no points.
+      expect(follower.goal).not.toBeNull();
+      expect(follower.age).toBe(0);
+      expect(follower.points).toEqual([]);
     }
     expect(nearestFreeCell(grid, { x: Number.NaN, y: 0 })).toBe(-1);
   });
