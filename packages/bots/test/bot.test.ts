@@ -527,12 +527,13 @@ describe('kite corner and line of sight', () => {
     thinkTimes(bot, state, TIERS.hard.delay + 1);
     expect(bot.inspect().intent).toBe('kite');
 
-    // Open ground: five kite steps, which never call the path follower.
+    // Open ground, 7 m from the target and in sight: the bot stands, so it never calls the path
+    // follower and the escape is over.
     put(state, 1, 2, 3);
-    put(state, 2, 0, 3);
+    put(state, 2, 9, 3);
     for (let i = 0; i < 5; i++) {
       const input = bot.think(state);
-      expect(input.moveX !== 0 || input.moveY !== 0).toBe(true);
+      expect(input).toMatchObject({ moveX: 0, moveY: 0 });
     }
 
     // Cornered again, in the other corner. The escape plan from the first corner is stale.

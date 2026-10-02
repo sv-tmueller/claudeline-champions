@@ -5,12 +5,13 @@ import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
 import { createFollower, followPath } from './follow';
 import { segmentClear } from './geometry';
-import { buildNavGrid, cellIndexAt } from './grid';
+import { buildNavGrid, cellCenter, cellIndexAt } from './grid';
 import type { NavGrid, Vec2 } from './grid';
 import { chooseIntent, scoreIntents } from './intent';
 import type { Intent, ScoredIntent } from './intent';
 import { profileFor } from './profile';
 import { createRng } from './rng';
+import { nearestSightCell } from './sight';
 import { steerToward } from './steer';
 import type { MoveCommand } from './steer';
 
@@ -27,6 +28,9 @@ export const TARGET_SWITCH_MARGIN = 1;
 export const KITE_STEP = 1;
 /** Thinks for which one aim error draw is kept. */
 export const AIM_ERROR_HOLD = 15;
+
+/** What the path follower is walking to: the target, the bot's own spawn or a cell that sees the target. */
+type FollowGoal = 'target' | 'spawn' | 'sight';
 
 interface Decision {
   intent: Intent;
@@ -89,9 +93,9 @@ function turn45(v: Vec2, sign: 1 | -1): Vec2 {
 
 /**
  * The first of straight away, +45, -45, +90, -90 degrees whose point 1 m off lies in a free grid
- * cell and is reached by a clear straight segment. Stands when all five fail.
+ * cell and is reached by a clear straight segment. Null when all five fail: the bot is cornered.
  */
-function kiteMove(grid: NavGrid, me: ChampionState, target: ChampionState): MoveCommand {
+function kiteStep(grid: NavGrid, me: ChampionState, target: ChampionState): MoveCommand | null {
   const d = distanceBetween(me, target);
   const away: Vec2 = d === 0 ? { x: 1, y: 0 } : { x: (me.x - target.x) / d, y: (me.y - target.y) / d };
   const directions: Vec2[] = [
@@ -105,7 +109,7 @@ function kiteMove(grid: NavGrid, me: ChampionState, target: ChampionState): Move
     const p = { x: me.x + dir.x * KITE_STEP, y: me.y + dir.y * KITE_STEP };
     if (cellFree(grid, p) && segmentClear(grid, me, p)) return steerToward(me, p);
   }
-  return { moveX: 0, moveY: 0 };
+  return null;
 }
 
 export function createBot(playerId: number, difficulty: Difficulty, seed: number): Bot {
@@ -124,6 +128,15 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   let decided: Decision = { intent: 'engage', targetId: -1 };
   let lastActed: Decision = { intent: 'idle', targetId: -1 };
   let follower = createFollower();
+  // The kind of goal the follower served on the previous think and on this one. Null after a
+  // think that did not call followPath, so a follower never carries a plan across a gap.
+  let previousGoal: FollowGoal | null = null;
+  let currentGoal: FollowGoal | null = null;
+  // True when the previous think was a cornered kiter's escape, and on this one. The escape
+  // goes on while the bot is closer than rangeMin: without it, one step along the wall frees a
+  // kite candidate, the step back into the corner blocks all five again, and the bot dithers.
+  let wasEscaping = false;
+  let escaping = false;
   let grid: NavGrid | undefined;
   let gridArena: GameState['arena'] | undefined;
   let aimU = 0;
@@ -154,6 +167,13 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     decided = { intent: chooseIntent(current, scores), targetId };
   }
 
+  /** Path following with a fresh follower when the goal kind differs from the previous think's. */
+  function follow(kind: FollowGoal, g: NavGrid, me: ChampionState, goal: Vec2): MoveCommand {
+    if (kind !== previousGoal) follower = createFollower();
+    currentGoal = kind;
+    return followPath(g, follower, me, goal);
+  }
+
   function move(state: GameState, me: ChampionState, acted: Decision): MoveCommand {
     const target = enemyAlive(state, me, acted.targetId);
     if (acted.intent === 'idle' || target === undefined) return { moveX: 0, moveY: 0 };
@@ -163,12 +183,31 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     switch (acted.intent) {
       case 'engage':
         if (d <= profile.rangeMax && hasLineOfSight(state, me, target)) return { moveX: 0, moveY: 0 };
-        return followPath(g, follower, me, target);
-      case 'kite':
-        return d >= profile.rangeMin ? { moveX: 0, moveY: 0 } : kiteMove(g, me, target);
+        return follow('target', g, me, target);
+      case 'kite': {
+        if (d < profile.rangeMin) {
+          if (!wasEscaping) {
+            const stepAway = kiteStep(g, me, target);
+            if (stepAway !== null) return stepAway;
+          }
+          // Cornered: leave along the path to the own spawn. The escape counts only while the
+          // path gives a move: at the spawn, or with no path, the bot stands for this think and
+          // tries the kite steps again on the next.
+          const spawn = ownSpawn(state, me);
+          if (spawn === undefined) return { moveX: 0, moveY: 0 };
+          const leave = follow('spawn', g, me, spawn);
+          escaping = leave.moveX !== 0 || leave.moveY !== 0;
+          return leave;
+        }
+        if (hasLineOfSight(state, me, target)) return { moveX: 0, moveY: 0 };
+        const cell = nearestSightCell(g, state, me, target, profile.rangeMin, profile.rangeMax);
+        return cell >= 0
+          ? follow('sight', g, me, cellCenter(g, cell))
+          : follow('target', g, me, target);
+      }
       case 'retreat': {
         const spawn = ownSpawn(state, me);
-        return spawn === undefined ? { moveX: 0, moveY: 0 } : followPath(g, follower, me, spawn);
+        return spawn === undefined ? { moveX: 0, moveY: 0 } : follow('spawn', g, me, spawn);
       }
     }
   }
@@ -187,6 +226,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
 
   return {
     think(state: GameState): PlayerInput {
+      previousGoal = currentGoal;
+      currentGoal = null;
+      wasEscaping = escaping;
+      escaping = false;
       const me = state.champions[playerId];
       if (me === undefined) return fail(`no champion ${playerId} in the state`);
       if (!me.alive) return { moveX: 0, moveY: 0, aimX: me.aimX, aimY: me.aimY, buttons: 0 };
