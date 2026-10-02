@@ -276,6 +276,66 @@ export function checkStatusInvariants(state: GameState): string[] {
   return problems;
 }
 
+/**
+ * Oracle for the kit, cast and energy state, from the state alone. It deliberately does not import
+ * `src/cast.ts`. Returns one message per violation.
+ */
+export function checkAbilityInvariants(state: GameState): string[] {
+  const problems: string[] = [];
+  const bad = (c: ChampionState, what: string) =>
+    problems.push(`tick ${state.tick} champion ${c.id}: ${what}`);
+  const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
+  const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
+
+  for (const c of state.champions) {
+    const kit = state.kits.find((k) => k.id === c.championId);
+    if (!isInt(c.energy) || c.energy < 0 || c.energy > 100) bad(c, `energy ${c.energy}`);
+    if (c.cooldowns.length !== 7) bad(c, `${c.cooldowns.length} cooldowns`);
+    c.cooldowns.forEach((value, i) => {
+      const max = kit ? (kit.slots[slots[i] as (typeof slots)[number]]?.cooldownTicks ?? 0) : 0;
+      if (!isInt(value) || value < 0 || value > max) bad(c, `cooldown ${slots[i]} is ${value} of at most ${max}`);
+    });
+    if (!c.alive && c.cast !== null) bad(c, 'dead with a cast');
+    if (c.cast) {
+      const { cast } = c;
+      const record = state.casts.find((r) => r.id === cast.castId);
+      if (!record) bad(c, `cast ${cast.castId} has no record`);
+      else if (record.casterId !== c.id || record.slot !== cast.slot || record.ex !== cast.ex) {
+        bad(c, `cast ${cast.castId} does not match its record`);
+      }
+      if (!isInt(cast.windupTicks) || cast.windupTicks < 1) bad(c, `windupTicks ${cast.windupTicks}`);
+      if (!isInt(cast.windupLeft) || cast.windupLeft < 1 || cast.windupLeft > cast.windupTicks) {
+        bad(c, `windupLeft ${cast.windupLeft} of ${cast.windupTicks}`);
+      }
+    }
+    if (c.dash && c.dash.castId !== null && !state.casts.some((r) => r.id === c.dash?.castId)) {
+      bad(c, `dash cast ${c.dash.castId} has no record`);
+    }
+  }
+
+  const ids = state.casts.map((r) => r.id);
+  if (ids.some((id, i) => i > 0 && id <= (ids[i - 1] as number))) problems.push(`tick ${state.tick}: cast ids are not ascending`);
+  for (const record of state.casts) {
+    const where = `tick ${state.tick}: cast ${record.id}`;
+    if (record.id < state.champions.length || record.id >= state.nextEntityId) problems.push(`${where} id out of range`);
+    if (new Set(record.credited).size !== record.credited.length) problems.push(`${where} credits a target twice`);
+    if (record.credited.some((t) => !state.champions[t])) problems.push(`${where} credits an unknown champion`);
+    const referenced =
+      state.champions.some((c) => c.cast?.castId === record.id || c.dash?.castId === record.id) ||
+      state.projectiles.some((p) => p.castId === record.id) ||
+      state.areas.some((a) => a.castId === record.id);
+    if (!referenced) problems.push(`${where} is not referenced`);
+  }
+  const entityIds = [...state.projectiles.map((p) => p.id), ...state.areas.map((a) => a.id), ...ids];
+  if (new Set(entityIds).size !== entityIds.length) problems.push(`tick ${state.tick}: entity and cast ids repeat`);
+  for (const entity of [...state.projectiles, ...state.areas]) {
+    if (entity.castId !== null && !state.casts.some((r) => r.id === entity.castId)) {
+      problems.push(`tick ${state.tick}: entity ${entity.id} refers to cast ${entity.castId}, which is gone`);
+    }
+  }
+  return problems;
+}
+
 /** Paths of every `-0` in a JSON-like value, since a JSON round trip would turn it into 0. */
 export function findNegativeZero(value: unknown, path: string): string[] {
   if (typeof value === 'number') return Object.is(value, -0) ? [path] : [];
