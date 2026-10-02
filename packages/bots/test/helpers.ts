@@ -1,6 +1,9 @@
 import arena01Json from '../../../data/arenas/arena01.json';
-import { CHAMPION_RADIUS, parseArenaDef } from '@claudeline/sim';
-import type { ArenaDef, MatchConfig } from '@claudeline/sim';
+import { CHAMPION_RADIUS, createMatch, parseArenaDef, step } from '@claudeline/sim';
+import type { ArenaDef, ChampionState, GameState, MatchConfig, PlayerInput } from '@claudeline/sim';
+import { createBot } from '../src/bot';
+import type { Bot } from '../src/bot';
+import type { Difficulty } from '../src/difficulty';
 
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
 
@@ -64,4 +67,105 @@ export function oracleSegmentViolates(arena: ArenaDef, a: Point, b: Point): bool
     if (clearanceAt(arena, x, y) < -tolerance) return true;
   }
   return false;
+}
+
+const INVARIANT_TOLERANCE = 1e-9;
+
+/**
+ * A copy of the sim's `checkInvariants` (bots tests must not import sim tests). Returns one
+ * message per violation: non-finite values, boundary, obstacle and champion overlap.
+ */
+export function checkInvariants(state: GameState): string[] {
+  const problems: string[] = [];
+  const { width, height } = state.arena.size;
+  const r = CHAMPION_RADIUS;
+  const tag = (c: ChampionState, what: string) => `tick ${state.tick} champion ${c.id}: ${what}`;
+
+  for (const c of state.champions) {
+    for (const key of ['x', 'y', 'vx', 'vy', 'facing', 'health'] as const) {
+      if (!Number.isFinite(c[key])) problems.push(tag(c, `${key} is ${c[key]}`));
+    }
+    if (c.x < -width / 2 + r - INVARIANT_TOLERANCE || c.x > width / 2 - r + INVARIANT_TOLERANCE) {
+      problems.push(tag(c, `x ${c.x} outside the boundary`));
+    }
+    if (c.y < -height / 2 + r - INVARIANT_TOLERANCE || c.y > height / 2 - r + INVARIANT_TOLERANCE) {
+      problems.push(tag(c, `y ${c.y} outside the boundary`));
+    }
+    state.arena.obstacles.forEach((o, i) => {
+      if (o.type === 'circle') {
+        const dist = Math.hypot(c.x - o.x, c.y - o.y);
+        if (dist < o.r + r - INVARIANT_TOLERANCE) {
+          problems.push(tag(c, `overlaps circle ${i} (${dist})`));
+        }
+      } else {
+        const gapX = Math.max(Math.abs(c.x - o.x) - o.w / 2, 0);
+        const gapY = Math.max(Math.abs(c.y - o.y) - o.h / 2, 0);
+        const dist = Math.hypot(gapX, gapY);
+        if (dist < r - INVARIANT_TOLERANCE) problems.push(tag(c, `overlaps rect ${i} (${dist})`));
+      }
+    });
+  }
+  for (const a of state.champions) {
+    for (const b of state.champions) {
+      if (b.id <= a.id || !a.alive || !b.alive) continue;
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist < 2 * r - INVARIANT_TOLERANCE) {
+        problems.push(`tick ${state.tick}: champions ${a.id} and ${b.id} overlap (${dist})`);
+      }
+    }
+  }
+  return problems;
+}
+
+/** A 2v2 arena01 match with one bot per champion. `advance` runs one tick. */
+export interface MatchRun {
+  state: GameState;
+  bots: Bot[];
+  /** inputs[t][i] is what bot i returned on tick t. */
+  inputs: PlayerInput[][];
+  advance(): PlayerInput[];
+}
+
+export function createRun(
+  botSeeds: readonly number[],
+  tiers: readonly Difficulty[],
+  matchSeed = 7,
+): MatchRun {
+  const state = createMatch(config2v2(), arena01, matchSeed);
+  const bots = state.champions.map((c) => {
+    const seed = botSeeds[c.id];
+    const tier = tiers[c.id];
+    if (seed === undefined || tier === undefined) throw new Error(`no seed or tier for ${c.id}`);
+    return createBot(c.id, tier, seed);
+  });
+  const inputs: PlayerInput[][] = [];
+  return {
+    state,
+    bots,
+    inputs,
+    advance(): PlayerInput[] {
+      const tickInputs = bots.map((bot) => bot.think(state));
+      step(state, tickInputs);
+      inputs.push(tickInputs);
+      return tickInputs;
+    },
+  };
+}
+
+/** Runs a match for `ticks` ticks; `before` runs ahead of each tick's thinks. */
+export function runMatch(
+  botSeeds: readonly number[],
+  tiers: readonly Difficulty[],
+  ticks: number,
+  onTick?: (run: MatchRun, tick: number, tickInputs: PlayerInput[]) => void,
+  before?: (run: MatchRun, tick: number) => void,
+  matchSeed = 7,
+): MatchRun {
+  const run = createRun(botSeeds, tiers, matchSeed);
+  for (let tick = 0; tick < ticks; tick++) {
+    before?.(run, tick);
+    const tickInputs = run.advance();
+    onTick?.(run, tick, tickInputs);
+  }
+  return run;
 }
