@@ -9,6 +9,7 @@ interface Hooks {
   areas: number;
   hits: number;
   deaths: number;
+  rings: number;
   flashing: string[];
   bars: string[];
   debugShots: number;
@@ -26,15 +27,22 @@ const RING = colourNear([0xff, 0xd2, 0x3f], 8);
 // Champion 2 is the first enemy and the target of the F4 shots.
 const TARGET = 2;
 const SHOTS = 8;
+// RING_TICKS in the client's impact-rings.ts: how long a ring lives, in sim ticks.
+const RING_TICKS = 18;
+// Ticks of slack after a ring's life, for the frame that retires it.
+const RING_SLACK_TICKS = 4;
 
-// The functions whose allocations the heap probe counts: the combat render
-// modules, and the three main.ts functions that call them every frame.
+// The functions whose allocations the heap probe counts: every combat render
+// module, the pose and overlay helpers that run each frame, the loop clock, and
+// every function in main.ts (frame, stepSim, sampleAim, draw and the hook writers).
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback)\.ts:|^main\.ts:(draw|stepSim|writeCombatHooks)$/;
-// Measured in a warm steady state: 0 bytes with the views as written, and over
-// 10 KB when draw makes one { x, y } literal per projectile per frame. See the
-// pull request for the numbers.
-const COMBAT_ALLOCATION_LIMIT_BYTES = 2048;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop)\.ts:|^main\.ts:/;
+// Measured in a warm steady state: 0 bytes with the code as written. Each of
+// these fails it: a template string written to a hook every frame (about 800 B),
+// a closure made per call in routeEvents (about 1500 B), and an object literal
+// per projectile per frame in draw that escapes (about 11 KB). The limit stays
+// just above zero so the small ones are caught. See the pull request.
+const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
 // Anything counted at all proves the profiler saw the sim's own garbage.
 const PROFILER_SANITY_BYTES = 100_000;
 
@@ -50,6 +58,7 @@ async function readHooks(page: Page): Promise<Hooks> {
       areas: Number(d['areas']),
       hits: Number(d['hits']),
       deaths: Number(d['deaths']),
+      rings: Number(d['rings']),
       flashing: list(d['flashing']),
       bars: list(d['bars']),
       debugShots: Number(d['debugShots']),
@@ -108,18 +117,38 @@ function summarise(root: ProfileNode): Allocations {
   return result;
 }
 
+// 30 frames of 17 ms: one 500 ms window and about 30 ticks.
+const WINDOW_FRAMES = 30;
+// A shot flies 27 m at 10 m/s, 162 ticks or 5.4 windows, from the spawn to the east boundary.
+const WINDOWS_PER_FLIGHT = 6;
+// Volleys the engine warms up on before the measured one.
+const WARM_UP_VOLLEYS = 4;
+// One window after the volley, then the measured ones. All of them end before the first shot does.
+const SETTLE_WINDOWS = 1;
+const MEASURED_WINDOWS = 3;
+
+/** Runs one window of frames, 500 ms of fake time. */
+async function runWindow(page: Page): Promise<void> {
+  for (let frame = 0; frame < WINDOW_FRAMES; frame++) await page.clock.runFor(FRAME_MS);
+}
+
+/** Eight shots in the same frame. */
+async function fireVolley(page: Page): Promise<void> {
+  for (let shot = 0; shot < SHOTS; shot++) await page.keyboard.press('F4');
+}
+
 /**
- * Runs 500 ms of fake time under the sampling heap profiler, which counts
- * garbage as well as live objects. A plain heap delta cannot be used: the sim
- * allocates inside `step` on every projectile sweep, far more than any view.
+ * Runs one window under the sampling heap profiler, which counts garbage as
+ * well as live objects. A plain heap delta cannot be used: the sim allocates
+ * inside `step` on every projectile sweep, far more than any view.
  */
-async function allocationsOverHalfASecond(page: Page, cdp: CDPSession): Promise<Allocations> {
+async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allocations> {
   await cdp.send('HeapProfiler.startSampling', {
     samplingInterval: 16,
     includeObjectsCollectedByMajorGC: true,
     includeObjectsCollectedByMinorGC: true,
   });
-  await page.clock.runFor(500);
+  await runWindow(page);
   const { profile } = await cdp.send('HeapProfiler.stopSampling');
   return summarise(profile.head as ProfileNode);
 }
@@ -144,10 +173,7 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.hits).toBe(0);
     expect(hooks.bars).toEqual(['100', '100', '100', '100']);
 
-    // 3. Idle frames for the engine to warm up on.
-    await page.clock.runFor(3000);
-
-    // 4. F4 spawns between steps, so only the array diff can show the shot.
+    // 3. F4 spawns between steps, so only the array diff can show the shot.
     await page.keyboard.press('F4');
     await runTicks(page, 1);
     hooks = await readHooks(page);
@@ -161,23 +187,7 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.projectiles).toBe(SHOTS);
     expect(hooks.debugShots).toBe(SHOTS);
 
-    // 5. The same loop with eight shots in flight, once it is warm, allocates
-    // nothing in the combat code. About 100 ticks fit before the first hit.
-    await allocationsOverHalfASecond(page, cdp);
-    await allocationsOverHalfASecond(page, cdp);
-    const allocations = await allocationsOverHalfASecond(page, cdp);
-    hooks = await readHooks(page);
-    expect(hooks.hits).toBe(0);
-    expect(hooks.projectiles).toBe(SHOTS);
-    expect(allocations.total, 'the profiler saw no allocations at all').toBeGreaterThan(
-      PROFILER_SANITY_BYTES,
-    );
-    expect(
-      allocations.combat,
-      `combat code allocated ${JSON.stringify(allocations.combatByFunction)}`,
-    ).toBeLessThan(COMBAT_ALLOCATION_LIMIT_BYTES);
-
-    // 6. The first hit: the picture shows a white champion and a yellow ring.
+    // 4. The first hit: the picture shows a white champion and a yellow ring.
     hooks = await runUntil(page, 'the first hit', 200, (h) => h.hits >= 1);
     const combat = await page.screenshot({ path: test.info().outputPath('combat.png') });
     const picture = await countPixels(page, combat, [WHITE, RING]);
@@ -187,17 +197,53 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(ring - baselineRing).toBeGreaterThanOrEqual(50);
     expect(hooks.flashing).toContain(String(TARGET));
     expect(hooks.bars[TARGET]).toBe(String(100 - 25 * hooks.hits));
+    expect(hooks.rings, 'a ring shows right after the hit').toBeGreaterThanOrEqual(1);
 
-    // 7. The fourth hit kills it, and its bar goes away.
+    // 5. The fourth hit kills it, and its bar goes away.
     hooks = await runUntil(page, 'the death', 60, (h) => h.deaths >= 1);
     expect(hooks.deaths).toBe(1);
     expect(hooks.bars[TARGET]).toBe('x');
 
-    // 8. The other shots pass through the dead champion and end at the east
+    // 6. The other shots pass through the dead champion and end at the east
     // boundary, and their views end with them.
     hooks = await runUntil(page, 'the last projectile', 60, (h) => h.projectiles === 0);
     expect(hooks.hits).toBe(4);
     expect(hooks.areas).toBe(0);
+
+    // 7. Every ring ends. Only the draw call retires a ring, so a ring that
+    // never grows and fades stays on screen and this fails. The last shot just
+    // ended at the boundary, so no ring can start after this.
+    expect(hooks.rings, 'a ring shows for the last shot').toBeGreaterThanOrEqual(1);
+    hooks = await runUntil(page, 'the rings to end', RING_TICKS + RING_SLACK_TICKS, (h) => h.rings === 0);
+    expect(hooks.rings).toBe(0);
+
+    // 8. Steady state: eight shots in flight and nothing to hit, the loop at
+    // its busiest. The shots pass through the dead champion 2. Code warmed up
+    // on an empty arena is thrown away when the first projectile arrives, so
+    // the engine warms up on volleys. The measured windows hold no spawn and no
+    // end of a shot, only frames with eight shots in flight, and in them the
+    // combat code allocates nothing.
+    for (let volley = 0; volley < WARM_UP_VOLLEYS; volley++) {
+      await fireVolley(page);
+      for (let window = 0; window < WINDOWS_PER_FLIGHT; window++) await runWindow(page);
+    }
+    await fireVolley(page);
+    for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
+    let worst: Allocations | undefined;
+    let sawGarbage = 0;
+    for (let window = 0; window < MEASURED_WINDOWS; window++) {
+      const allocations = await allocationsOverAWindow(page, cdp);
+      sawGarbage = Math.max(sawGarbage, allocations.total);
+      if (!worst || allocations.combat > worst.combat) worst = allocations;
+    }
+    hooks = await readHooks(page);
+    expect(hooks.hits).toBe(4);
+    expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
+    expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);
+    expect(
+      worst?.combat,
+      `combat code allocated ${JSON.stringify(worst?.combatByFunction)}`,
+    ).toBeLessThan(COMBAT_ALLOCATION_LIMIT_BYTES);
   } finally {
     expect(problems).toEqual([]);
   }
