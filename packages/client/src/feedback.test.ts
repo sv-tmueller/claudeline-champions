@@ -119,7 +119,7 @@ describe('combat feedback', () => {
     const feedback = new CombatFeedback(4, createImpactRings());
     feedback.hit(1, 0, 0);
     feedback.hit(1, 0, 0);
-    feedback.death(1, 2, 0);
+    feedback.death();
     expect([feedback.hits, feedback.deaths]).toEqual([2, 1]);
   });
 
