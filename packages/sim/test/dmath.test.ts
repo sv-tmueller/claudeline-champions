@@ -15,6 +15,21 @@ import { atan, atan2 } from '../src/dmath';
 const f64 = new Float64Array(1);
 const u64 = new BigUint64Array(f64.buffer);
 
+const SIGN = 1n << 63n;
+
+/** Position of a double on the number line, counted in ulps (so -0 and 0 are both 0n). */
+function ordinal(value: number): bigint {
+  f64[0] = value;
+  const raw = u64[0] ?? 0n;
+  return raw & SIGN ? -(raw & ~SIGN) : raw;
+}
+
+/** How many representable doubles apart `a` and `b` are. */
+function ulpDistance(a: number, b: number): bigint {
+  const d = ordinal(a) - ordinal(b);
+  return d < 0n ? -d : d;
+}
+
 function bits(value: number): string {
   f64[0] = value;
   return (u64[0] ?? 0n).toString(16).padStart(16, '0');
@@ -48,6 +63,17 @@ function inputs(): [number, number][] {
   return out;
 }
 
+describe('ulpDistance', () => {
+  it('counts representable doubles, also near zero and across its sign', () => {
+    expect(ulpDistance(1, 1)).toBe(0n);
+    expect(ulpDistance(1, 1 + 3 * Number.EPSILON)).toBe(3n);
+    expect(ulpDistance(0.5, 0.5 + 3 * Number.EPSILON)).toBe(6n);
+    expect(ulpDistance(-1, -(1 + 2 * Number.EPSILON))).toBe(2n);
+    expect(ulpDistance(0, -0)).toBe(0n);
+    expect(ulpDistance(Number.MIN_VALUE, -Number.MIN_VALUE)).toBe(2n);
+  });
+});
+
 describe('atan2 bit patterns', () => {
   it('matches the committed bit patterns on every input', () => {
     const actual = inputs().map(([y, x]) => bits(atan2(y, x)));
@@ -55,11 +81,10 @@ describe('atan2 bit patterns', () => {
     expect(actual).toEqual(bitsJson);
   });
 
-  it('stays within two ulps of Math.atan2', () => {
+  it('stays within 2 ulps of Math.atan2', () => {
     for (const [y, x] of inputs()) {
       const reference = Math.atan2(y, x);
-      const tolerance = 2 * Number.EPSILON * Math.max(1, Math.abs(reference));
-      expect(Math.abs(atan2(y, x) - reference)).toBeLessThanOrEqual(tolerance);
+      expect(ulpDistance(atan2(y, x), reference)).toBeLessThanOrEqual(2n);
     }
   });
 });
@@ -126,13 +151,12 @@ describe('atan', () => {
     expect(atan(-1e-20)).toBe(-1e-20);
   });
 
-  it('stays within two ulps of Math.atan on every reduction range', () => {
+  it('stays within 2 ulps of Math.atan on every reduction range', () => {
     const next = lcg(7);
     for (let i = 0; i < 1000; i++) {
       const x = (next() * 2 - 1) * 10 ** (next() * 6 - 3);
       const reference = Math.atan(x);
-      const tolerance = 2 * Number.EPSILON * Math.max(1, Math.abs(reference));
-      expect(Math.abs(atan(x) - reference)).toBeLessThanOrEqual(tolerance);
+      expect(ulpDistance(atan(x), reference)).toBeLessThanOrEqual(2n);
     }
   });
 });
