@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, hasLineOfSight, step } from '@claudeline/sim';
 import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
-import { createBot } from '../src/bot';
+import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
 import { profileFor } from '../src/profile';
-import { KITE_STEP, TARGET_SWITCH_MARGIN } from '../src/bot';
-import { NOMINAL_PROJECTILE_SPEED, leadPoint, roundAim } from '../src/aim';
+import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
+import { createRng } from '../src/rng';
 import { arena01, config2v2 } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -426,29 +426,26 @@ describe('reaction delay', () => {
 describe('aim lead', () => {
   it('leads a target walking across the line of fire, to the centimetre', () => {
     const tier = TIERS.hard;
-    const savedMaxU = tier.maxU;
-    // A test-only path to a zero aim error: the tier's error range is emptied for this test.
-    tier.maxU = 0;
-    try {
-      const state = setup();
-      kill(state, 0, 3);
-      const me = put(state, 1, -5, 0);
-      const target = put(state, 2, 5, 0);
-      target.vx = 0;
-      target.vy = 5.5;
-      const bot = createBot(1, 'hard', 3);
-      const input = thinkTimes(bot, state, tier.delay + 1);
-      expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
+    const state = setup();
+    kill(state, 0, 3);
+    const me = put(state, 1, -5, 0);
+    const target = put(state, 2, 5, 0);
+    target.vx = 0;
+    target.vy = 5.5;
+    const seed = 3;
+    const bot = createBot(1, 'hard', seed);
+    const input = thinkTimes(bot, state, tier.delay + 1);
+    expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
 
-      const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, NOMINAL_PROJECTILE_SPEED);
-      expect(input.aimX).toBe(roundAim(lead.x));
-      expect(input.aimY).toBe(roundAim(lead.y));
-      // The lead is well ahead of the target, not at its current position.
-      expect(Math.hypot(input.aimX / 100 - target.x, input.aimY / 100 - target.y)).toBeGreaterThan(1);
-      expect(input.aimY).toBeGreaterThan(100);
-    } finally {
-      tier.maxU = savedMaxU;
-    }
+    // The bot's first aim draw, replayed from the same seed, is the one error in force.
+    const u = (2 * createRng(seed).next() - 1) * tier.maxU;
+    const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, NOMINAL_PROJECTILE_SPEED);
+    const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+    expect(input.aimX).toBe(roundAim(me.x + turned.x));
+    expect(input.aimY).toBe(roundAim(me.y + turned.y));
+    // The lead is well ahead of the target, not at its current position.
+    expect(Math.hypot(input.aimX / 100 - target.x, input.aimY / 100 - target.y)).toBeGreaterThan(1);
+    expect(input.aimY).toBeGreaterThan(100);
   });
 });
 

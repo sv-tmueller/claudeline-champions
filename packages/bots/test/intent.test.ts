@@ -160,4 +160,9 @@ describe('TIERS', () => {
       expect(t.maxU).toBeCloseTo(Math.tan(((degrees / 2) * Math.PI) / 180), 15);
     });
   }
+
+  it('is frozen, the table and every tier, so no bot or test can change a tier', () => {
+    expect(Object.isFrozen(TIERS)).toBe(true);
+    for (const [tier] of expected) expect(Object.isFrozen(TIERS[tier]), tier).toBe(true);
+  });
 });
