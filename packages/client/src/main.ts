@@ -133,9 +133,10 @@ function stepSim(steps: number): void {
 /** Draws interpolated poses. Never steps the sim. */
 function draw(alpha: number): void {
   interpolatePoses(previousPoses, state.champions, alpha, drawnPoses);
-  for (const [i, pose] of drawnPoses.entries()) {
+  for (let i = 0; i < drawnPoses.length; i++) {
+    const pose = drawnPoses[i];
     const view = champions.children[i];
-    if (!view) continue;
+    if (!pose || !view) continue;
     view.position.set(pose.x, 0, -pose.y);
     view.rotation.y = pose.facing;
   }
@@ -165,5 +166,7 @@ async function loadModels(): Promise<void> {
 await loadModels();
 capturePoses(state.champions, previousPoses);
 writeHooks();
+// Draw once so the arena and champions are on the canvas before the hook.
+draw(0);
 renderer.domElement.dataset['arena'] = arena.id;
 renderer.setAnimationLoop(frame);

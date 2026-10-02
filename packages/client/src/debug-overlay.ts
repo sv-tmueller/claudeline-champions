@@ -23,14 +23,19 @@ function rectCorners(x: number, y: number, w: number, h: number): Vector3[] {
   ];
 }
 
-function footprint(obstacle: Obstacle): Vector3[] {
-  if (obstacle.type === 'rect') return rectCorners(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+/** A circle in sim space as CIRCLE_SEGMENTS points, lifted to OVERLAY_Y. */
+function circlePoints(cx: number, cy: number, r: number): Vector3[] {
   const points: Vector3[] = [];
   for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
     const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
-    points.push(lifted(obstacle.x + obstacle.r * Math.cos(angle), obstacle.y + obstacle.r * Math.sin(angle)));
+    points.push(lifted(cx + r * Math.cos(angle), cy + r * Math.sin(angle)));
   }
   return points;
+}
+
+function footprint(obstacle: Obstacle): Vector3[] {
+  if (obstacle.type === 'rect') return rectCorners(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+  return circlePoints(obstacle.x, obstacle.y, obstacle.r);
 }
 
 /**
@@ -57,12 +62,9 @@ export function buildDebugOverlay(arena: ArenaDef, championCount: number): Group
   // updateChampionCircles, so a frame only writes a position.
   const circles = new Group();
   circles.name = 'ChampionCircles';
-  const circlePoints = Array.from({ length: CIRCLE_SEGMENTS }, (_, i) => {
-    const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
-    return new Vector3(CHAMPION_RADIUS * Math.cos(angle), OVERLAY_Y, CHAMPION_RADIUS * Math.sin(angle));
-  });
+  const circle = circlePoints(0, 0, CHAMPION_RADIUS);
   for (let i = 0; i < championCount; i++) {
-    const loop = new LineLoop(new BufferGeometry().setFromPoints(circlePoints), material);
+    const loop = new LineLoop(new BufferGeometry().setFromPoints(circle), material);
     loop.renderOrder = 1;
     circles.add(loop);
   }
@@ -74,7 +76,9 @@ export function buildDebugOverlay(arena: ArenaDef, championCount: number): Group
 export function updateChampionCircles(overlay: Group, poses: readonly Pose[]): void {
   const circles = overlay.getObjectByName('ChampionCircles');
   if (!circles) throw new Error('overlay has no ChampionCircles group');
-  for (const [i, pose] of poses.entries()) {
+  for (let i = 0; i < poses.length; i++) {
+    const pose = poses[i];
+    if (!pose) continue;
     // Same mapping as simToThree, written in place.
     circles.children[i]?.position.set(pose.x, 0, -pose.y);
   }

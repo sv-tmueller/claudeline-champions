@@ -13,9 +13,10 @@ export function createPoses(count: number): Pose[] {
 
 /** Copies position and facing into `into` in place; no allocation per call. */
 export function capturePoses(champions: readonly Pose[], into: Pose[]): void {
-  for (const [i, champion] of champions.entries()) {
+  for (let i = 0; i < champions.length; i++) {
+    const champion = champions[i];
     const pose = into[i];
-    if (!pose) continue;
+    if (!champion || !pose) continue;
     pose.x = champion.x;
     pose.y = champion.y;
     pose.facing = champion.facing;
@@ -36,10 +37,11 @@ export function interpolatePoses(
   alpha: number,
   out: Pose[],
 ): void {
-  for (const [i, current] of champions.entries()) {
+  for (let i = 0; i < champions.length; i++) {
+    const current = champions[i];
     const before = previous[i];
     const pose = out[i];
-    if (!before || !pose) continue;
+    if (!current || !before || !pose) continue;
     pose.x = before.x + (current.x - before.x) * alpha;
     pose.y = before.y + (current.y - before.y) * alpha;
     pose.facing = lerpAngle(before.facing, current.facing, alpha);
