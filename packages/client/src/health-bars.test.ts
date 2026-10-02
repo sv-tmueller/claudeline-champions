@@ -1,6 +1,7 @@
-import type { ChampionState, TeamId } from '@claudeline/sim';
+import { createMatch, parseArenaDef, type ChampionState, type TeamId } from '@claudeline/sim';
 import type { Sprite, SpriteMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
+import arena01Json from '../../../data/arenas/arena01.json';
 import {
   ALLY_BAR_COLOUR,
   BAR_BACK_COLOUR,
@@ -11,8 +12,30 @@ import {
 } from './health-bars';
 import type { Pose } from './interpolate';
 
+// A real champion from the sim as the template, so a field the sim adds later
+// does not break the literals here.
+const TEMPLATE: ChampionState = (() => {
+  const state = createMatch(
+    {
+      teamSize: 2,
+      players: [
+        { championId: 'x', team: 'A' },
+        { championId: 'x', team: 'A' },
+        { championId: 'x', team: 'B' },
+        { championId: 'x', team: 'B' },
+      ],
+    },
+    parseArenaDef(arena01Json),
+    1,
+  );
+  const first = state.champions[0];
+  if (!first) throw new Error('no champion');
+  return first;
+})();
+
 function champion(id: number, team: TeamId, health = 120): ChampionState {
   return {
+    ...TEMPLATE,
     id,
     team,
     championId: 'x',
