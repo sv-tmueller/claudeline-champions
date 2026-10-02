@@ -17,6 +17,7 @@ import { createAreaViews, createProjectileViews } from './entity-views';
 import { CombatFeedback, flashText, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
 import { createImpactRings } from './impact-rings';
+import { createKillFeed } from './kill-feed';
 import { bindInput, createInputCore } from './input';
 import { capturePoses, createPoses, interpolatePoses } from './interpolate';
 import { createFixedStepClock } from './loop';
@@ -68,7 +69,8 @@ const projectileViews = createProjectileViews(human.team);
 const areaViews = createAreaViews(human.team);
 const impactRings = createImpactRings();
 const healthBars = createHealthBars(state.champions, human.team);
-const feedback = new CombatFeedback(state.champions.length, impactRings);
+const killFeed = createKillFeed();
+const feedback = new CombatFeedback(state.champions.length, impactRings, killFeed);
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
