@@ -25,7 +25,8 @@ import { describe, expect, it } from 'vitest';
 import fixtureJson from './fixtures/scripted-abilities-arena01-2v2.json';
 import { checksum, cloneState, createMatch, step } from '../src/index';
 import type { GameState, MatchConfig, PlayerInput, SimEvent } from '../src/index';
-import { AbilityWatcher, Coverage } from './ability-watch';
+import { AbilityWatcher, Coverage, copyChampions } from './ability-watch';
+import type { Champions } from './ability-watch';
 import { EVENT_FIXTURE, arena01, checkAbilityInvariants, champion, input, openArena } from './helpers';
 import { kitWith, quiet, testMender, testStriker } from './kits';
 
@@ -171,7 +172,7 @@ const ABILITY_EVENTS = (Object.keys(EVENT_FIXTURE) as SimEvent['type'][]).filter
 describe('scripted ability fixture', () => {
   it('keeps every oracle after every action and every step', () => {
     const state = start();
-    const watcher = new AbilityWatcher(state, cloneState);
+    const watcher = new AbilityWatcher(state);
     let steps = 0;
     play(state, 0, {
       afterAction: (s) => watcher.afterEnergySet(s),
@@ -187,11 +188,11 @@ describe('scripted ability fixture', () => {
 
   it('exercises everything the plan requires', () => {
     const coverage = new Coverage();
-    let before: GameState | undefined;
+    let before: Champions | undefined;
     play(start(), 0, {
       afterAction: (_, action) => coverage.energyWasSet(action.spec.championId),
       beforeStep: (s) => {
-        before = cloneState(s);
+        before = copyChampions(s);
       },
       afterStep: (s, inputs) => {
         if (before) coverage.note(s, before, inputs);
@@ -289,7 +290,7 @@ describe('the ability oracles', () => {
 
   it('has the watcher flag a step that moves energy or a cooldown by itself', () => {
     const energy = striking();
-    const w1 = new AbilityWatcher(energy, cloneState);
+    const w1 = new AbilityWatcher(energy);
     w1.beforeStep(energy);
     step(energy, []);
     champion(energy, 1).energy += 1;
@@ -297,7 +298,7 @@ describe('the ability oracles', () => {
     expect(w1.problems.join('\n')).toContain('champion 1 energy 1 is not 0');
 
     const cooldown = striking();
-    const w2 = new AbilityWatcher(cooldown, cloneState);
+    const w2 = new AbilityWatcher(cooldown);
     w2.beforeStep(cooldown);
     step(cooldown, []);
     champion(cooldown, 0).cooldowns[3] = 5;
@@ -307,7 +308,7 @@ describe('the ability oracles', () => {
 
   it('has the watcher flag a windup that does not count down and a cast that vanishes', () => {
     const stuck = striking();
-    const w1 = new AbilityWatcher(stuck, cloneState);
+    const w1 = new AbilityWatcher(stuck);
     w1.beforeStep(stuck);
     step(stuck, []);
     champion(stuck, 0).cast!.windupLeft = 10;
@@ -315,7 +316,7 @@ describe('the ability oracles', () => {
     expect(w1.problems.join('\n')).toContain('windup did not count down');
 
     const gone = striking();
-    const w2 = new AbilityWatcher(gone, cloneState);
+    const w2 = new AbilityWatcher(gone);
     w2.beforeStep(gone);
     step(gone, []);
     champion(gone, 0).cast = null;
@@ -326,7 +327,7 @@ describe('the ability oracles', () => {
 
   it('has the watcher flag a champion that walks while stunned, and one that casts while silenced', () => {
     const walker = striking();
-    const w1 = new AbilityWatcher(walker, cloneState);
+    const w1 = new AbilityWatcher(walker);
     walker.champions[2]!.statuses.push({ type: 'stun', sourceId: 0, slot: null, remainingTicks: 5 });
     w1.beforeStep(walker);
     step(walker, []);
@@ -347,7 +348,7 @@ describe('the ability oracles', () => {
       [kitWith('k0', { M1: quiet({ cooldownTicks: 30 }) })],
     );
     const run = (inputs: PlayerInput[]) => {
-      const before = cloneState(state);
+      const before = copyChampions(state);
       step(state, inputs);
       coverage.note(state, before, inputs);
     };

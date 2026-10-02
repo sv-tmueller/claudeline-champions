@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { checksum, cloneState, createMatch, step } from '../src/index';
 import type { GameState, MatchConfig, PlayerInput, SimEvent } from '../src/index';
 import { nextRandom } from '../src/rng';
-import { AbilityWatcher, Coverage } from './ability-watch';
+import { AbilityWatcher, Coverage, copyChampions } from './ability-watch';
 import { arena01 } from './helpers';
 import { MENDER_ID, STRIKER_ID, testMender, testStriker } from './kits';
 
@@ -56,11 +56,12 @@ function randomInputs(state: GameState, held: PlayerInput[]): PlayerInput[] {
   });
 }
 
-function play(seed: number): Run {
+/** `watch` false skips the oracles, for a replay that only needs the final state. */
+function play(seed: number, watch = true): Run {
   const state = createMatch(CONFIG, arena01, seed, [testStriker(), testMender()]);
   // Enough health that the champions live long enough for casts to interleave, but still die.
   for (const c of state.champions) c.health = c.maxHealth = 150;
-  const watcher = new AbilityWatcher(state, cloneState);
+  const watcher = new AbilityWatcher(state);
   const coverage = new Coverage();
   let held: PlayerInput[] = [];
   for (let t = 0; t < TICKS; t++) {
@@ -68,11 +69,15 @@ function play(seed: number): Run {
       const id = between(state, 0, 3);
       const champion = state.champions[id];
       if (champion) champion.energy = [0, 24, 25, 60, 98, 100][between(state, 0, 5)] as number;
-      watcher.afterEnergySet(state);
+      if (watch) watcher.afterEnergySet(state);
       coverage.energyWasSet(id);
     }
     held = randomInputs(state, held);
-    const before = cloneState(state);
+    if (!watch) {
+      step(state, held);
+      continue;
+    }
+    const before = copyChampions(state);
     watcher.beforeStep(state);
     step(state, held);
     watcher.afterStep(state, held);
@@ -98,7 +103,7 @@ describe('cast stress run', () => {
   });
 
   it('gives the same checksum when run twice', () => {
-    expect(checksum(play(20251003).state)).toBe(checksum(run.state));
+    expect(checksum(play(20251003, false).state)).toBe(checksum(run.state));
   });
 
   it('continues identically from a clone', () => {

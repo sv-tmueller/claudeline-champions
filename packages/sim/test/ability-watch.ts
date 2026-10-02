@@ -13,6 +13,15 @@ const SHIFT = 128;
 export const PRIORITY: Slot[] = ['F', 'R', 'E', 'Q', 'SPACE', 'M2', 'M1'];
 const SLOT_INDEX: Record<Slot, number> = { M1: 0, M2: 1, SPACE: 2, Q: 3, E: 4, R: 5, F: 6 };
 
+/** What a step needs of the state before it: the champions only, which is cheap to copy. */
+export interface Champions {
+  champions: ChampionState[];
+}
+
+export function copyChampions(state: GameState): Champions {
+  return { champions: JSON.parse(JSON.stringify(state.champions)) as ChampionState[] };
+}
+
 export type Rejection = 'dead' | 'stunned' | 'silenced' | 'windup' | 'cooldown' | 'energy' | 'rooted';
 export const REJECTIONS: Rejection[] = ['dead', 'stunned', 'silenced', 'windup', 'cooldown', 'energy', 'rooted'];
 
@@ -76,7 +85,7 @@ export class Coverage {
   }
 
   /** Notes everything one step shows; `before` and `inputs` are what it started from. */
-  note(state: GameState, before: GameState, inputs: readonly (PlayerInput | undefined)[]): void {
+  note(state: GameState, before: Champions, inputs: readonly (PlayerInput | undefined)[]): void {
     const events = state.events;
     const snaps = before.champions.map(snapshot);
     for (const [i, e] of events.entries()) {
@@ -231,7 +240,7 @@ export class Coverage {
  */
 export class AbilityWatcher {
   problems: string[] = [];
-  private before: GameState | null = null;
+  private before: Champions | null = null;
   private energy: number[];
   private statusOpen = new Map<string, number>();
   private dashOpen = new Map<number, number>();
@@ -239,7 +248,7 @@ export class AbilityWatcher {
   private gained = new Set<string>();
   private health: number[];
 
-  constructor(initial: GameState, private readonly cloneState: (s: GameState) => GameState) {
+  constructor(initial: GameState) {
     this.energy = initial.champions.map((c) => c.energy);
     this.health = initial.champions.map((c) => c.health);
   }
@@ -249,7 +258,7 @@ export class AbilityWatcher {
   }
 
   beforeStep(state: GameState): void {
-    this.before = this.cloneState(state);
+    this.before = copyChampions(state);
   }
 
   afterEnergySet(state: GameState): void {
@@ -272,9 +281,13 @@ export class AbilityWatcher {
     this.problems.push(...checkInvariants(state), ...checkStatusInvariants(state), ...checkAbilityInvariants(state));
     const negative = findNegativeZero(state, 'state');
     this.check(negative.length === 0, `-0 at ${negative.join(', ')}`, state);
+    // The arena and the kits never change during a run, so the per-step round trip skips them.
+    const dynamic = { ...state } as Partial<GameState>;
+    delete dynamic.arena;
+    delete dynamic.kits;
     try {
-      checksum(state);
-      expect(JSON.parse(JSON.stringify(state))).toStrictEqual(state);
+      checksum(dynamic as GameState);
+      expect(JSON.parse(JSON.stringify(dynamic))).toStrictEqual(dynamic);
     } catch (error) {
       this.problems.push(`tick ${state.tick}: checksum or JSON round trip failed: ${String(error)}`);
     }
@@ -363,10 +376,9 @@ export class AbilityWatcher {
   }
 
   /** The rules of casting, windups, cooldowns and movement, one champion at a time. */
-  private rules(state: GameState, before: GameState, inputs: readonly (PlayerInput | undefined)[]): void {
+  private rules(state: GameState, before: Champions, inputs: readonly (PlayerInput | undefined)[]): void {
     for (const c of state.champions) {
-      const b = before.champions[c.id] as ChampionState;
-      const snap = snapshot(b);
+      const snap = snapshot(before.champions[c.id] as ChampionState);
       const kit = kitOf(state, c);
       const started = state.events.find((e) => e.type === 'castStarted' && e.championId === c.id);
       const fired = state.events.filter((e) => e.type === 'castFired' && e.championId === c.id);
