@@ -85,6 +85,7 @@ export class Hud {
   private readonly lineShown: number[] = [];
   private readonly lineKiller: number[] = [];
   private readonly lineVictim: number[] = [];
+  private feedChanges = -1;
 
   constructor(
     private readonly handles: HudHandles,
@@ -192,6 +193,8 @@ export class Hud {
   private updateKillFeed(tick: number): void {
     const feed = this.killFeed;
     feed.expire(tick);
+    if (feed.changes === this.feedChanges) return;
+    this.feedChanges = feed.changes;
     for (let i = 0; i < KILL_FEED_LINES; i++) {
       const handle = this.handles.lines[i];
       if (!handle) continue;

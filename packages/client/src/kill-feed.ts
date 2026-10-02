@@ -13,7 +13,8 @@ export interface KillLine {
 /**
  * The last few deaths, oldest first. The five entries are made once and
  * rewritten in place, so a death or an expiry allocates nothing. `changes`
- * counts pushes and expiries, so a reader can tell the feed moved.
+ * counts pushes and expiries, so the HUD can skip its lines while the feed has
+ * not moved.
  */
 export class KillFeed {
   /** Lines showing right now. */
@@ -42,15 +43,14 @@ export class KillFeed {
     this.changes += 1;
   }
 
-  /** Removes the lines older than `KILL_FEED_TICKS` at `tick`. Returns whether any left. */
-  expire(tick: number): boolean {
+  /** Removes the lines older than `KILL_FEED_TICKS` at `tick`. Counts one change when any left. */
+  expire(tick: number): void {
     let removed = false;
     while (this.count > 0 && tick - (this.lines[0] as KillLine).tick >= KILL_FEED_TICKS) {
       this.dropOldest();
       removed = true;
     }
     if (removed) this.changes += 1;
-    return removed;
   }
 
   private dropOldest(): void {

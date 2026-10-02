@@ -26,11 +26,15 @@ describe('kill feed', () => {
   it('shows a line from tick T at T + 299 and not at T + 300', () => {
     const feed = createKillFeed();
     feed.push(100, 0, 2);
-    expect(feed.expire(399)).toBe(false);
+    const changes = feed.changes;
+    feed.expire(399);
     expect(feed.count).toBe(1);
-    expect(feed.expire(400)).toBe(true);
+    expect(feed.changes).toBe(changes);
+    feed.expire(400);
     expect(feed.count).toBe(0);
-    expect(feed.expire(401)).toBe(false);
+    expect(feed.changes).toBe(changes + 1);
+    feed.expire(401);
+    expect(feed.changes).toBe(changes + 1);
   });
 
   it('expires lines one by one, oldest first, and counts each change', () => {
@@ -38,12 +42,13 @@ describe('kill feed', () => {
     feed.push(100, 0, 2);
     feed.push(150, 1, 3);
     const changes = feed.changes;
-    expect(feed.expire(400)).toBe(true);
+    feed.expire(400);
     expect(feed.count).toBe(1);
     expect(feed.line(0)).toEqual({ tick: 150, killerId: 1, victimId: 3 });
     expect(feed.changes).toBe(changes + 1);
-    expect(feed.expire(450)).toBe(true);
+    feed.expire(450);
     expect(feed.count).toBe(0);
+    expect(feed.changes).toBe(changes + 2);
   });
 
   it('drops the oldest line when a sixth is pushed', () => {

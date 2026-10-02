@@ -1,5 +1,5 @@
 import { SLOTS, createMatch, parseArenaDef, type GameState } from '@claudeline/sim';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import { Hud, type HudElement, type HudHandles } from './hud';
 import { KILL_FEED_LINES, KILL_FEED_TICKS, createKillFeed, type KillFeed } from './kill-feed';
@@ -316,6 +316,23 @@ describe('HUD kill feed', () => {
     expect(first?.killer.log).toEqual(['text=Hargrim', 'data-team=ally']);
     expect(first?.victim.log).toEqual(['text=Lumeth', 'data-team=enemy']);
     expect(writeCount(elements)).toBe(5);
+  });
+
+  it('reads no line while the feed has not changed', () => {
+    const { hud, state, feed } = rig();
+    state.tick = 100;
+    feed.push(100, 2, 0);
+    hud.update(state);
+    const read = vi.spyOn(feed, 'line');
+    state.tick = 101;
+    hud.update(state);
+    expect(read).not.toHaveBeenCalled();
+    state.tick = 100 + KILL_FEED_TICKS;
+    hud.update(state);
+    expect(read).not.toHaveBeenCalled();
+    feed.push(state.tick, 0, 2);
+    hud.update(state);
+    expect(read).toHaveBeenCalled();
   });
 
   it('hides the line once when it expires and writes nothing else', () => {
