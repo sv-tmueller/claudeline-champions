@@ -18,6 +18,8 @@ export class ImpactRings {
   readonly group = new Group();
   /** Rings spawned so far. */
   spawned = 0;
+  /** Rings showing right now. */
+  visibleCount = 0;
   private readonly meshes: Mesh[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
   private readonly startTicks: number[] = [];
@@ -52,6 +54,8 @@ export class ImpactRings {
     mesh.position.set(x, RING_Y, -y);
     mesh.visible = true;
     this.startTicks[index] = tick;
+    // Taking the oldest ring while it still shows leaves the count as it was.
+    if (!this.active[index]) this.visibleCount += 1;
     this.active[index] = true;
     this.spawned += 1;
   }
@@ -65,6 +69,7 @@ export class ImpactRings {
       if (age >= RING_TICKS) {
         this.active[i] = false;
         mesh.visible = false;
+        this.visibleCount -= 1;
         continue;
       }
       const progress = Math.max(age, 0) / RING_TICKS;

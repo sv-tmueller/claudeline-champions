@@ -88,4 +88,25 @@ describe('impact rings', () => {
     impact.spawn(0, 0, 1);
     expect(impact.spawned).toBe(2);
   });
+
+  it('counts the rings that are showing, for the data-rings hook', () => {
+    const impact = createImpactRings();
+    expect(impact.visibleCount).toBe(0);
+    impact.spawn(0, 0, 10);
+    impact.spawn(1, 0, 12);
+    expect(impact.visibleCount).toBe(2);
+    impact.draw(10 + RING_TICKS, 0);
+    expect(impact.visibleCount).toBe(1);
+    impact.draw(12 + RING_TICKS, 0);
+    expect(impact.visibleCount).toBe(0);
+  });
+
+  it('does not count a reused ring twice', () => {
+    const impact = createImpactRings();
+    for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn(i, 0, 1);
+    impact.spawn(100, 0, 2);
+    expect(impact.visibleCount).toBe(RING_POOL_SIZE);
+    impact.draw(2 + RING_TICKS, 0);
+    expect(impact.visibleCount).toBe(0);
+  });
 });

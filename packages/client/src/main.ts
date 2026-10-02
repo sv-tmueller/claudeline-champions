@@ -122,17 +122,42 @@ function sampleAim(): void {
   aimY = hit.y;
 }
 
+// The text of every tick up to ten minutes, made once at startup. The tick
+// hook changes on every tick and the e2e tests read it to pace themselves, and
+// a number-to-string per tick cost about 2.9 KB of garbage per 500 ms in the
+// heap probe in e2e/combat.spec.ts. Past the table it falls back to String().
+const TICK_TEXT_COUNT = 36_000;
+const TICK_TEXT: string[] = [];
+for (let tick = 0; tick < TICK_TEXT_COUNT; tick++) TICK_TEXT.push(String(tick));
+
+// The last value written to each of these hooks, so a steady frame builds no
+// strings. Fields of an object, not `let`s: a number in a closure slot is a new
+// heap number on every store.
+const wrote = { tick: -1, x: NaN, y: NaN, facing: NaN };
+
 function writeHooks(): void {
   const dataset = renderer.domElement.dataset;
-  dataset['tick'] = String(state.tick);
+  if (state.tick !== wrote.tick) {
+    wrote.tick = state.tick;
+    dataset['tick'] = TICK_TEXT[state.tick] ?? String(state.tick);
+  }
   const champion = state.champions[HUMAN_ID];
   if (!champion) return;
-  dataset['p0'] = `${Math.round(champion.x * 100)},${Math.round(champion.y * 100)}`;
-  dataset['f0'] = champion.facing.toFixed(3);
+  const x = Math.round(champion.x * 100);
+  const y = Math.round(champion.y * 100);
+  if (x !== wrote.x || y !== wrote.y) {
+    wrote.x = x;
+    wrote.y = y;
+    dataset['p0'] = `${x},${y}`;
+  }
+  if (champion.facing !== wrote.facing) {
+    wrote.facing = champion.facing;
+    dataset['f0'] = champion.facing.toFixed(3);
+  }
 }
 
 // The last value written to each combat hook, so the DOM is only touched on a change.
-const written = { projectiles: -1, areas: -1, hits: -1, deaths: -1, flashMask: -1 };
+const written = { projectiles: -1, areas: -1, hits: -1, deaths: -1, flashMask: -1, rings: -1 };
 
 function writeCombatHooks(): void {
   const dataset = renderer.domElement.dataset;
@@ -196,6 +221,11 @@ function draw(alpha: number): void {
   projectileViews.draw(alpha);
   areaViews.draw(alpha);
   impactRings.draw(state.tick, alpha);
+  // Only draw retires a ring, so the count is written here.
+  if (impactRings.visibleCount !== written.rings) {
+    written.rings = impactRings.visibleCount;
+    renderer.domElement.dataset['rings'] = String(written.rings);
+  }
   if (healthBars.update(state.champions, drawnPoses)) {
     renderer.domElement.dataset['bars'] = healthBars.hookText();
   }
