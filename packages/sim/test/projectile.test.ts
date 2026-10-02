@@ -407,6 +407,17 @@ describe('who a projectile hits', () => {
     expect(state.projectiles).toHaveLength(0);
     expect(state.events[0]).toMatchObject({ type: 'projectileHit', targetId: 2, x: -5, y: 0 });
   });
+
+  it('hits an enemy at the same t = 0 as the boundary instead of expiring', () => {
+    const state = open();
+    place(state, 2, 14.5, 1);
+    spawnProjectile(state, spec({ x: 14.5, y: 0, dirX: 1, radius: 0.6 }));
+    step(state, []);
+    expect(state.projectiles).toHaveLength(0);
+    expect(ofType(state.events, 'projectileHit')).toMatchObject([{ targetId: 2, x: 14.5, y: 0 }]);
+    expect(ofType(state.events, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+    expect(champion(state, 2).health).toBe(110);
+  });
 });
 
 describe('a champion against a wall', () => {
