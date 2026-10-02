@@ -198,8 +198,20 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
 2. All time is integer ticks. All durations in config are converted to ticks
    once, at `createMatch`.
 3. Iterate arrays in index order; never iterate object keys for gameplay logic.
-4. Floats are fine (same engine everywhere). Guard against `NaN`: tests assert
-   `checksum` is finite and that no position or health is `NaN`.
+4. The sim uses only correctly rounded operations (`+`, `-`, `*`, `/` and
+   `Math.sqrt`), the exact helpers `Math.abs`, `Math.round`, `Math.min`,
+   `Math.max` and `Math.imul`, the constant `Math.PI`, and the deterministic
+   fdlibm ports in `packages/sim/src/dmath.ts`: `atan`, `atan2`, and `sin` and
+   `cos` for |x| below 1647099 (just under 2^20 · π/2). V8's transcendental
+   `Math` functions and the `**` operator are not correctly rounded and can
+   differ in the last bit between CPU architectures, so lint bans them in sim
+   source. Kits prefer constant sines and cosines in their data over runtime
+   calls. Guard against `NaN`: tests assert `checksum` is finite and that no
+   position or health is `NaN`. Amended 2026-10-02 by
+   [batch #23 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/23#issuecomment-5943538722),
+   replacing "Floats are fine (same engine everywhere)": the same V8 version
+   gives different last bits for `Math.atan2`, `Math.sin` and `Math.cos` on
+   x86 Linux and ARM macOS.
 5. Recorded input replays with expected checksums are committed as fixtures.
    Changing gameplay intentionally means regenerating the fixture in the same
    change.

@@ -15,7 +15,8 @@ const SECTOR = Math.SQRT2 - 1;
 
 /**
  * The eight-direction move toward target, or no move within the arrival radius. Signs use
- * ternaries on purpose: Math.sign can return -0, which the sim would see as a different value.
+ * ternaries on purpose: Math.sign can return -0. The ternaries keep -0 out of the MoveCommand
+ * itself (Object.is checks, recorded inputs); the sim's sanitizeAxis would map -0 to 0 anyway.
  */
 export function steerToward(
   position: Vec2,

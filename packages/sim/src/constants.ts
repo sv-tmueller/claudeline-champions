@@ -4,3 +4,32 @@ export const DT = 1 / 60;
 export const CHAMPION_RADIUS = 0.5;
 export const BASE_MOVE_SPEED = 5.5;
 export const DEFAULT_MAX_HEALTH = 120;
+
+/** Remaining stun never exceeds this, however it is applied (rules.md section 4.1). */
+export const STUN_CAP_TICKS = 120;
+/** Caps on the summed percents of slow and haste over all sources. */
+export const SLOW_CAP_PERCENT = 70;
+export const HASTE_CAP_PERCENT = 50;
+/** The most push, in meters, that all knockbacks on one champion may hold at once. */
+export const KNOCKBACK_CAP_METERS = 6;
+/** Ticks between the pulses of damage over time and heal over time. */
+export const STATUS_PULSE_TICKS = 30;
+/** Forced motion is resolved against collision in steps of at most this many meters. */
+export const MOTION_SUBSTEP_METERS = 0.25;
+/** Longest status, shield or knockback a spec may ask for: ten minutes of ticks. */
+export const MAX_STATUS_TICKS = 36000;
+/** Largest absorb, damage or heal per pulse, or knockback distance a spec may ask for. */
+export const MAX_MAGNITUDE = 1e6;
+/** No dash is longer than this; it keeps the substep loop short for any input. */
+export const MAX_DASH_DISTANCE = 1000;
+/**
+ * No dash is shorter than this. With at most `MAX_STATUS_TICKS` ticks the step length stays far
+ * above the subnormal range, so a running dash always moves.
+ */
+export const MIN_DASH_DISTANCE = 1e-6;
+/**
+ * A teleport may span at most this many meters along each axis, measured from the champion. The
+ * line of sight test squares each span, so the sum of squares is at most 2e18, far below the
+ * largest double (about 1.8e308), whatever the arena.
+ */
+export const MAX_TELEPORT_METERS = 1e9;

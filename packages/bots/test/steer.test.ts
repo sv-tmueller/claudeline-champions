@@ -47,6 +47,17 @@ describe('steerToward', () => {
     expect(steerToward(origin, origin)).toEqual({ moveX: 0, moveY: 0 });
   });
 
+  it('pins the arrival radius at 0.1 m with literal distances', () => {
+    expect(ARRIVAL_RADIUS).toBe(0.1);
+    // 0.12 m away keeps moving, 0.09 m away stops, 0.1 m exactly stops.
+    expect(steerToward(origin, { x: 0.12, y: 0 })).toEqual({ moveX: 1, moveY: 0 });
+    expect(steerToward(origin, { x: 0, y: -0.12 })).toEqual({ moveX: 0, moveY: -1 });
+    expect(steerToward(origin, { x: 0.09, y: 0 })).toEqual({ moveX: 0, moveY: 0 });
+    expect(steerToward(origin, { x: 0, y: -0.09 })).toEqual({ moveX: 0, moveY: 0 });
+    expect(steerToward(origin, { x: 0.1, y: 0 })).toEqual({ moveX: 0, moveY: 0 });
+    expect(steerToward(origin, { x: 0.105, y: 0 })).toEqual({ moveX: 1, moveY: 0 });
+  });
+
   it('takes the arrival radius as an argument', () => {
     expect(steerToward(origin, { x: 0.4, y: 0 }, 0.5)).toEqual({ moveX: 0, moveY: 0 });
     expect(steerToward(origin, { x: 0.6, y: 0 }, 0.5)).toEqual({ moveX: 1, moveY: 0 });

@@ -29,7 +29,7 @@ import type { AreaSpec } from '../src/area';
 import { applyDamage, applyHeal } from '../src/health';
 import { spawnProjectile } from '../src/projectile';
 import type { ProjectileSpec } from '../src/projectile';
-import { arena01, checkInvariants } from './helpers';
+import { EVENT_FIXTURE, arena01, checkInvariants, findNegativeZero, legacyState } from './helpers';
 
 type Entry = [number, number, number, number, number] | null;
 
@@ -162,12 +162,6 @@ function play(state: GameState, from = 0, observer: Observer = {}): GameState {
 
 function start(): GameState {
   return createMatch(fixture.config, arena01, fixture.seed);
-}
-
-function findNegativeZero(value: unknown, path: string): string[] {
-  if (typeof value === 'number') return Object.is(value, -0) ? [path] : [];
-  if (typeof value !== 'object' || value === null) return [];
-  return Object.entries(value).flatMap(([key, item]) => findNegativeZero(item, `${path}.${key}`));
 }
 
 interface Frozen {
@@ -360,19 +354,12 @@ describe('scripted combat fixture', () => {
       },
     });
 
-    const everyType: Record<SimEvent['type'], true> = {
-      projectileSpawned: true,
-      projectileHit: true,
-      projectileExpired: true,
-      areaSpawned: true,
-      areaTick: true,
-      areaExpired: true,
-      damage: true,
-      heal: true,
-      death: true,
-    };
+    const combatTypes = (Object.keys(EVENT_FIXTURE) as SimEvent['type'][]).filter(
+      (type) => EVENT_FIXTURE[type] === 'combat',
+    );
     const seen = new Set(allEvents.map((e) => e.type));
-    expect(Object.keys(everyType).filter((type) => !seen.has(type as SimEvent['type']))).toEqual([]);
+    expect(combatTypes.filter((type) => !seen.has(type))).toEqual([]);
+    expect([...seen].filter((type) => EVENT_FIXTURE[type] !== 'combat')).toEqual([]);
 
     const reasons = new Set(
       allEvents.flatMap((e) => (e.type === 'projectileExpired' ? [e.reason] : [])),
@@ -404,14 +391,14 @@ describe('scripted combat fixture', () => {
     const actual: Checkpoint[] = [];
     play(start(), 0, {
       afterStep: (s) => {
-        if (s.tick % 100 === 0) actual.push({ tick: s.tick, checksum: checksum(s) });
+        if (s.tick % 100 === 0) actual.push({ tick: s.tick, checksum: checksum(legacyState(s)) });
       },
     });
     expect(actual).toEqual(fixture.checkpoints);
   });
 
   it('reproduces the committed checksum', () => {
-    expect(checksum(play(start()))).toBe(fixture.checksum);
+    expect(checksum(legacyState(play(start())))).toBe(fixture.checksum);
   });
 
   it('gives the same checksum when replayed twice in one process', () => {

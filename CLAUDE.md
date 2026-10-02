@@ -13,7 +13,7 @@ The repo is an npm workspaces monorepo: `packages/sim`, `packages/bots` and
 npm ci                           # install from the lockfile
 npx playwright install chromium  # one-time per machine; check and e2e fail without it
 npm run dev                      # dev server at http://127.0.0.1:5173
-npm run check                    # lint, typecheck, unit tests, asset checks, Playwright smoke: the check suite
+npm run check                    # lint, typecheck, unit tests, asset checks, Playwright e2e: the check suite
 npm run test                     # Vitest unit tests (all projects)
 npm run lint                     # ESLint, includes the package boundary rules
 npm run typecheck                # tsc for sim, bots, client and the tools/tests config
@@ -39,10 +39,16 @@ and on main.
   from bots source into sim. In sim and bots source it also bans dynamic
   `import()` and `import()` types. In `packages/sim/src` it also bans `Date`,
   `performance`, `Math.random`, `setTimeout`, `setInterval`, `window`,
-  `document` and `fetch`. `tests/lint-boundaries.test.ts` checks that each rule
-  fires.
+  `document` and `fetch`, ignores inline `eslint-disable` comments, and bans
+  V8's transcendental math, which differs in the last bit between CPUs:
+  `Math.atan2`, `atan`, `sin`, `cos`, `tan`, `asin`, `acos`, `exp`, `log`,
+  `log2`, `log10`, `pow`, `hypot`, `cbrt`, `expm1`, `log1p`, `sinh`, `cosh`,
+  `tanh` and the `**` operator. Use the fdlibm ports in
+  `packages/sim/src/dmath.ts` (`atan`, `atan2`, and `sin` and `cos` for
+  |x| < 1647099) or a constant in kit data. `tests/lint-boundaries.test.ts`
+  checks that each rule fires.
 - The sim and bots tsconfigs (`lib: ["ES2023"]`, `types: []`) make any other
   browser or Node global a type error.
-- Review and the replay tests enforce the other determinism rules (spec
-  section 4.8).
+- Review, the replay tests and the dmath bit-pattern fixtures enforce the other
+  determinism rules (spec section 4.8).
 - Rules for future packages (`server`, `protocol`) are in spec section 3.2.

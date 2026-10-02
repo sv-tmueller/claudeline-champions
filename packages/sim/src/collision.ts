@@ -103,13 +103,14 @@ export function resolveChampion(
   champion: ChampionState,
   prevX: number,
   prevY: number,
-): void {
+): boolean {
   for (let pass = 0; pass < MAX_PASSES; pass++) {
-    if (!pushOutPass(state, champion, champion.id)) return;
+    if (!pushOutPass(state, champion, champion.id)) return pass > 0;
   }
   // One more pass on a probe tells whether the champion is still penetrating.
   if (pushOutPass(state, { x: champion.x, y: champion.y }, champion.id)) {
     champion.x = prevX;
     champion.y = prevY;
   }
+  return true;
 }

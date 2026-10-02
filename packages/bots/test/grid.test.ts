@@ -164,7 +164,7 @@ describe('buildNavGrid arguments', () => {
     expect(g.rows).toBe(40);
     expect(g.originX).toBe(-15.1);
     expect(buildNavGrid(arena01, 1).cols).toBe(30);
-    expect(buildNavGrid({ ...arena01, size: { width: 0.3 * 3, height: 1 } }, 0.3).cols).toBe(3);
+    expect(buildNavGrid({ ...arena01, size: { width: 0.1 * 3, height: 1 } }, 0.1).cols).toBe(3);
   });
 
   it('throws on a non-positive or non-finite cell size', () => {

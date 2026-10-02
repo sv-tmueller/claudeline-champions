@@ -18,6 +18,24 @@ export function length(x: number, y: number): number {
   return Math.sqrt(x * x + y * y);
 }
 
+/**
+ * The unit vector of (dx, dy) and its length, or null for a zero vector. Both axes are first
+ * divided by the larger one, so unlike `length` it needs no bound on the input: the squares
+ * are at most 2 and the result is exact to a few ulps from 5e-324 up to the largest doubles.
+ * Callers pass finite numbers. A zero component is stored as +0.
+ */
+export function direction(
+  dx: number,
+  dy: number,
+): { x: number; y: number; length: number } | null {
+  const m = Math.max(Math.abs(dx), Math.abs(dy));
+  if (m === 0) return null;
+  const ux = dx / m;
+  const uy = dy / m;
+  const l = Math.sqrt(ux * ux + uy * uy);
+  return { x: ux / l + 0, y: uy / l + 0, length: m * l };
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
 }
