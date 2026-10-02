@@ -1,4 +1,4 @@
-import { createMatch, parseArenaDef, type ChampionState, type TeamId } from '@claudeline/sim';
+import { createMatch, parseArenaDef, type ChampionState } from '@claudeline/sim';
 import type { Sprite, SpriteMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
@@ -12,50 +12,21 @@ import {
 } from './health-bars';
 import type { Pose } from './interpolate';
 
-// A real champion from the sim as the template, so a field the sim adds later
-// does not break the literals here.
-const TEMPLATE: ChampionState = (() => {
-  const state = createMatch(
+/** The four champions of a fresh match, ids 0 and 1 on team A and 2 and 3 on team B. */
+function four(): ChampionState[] {
+  return createMatch(
     {
       teamSize: 2,
       players: [
-        { championId: 'x', team: 'A' },
-        { championId: 'x', team: 'A' },
-        { championId: 'x', team: 'B' },
-        { championId: 'x', team: 'B' },
+        { championId: 'hargrim', team: 'A' },
+        { championId: 'quillon', team: 'A' },
+        { championId: 'lumeth', team: 'B' },
+        { championId: 'skerrow', team: 'B' },
       ],
     },
     parseArenaDef(arena01Json),
     1,
-  );
-  const first = state.champions[0];
-  if (!first) throw new Error('no champion');
-  return first;
-})();
-
-function champion(id: number, team: TeamId, health = 120): ChampionState {
-  return {
-    ...TEMPLATE,
-    id,
-    team,
-    championId: 'x',
-    x: id * 2,
-    y: 1,
-    vx: 0,
-    vy: 0,
-    facing: 0,
-    aimX: 0,
-    aimY: 0,
-    health,
-    maxHealth: 120,
-    energy: 0,
-    alive: health > 0,
-    statuses: [],
-  };
-}
-
-function four(): ChampionState[] {
-  return [champion(0, 'A'), champion(1, 'A'), champion(2, 'B'), champion(3, 'B')];
+  ).champions;
 }
 
 function poses(champions: readonly ChampionState[]): Pose[] {
