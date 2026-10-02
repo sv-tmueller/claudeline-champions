@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_MOVE_SPEED, DT, createMatch, step } from '../src/index';
+import { resolveChampion } from '../src/collision';
 import type { GameState, Obstacle, PlayerInput } from '../src/index';
 import {
   TOLERANCE,
@@ -232,5 +233,29 @@ describe('champion against champion', () => {
       step(state, [toward(0), toward(1), toward(2), undefined]);
       expect(checkInvariants(state)).toEqual([]);
     }
+  });
+});
+
+describe('resolveChampion result', () => {
+  it('returns false when nothing pushed the champion', () => {
+    const state = openMatch();
+    expect(resolveChampion(state, champion(state, 0), -12, 2)).toBe(false);
+    expect([champion(state, 0).x, champion(state, 0).y]).toEqual([-12, 2]);
+  });
+
+  it('returns true when a push moved the champion out of an obstacle', () => {
+    const state = openMatch([{ type: 'circle', x: 0, y: 0, r: 1, height: 1, blocksProjectiles: true }]);
+    place(state, 0, 1.2, 0);
+    expect(resolveChampion(state, champion(state, 0), 3, 0)).toBe(true);
+    expect(champion(state, 0).x).toBeCloseTo(1.5, 9);
+  });
+
+  it('returns true when it had to fall back to the previous position', () => {
+    // The gap between the two walls is 0.6 m, narrower than a champion.
+    const wall = (x: number): Obstacle => ({ type: 'rect', x, y: 0, w: 5, h: 10, height: 1, blocksProjectiles: true });
+    const state = openMatch([wall(-2.8), wall(2.8)]);
+    place(state, 0, 0, 0);
+    expect(resolveChampion(state, champion(state, 0), 5, 5)).toBe(true);
+    expect([champion(state, 0).x, champion(state, 0).y]).toEqual([5, 5]);
   });
 });
