@@ -199,12 +199,11 @@ class InvariantWatcher {
     this.entities(state, events);
     const negative = findNegativeZero(state, 'state');
     this.check(negative.length === 0, `-0 at ${negative.join(', ')}`, state);
-    const round = JSON.parse(JSON.stringify(state)) as GameState;
-    this.check(
-      JSON.stringify(round) === JSON.stringify(state),
-      'JSON round trip changed the state',
-      state,
-    );
+    try {
+      expect(JSON.parse(JSON.stringify(state))).toStrictEqual(state);
+    } catch (error) {
+      this.problems.push(`tick ${state.tick}: JSON round trip changed the state: ${String(error)}`);
+    }
     try {
       checksum(state);
     } catch (error) {
@@ -339,16 +338,22 @@ describe('scripted combat fixture', () => {
         if (e.type === 'projectileHit' && !hitTick.has(e.projectileId)) hitTick.set(e.projectileId, s.tick);
       }
     };
+    let aliveBefore: boolean[] = [];
     play(start(), 0, {
+      beforeTick: (s) => {
+        aliveBefore = s.champions.map((c) => c.alive);
+      },
       afterAction: (s, events) => note(s, events),
       afterStep: (s, inputs) => {
         note(s, s.events);
         for (const p of s.projectiles) {
           if (overlaps(p.x, p.y, p.radius) && !overlapTick.has(p.id)) overlapTick.set(p.id, s.tick);
         }
-        s.champions.forEach((c, i) => {
+        s.champions.forEach((_, i) => {
           const input = inputs[i];
-          if (!c.alive && input && (input.moveX !== 0 || input.moveY !== 0)) deadInput = true;
+          if (aliveBefore[i] === false && input && (input.moveX !== 0 || input.moveY !== 0)) {
+            deadInput = true;
+          }
         });
       },
     });
