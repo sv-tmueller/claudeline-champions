@@ -33,16 +33,19 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
     champion.aimX = input.aimX;
     champion.aimY = input.aimY;
 
-    tickCooldowns(champion);
-    advanceWindup(state, champion);
-    startCast(state, champion, input.buttons);
+    // A champion with no kit has no cooldown, windup or cast to run, so its turn skips them.
+    const kit = findKit(state, champion);
+    if (kit) {
+      tickCooldowns(champion);
+      advanceWindup(state, champion);
+      startCast(state, champion, kit, input.buttons);
+    }
 
     const moveLength = length(input.moveX, input.moveY);
     const dirX = moveLength === 0 ? 0 : input.moveX / moveLength;
     const dirY = moveLength === 0 ? 0 : input.moveY / moveLength;
     // Stun, root, a dash and a locked windup take walking away; `+ 0` keeps a blocked velocity
     // from being -0. A champion with no kit keeps the exact base speed expression.
-    const kit = findKit(state, champion);
     const movement =
       kit && champion.cast ? abilityOf(kit, champion.cast.slot, champion.cast.ex).movement : 'free';
     const walking = !(

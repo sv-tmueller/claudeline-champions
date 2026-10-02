@@ -9,7 +9,14 @@ import { meleeArc } from './melee';
 import { startDash, teleport } from './motion';
 import { spawnProjectile } from './projectile';
 import { nextId } from './state';
-import type { ChampionState, DashState, GameState } from './state';
+import type {
+  AreaState,
+  CastRecord,
+  ChampionState,
+  DashState,
+  GameState,
+  ProjectileState,
+} from './state';
 import { applyShield, applyStatus, hasStatus } from './status';
 
 // Casting: cooldowns, windups, the cost of a cast and what its effects do. `step` calls these in
@@ -20,7 +27,11 @@ import { applyShield, applyStatus, hasStatus } from './status';
 
 /** The kit of a champion, found by its champion id, or undefined for a champion without one. */
 export function findKit(state: GameState, champion: ChampionState): KitDef | undefined {
-  for (const kit of state.kits) if (kit.id === champion.championId) return kit;
+  const { kits } = state;
+  for (let i = 0; i < kits.length; i++) {
+    const kit = kits[i] as KitDef;
+    if (kit.id === champion.championId) return kit;
+  }
   return undefined;
 }
 
@@ -29,6 +40,10 @@ export function abilityOf(kit: KitDef, slot: Slot, ex: boolean): AbilitySpec {
   const spec = kit.slots[slot];
   return ex && spec.ex !== undefined ? spec.ex : spec;
 }
+
+/** The seven slot buttons of `Button`, without SHIFT. */
+const ALL_SLOT_BUTTONS =
+  Button.M1 | Button.M2 | Button.SPACE | Button.Q | Button.E | Button.R | Button.F;
 
 /** Step 3b: every cooldown above 0 drops by 1. */
 export function tickCooldowns(champion: ChampionState): void {
@@ -222,12 +237,14 @@ export function advanceWindup(state: GameState, champion: ChampionState): void {
  * when the champion is rooted and the ability holds a dash. The first slot that passes pays its
  * cost, sets its cooldown, starts, and fires at once when its windup is 0. Rejections emit nothing.
  */
-export function startCast(state: GameState, champion: ChampionState, buttons: number): void {
-  if (champion.cast !== null || hasStatus(champion, 'stun') || hasStatus(champion, 'silence')) {
-    return;
-  }
-  const kit = findKit(state, champion);
-  if (!kit) return;
+export function startCast(
+  state: GameState,
+  champion: ChampionState,
+  kit: KitDef,
+  buttons: number,
+): void {
+  if (champion.cast !== null || (buttons & ALL_SLOT_BUTTONS) === 0) return;
+  if (hasStatus(champion, 'stun') || hasStatus(champion, 'silence')) return;
   const shift = (buttons & Button.SHIFT) !== 0;
   const rooted = hasStatus(champion, 'root');
   for (let i = SLOTS.length - 1; i >= 0; i--) {
@@ -284,15 +301,45 @@ export function fireDashThen(state: GameState, champion: ChampionState, dash: Da
   });
 }
 
-/** Step 7: drops the cast records nothing refers to: no windup, projectile, area or dash. */
+/** Whether a windup, a dash, a projectile or an area of the champions and entities holds the cast. */
+function isReferenced(state: GameState, id: number): boolean {
+  const { champions, projectiles, areas } = state;
+  for (let i = 0; i < champions.length; i++) {
+    const champion = champions[i] as ChampionState;
+    if (champion.cast !== null && champion.cast.castId === id) return true;
+    if (champion.dash !== null && champion.dash.castId === id) return true;
+  }
+  for (let i = 0; i < projectiles.length; i++) {
+    if ((projectiles[i] as ProjectileState).castId === id) return true;
+  }
+  for (let i = 0; i < areas.length; i++) {
+    if ((areas[i] as AreaState).castId === id) return true;
+  }
+  return false;
+}
+
+/**
+ * Step 7: drops the cast records nothing refers to: no windup, projectile, area or dash. It runs
+ * every tick, also for a match with no kits, so it holds no closure: a closure over `state` would
+ * make V8 allocate a context on every call, before the early return, and the combat e2e counts
+ * those bytes.
+ */
 export function dropUnusedCasts(state: GameState): void {
-  if (state.casts.length === 0) return;
-  const used = (id: number): boolean =>
-    state.champions.some((c) => c.cast?.castId === id || c.dash?.castId === id) ||
-    state.projectiles.some((p) => p.castId === id) ||
-    state.areas.some((a) => a.castId === id);
-  if (state.casts.every((record) => used(record.id))) return;
-  state.casts = state.casts.filter((record) => used(record.id));
+  const { casts } = state;
+  let unused = false;
+  for (let i = 0; i < casts.length; i++) {
+    if (!isReferenced(state, (casts[i] as CastRecord).id)) {
+      unused = true;
+      break;
+    }
+  }
+  if (!unused) return;
+  const kept: CastRecord[] = [];
+  for (let i = 0; i < casts.length; i++) {
+    const record = casts[i] as CastRecord;
+    if (isReferenced(state, record.id)) kept.push(record);
+  }
+  state.casts = kept;
 }
 
 /**

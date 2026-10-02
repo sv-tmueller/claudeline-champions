@@ -185,7 +185,10 @@ slots in `Button` bit order.
    `lifetime` at 0; then each area loses a tick of duration and ends with
    `areaExpired` at 0.
 7. Drop the cast records nothing refers to: no windup, projectile, area or dash
-   of that cast is left.
+   of that cast is left. A match with no kits allocates nothing in steps 3b to 3d
+   or here (the combat e2e counts per-tick allocations), so these hold no
+   closure: V8 allocates a closure's context on every call, before an early
+   return.
 8. `tick++`.
 
 A projectile with lifetime L makes exactly L sweeps. An area with duration D
