@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_ROUNDS_TO_WIN,
   ENERGY_GAIN_M1,
   ENERGY_GAIN_SKILL,
   ENERGY_GAIN_ULTIMATE,
@@ -14,11 +15,16 @@ import {
   MAX_TELEPORT_METERS,
   MIN_DASH_DISTANCE,
   MOTION_SUBSTEP_METERS,
+  RING_SOURCE_ID,
+  ROUND_END_TICKS,
+  ROUND_TICKS,
   SLOWED_WINDUP_FACTOR,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
   STUN_CAP_TICKS,
+  SUDDEN_DEATH_TICKS,
   ULTIMATE_ENERGY_COST,
+  WARMUP_TICKS,
 } from '../src/index';
 
 describe('status and motion constants', () => {
@@ -54,5 +60,19 @@ describe('status and motion constants', () => {
     expect(ENERGY_GAIN_M1).toBe(5);
     expect(ENERGY_GAIN_SKILL).toBe(10);
     expect(ENERGY_GAIN_ULTIMATE).toBe(15);
+  });
+});
+
+describe('match flow constants', () => {
+  it('holds the rules.md section 1 timings in ticks', () => {
+    expect(WARMUP_TICKS).toBe(180);
+    expect(ROUND_TICKS).toBe(5400);
+    expect(SUDDEN_DEATH_TICKS).toBe(1800);
+    expect(ROUND_END_TICKS).toBe(180);
+  });
+
+  it('holds the standard rounds to win and the ring damage source id', () => {
+    expect(DEFAULT_ROUNDS_TO_WIN).toBe(3);
+    expect(RING_SOURCE_ID).toBe(-1);
   });
 });

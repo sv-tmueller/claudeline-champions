@@ -23,3 +23,10 @@ DSL to maintain for a single authoring team.
   toolkit through the design doc first, then the sim. See
   [simulation](../simulation.md).
 - There is no interpreter or ability file format to maintain.
+- Kits are typed plain data (`KitDef` in `kit.ts`), stored in the state and run by a
+  `switch` over a closed effect union in `cast.ts` (batch #32 decision 4, #43). The
+  union is the toolkit, not an ability language: it has no expressions, references,
+  kit code or kit-defined control flow, so the rejected ability language stays
+  rejected. Roster kit data lives as JSON in `data/kits/<id>.json`. The type checker
+  checks the contract and the code; `validateKit` (run by `createMatch`) and the
+  roster tests check the data (batch #53 decision 1).

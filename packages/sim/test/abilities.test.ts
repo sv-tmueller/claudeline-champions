@@ -213,7 +213,10 @@ describe('scripted ability fixture', () => {
     });
     expect(coverage.missing(KITS, ABILITY_EVENTS)).toEqual([]);
     // Every event type of the union appears, the combat ones included: kits fire real projectiles.
-    const all = Object.keys(EVENT_FIXTURE) as SimEvent['type'][];
+    // The match events are the rounds fixture's: this one is free play.
+    const all = (Object.keys(EVENT_FIXTURE) as SimEvent['type'][]).filter(
+      (type) => EVENT_FIXTURE[type] !== 'match',
+    );
     expect(all.filter((type) => !coverage.eventTypes.has(type))).toEqual([]);
   });
 
@@ -229,6 +232,11 @@ describe('scripted ability fixture', () => {
 
   it('reproduces the committed checksum', () => {
     expect(checksum(play(start()))).toBe(fixture.checksum);
+  });
+
+  it('is free play: the state never has a match key', () => {
+    expect('match' in start()).toBe(false);
+    expect('match' in play(start())).toBe(false);
   });
 
   it('gives the same checksum when replayed twice in one process', () => {

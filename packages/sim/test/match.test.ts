@@ -149,3 +149,59 @@ describe('createMatch toolkit state', () => {
     expect(state.casts).toEqual([]);
   });
 });
+
+describe('createMatch match flow', () => {
+  const INITIAL = {
+    phase: 'warmup',
+    phaseTicks: 0,
+    round: 0,
+    roundsToWin: 3,
+    score: { A: 0, B: 0 },
+    ring: null,
+  };
+
+  it('is free play without roundsToWin: the state has no match key', () => {
+    const state = createMatch(config2v2(), arena01, 1);
+    expect('match' in state).toBe(false);
+    expect(Object.keys(state)).not.toContain('match');
+  });
+
+  it('treats an explicit undefined roundsToWin as free play and never stores undefined', () => {
+    const config = { ...config2v2(), roundsToWin: undefined };
+    const state = createMatch(config, arena01, 1);
+    expect('match' in state).toBe(false);
+  });
+
+  it('starts in warmup at round 0 with a 0 : 0 score and no ring', () => {
+    const state = createMatch({ ...config2v2(), roundsToWin: 3 }, arena01, 1);
+    expect(state.match).toEqual(INITIAL);
+    expect(state.tick).toBe(0);
+    expect(state.events).toEqual([]);
+  });
+
+  it('stores the given roundsToWin', () => {
+    expect(createMatch({ ...config2v2(), roundsToWin: 1 }, arena01, 1).match?.roundsToWin).toBe(1);
+    expect(createMatch({ ...config2v2(), roundsToWin: 7 }, arena01, 1).match?.roundsToWin).toBe(7);
+  });
+
+  it('survives a JSON round trip unchanged', () => {
+    const state = createMatch({ ...config2v2(), roundsToWin: 3 }, arena01, 1);
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+  });
+
+  it('does not share the score record between matches', () => {
+    const a = createMatch({ ...config2v2(), roundsToWin: 3 }, arena01, 1);
+    const b = createMatch({ ...config2v2(), roundsToWin: 3 }, arena01, 1);
+    expect(a.match?.score).not.toBe(b.match?.score);
+  });
+
+  it('rejects a roundsToWin that is not a positive integer', () => {
+    const rejected: unknown[] = [null, 0, -1, 1.5, NaN, Infinity, '3', 2 ** 53];
+    for (const roundsToWin of rejected) {
+      const config = { ...config2v2(), roundsToWin } as unknown as MatchConfig;
+      expect(() => createMatch(config, arena01, 1), String(roundsToWin)).toThrow(
+        'Invalid match: roundsToWin must be a positive integer',
+      );
+    }
+  });
+});

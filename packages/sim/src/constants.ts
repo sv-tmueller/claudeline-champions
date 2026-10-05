@@ -53,3 +53,16 @@ export const SLOWED_WINDUP_FACTOR = 0.5;
 export const ENERGY_GAIN_M1 = 5;
 export const ENERGY_GAIN_SKILL = 10;
 export const ENERGY_GAIN_ULTIMATE = 15;
+
+/** Match flow, rules.md section 1: the lengths of the phases, in ticks. */
+export const WARMUP_TICKS = 180;
+/** The round clock, 90 s; sudden death starts when it is used up. */
+export const ROUND_TICKS = 5400;
+/** The ring shrinks over this many ticks (30 s), then holds. */
+export const SUDDEN_DEATH_TICKS = 1800;
+/** The pause after a round is decided. */
+export const ROUND_END_TICKS = 180;
+/** Round wins a team needs in a standard match; a config passes it as `roundsToWin`. */
+export const DEFAULT_ROUNDS_TO_WIN = 3;
+/** The `sourceId` of the ring's damage and deaths: no champion has a negative id. */
+export const RING_SOURCE_ID = -1;

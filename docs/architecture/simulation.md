@@ -59,10 +59,20 @@ Iteration order is always id order. This gives:
   a size, a spawn coordinate or an obstacle `x`, `y`, `r`, `w` or `h` above 1e6
   m in magnitude (`MAX_ARENA_METERS`; exactly 1e6 is accepted), because a
   champion stands at its spawn until the first step, and a teleport from there
-  feeds the squares of the collision tests. `kits` are the ability kits (see
-  [Abilities](#abilities-and-the-effects-toolkit)); with none, no champion has
-  abilities. The optional fourth argument extends the three-argument signature
-  of the design spec, section 4.3, compatibly.
+  feeds the squares of the collision tests. It also rejects a ring radius that
+  is not above 0 and at most `MAX_ARENA_METERS`, and an `endRadius` that is not
+  below the `startRadius`: with unbounded radii the shrink arithmetic could
+  overflow, and a non-finite radius would make `checksum` throw. `kits` are the
+  ability kits (see [Abilities](#abilities-and-the-effects-toolkit)); with
+  none, no champion has abilities. The optional fourth argument extends the
+  three-argument signature of the design spec, section 4.3, compatibly.
+  `MatchConfig` is `teamSize` (2 or 3), `players` (`players[i]` becomes
+  champion id `i`) and an optional `roundsToWin`. With `roundsToWin` (a positive
+  safe integer; anything else throws `Invalid match: roundsToWin must be a
+  positive integer`) the match runs the rounds of [Match flow](#match-flow) and
+  `state.match` is set. Without it the match is free play and the `match` key is
+  missing from the state, never `undefined`. The standard value is
+  `DEFAULT_ROUNDS_TO_WIN = 3`.
 - `step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void`
   advances one tick in place. `inputs[i]` belongs to champion id `i`; an
   `undefined` or absent entry is a missing input.
@@ -80,7 +90,7 @@ Iteration order is always id order. This gives:
   | --- | --- |
   | `projectileSpawned` | `projectileId`, `ownerId`, `x`, `y`, `vx`, `vy`, `radius` |
   | `projectileHit` | `projectileId`, `ownerId`, `targetId`, `x`, `y` |
-  | `projectileExpired` | `projectileId`, `reason` (`hit`, `obstacle`, `boundary`, `lifetime`), `x`, `y` |
+  | `projectileExpired` | `projectileId`, `reason` (`hit`, `obstacle`, `boundary`, `lifetime`, `roundEnd`), `x`, `y` |
   | `areaSpawned` | `areaId`, `ownerId`, `x`, `y`, `radius` |
   | `areaTick` | `areaId`, `targetIds` (champion id order, empty when nobody is inside) |
   | `areaExpired` | `areaId` |
@@ -96,12 +106,19 @@ Iteration order is always id order. This gives:
   | `dashEnded` | `championId`, `x`, `y`, `reason` (`complete`, `blocked`, `rooted`, `stunned`, `death`, `replaced`) |
   | `castStarted` | `championId`, `castId`, `slot`, `ex`, `windupTicks`, `cost` (energy paid: 100 for F, 25 for an EX variant, else 0) |
   | `castFired` | `championId`, `castId`, `slot`, `ex` |
-  | `castInterrupted` | `championId`, `castId`, `slot`, `ex`, `reason` (`stun`, `death`) |
+  | `castInterrupted` | `championId`, `castId`, `slot`, `ex`, `reason` (`stun`, `death`, `roundEnd`) |
   | `energyGained` | `championId` (the caster), `castId`, `targetId`, `amount` (what was added, after the cap trimmed it, always above 0), `energy` (the caster's after) |
+  | `roundStarted` | `round` (counting from 1) |
+  | `suddenDeathStarted` | `round`, `radius` (the ring's start radius) |
+  | `roundEnded` | `round`, `winner` (`A`, `B`, or `null` for a draw), `scoreA`, `scoreB` (after this round counted) |
+  | `matchEnded` | `winner`, `scoreA`, `scoreB` |
 
-  Round and match events join with match flow, which also adds the reason
-  `roundEnd` to `castInterrupted`. Hit and expired positions are the projectile
-  centre at contact (the final position for `lifetime`).
+  The four match events come only from a match with match flow. Ring `damage`
+  and `death` events carry `sourceId` -1 (`RING_SOURCE_ID`). The clocks
+  (`phaseTicks`, the ring radius) advance without events, as `tick` and the
+  positions do; every discrete change has an event. Hit and expired positions
+  are the projectile centre at contact (the final position for `lifetime`, and
+  where it was for `roundEnd`).
 
 Randomness goes through a seeded PRNG stored in the state. Given the same seed
 and the same input stream, `checksum` after N ticks is identical on every run.
@@ -128,7 +145,10 @@ and the same input stream, `checksum` after N ticks is identical on every run.
   `state.casts` the records of casts that something still refers to, in
   ascending id order (see [Abilities](#abilities-and-the-effects-toolkit)).
 - Obstacle: static, from the arena definition.
-- Ring (sudden death): center, current radius, damage per second.
+- Match (match flow only): `state.match` holds the phase, the step count of the
+  phase, the round, `roundsToWin`, the score and the ring, see [Match
+  flow](#match-flow). The ring (sudden death) is `match.ring`: its centre `(0,
+  0)`, the current radius and the damage per tick, or `null`.
 
 Projectiles, areas and casts share one id space with `state.nextEntityId`. Champion
 ids are `0` to `n-1` (so `inputs[i]` is champion `i`), and the counter starts at
@@ -157,12 +177,19 @@ slots in `Button` bit order.
 
 1. Read and sanitize every input into an array, with no mutation.
 2. Clear `state.events`.
+   - L. Locked phases (match flow, phase `warmup`, `roundEnd` or `matchEnd`):
+     for each alive champion in id order, store the aim (3a), set the walk
+     velocity to `+0` and face the aim (the expression of 3e). Nothing else
+     runs: no cooldown, windup, cast, walk, forced motion, status upkeep,
+     projectile, area, ring or decision, and no step 7. Then 7b and 8 run, and
+     the phase may end there (see [Match flow](#match-flow)). Steps 3 to 7
+     below are the round phase, and free play, which has no phase.
 3. For each champion in id order, skipping a dead one and ending its turn if it
    dies:
    - 3a. Store the aim.
    - 3b. Cooldowns: every cooldown above 0 drops by 1.
-   - 3c. Windup: a cast in progress loses a turn (`windupLeft - 1`) and fires at
-      0.
+   - 3c. Windup: a cast in progress loses a turn (`windupLeft - 1`) and fires
+      when `windupLeft` reaches zero.
    - 3d. Cast start: at most one cast starts from the held buttons; a windup of 0
       fires at once (see [Abilities](#abilities-and-the-effects-toolkit)).
    - 3e. Walk: the walk velocity is the move direction times the speed, where the
@@ -187,11 +214,28 @@ slots in `Button` bit order.
 6. Expiries: each projectile in id order loses a tick of lifetime and ends with
    `lifetime` at 0; then each area loses a tick of duration and ends with
    `areaExpired` at 0.
+   - 6b. Sudden death (match flow only, when `phaseTicks` is at least 5400,
+     `ROUND_TICKS`). With `e = phaseTicks - 5400`: at `e = 0` the ring is
+     created with the arena's start radius and `damagePerSecond / TICK_RATE`
+     per tick, and `suddenDeathStarted` is emitted. The radius is `endRadius`
+     when `e >= 1800` (`SUDDEN_DEATH_TICKS`), else `startRadius + ((endRadius -
+     startRadius) * e) / 1800`, recomputed from the integer `e` every step. Then
+     each alive champion in id order whose centre is farther than the radius
+     from the ring centre takes the ring damage (see [Damage](#damage-healing-and-death)).
+   - 6c. Round decision (match flow only): if a team has no alive champion, the
+     round is decided. The other team wins, or it is a draw when neither team
+     has one. In this order: `roundEnded`, a `castInterrupted` (`roundEnd`) for
+     each windup in champion id order, a `projectileExpired` (`roundEnd`) for
+     each projectile in id order at its position, an `areaExpired` for each
+     area in id order. Both lists are replaced by empty ones, the phase becomes
+     `roundEnd` and `phaseTicks` 0.
 7. Drop the cast records nothing refers to: no windup, projectile, area or dash
    of that cast is left. A match with no kits allocates nothing in steps 3b to 3d
    or here (the combat e2e counts per-tick allocations), so these hold no
    closure: V8 allocates a closure's context on every call, before an early
    return.
+   - 7b. `phaseTicks += 1` (match flow only). In a locked step this comes first,
+     then the phase ends if its length is reached.
 8. `tick++`.
 
 A projectile with lifetime L makes exactly L sweeps. An area with duration D
@@ -277,8 +321,14 @@ matter because the arena is convex.
   move), is no obstacle for other champions and is never touched by
   projectiles or areas.
 
+- The ring damages through `applyDamage(state, id, damagePerTick, -1, true)`.
+  The last argument, `ignoreShields`, skips the whole shield block: no
+  `shieldAbsorbed`, no shield change. Invulnerable still blocks it. The ring
+  gives no energy, because `applyDamage` never does. A ring death is a `death`
+  with `sourceId` -1.
+
 `applyDamage` is an internal building block, not a kit primitive. Projectiles,
-areas, melee arcs and damage over time use it, and the ring will.
+areas, melee arcs, damage over time and the ring use it.
 
 ## Toolkit entry points
 
@@ -298,6 +348,7 @@ them from inside the sim, through `cast.ts`.
 | `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null)` | `applyEffects` returns the health its `heal` effects restored |
 | `energy.ts` | `landHit(state, { ownerId, castId }, targetId, effects, origin)` | |
 | `cast.ts` | `tickCooldowns`, `advanceWindup`, `startCast`, `fireDashThen`, `dropUnusedCasts`, `resetAbilityState` | what `step` calls, see [Abilities](#abilities-and-the-effects-toolkit) |
+| `flow.ts` | `stepLocked`, `stepRoundEnd` | what `step` calls for match flow, see [Match flow](#match-flow) |
 
 `source` is `{ sourceId, slot }`, with a null slot for a direct call. Projectiles,
 areas and melee arcs land their hits through `landHit`, which wraps
@@ -569,6 +620,26 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
   throw inside `step`. A teleport range in a kit stops at 1e6, not 1e9, because
   near 1e9 the rounded `origin + dir * range` can land an ulp past the per-axis
   check of `teleport`.
+- The deciding step of a round counts as the first tick of the 180 tick pause
+  (rules.md says the pause "starts on the tick a round is decided").
+- The decision is made at the end of the step, after the ring: a champion that
+  dies to the ring and a champion that dies to a hit in the same step both count.
+- A champion exactly on the ring radius is inside; the test is on squared
+  distances, `dx * dx + dy * dy > radius * radius`, with no square root.
+- Aim and facing stay live in locked phases and are kept through the reset;
+  rules.md locks movement and casting only.
+- Statuses and dashes are frozen through the pause, not run down, and the reset
+  drops them. They get no events of their own at the reset.
+- Projectiles and areas end with `roundEnd` events when a round is decided (and
+  any left at a reset), so the rule that every projectile gets one
+  `projectileExpired` holds; `roundEnd` is a new `ProjectileEndReason`, and the
+  `castInterrupted` reason `roundEnd` is rules.md 2.4.
+- Ring damage and ring deaths use the source id -1, which no champion has.
+- A dev tool spawn made during a locked phase is frozen with the rest and
+  cleared at the next round start.
+- rules.md 2.4 (a decided round interrupts a windup) governs over 1.2 ("a cast
+  in progress is dropped" at the reset) for when a windup ends, so the drop in
+  1.2 finds nothing to drop.
 
 ## Abilities and the effects toolkit
 
@@ -680,9 +751,9 @@ counting and the fire tick not: `free` walks at the normal speed, `slowed` at
 half of it after slow and haste, `locked` not at all. Knockback and a dash still
 move a champion in a locked windup.
 
-Only stun and death interrupt a windup (`castInterrupted` reasons `stun` and
-`death`; the event order is in [Statuses](#statuses) and
-[Damage](#damage-healing-and-death)). Nothing is refunded, and the cooldown keeps
+Only stun, death and a round end interrupt a windup (`castInterrupted` reasons
+`stun`, `death` and `roundEnd`; the event order is in [Statuses](#statuses),
+[Damage](#damage-healing-and-death) and [Match flow](#match-flow)). Nothing is refunded, and the cooldown keeps
 running. Silence, root, slow and knockback do not interrupt it. A rooted champion
 whose windup fires skips the `dash` effect of the cast, fires that dash's `then`
 effects at once and applies the rest of the ability.
@@ -725,30 +796,85 @@ does a hit with no cast id, which a dev tool spawn makes.
 Cast records are dropped in step 7 once no windup, projectile, area or dash of
 the cast refers to them.
 
-`resetAbilityState(state)` in `cast.ts` is the hook match flow will call between
-rounds. It sets every champion's energy and cooldowns to 0, drops its windup and
-dash, empties `statuses` and `state.casts`, sets `castId` to null on the
-projectiles and areas still alive and emits nothing. It is not in the index.
-Match flow wraps it in its round event.
+`resetAbilityState(state)` in `cast.ts` is the hook `startRound` in `flow.ts`
+calls at the start of every round, inside `roundStarted`. It sets every
+champion's energy and cooldowns to 0, drops its windup and dash, empties
+`statuses` and `state.casts`, sets `castId` to null on the projectiles and areas
+still alive and emits nothing. It is not in the index.
 
 ## Match flow
 
-State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
+State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`. The numbers
+are in rules.md section 1; the code is `flow.ts` and three checks in `step.ts`.
 
-- Warmup: 3 seconds, movement and casting locked, champions at spawn.
-- Round: 90 seconds. A team wins the round when every enemy champion is dead.
-- Sudden death: when the round timer expires, a ring centred on the arena
-  shrinks linearly from `ring.startRadius` to `ring.endRadius` over 30 seconds
-  and deals `ring.damagePerSecond` to champions outside it, then holds at
-  `endRadius` until the round resolves.
-- If both teams lose their last champion on the same tick the round is a draw:
-  no score, next round.
-- Round end: 3 seconds, then full heal, cooldown reset, energy to 0, respawn at
-  the team's spawn points.
-- Match end: first team to `roundsToWin` (default 3) round wins.
-- `MatchConfig`: team size (2 or 3) and per-player champion id and team
-  (`players[i]` becomes champion id `i`). Rounds to win joins it with match
-  flow. The arena and the seed are `createMatch` parameters, not config fields.
+**Opt-in.** A match has match flow when its config has `roundsToWin`.
+`state.match` is then:
+
+```ts
+interface MatchState {
+  phase: 'warmup' | 'round' | 'roundEnd' | 'matchEnd';
+  phaseTicks: number;             // steps completed in this phase
+  round: number;                  // 0 in warmup, then the current or last decided round
+  roundsToWin: number;
+  score: { A: number; B: number };
+  ring: { x: number; y: number; radius: number; damagePerTick: number } | null;
+}
+```
+
+It starts as warmup, `phaseTicks` 0, round 0, score 0 : 0 and no ring. Without
+`roundsToWin` the match is free play: the `match` key is missing, and `step`
+does what it did before match flow existed: no warmup, no round clock, no ring
+and no round end. A missing key keeps every free-play state and checksum bit for
+bit what it was, so the committed fixtures, the bots tests and the client's
+walk spec need no change.
+
+**Phases.**
+
+- Warmup: 180 ticks (`WARMUP_TICKS`). The steps that make `state.tick` 1 to 180
+  are locked, and round 1 starts in the step that makes it 180.
+- Round: no length of its own. Steps 3 to 7 run as in free play. The round
+  clock is 5400 ticks (`ROUND_TICKS`); from the step that makes `state.tick`
+  5581 (counting from a round that started at tick 180) sudden death runs.
+- Sudden death: the ring starts at the arena's `startRadius` and reaches
+  `endRadius` 1800 ticks (`SUDDEN_DEATH_TICKS`) later, then holds. For the v1
+  arena (18 m to 3 m) the radius after the step that makes `state.tick` 5581 is
+  18, after 5582 it is 17.991666666666667, after 5701 it is 17, after 6481 it
+  is 10.5, after 7380 it is 3.008333333333333 and after 7381 it is 3. Ring
+  damage ignores shields, gives no energy and is blocked by invulnerable. There
+  is no win by timer: only a dead team decides a round.
+- Round end pause: 180 ticks (`ROUND_END_TICKS`). The deciding step is the
+  first of them, so a round decided in the step that makes `state.tick` T is
+  followed by `roundStarted` or `matchEnded` in the step that makes it T + 179.
+  Locked.
+- Match end: reached from the pause when a score has reached `roundsToWin`,
+  with `matchEnded`, `phaseTicks` 0. It never ends; the steps are locked.
+- No cap on rounds: draws score nothing, so a match can run longer than
+  `2 * roundsToWin - 1` rounds.
+
+**Locked steps** run only step L: the aim is stored and the facing follows it
+for every alive champion, the walk velocity is `+0`, and nothing else changes.
+Inputs are still read first, so a throwing input throws with the state
+unchanged. Statuses, a dash and the ring stay frozen through the pause.
+
+**The deciding step** (step 6c) emits, in this order: the deaths of that tick,
+`roundEnded`, `castInterrupted` (`roundEnd`) per windup in champion id order,
+`projectileExpired` (`roundEnd`) per projectile in id order at its position,
+`areaExpired` per area in id order. Each projectile therefore still gets
+exactly one `projectileExpired`. The client package may rely on this order.
+
+**The round reset** (`startRound`, the same for round 1 and every later round)
+runs in the last locked step of the warmup or the pause: leftover projectiles and
+areas end with `projectileExpired` (`roundEnd`) or `areaExpired` (only a dev
+tool spawn made between steps in a locked phase can leave one), each champion
+goes back to its spawn in the team slot order of `createMatch` with velocity
+`+0`, `health = maxHealth` and `alive = true`, `resetAbilityState` runs (energy
+0, cooldowns 0, no status, dash or cast, `casts` empty), the ring is dropped,
+`round` counts up, the phase is `round`, and `roundStarted` is emitted last. The
+score and `nextEntityId` carry over, and so do the aim and the facing.
+
+`createMatch` rejects a bad `roundsToWin` (see [State and
+API](#state-and-api-surface)). The sim never reads the wall clock for the round
+timer: it counts steps.
 
 The ring values come from the arena definition. See [assets](assets.md).
 

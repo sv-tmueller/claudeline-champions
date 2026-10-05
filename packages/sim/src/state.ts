@@ -17,8 +17,8 @@ export type StatusType =
   | 'knockback';
 export type StatusEndReason = 'expired' | 'depleted' | 'stopped' | 'replaced' | 'death';
 export type DashEndReason = 'complete' | 'blocked' | 'rooted' | 'stunned' | 'death' | 'replaced';
-/** Only stun and death interrupt a windup; a round end joins with match flow. */
-export type CastInterruptReason = 'stun' | 'death';
+/** Stun, death and a round end interrupt a windup. */
+export type CastInterruptReason = 'stun' | 'death' | 'roundEnd';
 
 /** Who a status came from: the champion and the ability slot, null for a direct toolkit call. */
 export interface StatusSource {
@@ -70,7 +70,8 @@ export type Effect =
    */
   | { type: 'energyGain'; amount: number };
 export type AreaTargets = 'enemies' | 'allies' | 'all';
-export type ProjectileEndReason = 'hit' | 'obstacle' | 'boundary' | 'lifetime';
+/** `roundEnd`: the round was decided, or a round started, with the projectile still in flight. */
+export type ProjectileEndReason = 'hit' | 'obstacle' | 'boundary' | 'lifetime' | 'roundEnd';
 
 export interface ProjectileState {
   id: number;
@@ -233,7 +234,24 @@ export type SimEvent =
       amount: number;
       /** The caster's energy afterwards. */
       energy: number;
-    };
+    }
+  | { type: 'roundStarted'; round: number }
+  | {
+      type: 'suddenDeathStarted';
+      round: number;
+      /** The ring radius it starts at. */
+      radius: number;
+    }
+  | {
+      type: 'roundEnded';
+      round: number;
+      /** The team that won the round, or null for a draw. */
+      winner: TeamId | null;
+      /** The score after this round counted. */
+      scoreA: number;
+      scoreB: number;
+    }
+  | { type: 'matchEnded'; winner: TeamId; scoreA: number; scoreB: number };
 
 export interface DashState {
   /** Unit vector. */
@@ -302,6 +320,31 @@ export interface ChampionState {
   cast: CastState | null;
 }
 
+/** `warmup` before round 1, `roundEnd` is the pause after a decided round, `matchEnd` is final. */
+export type MatchPhase = 'warmup' | 'round' | 'roundEnd' | 'matchEnd';
+
+/** The sudden death ring, centred on the arena centre. */
+export interface RingState {
+  x: number;
+  y: number;
+  radius: number;
+  /** Damage a champion outside takes each tick. */
+  damagePerTick: number;
+}
+
+/** Match flow, present only for a match created with `roundsToWin`; free play has no such key. */
+export interface MatchState {
+  phase: MatchPhase;
+  /** Steps completed in this phase. */
+  phaseTicks: number;
+  /** 0 in warmup, then the current or last decided round, counting from 1. */
+  round: number;
+  roundsToWin: number;
+  score: { A: number; B: number };
+  /** From the first sudden death step until the next round starts. */
+  ring: RingState | null;
+}
+
 export interface GameState {
   tick: number;
   /** mulberry32 state, a uint32. */
@@ -317,6 +360,8 @@ export interface GameState {
   kits: KitDef[];
   /** Casts something still refers to, in ascending id order; ids come from `nextEntityId`. */
   casts: CastRecord[];
+  /** Rounds, score and sudden death. The key is missing in free play and is never undefined. */
+  match?: MatchState;
   /**
    * Cleared at the start of each `step`. Toolkit calls between steps append to it, and the
    * next `step` drops them.
@@ -333,6 +378,11 @@ export interface MatchConfig {
   teamSize: 2 | 3;
   /** players[i] becomes champion id i. */
   players: PlayerConfig[];
+  /**
+   * Round wins that take the match (rules.md 1.3). Without it the match is free play: no warmup,
+   * no round clock, no ring and no round end.
+   */
+  roundsToWin?: number;
 }
 
 export function nextId(state: GameState): number {

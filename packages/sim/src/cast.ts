@@ -228,6 +228,14 @@ export function advanceWindup(state: GameState, champion: ChampionState): void {
   fire(state, champion, cast);
 }
 
+/** Whether a dash is among the effects; a plain loop, so no closure is made on the casting path. */
+function holdsDash(effects: readonly AbilityEffect[]): boolean {
+  for (let i = 0; i < effects.length; i++) {
+    if ((effects[i] as AbilityEffect).type === 'dash') return true;
+  }
+  return false;
+}
+
 /**
  * Step 3d: starts at most one cast from the held buttons. Nothing starts while a windup is in
  * progress or while the champion is stunned or silenced (silence includes SPACE). The slots are
@@ -255,7 +263,7 @@ export function startCast(
     const ability = abilityOf(kit, slot, ex);
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if ((champion.cooldowns[i] as number) > 0 || champion.energy < cost) continue;
-    if (rooted && ability.effects.some((e) => e.type === 'dash')) continue;
+    if (rooted && holdsDash(ability.effects)) continue;
 
     champion.energy -= cost;
     champion.cooldowns[i] = spec.cooldownTicks;
@@ -293,12 +301,16 @@ export function startCast(
 export function fireDashThen(state: GameState, champion: ChampionState, dash: DashState): void {
   if (!champion.alive || dash.then.length === 0 || dash.castId === null) return;
   const castId = dash.castId;
-  const record = state.casts.find((c) => c.id === castId);
-  if (!record) return;
-  runEffects(state, champion, { castId, slot: record.slot }, dash.then, {
-    x: dash.dirX,
-    y: dash.dirY,
-  });
+  const { casts } = state;
+  for (let i = 0; i < casts.length; i++) {
+    const record = casts[i] as CastRecord;
+    if (record.id !== castId) continue;
+    runEffects(state, champion, { castId, slot: record.slot }, dash.then, {
+      x: dash.dirX,
+      y: dash.dirY,
+    });
+    return;
+  }
 }
 
 /** Whether a windup, a dash, a projectile or an area of the champions and entities holds the cast. */
@@ -343,10 +355,10 @@ export function dropUnusedCasts(state: GameState): void {
 }
 
 /**
- * Round reset hook for match flow: every champion's energy and cooldowns go to 0, its windup and
- * dash are dropped and its statuses removed, the cast records are emptied, and the projectiles
- * and areas still alive forget their cast. Emits nothing; match flow wraps it in its own round
- * event. Not in the index.
+ * The ability part of the round reset: every champion's energy and cooldowns go to 0, its windup
+ * and dash are dropped and its statuses removed, the cast records are emptied, and the projectiles
+ * and areas still alive forget their cast. Emits nothing: `startRound` in `flow.ts` calls it and
+ * wraps it in `roundStarted`. Not in the index.
  */
 export function resetAbilityState(state: GameState): void {
   for (const champion of state.champions) {

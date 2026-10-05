@@ -62,6 +62,14 @@ describe('legacyState', () => {
           remainingTicks: 5, intervalTicks: 1, ticksToNextApply: 0, effects: [], castId: 9,
         }),
     ],
+    [
+      'match flow',
+      'state has match flow',
+      (s) =>
+        void (s.match = {
+          phase: 'warmup', phaseTicks: 0, round: 0, roundsToWin: 3, score: { A: 0, B: 0 }, ring: null,
+        }),
+    ],
     ['a kit', 'state has kits', (s) => void s.kits.push(kitWith('x'))],
     [
       'a cast record',
