@@ -106,3 +106,12 @@ export async function countPixels(
     { base64: png.toString('base64'), boxes: ranges },
   );
 }
+
+/**
+ * Waits for the match phase hook, `data-phase` on the canvas. The sim's phase
+ * strings: warmup, round, roundEnd and matchEnd. Rejects as soon as a page
+ * problem is reported.
+ */
+export async function waitForPhase(page: Page, phase: string, failed: Problems['failed']): Promise<void> {
+  await orFail(page.waitForSelector(`canvas[data-phase="${phase}"]`), failed);
+}

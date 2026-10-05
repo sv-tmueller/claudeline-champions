@@ -201,6 +201,10 @@
   font-weight: 700;
 }
 
+#hud [data-hud='round-timer'][data-sudden='true'] {
+  color: var(--hud-enemy);
+}
+
 /* Kill feed: top right, newest line last. */
 #hud [data-hud='kill-feed'] {
   right: calc(var(--hud-u) * 1);

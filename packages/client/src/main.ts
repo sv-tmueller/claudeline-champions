@@ -1,4 +1,4 @@
-import { createMatch, parseArenaDef, step, type PlayerInput } from '@claudeline/sim';
+import { parseArenaDef, step, type KitDef, type PlayerInput } from '@claudeline/sim';
 import {
   Color,
   DirectionalLight,
@@ -10,6 +10,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import arena01Json from '../../../data/arenas/arena01.json';
+import { createBotDriver } from './bot-driver';
 import { CAMERA_VERTICAL_FOV_DEG, fitCamera, groundAimCm, pointerToNdc } from './camera';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
@@ -20,35 +21,43 @@ import { Hud } from './hud';
 import { buildHud } from './hud-dom';
 import { createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
+import { parseLaunch } from './launch';
+import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { bindInput, createInputCore } from './input';
 import { capturePoses, createPoses, interpolatePoses } from './interpolate';
-import { createFixedStepClock } from './loop';
-import { PLACEHOLDER_CHAMPION_URL, arenaModelUrl } from './models';
+import { createFixedStepClock, STEP_MS } from './loop';
+import { arenaModelUrl, championModelUrl } from './models';
+import { buildResult } from './result-dom';
+import { ResultScreen } from './result-screen';
 import './style.css';
 import './hud.css';
+import './result.css';
 
 const HUMAN_ID = 0;
-const LOCAL_SEED = 1;
 
 const arena = parseArenaDef(arena01Json);
-const state = createMatch(
-  {
-    teamSize: 2,
-    players: [
-      { championId: 'hargrim', team: 'A' },
-      { championId: 'quillon', team: 'A' },
-      { championId: 'lumeth', team: 'B' },
-      { championId: 'skerrow', team: 'B' },
-    ],
-  },
-  arena,
-  LOCAL_SEED,
-);
+
+// Every kit file under data/kits joins the match and the select without a client
+// change. A bad kit file shows up as a page error from createMatch, which
+// validates it. Sorted by id, so the order does not depend on the file system.
+const kits = (Object.values(
+  import.meta.glob('../../../data/kits/*.json', { eager: true, import: 'default' }),
+) as KitDef[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+const kitIds = kits.map((kit) => kit.id);
+const launch = parseLaunch(location.search, kitIds, import.meta.env.DEV);
+
+const { state, botIds } = createLocalMatch(launch, arena, kits);
+// The bots think here, in the main thread, once per tick before `step`.
+const bots = createBotDriver(botIds, launch.difficulty, LOCAL_SEED);
+const roundsToWin = state.match?.roundsToWin;
+if (roundsToWin === undefined) throw new Error('the local match has no match flow');
 
 const container = document.getElementById('app');
 if (!container) throw new Error('missing #app container');
 const hudRoot = document.getElementById('hud');
 if (!hudRoot) throw new Error('missing #hud container');
+const resultRoot = document.getElementById('result');
+if (!resultRoot) throw new Error('missing #result container');
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setClearColor(new Color('#1b2230'));
@@ -79,7 +88,8 @@ const feedback = new CombatFeedback(state.champions.length, impactRings, killFee
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 // Built before the models load, so the HUD shows while they do.
-const hud = new Hud(buildHud(hudRoot), state.champions, HUMAN_ID, killFeed);
+const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed);
+const result = new ResultScreen(buildResult(resultRoot, kitIds, launch.difficulty), human.team);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 
@@ -114,7 +124,8 @@ bindInput(window, renderer.domElement, input);
 const clock = createFixedStepClock();
 
 // The pose before the latest tick, the one being drawn, and the inputs array
-// the sim reads. Champion 0 is the human, the others get missing inputs.
+// the sim reads. Champion 0 is the human, the bots write their own entries
+// before every step, and an entry nobody writes is a missing input.
 const previousPoses = createPoses(state.champions.length);
 const drawnPoses = createPoses(state.champions.length);
 const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
@@ -145,13 +156,25 @@ for (let tick = 0; tick < TICK_TEXT_COUNT; tick++) TICK_TEXT.push(String(tick));
 // The last value written to each of these hooks, so a steady frame builds no
 // strings. Fields of an object, not `let`s: a number in a closure slot is a new
 // heap number on every store.
-const wrote = { tick: -1, x: NaN, y: NaN, facing: NaN };
+const wrote = { tick: -1, x: NaN, y: NaN, facing: NaN, round: -1, phase: '' };
 
 function writeHooks(): void {
   const dataset = renderer.domElement.dataset;
   if (state.tick !== wrote.tick) {
     wrote.tick = state.tick;
     dataset['tick'] = TICK_TEXT[state.tick] ?? String(state.tick);
+  }
+  // The match phase and the round, for the e2e specs: a phase is the sim's own string.
+  const match = state.match;
+  if (match !== undefined) {
+    if (match.phase !== wrote.phase) {
+      wrote.phase = match.phase;
+      dataset['phase'] = match.phase;
+    }
+    if (match.round !== wrote.round) {
+      wrote.round = match.round;
+      dataset['round'] = TICK_TEXT[match.round] ?? String(match.round);
+    }
   }
   const champion = state.champions[HUMAN_ID];
   if (!champion) return;
@@ -204,6 +227,7 @@ function stepSim(steps: number): void {
     capturePoses(state.champions, previousPoses);
     projectileViews.capture(state.projectiles);
     areaViews.capture(state.areas);
+    bots.think(state, inputs);
     step(state, inputs);
     // Every step: the sim clears its events at the start of the next one.
     routeEvents(state, feedback);
@@ -214,6 +238,7 @@ function stepSim(steps: number): void {
   writeHooks();
   writeCombatHooks();
   hud.update(state);
+  result.update(state);
 }
 
 // Created after the champion views exist, in loadModels. draw never runs before then.
@@ -252,17 +277,44 @@ function frame(now: number): void {
   draw(clock.alpha);
 }
 
+// The timestamp of the dev-only probe hook below, in the same closure as frame.
+// Set once from performance.now() on the first call (the paused fake clock in
+// combat.spec, in a warm-up window), so the first probe frame moves the loop
+// clock forward; later frames read no clock.
+let probeNow = -1;
+
+/**
+ * Runs `count` frames with synthetic timestamps one sim tick apart, without the
+ * animation loop. Only the dev-only hook calls it, and a build drops it. The
+ * heap probe counts this function like the rest of main.ts: V8 inlines the frame
+ * into it, so the frame's bytes land here, and the hook's own cost is 9 to
+ * 18 B per frame (see testing.md).
+ */
+function frameMany(count: number): void {
+  if (probeNow < 0) probeNow = performance.now();
+  for (let i = 0; i < count; i++) {
+    probeNow += STEP_MS;
+    frame(probeNow);
+  }
+}
+
 // A rejected load is not caught on purpose: it surfaces as a page error.
 async function loadModels(): Promise<void> {
   const loader = new GLTFLoader();
-  const [arenaGltf, championGltf] = await Promise.all([
+  // Each distinct champion model loads once, however many champions use it.
+  const urls = [...new Set(state.champions.map((champion) => championModelUrl(champion.championId)))];
+  const [arenaGltf, ...championGltfs] = await Promise.all([
     loader.loadAsync(arenaModelUrl(arena.id)),
-    loader.loadAsync(PLACEHOLDER_CHAMPION_URL),
+    ...urls.map((url) => loader.loadAsync(url)),
   ]);
   // The arena glb already uses the (x, 0, -y) mapping.
-  scene.add(arenaGltf.scene);
+  if (arenaGltf) scene.add(arenaGltf.scene);
   // One view per champion in id order, so champions.children[i] is champion i.
-  for (let i = 0; i < state.champions.length; i++) champions.add(championGltf.scene.clone());
+  for (const champion of state.champions) {
+    const gltf = championGltfs[urls.indexOf(championModelUrl(champion.championId))];
+    if (!gltf) throw new Error(`no model loaded for ${champion.championId}`);
+    champions.add(gltf.scene.clone());
+  }
   looks = createChampionLooks(champions.children);
 }
 
@@ -271,11 +323,17 @@ capturePoses(state.champions, previousPoses);
 writeHooks();
 writeCombatHooks();
 hud.update(state);
+result.update(state);
 if (import.meta.env.DEV) {
   // Dev builds only: Vite replaces the flag with false in a build and drops the
-  // branch and the chunk, so F4 never ships.
+  // branch and the chunk, so F4 and the probe hook never ship.
   const { bindDebugShot, fireDebugShot } = await import('./debug-shot');
   bindDebugShot(window, renderer.domElement, () => fireDebugShot(state, HUMAN_ID, aimX, aimY));
+  // The heap probe of e2e/combat.spec.ts runs frames through this hook instead of
+  // the animation loop, see frameMany. The hook only forwards a frame count.
+  (window as unknown as { __runProbeFrames: (frames: number) => void }).__runProbeFrames = (frames) => {
+    frameMany(frames);
+  };
 }
 // Draw once so the arena and champions are on the canvas before the hook.
 draw(0);

@@ -33,8 +33,9 @@ export function routeEvents(state: GameState, handlers: FeedbackHandlers): void 
         handlers.hit(tick, event.x, event.y);
         break;
       case 'projectileExpired':
-        // The 'hit' expiry repeats the position of the projectileHit before it.
-        if (event.reason !== 'hit') handlers.expire(tick, event.x, event.y);
+        // The 'hit' expiry repeats the position of the projectileHit before it. A 'roundEnd'
+        // expiry is a shot cut off by the round's end or start, where nothing was hit.
+        if (event.reason !== 'hit' && event.reason !== 'roundEnd') handlers.expire(tick, event.x, event.y);
         break;
       case 'death':
         handlers.death(tick, event.targetId, event.sourceId);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { orFail, watchProblems, type Problems } from './support';
+import { orFail, waitForPhase, watchProblems, type Problems } from './support';
 
 // The sim state the canvas exposes: tick, champion 0 position in cm and facing.
 interface Sim {
@@ -38,11 +38,18 @@ async function waitForTick(page: Page, tick: number, failed: Problems['failed'])
   );
 }
 
-/** Opens the page, waits for the first ticks and checks the spawn state. */
+/**
+ * Opens the dev-only sandbox, waits for the round phase and checks the spawn
+ * state. The sandbox is the roster of these tests with match flow: champions 0
+ * and 1 are Hargrim and Quillon, champion 2 stands and only champion 3 is a bot,
+ * which walks towards champion 1 and never comes near the walks below. In the
+ * default match the enemy Hargrim targets champion 0 and its pull could reach it.
+ * The warmup locks every champion, so the walks start with the round.
+ */
 async function openMatch(page: Page, failed: Problems['failed']): Promise<Sim> {
-  await page.goto('/');
+  await page.goto('/?scene=sandbox');
   await orFail(page.waitForSelector('canvas[data-arena="arena01"][data-tick]'), failed);
-  await waitForTick(page, 2, failed);
+  await waitForPhase(page, 'round', failed);
   const start = await readSim(page);
   expect([start.x, start.y]).toEqual([START_X, START_Y]);
   expect(start.facing).toBe(0);

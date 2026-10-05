@@ -79,6 +79,12 @@ describe('routeEvents', () => {
     expect(calls.map((call) => call.kind)).toEqual(['hit']);
   });
 
+  it('gives no ring for a shot that ended with the round', () => {
+    const { handlers, calls } = recorder();
+    routeEvents(fakeState(7, [expired('roundEnd')]), handlers);
+    expect(calls).toEqual([]);
+  });
+
   it('ignores heal, areaTick and the spawn and area events', () => {
     const { handlers, calls } = recorder();
     routeEvents(
@@ -235,5 +241,81 @@ describe('routing real sim events', () => {
     expect(feedback.deaths).toBe(1);
     expect(feed.count).toBe(1);
     expect(feed.line(0)).toMatchObject({ killerId: 0, victimId: 2 });
+  });
+});
+
+// The deciding step of a round: the last death, `roundEnded`, and every shot
+// still flying ends with the reason `roundEnd` (simulation.md, match flow).
+describe('routing the end of a round', () => {
+  function roundMatch(): GameState {
+    const state = createMatch(
+      {
+        teamSize: 2,
+        players: [
+          { championId: 'a', team: 'A' },
+          { championId: 'b', team: 'A' },
+          { championId: 'c', team: 'B' },
+          { championId: 'd', team: 'B' },
+        ],
+        roundsToWin: 3,
+      },
+      parseArenaDef(arena01Json),
+      1,
+    );
+    // The warmup locks the champions for 180 steps.
+    for (let i = 0; i < 180; i++) step(state, []);
+    return state;
+  }
+
+  function shoot(state: GameState, ownerId: number, x: number, y: number): void {
+    debug.spawnProjectile(state, {
+      ownerId,
+      x,
+      y,
+      dirX: 1,
+      dirY: 0,
+      speed: 10,
+      radius: 0.25,
+      lifetimeTicks: 180,
+      pierce: false,
+      effects: [{ type: 'damage', amount: 30 }],
+    });
+  }
+
+  it('rings once per hit and leaves the shots that end with the round without a ring', () => {
+    const state = roundMatch();
+    expect(state.match?.phase).toBe('round');
+    // Four hits kill each enemy: champion 0 shoots champion 2 and champion 1
+    // shoots champion 3. Two more shots are far behind, still in flight when
+    // the second death decides the round.
+    for (let i = 0; i < 4; i++) {
+      shoot(state, 0, 10 - 0.001 * i, 2);
+      shoot(state, 1, 10 - 0.001 * i, -2);
+    }
+    shoot(state, 0, -5, 2);
+    shoot(state, 1, -5, -2);
+
+    const rings = createImpactRings();
+    const feed = createKillFeed();
+    const feedback = new CombatFeedback(4, rings, feed);
+    let endedWithRound = 0;
+    for (let i = 0; i < 40; i++) {
+      step(state, []);
+      for (const event of state.events) {
+        if (event.type === 'projectileExpired' && event.reason === 'roundEnd') endedWithRound++;
+      }
+      routeEvents(state, feedback);
+    }
+
+    expect(state.match?.phase).toBe('roundEnd');
+    expect(endedWithRound, 'two shots were still in flight when the round was decided').toBe(2);
+    expect(feedback.hits).toBe(8);
+    expect(feedback.deaths).toBe(2);
+    expect(feed.count).toBe(2);
+    expect([feed.line(0), feed.line(1)]).toEqual([
+      expect.objectContaining({ killerId: 0, victimId: 2 }),
+      expect.objectContaining({ killerId: 1, victimId: 3 }),
+    ]);
+    expect(rings.visibleCount, 'one ring per hit and none for the two roundEnd expiries').toBe(8);
   });
 });

@@ -1,9 +1,7 @@
-import type { TeamId } from '@claudeline/sim';
+import { EX_ENERGY_COST, MAX_ENERGY, ULTIMATE_ENERGY_COST, type MatchState, type TeamId } from '@claudeline/sim';
 import {
-  EX_MARK,
-  MAX_ENERGY,
+  SUDDEN_DEATH_TEXT,
   TIMER_TEXT,
-  ULTIMATE_COST,
   createRoundView,
   createSlotViews,
   readRoundView,
@@ -15,11 +13,17 @@ import {
 import { KILL_FEED_LINES, type KillFeed } from './kill-feed';
 import { championName } from './roster';
 
-/** The part of an element the HUD writes. `HTMLElement` satisfies it, and so does a counting fake. */
+/**
+ * The part of an element the HUD writes. `HTMLElement` satisfies it, and so does
+ * a counting fake. State goes into `data-*` attributes through `setAttribute`
+ * and not through `dataset`: in the heap probe (e2e/combat.spec.ts) a `dataset`
+ * write allocated about 100 B per window in the counted code whenever a slot
+ * changed, and `setAttribute` allocated none.
+ */
 export interface HudElement {
   textContent: string | null;
   style: { transform: string };
-  dataset: Record<string, string | undefined>;
+  setAttribute(name: string, value: string): void;
 }
 
 export interface HudHandles {
@@ -39,10 +43,14 @@ export interface HudHandles {
 /** What `update` reads from the game state. */
 export interface HudState {
   tick: number;
+  /** Absent in free play, which reads as 0 : 0 and a full round. */
+  match?: MatchState;
   champions: readonly (SlotSource & { health: number; maxHealth: number })[];
 }
 
 const RING_NAME = 'Ring';
+// The timer key of the sudden death text, past the 91 keys of the seconds.
+const SUDDEN_KEY = 100;
 const SIDE_ALLY = 'ally';
 const SIDE_ENEMY = 'enemy';
 const SIDE_RING = 'ring';
@@ -77,7 +85,9 @@ export class Hud {
   private ultimateReady = -1;
   private scoreA = -1;
   private scoreB = -1;
-  private secondsLeft = -1;
+  // 0 to 90 for the seconds shown, SUDDEN_KEY for the sudden death text, -1 for not written yet.
+  private timerKey = -1;
+  private suddenFlag = -1;
   private readonly slotSeconds: number[] = [];
   private readonly slotReady: number[] = [];
   private readonly slotWindup: number[] = [];
@@ -136,15 +146,15 @@ export class Hud {
       this.energyKey = key;
       this.handles.energyFill.style.transform = `scaleX(${key / MAX_ENERGY})`;
     }
-    const ex = energy >= EX_MARK ? 1 : 0;
+    const ex = energy >= EX_ENERGY_COST ? 1 : 0;
     if (ex !== this.exReady) {
       this.exReady = ex;
-      this.handles.exMark.dataset['ready'] = flag(ex === 1);
+      this.handles.exMark.setAttribute('data-ready', flag(ex === 1));
     }
-    const ultimate = energy >= ULTIMATE_COST ? 1 : 0;
+    const ultimate = energy >= ULTIMATE_ENERGY_COST ? 1 : 0;
     if (ultimate !== this.ultimateReady) {
       this.ultimateReady = ultimate;
-      this.handles.ultimateMark.dataset['ready'] = flag(ultimate === 1);
+      this.handles.ultimateMark.setAttribute('data-ready', flag(ultimate === 1));
     }
   }
 
@@ -161,17 +171,17 @@ export class Hud {
       const ready = view.seconds === 0 ? 1 : 0;
       if (ready !== this.slotReady[i]) {
         this.slotReady[i] = ready;
-        handle.icon.dataset['ready'] = flag(ready === 1);
+        handle.icon.setAttribute('data-ready', flag(ready === 1));
       }
       const windup = view.windup ? 1 : 0;
       if (windup !== this.slotWindup[i]) {
         this.slotWindup[i] = windup;
-        handle.icon.dataset['windup'] = flag(windup === 1);
+        handle.icon.setAttribute('data-windup', flag(windup === 1));
       }
       const blocked = view.blocked ? 1 : 0;
       if (blocked !== this.slotBlocked[i]) {
         this.slotBlocked[i] = blocked;
-        handle.icon.dataset['blocked'] = flag(blocked === 1);
+        handle.icon.setAttribute('data-blocked', flag(blocked === 1));
       }
     }
   }
@@ -184,9 +194,17 @@ export class Hud {
       this.scoreB = round.scoreB;
       this.handles.score.textContent = `${round.scoreA} : ${round.scoreB}`;
     }
-    if (round.secondsLeft !== this.secondsLeft) {
-      this.secondsLeft = round.secondsLeft;
-      this.handles.timer.textContent = TIMER_TEXT[round.secondsLeft] ?? '';
+    // Outside the round phases the timer keeps what it shows.
+    if (!round.live) return;
+    const key = round.suddenDeath ? SUDDEN_KEY : round.secondsLeft;
+    if (key !== this.timerKey) {
+      this.timerKey = key;
+      this.handles.timer.textContent = round.suddenDeath ? SUDDEN_DEATH_TEXT : (TIMER_TEXT[round.secondsLeft] ?? '');
+    }
+    const sudden = round.suddenDeath ? 1 : 0;
+    if (sudden !== this.suddenFlag) {
+      this.suddenFlag = sudden;
+      this.handles.timer.setAttribute('data-sudden', flag(sudden === 1));
     }
   }
 
@@ -201,19 +219,19 @@ export class Hud {
       const shown = i < feed.count ? 1 : 0;
       if (shown !== this.lineShown[i]) {
         this.lineShown[i] = shown;
-        handle.line.dataset['visible'] = flag(shown === 1);
+        handle.line.setAttribute('data-visible', flag(shown === 1));
       }
       if (shown === 0) continue;
       const entry = feed.line(i);
       if (entry.killerId !== this.lineKiller[i]) {
         this.lineKiller[i] = entry.killerId;
         handle.killer.textContent = this.names[entry.killerId] ?? RING_NAME;
-        handle.killer.dataset['team'] = this.sides[entry.killerId] ?? SIDE_RING;
+        handle.killer.setAttribute('data-team', this.sides[entry.killerId] ?? SIDE_RING);
       }
       if (entry.victimId !== this.lineVictim[i]) {
         this.lineVictim[i] = entry.victimId;
         handle.victim.textContent = this.names[entry.victimId] ?? RING_NAME;
-        handle.victim.dataset['team'] = this.sides[entry.victimId] ?? SIDE_RING;
+        handle.victim.setAttribute('data-team', this.sides[entry.victimId] ?? SIDE_RING);
       }
     }
   }

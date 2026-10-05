@@ -1,17 +1,25 @@
-import { SLOTS, createMatch, parseArenaDef } from '@claudeline/sim';
+import {
+  DEFAULT_ROUNDS_TO_WIN,
+  EX_ENERGY_COST,
+  MAX_ENERGY,
+  ROUND_TICKS,
+  SLOTS,
+  ULTIMATE_ENERGY_COST,
+  createMatch,
+  parseArenaDef,
+  type CastState,
+  type MatchPhase,
+  type MatchState,
+} from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import {
-  EX_MARK,
-  MAX_ENERGY,
-  ROUNDS_TO_WIN,
-  ROUND_TICKS,
   TIMER_TEXT,
-  ULTIMATE_COST,
   createRoundView,
   createSlotViews,
   readRoundView,
   readSlotViews,
+  type RoundView,
   type SlotSource,
 } from './hud-views';
 
@@ -34,15 +42,23 @@ function localChampion(): SlotSource {
   return champion;
 }
 
+// The HUD reads these from the sim. The literals pin them to rules.md sections 1 to 3.
 describe('HUD constants', () => {
   it('match rules.md sections 1 to 3', () => {
-    expect(EX_MARK).toBe(25);
-    expect(ULTIMATE_COST).toBe(100);
+    expect(EX_ENERGY_COST).toBe(25);
+    expect(ULTIMATE_ENERGY_COST).toBe(100);
     expect(MAX_ENERGY).toBe(100);
     expect(ROUND_TICKS).toBe(5400);
-    expect(ROUNDS_TO_WIN).toBe(3);
+    expect(DEFAULT_ROUNDS_TO_WIN).toBe(3);
   });
 });
+
+/** A source with ready slots, the shape of a real champion. */
+function source(overrides: Partial<SlotSource> = {}): SlotSource {
+  return { energy: 0, cooldowns: [0, 0, 0, 0, 0, 0, 0], cast: null, ...overrides };
+}
+
+const WINDUP: CastState = { castId: 1, slot: 'Q', ex: false, windupTicks: 12, windupLeft: 12 };
 
 describe('slot views', () => {
   it('creates seven views, one per slot', () => {
@@ -67,54 +83,63 @@ describe('slot views', () => {
 
   it('shows the remaining cooldown in whole seconds, rounded up', () => {
     const views = createSlotViews();
-    readSlotViews({ energy: 100, cooldowns: [61, 60, 1, 0, 120, 121, 599] }, views);
+    readSlotViews(source({ energy: 100, cooldowns: [61, 60, 1, 0, 120, 121, 599] }), views);
     expect(views.map((v) => v.seconds)).toEqual([2, 1, 1, 0, 2, 3, 10]);
   });
 
   it('dims every slot during a windup', () => {
     const views = createSlotViews();
-    readSlotViews({ energy: 0, cast: { slot: 'Q' } }, views);
+    readSlotViews(source({ cast: WINDUP }), views);
     expect(views.every((v) => v.windup)).toBe(true);
-    readSlotViews({ energy: 0, cast: null }, views);
-    expect(views.some((v) => v.windup)).toBe(false);
-  });
-
-  it('reads a source without cooldowns or cast as ready', () => {
-    const views = createSlotViews();
-    readSlotViews({ energy: 100, cooldowns: [5, 5, 5, 5, 5, 5, 5], cast: {} }, views);
-    readSlotViews({ energy: 100 }, views);
-    expect(views.map((v) => v.seconds)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    readSlotViews(source({ cast: null }), views);
     expect(views.some((v) => v.windup)).toBe(false);
   });
 
   it('keeps the identity of its view objects', () => {
     const views = createSlotViews();
     const before = [...views];
-    readSlotViews({ energy: 0, cooldowns: [1, 2, 3, 4, 5, 6, 7] }, views);
+    readSlotViews(source({ cooldowns: [1, 2, 3, 4, 5, 6, 7] }), views);
     for (let i = 0; i < views.length; i++) expect(views[i]).toBe(before[i]);
   });
 
   it('reads a short cooldowns array as ready for the missing slots', () => {
     const views = createSlotViews();
-    readSlotViews({ energy: 100, cooldowns: [90] }, views);
+    readSlotViews(source({ energy: 100, cooldowns: [90] }), views);
     expect(views.map((v) => v.seconds)).toEqual([2, 0, 0, 0, 0, 0, 0]);
   });
 });
 
 describe('round view', () => {
-  function timer(tick: number): string {
-    const view = createRoundView();
-    readRoundView({ tick }, view);
-    return TIMER_TEXT[view.secondsLeft] as string;
+  function matchAt(phase: MatchPhase, phaseTicks: number, over: Partial<MatchState> = {}): { match: MatchState } {
+    return {
+      match: { phase, phaseTicks, round: 1, roundsToWin: 3, score: { A: 0, B: 0 }, ring: null, ...over },
+    };
   }
 
-  it('starts at 0 : 0 with 90 seconds left', () => {
+  function read(state: { match?: MatchState }): RoundView {
     const view = createRoundView();
-    readRoundView({ tick: 0 }, view);
-    expect(view).toEqual({ scoreA: 0, scoreB: 0, secondsLeft: 90 });
+    readRoundView(state, view);
+    return view;
+  }
+
+  function timer(phaseTicks: number): string {
+    return TIMER_TEXT[read(matchAt('round', phaseTicks)).secondsLeft] as string;
+  }
+
+  it('starts at 0 : 0 with 90 seconds left, no sudden death, and a running timer', () => {
+    expect(createRoundView()).toEqual({ scoreA: 0, scoreB: 0, secondsLeft: 90, suddenDeath: false, live: true });
   });
 
-  it('counts the timer down by tick', () => {
+  it('reads a state without match flow as 0 : 0 and 90 seconds', () => {
+    expect(read({})).toEqual({ scoreA: 0, scoreB: 0, secondsLeft: 90, suddenDeath: false, live: true });
+  });
+
+  it('shows the full round in the warmup, where the round clock has not started', () => {
+    expect(read(matchAt('warmup', 0))).toMatchObject({ secondsLeft: 90, live: true, suddenDeath: false });
+    expect(read(matchAt('warmup', 179))).toMatchObject({ secondsLeft: 90, live: true });
+  });
+
+  it('counts the timer down by the ticks of the round phase', () => {
     expect(timer(0)).toBe('1:30');
     expect(timer(59)).toBe('1:30');
     expect(timer(60)).toBe('1:29');
@@ -123,9 +148,26 @@ describe('round view', () => {
     expect(timer(5399)).toBe('0:01');
   });
 
-  it('holds at 0:00', () => {
+  it('holds at 0:00 until the ring comes', () => {
     expect(timer(5400)).toBe('0:00');
     expect(timer(6000)).toBe('0:00');
+  });
+
+  it('reads sudden death from the ring, not from the clock', () => {
+    const ring = { x: 0, y: 0, radius: 12, damagePerTick: 0.1 };
+    expect(read(matchAt('round', 5400)).suddenDeath).toBe(false);
+    expect(read(matchAt('round', 5401, { ring })).suddenDeath).toBe(true);
+  });
+
+  it('reads the score of the match', () => {
+    const view = read(matchAt('roundEnd', 10, { score: { A: 2, B: 1 } }));
+    expect([view.scoreA, view.scoreB]).toEqual([2, 1]);
+  });
+
+  it('stops the timer after the round and after the match', () => {
+    expect(read(matchAt('roundEnd', 0)).live).toBe(false);
+    expect(read(matchAt('matchEnd', 0)).live).toBe(false);
+    expect(read(matchAt('round', 0)).live).toBe(true);
   });
 
   it('has a text for every whole second from 0 to 90', () => {

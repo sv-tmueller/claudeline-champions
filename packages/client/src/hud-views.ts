@@ -1,29 +1,21 @@
-import { SLOTS, TICK_RATE } from '@claudeline/sim';
-
-// Numbers from rules.md sections 1 to 3. The kit framework exports its own
-// copies; those replace these when the HUD is wired to it.
-/** Energy at which an EX variant can be cast. */
-export const EX_MARK = 25;
-/** Energy the ultimate costs. */
-export const ULTIMATE_COST = 100;
-export const MAX_ENERGY = 100;
-/** A round lasts 90 s. */
-export const ROUND_TICKS = 5400;
-export const ROUNDS_TO_WIN = 3;
+import {
+  ROUND_TICKS,
+  SLOTS,
+  TICK_RATE,
+  ULTIMATE_ENERGY_COST,
+  type ChampionState,
+  type MatchState,
+} from '@claudeline/sim';
 
 /** The slot that is the ultimate, F. */
 const ULTIMATE_INDEX = SLOTS.length - 1;
 
 /**
- * What the HUD reads from a champion. `cooldowns` holds one remaining-tick
- * entry per slot in `SLOTS` order and `cast` is non-null during a windup.
- * Both are optional, so a champion without them reads as ready.
+ * What the HUD reads from a champion: the sim's own fields, so a rename there
+ * breaks the build. `cooldowns` holds one remaining-tick entry per slot in
+ * `SLOTS` order and `cast` is non-null during a windup.
  */
-export interface SlotSource {
-  energy: number;
-  cooldowns?: readonly number[];
-  cast?: unknown;
-}
+export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast'>;
 
 export interface SlotView {
   /** Whole seconds of cooldown left, 0 when the slot is ready. */
@@ -42,35 +34,59 @@ export function createSlotViews(): SlotView[] {
 /** Fills `out` from the champion. Allocates nothing. */
 export function readSlotViews(source: SlotSource, out: readonly SlotView[]): void {
   const cooldowns = source.cooldowns;
-  const windup = source.cast != null;
+  const windup = source.cast !== null;
   for (let i = 0; i < out.length; i++) {
     const view = out[i] as SlotView;
-    const ticks = cooldowns?.[i] ?? 0;
+    const ticks = cooldowns[i] ?? 0;
     view.seconds = ticks > 0 ? Math.ceil(ticks / TICK_RATE) : 0;
     view.windup = windup;
-    // Only the ultimate has an energy gate to show; silence arrives with the kits.
-    view.blocked = i === ULTIMATE_INDEX && source.energy < ULTIMATE_COST;
+    // Only the ultimate has an energy gate to show; silence is not built yet.
+    view.blocked = i === ULTIMATE_INDEX && source.energy < ULTIMATE_ENERGY_COST;
   }
 }
 
-/** Placeholder until match flow exists: no round wins yet, a 90 s timer from the tick. */
+/** What the HUD shows of the round, read from `state.match`. */
 export interface RoundView {
   scoreA: number;
   scoreB: number;
   /** Whole seconds left, 0 to 90. */
   secondsLeft: number;
+  /** The ring exists: the timer shows the sudden death text. */
+  suddenDeath: boolean;
+  /** The timer follows the state. False after a round and after the match, where it keeps its last text. */
+  live: boolean;
 }
 
 export function createRoundView(): RoundView {
-  return { scoreA: 0, scoreB: 0, secondsLeft: ROUND_TICKS / TICK_RATE };
+  return { scoreA: 0, scoreB: 0, secondsLeft: ROUND_TICKS / TICK_RATE, suddenDeath: false, live: true };
 }
 
-export function readRoundView(state: { tick: number }, out: RoundView): void {
-  out.scoreA = 0;
-  out.scoreB = 0;
-  const left = ROUND_TICKS - state.tick;
+/**
+ * Fills `out` from the match. The warmup shows the full round, since the round
+ * clock has not started. In a round the timer counts down `phaseTicks`, and once
+ * the ring exists it is sudden death (rules.md section 8). A state without
+ * match flow reads as 0 : 0 and a full round. Allocates nothing.
+ */
+export function readRoundView(state: { match?: MatchState }, out: RoundView): void {
+  const match = state.match;
+  if (match === undefined) {
+    out.scoreA = 0;
+    out.scoreB = 0;
+    out.secondsLeft = ROUND_TICKS / TICK_RATE;
+    out.suddenDeath = false;
+    out.live = true;
+    return;
+  }
+  out.scoreA = match.score.A;
+  out.scoreB = match.score.B;
+  out.live = match.phase === 'warmup' || match.phase === 'round';
+  out.suddenDeath = match.phase === 'round' && match.ring !== null;
+  const left = match.phase === 'round' ? ROUND_TICKS - match.phaseTicks : ROUND_TICKS;
   out.secondsLeft = left > 0 ? Math.ceil(left / TICK_RATE) : 0;
 }
+
+/** The timer text once the ring exists. */
+export const SUDDEN_DEATH_TEXT = 'Sudden death';
 
 /** The text m:ss of every whole second from 0 to 90, made once at startup. */
 export const TIMER_TEXT: readonly string[] = (() => {
