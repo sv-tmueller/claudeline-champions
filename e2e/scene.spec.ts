@@ -1,12 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { orFail, watchProblems } from './support';
+import { orFail, waitForPhase, watchProblems } from './support';
 
 // The slots in the order of SLOTS in the sim, which is the order on screen.
 const SLOT_NAMES = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'];
 const HUD_ELEMENTS = ['health-bar', 'energy-bar', 'cooldown-icons', 'round-score', 'round-timer', 'kill-feed'];
-// A round is 5400 ticks (90 s at 60 Hz) in the HUD placeholder.
+// A round is 5400 ticks (90 s at 60 Hz) and the warmup before round 1 is 180 ticks.
 const ROUND_TICKS = 5400;
 const TICK_RATE = 60;
+const WARMUP_TICKS = 180;
 
 interface HudRead {
   slots: { name: string | null; ready: string | null; windup: string | null; blocked: string | null; seconds: string }[];
@@ -15,8 +16,14 @@ interface HudRead {
   score: string;
   timer: string;
   tick: number;
+  phase: string | undefined;
+  round: string | undefined;
   visibleLines: number;
   hudElements: (string | null)[];
+  result: {
+    visible: string | null;
+    entries: { champion: string | null; available: string | null; href: string | null; text: string }[];
+  };
 }
 
 // One evaluate reads everything, so the tick and the timer come from the same frame.
@@ -41,14 +48,26 @@ async function readHud(page: Page): Promise<HudRead> {
       score: text('[data-hud="round-score"]'),
       timer: text('[data-hud="round-timer"]'),
       tick: Number(canvas.dataset['tick']),
+      phase: canvas.dataset['phase'],
+      round: canvas.dataset['round'],
       visibleLines: document.querySelectorAll('[data-line][data-visible="true"]').length,
       hudElements: [...document.querySelectorAll('[data-hud]')].map((el) => el.getAttribute('data-hud')),
+      result: {
+        visible: document.querySelector('[data-result="panel"]')?.getAttribute('data-visible') ?? null,
+        entries: [...document.querySelectorAll<HTMLElement>('[data-result="panel"] [data-champion]')].map((entry) => ({
+          champion: entry.getAttribute('data-champion'),
+          available: entry.getAttribute('data-available'),
+          href: entry.getAttribute('href'),
+          text: entry.textContent ?? '',
+        })),
+      },
     };
   });
 }
 
+/** The timer of the first round at a tick: the full round in the warmup, then the ticks since round 1 began. */
 function timerText(tick: number): string {
-  const seconds = Math.max(0, Math.ceil((ROUND_TICKS - tick) / TICK_RATE));
+  const seconds = Math.max(0, Math.ceil((ROUND_TICKS - Math.max(0, tick - WARMUP_TICKS)) / TICK_RATE));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
@@ -78,7 +97,8 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
       // Only the ultimate is blocked: the energy starts at 0.
       expect(slot.blocked, `${slot.name} blocked`).toBe(slot.name === 'F' ? 'true' : 'false');
     }
-    expect(hud.healthText).toBe('120 / 120');
+    // The pick is Hargrim, with 160 health.
+    expect(hud.healthText).toBe('160 / 160');
     expect(hud.marks).toEqual([
       { name: 'ex', ready: 'false' },
       { name: 'ultimate', ready: 'false' },
@@ -87,6 +107,23 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     expect(hud.score).toContain('first to 3');
     expect(hud.timer).toBe(timerText(hud.tick));
     expect(hud.visibleLines).toBe(0);
+    // The result panel exists and stays hidden until the match ends. Its select
+    // lists the roster in order: the champions with a kit link to a relaunch, the
+    // others are greyed and have no link.
+    expect(hud.result.visible).toBe('false');
+    expect(hud.result.entries).toEqual([
+      { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal', text: 'Hargrim' },
+      { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal', text: 'Quillon' },
+      { champion: 'lumeth', available: 'false', href: null, text: 'Lumeth' },
+      { champion: 'skerrow', available: 'false', href: null, text: 'Skerrow' },
+    ]);
+    expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
+
+    // The timer follows the phase: the full round in the warmup, then the round clock.
+    await waitForPhase(page, 'round', failed);
+    const round = await readHud(page);
+    expect(round.round).toBe('1');
+    expect(round.timer).toBe(timerText(round.tick));
 
     // A right click must reach the canvas, so no HUD element takes the pointer.
     const icon = await page.locator('[data-slot="Q"]').boundingBox();
@@ -105,6 +142,17 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 720 });
 
     await page.screenshot({ path: testInfo.outputPath('scene.png') });
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('starts as Quillon from the launch address', async ({ page }) => {
+  const { problems, failed } = watchProblems(page);
+  try {
+    await page.goto('/?champion=quillon');
+    await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
+    expect((await readHud(page)).healthText).toBe('120 / 120');
   } finally {
     expect(problems).toEqual([]);
   }
