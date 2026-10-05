@@ -156,15 +156,18 @@ describe('the warmup', () => {
     const state = fresh();
     stepTo(state, 180, HOLD_ALL);
     step(state, HOLD_ALL);
-    expect(champion(state, 0).x).toBeCloseTo(-11.908333333333333, 12);
+    expect(champion(state, 0).x).toBe(-11.908333333333333);
     expect(state.events[0]).toMatchObject({ type: 'castStarted', championId: 0, slot: 'R' });
   });
 
   it('keeps dead champions out of the locked turn and leaves missing inputs alone', () => {
     const state = fresh();
     kill(state, 3);
-    step(state, [input(1, 0, 900, 900, 0)]);
+    const dead = champion(state, 3);
+    const [aimX, aimY, facing] = [dead.aimX, dead.aimY, dead.facing];
+    step(state, [input(1, 0, 900, 900, 0), undefined, undefined, input(0, 0, -700, 300, 0)]);
     expect(champion(state, 3).alive).toBe(false);
+    expect([dead.aimX, dead.aimY, dead.facing]).toEqual([aimX, aimY, facing]);
     expect([champion(state, 1).aimX, champion(state, 1).aimY]).toEqual([-1100, -200]);
   });
 
@@ -210,6 +213,22 @@ describe('the round clock and the ring', () => {
     expect(state.match?.round).toBe(1);
     expect(state.match?.phase).toBe('round');
     expect(state.match?.ring).toEqual({ x: 0, y: 0, radius: 3, damagePerTick: 0.16666666666666666 });
+  });
+
+  it('holds the end radius exactly from the step that makes state.tick 7381 on a ring of 12 to 0.7', () => {
+    const arena = { ...openArena(), ring: { startRadius: 12, endRadius: 0.7, damagePerSecond: 10 } };
+    const state = createMatch(config(), arena, 1, kits());
+    for (let i = 0; i < 180; i++) step(state, []);
+    centred(state);
+    stepTo(state, 7380);
+    expect(state.match?.ring?.radius).toBe(0.7062777777777782);
+    step(state, []);
+    expect(state.tick).toBe(7381);
+    expect(state.match?.ring?.radius).toBe(0.7);
+    expect(state.match).toMatchObject({ phase: 'round', round: 1 });
+    stepTo(state, 8000);
+    expect(state.match?.ring?.radius).toBe(0.7);
+    expect(state.match).toMatchObject({ phase: 'round', round: 1 });
   });
 
   it('announces sudden death once, with the round and the start radius', () => {
@@ -714,6 +733,31 @@ describe('the match end', () => {
     expect(state.match).toMatchObject({ phase: 'matchEnd', phaseTicks: 300, round: 1 });
   });
 
+  it('keeps a debug projectile spawned in the match end frozen for good', () => {
+    const state = begun(1);
+    kill(state, 0, 1);
+    step(state, []);
+    stepTo(state, 360);
+    expect(state.match?.phase).toBe('matchEnd');
+    const id = debug.spawnProjectile(state, {
+      ownerId: 0,
+      x: -6,
+      y: 4,
+      dirX: 1,
+      dirY: 0,
+      speed: 25,
+      radius: 0.2,
+      lifetimeTicks: 600,
+      pierce: false,
+      effects: [{ type: 'damage', amount: 1 }],
+    });
+    for (let i = 0; i < 300; i++) {
+      step(state, HOLD_ALL);
+      expect(state.events).toEqual([]);
+    }
+    expect(state.projectiles.map((p) => [p.id, p.x, p.y, p.remainingTicks])).toEqual([[id, -6, 4, 600]]);
+  });
+
   it('takes three round wins in a standard match', () => {
     expect(DEFAULT_ROUNDS_TO_WIN).toBe(3);
     const state = begun(DEFAULT_ROUNDS_TO_WIN);
@@ -772,7 +816,7 @@ describe('free play', () => {
   it('moves a champion in the very first step', () => {
     const state = free();
     step(state, [input(1, 0, 0, 0, 0)]);
-    expect(champion(state, 0).x).toBeCloseTo(-11.908333333333333, 12);
+    expect(champion(state, 0).x).toBe(-11.908333333333333);
   });
 
   it('never starts a ring: nothing at the corner after 7400 steps', () => {

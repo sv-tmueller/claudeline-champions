@@ -348,7 +348,7 @@ them from inside the sim, through `cast.ts`.
 | `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null)` | `applyEffects` returns the health its `heal` effects restored |
 | `energy.ts` | `landHit(state, { ownerId, castId }, targetId, effects, origin)` | |
 | `cast.ts` | `tickCooldowns`, `advanceWindup`, `startCast`, `fireDashThen`, `dropUnusedCasts`, `resetAbilityState` | what `step` calls, see [Abilities](#abilities-and-the-effects-toolkit) |
-| `flow.ts` | `stepLocked`, `stepRoundEnd` | what `step` calls for match flow, see [Match flow](#match-flow) |
+| `flow.ts` | `stepLocked`, `stepSuddenDeathAndDecision` | what `step` calls for match flow, see [Match flow](#match-flow) |
 
 `source` is `{ sourceId, slot }`, with a null slot for a direct call. Projectiles,
 areas and melee arcs land their hits through `landHit`, which wraps
@@ -464,9 +464,9 @@ slow) / 100)`, with the capped totals, and times 0.5 more during a `slowed`
 windup (`SLOWED_WINDUP_FACTOR`; the product, so it multiplies after slow and
 haste). With no slow or haste the factor is exactly 1, so the speed stays
 exactly 5.5 m/s. Stun, root, a running dash and a `locked` windup zero the walk
-velocity, which is then stored as `+0`; the stored velocity is the walk velocity only, never the
-displacement left after collision or forced motion. Dash and knockback ignore
-the speed factor.
+velocity, which is then stored as `+0`; the stored velocity is the walk velocity
+only, never the displacement left after collision or forced motion. Dash and
+knockback ignore the speed factor.
 
 ### Shields
 
@@ -636,7 +636,8 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
   `castInterrupted` reason `roundEnd` is rules.md 2.4.
 - Ring damage and ring deaths use the source id -1, which no champion has.
 - A dev tool spawn made during a locked phase is frozen with the rest and
-  cleared at the next round start.
+  cleared at the next round start. In `matchEnd` no round follows, so the spawn
+  stays frozen for good.
 - rules.md 2.4 (a decided round interrupts a windup) governs over 1.2 ("a cast
   in progress is dropped" at the reset) for when a windup ends, so the drop in
   1.2 finds nothing to drop.
@@ -753,10 +754,11 @@ move a champion in a locked windup.
 
 Only stun, death and a round end interrupt a windup (`castInterrupted` reasons
 `stun`, `death` and `roundEnd`; the event order is in [Statuses](#statuses),
-[Damage](#damage-healing-and-death) and [Match flow](#match-flow)). Nothing is refunded, and the cooldown keeps
-running. Silence, root, slow and knockback do not interrupt it. A rooted champion
-whose windup fires skips the `dash` effect of the cast, fires that dash's `then`
-effects at once and applies the rest of the ability.
+[Damage](#damage-healing-and-death) and [Match flow](#match-flow)). Nothing is
+refunded, and the cooldown keeps running. Silence, root, slow and knockback do
+not interrupt it. A rooted champion whose windup fires skips the `dash` effect
+of the cast, fires that dash's `then` effects at once and applies the rest of
+the ability.
 
 ### Firing
 

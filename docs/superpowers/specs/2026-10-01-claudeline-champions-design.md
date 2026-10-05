@@ -51,7 +51,7 @@ packages/protocol/          shared network message types (milestone 6)
 packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
 data/arenas/                arena definitions (JSON), read by sim and by Blender scripts
-data/kits/                  roster kit definitions (JSON), read by sim, bots and client
+data/kits/                  roster kit definitions (JSON), read like arenas
 assets/models/              generated .glb files, committed
 docs/architecture/          living reference for humans and agents
 docs/design/                game design documents (rules, roster, arenas)

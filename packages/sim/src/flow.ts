@@ -125,7 +125,7 @@ export function stepLocked(
  * `ROUND_TICKS` steps on the ring exists, its radius is recomputed from the integer step count
  * and an alive champion whose centre is outside takes its damage. Then the decision.
  */
-export function stepRoundEnd(state: GameState, match: MatchState): void {
+export function stepSuddenDeathAndDecision(state: GameState, match: MatchState): void {
   const { champions } = state;
   if (match.phaseTicks >= ROUND_TICKS) {
     const e = match.phaseTicks - ROUND_TICKS;
