@@ -66,17 +66,18 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // bad mode (see the retries below). Each of these fails the limit, with the
 // figures of the pull request: an escaping array in frame (about 1300 B), a
 // template string written to a hook every frame (about 2500 B), a closure made per
-// call in routeEvents (about 1500 to 1900 B), an escaping object in draw (about
-// 10.7 KB), a fresh literal from toPlayerInput (about 1350 B), a template string
-// per Hud.update call (about 1300 B), an escaping array per BotDriver.think call
-// (about 970 B) and a template string per ResultScreen.update call (about 800 B).
+// call in routeEvents (about 1700 B), an escaping object in draw (about 10.7 KB), a
+// fresh literal from toPlayerInput (about 1350 B), a template string per Hud.update
+// call (about 1300 B), an escaping array per BotDriver.think call (about 970 B) and
+// a template string per ResultScreen.update call (about 750 B).
 // The limit stays just above the clean figure so the small ones are caught. See
 // testing.md.
 const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code, the fake clock's timers and three's
-// render. About 320 KB per window was the lowest figure measured on the sandbox
-// (317 to 333 KB over 25 windows), so the floor is about a quarter of it.
+// render. About 344 KB per window was the lowest figure measured on the sandbox
+// with the bots casting (344 to 360 KB over 15 windows), so the floor is about a
+// quarter of it.
 const PROFILER_SANITY_BYTES = 80_000;
 
 async function readHooks(page: Page): Promise<Hooks> {

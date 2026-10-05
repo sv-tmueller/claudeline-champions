@@ -118,7 +118,7 @@ a plain heap delta is not needed.
 - The sanity floor: the lowest window outside the sim's three sweep files
   (`projectile.ts`, `geometry.ts` and `area.ts`, whose garbage is large and moves
   with the sweep fix in #49) must exceed 80 KB, about a quarter of the lowest
-  measured figure, 317 KB. The floor only proves that the profiler sees garbage.
+  measured figure, 344 KB with the bots casting (317 KB before they did). The floor only proves that the profiler sees garbage.
 - The mutation rule: a change to the probe, its pattern or the frame path is
   checked by applying each of these alone and seeing the spec fail on every
   attempt (all three, with the retries): an escaping array in `frame`, a template
@@ -127,8 +127,9 @@ a plain heap delta is not needed.
   `toPlayerInput` literal, a template string built on every `Hud.update` call, an
   escaping array built on every `BotDriver.think` call and a template string built
   on every `ResultScreen.update` call. The figures, bytes of the worst window per
-  attempt, are 1304 to 1328, 2416 to 2676, 1488 to 1956, 10684 to 10804, 1324 to
-  1364, 1280 to 2452 (one attempt in the bad mode), 952 to 984 and 744 to 884.
+  attempt, are 1200 to 1328, 2508 to 2656, 1656 to 2592, 10648 to 10892, 1344 to
+  1388, 1304 to 2416, 952 to 2256 and 724 to 1832 (the upper figures are attempts
+  in the bad mode, which adds about 1100 B).
 - Each attempt logs one line, `heap probe attempt N: bytes per window,
   total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files`, with
   the four figures of its measured windows.
