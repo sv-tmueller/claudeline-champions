@@ -3,7 +3,7 @@ import { length } from './geometry';
 import { landHit } from './energy';
 import { copyEffects } from './health';
 import { nextId } from './state';
-import type { AreaState, AreaTargets, Effect, GameState, TeamId } from './state';
+import type { AreaState, AreaTargets, CastRecord, Effect, GameState, TeamId } from './state';
 
 export interface AreaSpec {
   ownerId: number;
@@ -47,8 +47,16 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
     return fail(`unknown targets ${String(spec.targets)}`);
   }
   const effects = copyEffects(spec.effects, fail);
-  if (castId !== null && !state.casts.some((c) => c.id === castId)) {
-    return fail(`unknown cast ${castId}`);
+  if (castId !== null) {
+    // A plain loop: a closure over `castId` here would allocate on every spawn.
+    const { casts } = state;
+    let known = false;
+    for (let i = 0; i < casts.length; i++) {
+      if ((casts[i] as CastRecord).id !== castId) continue;
+      known = true;
+      break;
+    }
+    if (!known) return fail(`unknown cast ${castId}`);
   }
 
   const area: AreaState = {
