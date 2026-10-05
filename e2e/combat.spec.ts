@@ -40,11 +40,12 @@ const RING_SLACK_TICKS = 4;
 
 // The functions whose allocations the heap probe counts: every combat render
 // module, the pose and overlay helpers that run each frame, the loop clock, the
-// input sampler, the HUD writer with its views and the kill feed, the champion
-// names, the result screen's writer, the client's bot-driving glue
-// (bot-driver.ts) and every function in main.ts (stepSim, sampleAim, draw and
-// the hook writers). The HUD builder, hud-dom.ts, the result panel's builder,
-// result-dom.ts, and the setup modules run once at startup and are not counted.
+// input sampler, the HUD writer with its views and the kill feed, the text tables
+// of the hooks and the HUD (hook-text.ts), the champion names, the result screen's
+// writer, the client's bot-driving glue (bot-driver.ts) and every function in
+// main.ts (stepSim, sampleAim, draw and the hook writers). The HUD builder,
+// hud-dom.ts, the result panel's builder, result-dom.ts, and the setup modules run
+// once at startup and are not counted.
 // The bots package is not counted either: it allocates on every think, by its
 // API (a fresh PlayerInput, a decision record per think), which the bots
 // package's milestone addresses. Its files get the prefix bots/ in `summarise`,
@@ -62,7 +63,7 @@ const RING_SLACK_TICKS = 4;
 // callee V8 inlines into it land on it, so excluding it would hide a regression
 // (the escaping array in frame passed with the hook excluded).
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|hook-text|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:/;
 // Three's own animation callback. It is logged and never counted.
 const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // The sweep files of the sim. Their garbage was huge (about 790 KB per window, in
@@ -72,19 +73,20 @@ const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // them.
 const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // Measured in a warm steady state: every counted function reads 0 B but the
-// hook's frameMany, which reads 276 to 540 B per window (9 to 18 B per frame, one
+// hook's frameMany, which reads 300 to 588 B per window (9 to 18 B per frame, one
 // boxed number per frame, whatever its argument: it stayed with the timestamp
 // as an argument, as an integer, in a field of the loop clock and with no
 // argument at all) and counts the bytes of the callees inlined into it. The limit
-// is 640 B: about 100 B above the largest clean window in 35 attempts. Each of
-// these fails it, with the figures of the pull request, as the bytes of the
-// worst window: an escaping array in frame (1324 to 1520 B), a template string
-// written to a hook every frame (2340 to 2736 B), a closure made per call in
-// routeEvents (1996 to 2324 B), an escaping object in draw (10.9 to 11.2 KB), a
-// fresh literal from toPlayerInput (1776 to 1820 B), a template string per
-// Hud.update call (1432 to 1736 B), an escaping array per BotDriver.think call
-// (1424 to 1480 B) and a template string per ResultScreen.update call (1048 to
-// 1120 B). See testing.md.
+// is 640 B: about 100 B above the largest clean window of the 35 attempts of #61,
+// and 52 B above the largest of 6 attempts after the table-driven writes (588 B).
+// Each of these fails it, with the figures of the pull request, as the bytes of
+// the worst window per attempt: an escaping array in frame (1352 to 1384 B), a
+// template string written to data-p0x on every writeHooks call (2820 to 3264 B),
+// a closure made per call in routeEvents (2080 to 2188 B), an escaping object in
+// draw (11.2 to 11.3 KB), a fresh literal from toPlayerInput (1680 to 1816 B), a
+// template string per Hud.update call (2260 to 2504 B), an escaping array per
+// BotDriver.think call (1148 to 1396 B) and a template string per
+// ResultScreen.update call (1592 to 1704 B). See testing.md.
 const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
@@ -277,7 +279,7 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
 // (4020 B counted, cause not isolated), and its retry passed. A flaky combat.spec
 // whose failed attempt shows this spike is that case; any other failure is real.
 // A retry also lets a marginal regression near the limit pass; a regression of
-// the sizes measured (1048 B and up) fails all three attempts. The global
+// the sizes measured (1148 B and up) fails all three attempts. The global
 // retries stay 0 in playwright.config.ts.
 test.describe.configure({ retries: 2 });
 
