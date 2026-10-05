@@ -15,6 +15,9 @@ describe('bot determinism within one process', () => {
     const a = runMatch(SEEDS, TIERS, TICKS);
     const b = runMatch(SEEDS, TIERS, TICKS);
     expect(a.inputs).toHaveLength(TICKS);
+    // One record per bot per tick: a stream of aliases would compare a few objects with themselves.
+    expect(new Set(a.inputs.flat()).size).toBe(TICKS * 4);
+    expect(new Set(b.inputs.flat()).size).toBe(TICKS * 4);
     expect(b.inputs).toEqual(a.inputs);
     expect(checksum(b.state)).toBe(checksum(a.state));
   });
@@ -62,6 +65,8 @@ describe('bot determinism within one process, with kits', () => {
     const a = kitRun(SEEDS, TIERS, TICKS);
     const b = kitRun(SEEDS, TIERS, TICKS);
     expect(a.inputs).toHaveLength(TICKS);
+    expect(new Set(a.inputs.flat()).size).toBe(TICKS * 4);
+    expect(new Set(b.inputs.flat()).size).toBe(TICKS * 4);
     expect(b.inputs).toEqual(a.inputs);
     expect(checksum(b.state)).toBe(checksum(a.state));
   });
