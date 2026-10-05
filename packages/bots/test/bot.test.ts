@@ -800,10 +800,10 @@ describe('finisher', () => {
     ch(state, 3).health = 0.15 * ch(state, 3).maxHealth;
     put(state, 2, me.x, 5);
     put(state, 3, me.x, -5);
-    expect(intentAfterDelay(state).targetId).toBe(2);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'kite', targetId: 2 });
     put(state, 2, me.x, -5);
     put(state, 3, me.x, 5);
-    expect(intentAfterDelay(state).targetId).toBe(2);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'kite', targetId: 2 });
   });
 
   it('does not take a dead enemy as the finisher, and retreats from the live one', () => {
@@ -817,5 +817,37 @@ describe('finisher', () => {
 
   it('kites a finisher that is closer than rangeMin', () => {
     expect(intentAfterDelay(duelAt(0.15, 2).state)).toEqual({ intent: 'kite', targetId: 2 });
+  });
+
+  /**
+   * The bot retreats at 20 percent, takes the finisher at `distance`, then regains health to
+   * `health` while the enemy leaves reach (and is healthy, so no finisher qualifies). Returns the
+   * intents acted on after the finisher think and after the enemy has left.
+   */
+  function afterFinisherLeaves(distance: number, health: number) {
+    const { state, me, enemy } = duelAt(0.1, distance);
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    const during = bot.inspect();
+    me.health = health * me.maxHealth;
+    enemy.x = me.x + 20;
+    enemy.health = enemy.maxHealth;
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    return { during, after: bot.inspect() };
+  }
+
+  it('does not resume the retreat in the band after an engage finisher', () => {
+    expect(afterFinisherLeaves(8, 0.32)).toEqual({
+      during: { intent: 'engage', targetId: 2 },
+      after: { intent: 'engage', targetId: 2 },
+    });
+  });
+
+  it('resumes the retreat in the band after a kite finisher', () => {
+    // At 5 m the retreat score tops the kite score at 20 percent, so the finisher is reached.
+    expect(afterFinisherLeaves(5, 0.32)).toEqual({
+      during: { intent: 'kite', targetId: 2 },
+      after: { intent: 'retreat', targetId: 2 },
+    });
   });
 });

@@ -103,12 +103,15 @@ health every champion of the kit headless run retreated to its spawn and the
 match froze with no kill; a bot that can win the trade should take it. The rule
 is a pure function of the state and draws no random number, and it runs inside
 `decide`, so the reaction delay applies to it like to any decision. When no
-enemy qualifies, retreat is as above. A finisher think ends the retreat: the
-engage or kite it decides is what the next think reads as the current intent,
-so once that enemy leaves reach, the bot engages again instead of resuming the
-retreat in the 0.30 to 0.36 band, and the retreat starts again below 0.3. The
-rule also runs for a bot with no kit, which never presses: such a bot stands at
-`rangeMax` next to a weak enemy instead of retreating.
+enemy qualifies, retreat is as above. The engage or kite a finisher think
+decides is what the next think reads as the current intent. After an engage
+finisher, once that enemy leaves reach, the bot engages again instead of
+resuming the retreat in the 0.30 to 0.36 band, and the retreat starts again
+below 0.3. After a kite finisher the current intent is kite, which scores 0 once
+the enemy is beyond `rangeMin`, so the retreat resumes while the retreat score
+ties or beats engage (health up to about 0.33). The rule also runs for a bot
+with no kit, which never presses: such a bot stands within `rangeMax` of a weak
+enemy instead of retreating.
 
 A stand needs a clear shot of a champion's width, not only a line of sight: see
 Clear shot. Wherever this document says a stand needs line of sight, it means

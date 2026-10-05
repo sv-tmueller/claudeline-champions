@@ -14,7 +14,7 @@ import { hargrimKit, quillonKit } from './kits';
 
 const TICKS = 3600;
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
-// after a change to the bots or the sim is governed by batch #53 decision 8.3.
+// after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3.
 const SEEDS = [101, 102, 103, 104];
 const TIERS = ['easy', 'normal', 'hard', 'normal'] as const;
 
