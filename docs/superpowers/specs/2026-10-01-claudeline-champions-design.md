@@ -51,6 +51,7 @@ packages/protocol/          shared network message types (milestone 6)
 packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
 data/arenas/                arena definitions (JSON), read by sim and by Blender scripts
+data/kits/                  roster kit definitions (JSON), read by sim, bots and client
 assets/models/              generated .glb files, committed
 docs/architecture/          living reference for humans and agents
 docs/design/                game design documents (rules, roster, arenas)
@@ -58,6 +59,9 @@ docs/roadmap.md             living roadmap
 docs/superpowers/specs/     approved designs (this file)
 .github/workflows/ci.yml    runs `npm run check` on every pull request
 ```
+
+Amended 2026-10-05 by [batch #53 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5954741436): `data/kits/<id>.json`
+holds the roster kits as plain data (`KitDef`), checked by `validateKit` and read the way arenas are.
 
 ### 3.2 Dependency rules
 
@@ -120,7 +124,7 @@ movement, no buttons, aim unchanged".
 `Map`, no `Set`, no closures. Entities live in arrays ordered by ascending id.
 Iteration order is always id order. This gives:
 
-- `createMatch(config: MatchConfig, arena: ArenaDef, seed: number): GameState`
+- `createMatch(config: MatchConfig, arena: ArenaDef, seed: number, kits: readonly KitDef[] = []): GameState`. Amended 2026-10-05 by [batch #47 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/47#issuecomment-5950051780): the optional `kits` argument (#43) extends the three-argument form compatibly, and with no kits no champion has abilities. A `config` without `roundsToWin` starts free play, with no rounds (#54; see `docs/architecture/simulation.md`).
 - `step(state: GameState, inputs: PlayerInput[]): void` advances one tick in place
 - `cloneState(state): GameState`
 - `checksum(state): number` for replay and desync tests
@@ -191,6 +195,9 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
 - Match end: first team to `roundsToWin` (default 3) round wins.
 - `MatchConfig`: team size (2 or 3), per-player champion id and team, rounds to
   win. The parsed arena and the seed are `createMatch` parameters.
+  Amended 2026-10-05 by [batch #53 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5954853203): rounds to win is the optional
+  `MatchConfig.roundsToWin`; a config without it is free play, with no warmup, round clock, ring or
+  round end, and the standard match passes `DEFAULT_ROUNDS_TO_WIN = 3`.
 
 ### 4.8 Determinism rules (enforced by review and tests)
 
@@ -251,6 +258,9 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
   predicted projectile, retreat, peel for an ally, hold position, use the
   ultimate. Each champion kit ships a small bot profile describing preferred
   range and which slots are openers, escapes and finishers.
+  Amended 2026-10-05 by [batch #53 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5954808062): the kit does not ship the bot
+  profile. Bots derive the preferred range from the kit and keep their profiles in `packages/bots`;
+  openers, escapes and finishers are not built.
 - Aim: lead moving targets using their current velocity; add a tier-dependent
   angular error.
 - Difficulty tiers: easy, normal, hard. They differ in reaction delay (ticks

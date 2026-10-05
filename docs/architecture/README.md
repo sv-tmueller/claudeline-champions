@@ -22,6 +22,9 @@ first.
   their input stream. The server stays authoritative.
 - Arenas are JSON. The sim reads them for collision and Blender scripts read
   them to generate the committed `.glb` models.
+- Roster kits are JSON too, under `data/kits/<id>.json`: plain data that the
+  sim's casting code runs and `validateKit` checks (see
+  [ADR-003](decisions/ADR-003-typed-ability-modules.md)).
 - `npm run check` is the gate every package must pass.
 
 ## Index
