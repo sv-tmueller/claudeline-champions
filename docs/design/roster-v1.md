@@ -1,6 +1,6 @@
 # Roster v1: four champions
 
-Status: v1 roster. Hargrim and Quillon are implemented as data in `data/kits/`; Lumeth and Skerrow are pre-implementation
+Status: v1 roster. Hargrim, Quillon and Skerrow are implemented as data in `data/kits/`. Lumeth is pending: her kit waits for projectiles with ally effects (#69) and is issue #70
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.5, 4.6, 6 and 10
 
 This document defines the four champions of roster v1, one per archetype: melee bruiser, ranged skillshot, healer and support, mobile assassin. The sim, the client and the bots implement these kits. Arena layouts and match rules are covered elsewhere.
@@ -17,7 +17,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 - An EX variant costs 25 energy, uses the same cooldown as its base ability and lists only what changes. Each kit has exactly two EX variants. The ultimate costs 100 energy and has no EX variant.
 - The ultimate cooldown is 10 s for every champion. Energy is the real limit.
 - All four champions have move speed 5.5 m/s and collision radius 0.5 m. No kit changes base speed.
-- **Kit data.** Hargrim and Quillon are implemented as `data/kits/hargrim.json` and `data/kits/quillon.json`: one file per champion, named after its id, holding exactly the `KitDef` fields. Display names stay in this document and in the client. A table row becomes data by these rules. Ticks are seconds times 60. "One hit" means `durationTicks` 1 and `intervalTicks` 1. "Around caster" is the placement `self`, and "N m ahead" is `ahead` N. "On self" is a top-level `applyStatus` or `shield`, and "on allies" is `targets` `allies`, which includes the caster. "At the dash end" is the `then` list of the dash. A hit lists `damage` first, then the statuses and pushes in the order the table names them. A projectile's `lifetimeTicks` is its range times 60 divided by its speed, rounded to a whole tick, and its reach is its speed times its lifetime divided by 60, so Quillon's M1, M2 and Lance reach 13.93, 11.9 and 17.92 m, where 14, 12 and 18 m would need 38.18, 51.43 and 43.2 ticks. An arc of A degrees is a `cosHalfAngle` of cos(A/2), written as a 10-decimal literal. An EX variant in the data is a complete ability, while the tables list only what differs from the base ability, and a test checks that nothing else differs. An area or an arc reaches a champion whose centre is within its radius plus 0.5 m. Changing a number means changing `data/kits/<id>.json`, this document and that kit's scripted fixture (`scripted-roster-<id>-arena01-2v2.json`) in the same change.
+- **Kit data.** Hargrim, Quillon and Skerrow are implemented as `data/kits/hargrim.json`, `data/kits/quillon.json` and `data/kits/skerrow.json`: one file per champion, named after its id, holding exactly the `KitDef` fields. Display names stay in this document and in the client. A table row becomes data by these rules. Ticks are seconds times 60, and a tie rounds half up, as `Math.round`. "One hit" means `durationTicks` 1 and `intervalTicks` 1, and an `area` row that gives no duration is one hit. "Around caster" is the placement `self`, and "N m ahead" is `ahead` N. "On self" is a top-level `applyStatus` or `shield`, and "on allies" is `targets` `allies`, which includes the caster. An `area` has one `targets` filter, so a circle that treats allies and enemies differently is two `area` effects on the same circle, listed in the order the table names them (Dawnbloom: the allies first, then the enemies). "At the dash end" is the `then` list of the dash. A hit lists `damage` first, then the statuses and pushes in the order the table names them. A projectile's `lifetimeTicks` is its range times 60 divided by its speed, rounded to a whole tick, and its reach is its speed times its lifetime divided by 60, so Quillon's M1, M2 and Lance reach 13.93, 11.9 and 17.92 m, where 14, 12 and 18 m would need 38.18, 51.43 and 43.2 ticks, while Skerrow's Throwing Knife and Quiet Dart reach exactly 10 and 11 m in 25 and 33 ticks. Lumeth's Soothing Surge is the one tie: 10 m at 16 m/s is 37.5 ticks, which becomes 38 ticks and a reach of 10.13 m when her kit lands. An arc of A degrees is a `cosHalfAngle` of cos(A/2), written as a 10-decimal literal: 0.6427876097 for Hargrim's 100 degrees and 0.7071067812 for Skerrow's 90 degrees, and -1 for a full circle. Every top-level effect reads the caster's position again, so an arc listed after a `teleport` swings where the teleport lands. An EX variant in the data is a complete ability, while the tables list only what differs from the base ability, and a test checks that nothing else differs. An area or an arc reaches a champion whose centre is within its radius plus 0.5 m. Changing a number means changing `data/kits/<id>.json`, this document and that kit's scripted fixture (`scripted-roster-<id>-arena01-2v2.json`) in the same change.
 - The names were checked by hand against the Bloodline Champions and Battlerite rosters. They are original.
 
 ## 1. Hargrim, the melee bruiser
@@ -139,7 +139,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 | SPACE | Glide: `dash` (4 m in 0.2 s), `applyStatus` | none | 4 m | n/a | 8 s | 0, free | haste 30 percent for 1.0 s on self |
 | Q | Binding Sigil: `area` (circle, radius 1.5 m, placed up to 9 m away, one hit), `applyStatus` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
 | E | Lantern Burst: `area` (circle, radius 3 m around caster, one hit), `knockback` (2 m outward in 8 ticks) | 12 damage | 3 m radius | n/a | 9 s | 0.2 s, slowed | none |
-| R | Aegis Veil: `area` (circle, radius 5 m around caster), `shield` on allies in the area, including self | 30 absorb for 4 s | 5 m radius | n/a | 12 s | 0, free | none |
+| R | Aegis Veil: `area` (circle, radius 5 m around caster, one hit), `shield` on allies in the area, including self | 30 absorb for 4 s | 5 m radius | n/a | 12 s | 0, free | none |
 | F | Dawnbloom (ultimate): `area` (circle, radius 5 m around caster, one hit), `heal` on allies, `applyStatus` | 30 heal, plus 30 heal over time in total | 5 m radius | n/a | 10 s | 0.6 s, slowed | heal over time for 3.0 s (5 per tick) on allies, slow 30 percent for 2.0 s on enemies |
 
 **EX variants** (Shift plus slot, 25 energy).
@@ -184,19 +184,19 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 
 | Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
 |------|---------------------|--------|-------|----------------|----------|--------|------------------|
-| M1 | Twin Cut: `meleeArc` (90 degree arc) | 9 damage | 2.0 m | n/a | 0.4 s | 0.1 s, free | none |
+| M1 | Twin Cut: `meleeArc` (90 degree arc, `cosHalfAngle` 0.7071067812) | 9 damage | 2.0 m | n/a | 0.4 s | 0.1 s, free | none |
 | M2 | Throwing Knife: `projectile`, `applyStatus` | 12 damage | 10 m | 24 m/s / 0.2 m | 3 s | 0.1 s, free | slow 20 percent for 1.0 s |
 | SPACE | Lunge: `dash` (6 m in 0.2 s), `applyStatus` | none | 6 m | n/a | 6 s | 0, free | haste 20 percent for 1.5 s on self |
 | Q | Quiet Dart: `projectile`, `applyStatus` | 8 damage | 11 m | 20 m/s / 0.3 m | 12 s | 0.2 s, free | silence 1.5 s |
-| E | Rend: `meleeArc` (90 degree arc), `applyStatus` | 20 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
+| E | Rend: `meleeArc` (90 degree arc, `cosHalfAngle` 0.7071067812), `applyStatus` | 20 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
 | R | Vanish Step: `teleport` (up to 5 m toward the aim point), `applyStatus` | none | 5 m | n/a | 16 s | 0, free | invulnerable 0.5 s on self |
-| F | Reaper's Dance (ultimate): `teleport` (up to 8 m toward the aim point), `meleeArc` (360 degrees), `applyStatus` | 40 damage | 8 m teleport, 2.5 m arc | n/a | 10 s | 0.3 s, locked | stun 0.5 s and silence 2.0 s, both applied on hit, so the silence outlasts the stun |
+| F | Reaper's Dance (ultimate): `teleport` (up to 8 m toward the aim point), `meleeArc` (360 degrees, `cosHalfAngle` -1, swung where the teleport lands), `applyStatus` | 40 damage | 8 m teleport, 2.5 m arc | n/a | 10 s | 0.3 s, locked | stun 0.5 s and silence 2.0 s, both applied on hit, so the silence outlasts the stun |
 
 **EX variants** (Shift plus slot, 25 energy).
 
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
-| SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, 2.0 m) deals 14 damage. Haste on self becomes 30 percent for 2.0 s. |
+| SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, `cosHalfAngle` 0.7071067812, 2.0 m) deals 14 damage. Haste on self becomes 30 percent for 2.0 s. |
 | E | Rend EX: direct damage 20 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
 
 **Intended counters.**

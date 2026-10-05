@@ -115,7 +115,7 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
       { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal', text: 'Hargrim' },
       { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal', text: 'Quillon' },
       { champion: 'lumeth', available: 'false', href: null, text: 'Lumeth' },
-      { champion: 'skerrow', available: 'false', href: null, text: 'Skerrow' },
+      { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal', text: 'Skerrow' },
     ]);
     expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
 
