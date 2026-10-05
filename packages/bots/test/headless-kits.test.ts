@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
+import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import {
   checkInvariants,
   clearShotOracle,
   configMirror,
   createRun,
   createStallTracker,
+  jsonKits,
   kitOf,
   validInput,
 } from './helpers';
@@ -23,43 +25,87 @@ interface Band {
   max: number;
 }
 
-// The oracle's own band table, written out from the test kits in kits.ts: it must not import the
-// code under test. Keys are `champion:SLOT` and `champion:SLOT:ex`. A pressed slot that is not
-// here fails the test, so a slot with no band is never pressed.
-const BANDS: Record<string, Band> = {
+// The oracle's own band and clearance tables, one per kit set, written out from the kit files
+// and not from src: they must not import the code under test. Keys are `champion:SLOT` and
+// `champion:SLOT:ex`. A pressed slot that is not in a table fails the test, so a slot with no band
+// is never pressed. The clearance is the width of the shot of each pressed ability: the first
+// projectile radius, or the champion radius 0.5 for an ability with no projectile.
+interface KitSet {
+  name: string;
+  kits: () => KitDef[];
+  bands: Record<string, Band>;
+  clearances: Record<string, number>;
+}
+
+const HARGRIM_BANDS: Record<string, Band> = {
   'hargrim:M1': { min: 0, max: 3 },
   'hargrim:M2': { min: 0, max: 5 },
   'hargrim:M2:ex': { min: 0, max: 5.75 },
   'hargrim:SPACE:ex': { min: 0, max: 9 },
   'hargrim:E': { min: 0, max: 9 },
   'hargrim:F': { min: 0, max: 10 },
-  'quillon:M1': { min: 0, max: 14 },
-  'quillon:M2': { min: 0, max: 12 },
-  'quillon:M2:ex': { min: 0, max: 12 },
-  'quillon:Q': { min: 0, max: 10 },
-  'quillon:E': { min: 0, max: 18 },
-  'quillon:E:ex': { min: 0, max: 18 },
-  'quillon:F': { min: 0, max: 20 },
 };
-/**
- * The width of the shot of each pressed ability, from the kits: the first projectile radius, or the
- * champion radius 0.5 for an ability with no projectile.
- */
-const CLEARANCES: Record<string, number> = {
+const HARGRIM_CLEARANCES: Record<string, number> = {
   'hargrim:M1': 0.5,
   'hargrim:M2': 0.5,
   'hargrim:M2:ex': 0.5,
   'hargrim:SPACE:ex': 0.5,
   'hargrim:E': 0.4,
   'hargrim:F': 0.5,
-  'quillon:M1': 0.25,
-  'quillon:M2': 0.4,
-  'quillon:M2:ex': 0.6,
-  'quillon:Q': 0.6,
-  'quillon:E': 0.2,
-  'quillon:E:ex': 0.2,
-  'quillon:F': 0.6,
 };
+
+const KIT_SETS: KitSet[] = [
+  {
+    // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal reaches.
+    name: 'the test kits',
+    kits: () => [hargrimKit(), quillonKit()],
+    bands: {
+      ...HARGRIM_BANDS,
+      'quillon:M1': { min: 0, max: 14 },
+      'quillon:M2': { min: 0, max: 12 },
+      'quillon:M2:ex': { min: 0, max: 12 },
+      'quillon:Q': { min: 0, max: 10 },
+      'quillon:E': { min: 0, max: 18 },
+      'quillon:E:ex': { min: 0, max: 18 },
+      'quillon:F': { min: 0, max: 20 },
+    },
+    clearances: {
+      ...HARGRIM_CLEARANCES,
+      'quillon:M1': 0.25,
+      'quillon:M2': 0.4,
+      'quillon:M2:ex': 0.6,
+      'quillon:Q': 0.6,
+      'quillon:E': 0.2,
+      'quillon:E:ex': 0.2,
+      'quillon:F': 0.6,
+    },
+  },
+  {
+    // data/kits/hargrim.json and quillon.json: speed times lifetime in ticks over 60 for each bolt.
+    name: 'the shipped kits',
+    kits: jsonKits,
+    bands: {
+      ...HARGRIM_BANDS,
+      'quillon:M1': { min: 0, max: (22 * 38) / 60 },
+      'quillon:M2': { min: 0, max: (14 * 51) / 60 },
+      'quillon:M2:ex': { min: 0, max: (14 * 51) / 60 },
+      'quillon:Q': { min: 0, max: 10 },
+      'quillon:E': { min: 0, max: (25 * 43) / 60 },
+      'quillon:E:ex': { min: 0, max: (25 * 43) / 60 },
+      'quillon:F': { min: 0, max: 20 },
+    },
+    clearances: {
+      ...HARGRIM_CLEARANCES,
+      'quillon:M1': 0.25,
+      'quillon:M2': 0.4,
+      'quillon:M2:ex': 0.6,
+      'quillon:Q': 0.6,
+      'quillon:E': 0.2,
+      'quillon:E:ex': 0.2,
+      'quillon:F': 0.6,
+    },
+  },
+];
 /** The pressed abilities that hold a dash, which a root skips. */
 const DASHES = new Set(['hargrim:SPACE:ex', 'hargrim:F']);
 const MARGIN = 1;
@@ -91,6 +137,7 @@ function pressProblems(
   c: ChampionState,
   pressed: { slot: Slot; ex: boolean },
   targetId: number,
+  set: KitSet,
 ): { problems: string[]; key: string; gates: string } {
   const key = `${c.championId}:${pressed.slot}${pressed.ex ? ':ex' : ''}`;
   const target = state.champions[targetId];
@@ -100,13 +147,13 @@ function pressProblems(
   const gates =
     `d ${d}, cooldown ${cooldown}, energy ${c.energy}, windupLeft ${c.cast?.windupLeft ?? 'none'}, ` +
     `statuses ${c.statuses.map((s) => s.type).join(',') || 'none'}`;
-  const band = BANDS[key];
+  const band = set.bands[key];
   if (band === undefined) problems.push(`${key} has no reach band in the oracle table`);
   if (target === undefined || !target.alive || target.team === c.team) {
     problems.push(`target ${targetId} is not an alive enemy`);
   } else {
     if (!hasLineOfSight(state, c, target)) problems.push('no line of sight');
-    const clearance = CLEARANCES[key];
+    const clearance = set.clearances[key];
     if (clearance !== undefined && !clearShotOracle(state, c, target, clearance)) {
       problems.push(`no clear shot of width ${clearance}`);
     }
@@ -140,9 +187,9 @@ function explained(events: readonly SimEvent[], press: Press): boolean {
   return false;
 }
 
-describe('headless 2v2 match of bots with kits', () => {
+describe.each(KIT_SETS)('headless 2v2 match of bots with $name', (set) => {
   it('a 2v2 of four bots on two kits ends with a death from a cast within 3600 ticks', () => {
-    const run = createRun(SEEDS, TIERS, 7, { config: configMirror(), kits: [hargrimKit(), quillonKit()] });
+    const run = createRun(SEEDS, TIERS, 7, { config: configMirror(), kits: set.kits() });
     const { state, bots } = run;
     const tracker = createStallTracker(state, bots);
     const started = state.champions.map(() => 0);
@@ -169,7 +216,7 @@ describe('headless 2v2 match of bots with kits', () => {
         const acted = bots[id]?.inspect();
         if (pressed === null || acted === undefined) return;
         presses[id] = (presses[id] ?? 0) + 1;
-        const { problems, key, gates } = pressProblems(state, c, pressed, acted.targetId);
+        const { problems, key, gates } = pressProblems(state, c, pressed, acted.targetId, set);
         expect(problems, `tick ${t} champion ${id} pressed ${key}: ${gates}`).toEqual([]);
         pending.push({ id, slot: pressed.slot, ex: pressed.ex, key, gates });
       });
@@ -217,4 +264,64 @@ describe('headless 2v2 match of bots with kits', () => {
       `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent}`,
     ).toBeLessThanOrEqual(120);
   }, 30_000);
+});
+
+// The run presses only some slots, so a wrong row of a table could go unseen. This reads the
+// kit files and works every row out again, by the rule of docs/architecture/bots.md (the end of
+// the first effect that reaches an enemy) written here by hand for the shapes these kits use.
+describe('the band and clearance tables of the shipped kits', () => {
+  const set = KIT_SETS[1] as KitSet;
+  const kits = jsonKits();
+  const slotOf = (id: string, key: string): AbilitySpec => {
+    const kit = kits.find((k) => k.id === id) as KitDef;
+    const [slot, variant] = key.split(':') as [Slot, string | undefined];
+    const base = kit.slots[slot];
+    return variant === 'ex' ? (base.ex as AbilitySpec) : base;
+  };
+  const projectile = (spec: AbilitySpec) => {
+    const effect = spec.effects[0];
+    if (effect === undefined || effect.type !== 'projectile') throw new Error('not a projectile');
+    return effect;
+  };
+
+  it('has the reach and the shot width of every Quillon bolt', () => {
+    for (const key of ['M1', 'M2', 'M2:ex', 'Q', 'E', 'E:ex', 'F']) {
+      const bolt = projectile(slotOf('quillon', key));
+      // The speed is multiplied by the lifetime first: 22 x 38 / 60, not 22 x (38 / 60).
+      expect(set.bands[`quillon:${key}`], key).toEqual({
+        min: 0,
+        max: (bolt.speed * bolt.lifetimeTicks) / 60,
+      });
+      expect(set.clearances[`quillon:${key}`], key).toBe(bolt.radius);
+    }
+  });
+
+  it('has the reach and the shot width of every Hargrim ability that is pressed', () => {
+    const arc = slotOf('hargrim', 'M1').effects[0];
+    if (arc === undefined || arc.type !== 'meleeArc') throw new Error('no arc');
+    expect(set.bands['hargrim:M1']).toEqual({ min: 0, max: arc.radius + 0.5 });
+    for (const key of ['M2', 'M2:ex']) {
+      const area = slotOf('hargrim', key).effects[0];
+      if (area === undefined || area.type !== 'area' || area.placement.type !== 'ahead') {
+        throw new Error('no area ahead');
+      }
+      expect(set.bands[`hargrim:${key}`], key).toEqual({
+        min: 0,
+        max: area.placement.distance + area.radius + 0.5,
+      });
+    }
+    const dash = slotOf('hargrim', 'SPACE:ex').effects[0];
+    if (dash === undefined || dash.type !== 'dash') throw new Error('no dash');
+    const burst = dash.then[0];
+    if (burst === undefined || burst.type !== 'area') throw new Error('no burst');
+    expect(set.bands['hargrim:SPACE:ex']).toEqual({ min: 0, max: dash.distance + burst.radius + 0.5 });
+    const hook = projectile(slotOf('hargrim', 'E'));
+    expect(set.bands['hargrim:E']).toEqual({ min: 0, max: (hook.speed * hook.lifetimeTicks) / 60 });
+    expect(set.clearances['hargrim:E']).toBe(hook.radius);
+    const ultimate = slotOf('hargrim', 'F').effects[0];
+    if (ultimate === undefined || ultimate.type !== 'dash') throw new Error('no dash');
+    const slam = ultimate.then[0];
+    if (slam === undefined || slam.type !== 'area') throw new Error('no slam');
+    expect(set.bands['hargrim:F']).toEqual({ min: 0, max: ultimate.distance + slam.radius + 0.5 });
+  });
 });
