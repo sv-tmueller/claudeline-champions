@@ -156,7 +156,8 @@ function catalogProblems(kit: KitDef): string[] {
           case 'hot': {
             if (status.type === 'dot') ticks(60, 240);
             else ticks(120, 300);
-            const total = status.perPulse * (status.ticks / 30);
+            // One pulse every 30 ticks: only the whole pulses count (the floor ban is for sim source).
+            const total = status.perPulse * Math.floor(status.ticks / 30);
             if (!within(total, 8, 30)) bad(`${path}.status`, `${status.type} total ${total} is not 8 to 30`);
             break;
           }
@@ -205,6 +206,17 @@ describe('the catalog ranges', () => {
     stun.status.ticks = 121;
     expect(catalogProblems(copy)).toEqual([
       'hargrim.slots.F.effects[0].then[0].effects[1].status.ticks: stun of 121 ticks is outside 30 to 120',
+    ]);
+  });
+
+  it('count only the whole pulses of a dot that does not end on a pulse', () => {
+    // 89 ticks hold two pulses of 30 ticks, so a dot of 3 per pulse does 6, not 8.9.
+    const copy = copyOf(quillon);
+    const bolt = copy.slots.M1.effects[0];
+    if (bolt?.type !== 'projectile') throw new Error('Quillon M1 is not a projectile');
+    bolt.effects.push({ type: 'applyStatus', status: { type: 'dot', perPulse: 3, ticks: 89 } });
+    expect(catalogProblems(copy)).toEqual([
+      'quillon.slots.M1.effects[0].effects[1].status: dot total 6 is not 8 to 30',
     ]);
   });
 
@@ -344,6 +356,18 @@ class Rig {
   }
 }
 
+/** A "one hit" area expires in the step it spawns (area.ts), so `durationTicks` 1 shows in the steps. */
+function expectOneHit(rig: Rig): void {
+  const spawned = rig.events('areaSpawned').map(({ step }) => step);
+  expect(spawned).not.toEqual([]);
+  expect(rig.events('areaExpired').map(({ step }) => step)).toEqual(spawned);
+}
+
+/** A single-target projectile ends on its first hit: every end reason is `hit`, so it does not pierce. */
+function expectStopsOnHit(rig: Rig): void {
+  expect(rig.events('projectileExpired').map(({ e }) => e.reason)).toEqual(['hit']);
+}
+
 function press(slot: Slot, options: { ex?: boolean; aim?: Spot; moveY?: -1 | 0 | 1 } = {}): PlayerInput {
   const [aimX, aimY] = options.aim ?? AHEAD;
   const buttons = Button[slot] | (options.ex ? Button.SHIFT : 0);
@@ -357,28 +381,28 @@ describe('every slot of both kits', () => {
     ex: boolean;
     cooldown: number;
     windup: number;
-    /** The caster's vy at the start step with moveY 1: 5.5 free, 2.75 slowed, 0 locked. */
-    walk: number;
+    /** The caster's vy at the start step with moveY 1: 5.5 free, 2.75 slowed, 0 locked. Left out when the windup is 0. */
+    walk?: number;
     cost: number;
   }
   const rows: Row[] = [
     { kit: hargrim, slot: 'M1', ex: false, cooldown: 36, windup: 9, walk: 2.75, cost: 0 },
     { kit: hargrim, slot: 'M2', ex: false, cooldown: 360, windup: 24, walk: 2.75, cost: 0 },
     { kit: hargrim, slot: 'M2', ex: true, cooldown: 360, windup: 24, walk: 2.75, cost: 25 },
-    { kit: hargrim, slot: 'SPACE', ex: false, cooldown: 420, windup: 0, walk: 0, cost: 0 },
-    { kit: hargrim, slot: 'SPACE', ex: true, cooldown: 420, windup: 0, walk: 0, cost: 25 },
+    { kit: hargrim, slot: 'SPACE', ex: false, cooldown: 420, windup: 0, cost: 0 },
+    { kit: hargrim, slot: 'SPACE', ex: true, cooldown: 420, windup: 0, cost: 25 },
     { kit: hargrim, slot: 'Q', ex: false, cooldown: 840, windup: 12, walk: 2.75, cost: 0 },
     { kit: hargrim, slot: 'E', ex: false, cooldown: 540, windup: 18, walk: 0, cost: 0 },
-    { kit: hargrim, slot: 'R', ex: false, cooldown: 720, windup: 0, walk: 0, cost: 0 },
+    { kit: hargrim, slot: 'R', ex: false, cooldown: 720, windup: 0, cost: 0 },
     { kit: hargrim, slot: 'F', ex: false, cooldown: 600, windup: 30, walk: 0, cost: 100 },
     { kit: quillon, slot: 'M1', ex: false, cooldown: 30, windup: 6, walk: 5.5, cost: 0 },
     { kit: quillon, slot: 'M2', ex: false, cooldown: 360, windup: 18, walk: 2.75, cost: 0 },
     { kit: quillon, slot: 'M2', ex: true, cooldown: 360, windup: 18, walk: 2.75, cost: 25 },
-    { kit: quillon, slot: 'SPACE', ex: false, cooldown: 540, windup: 0, walk: 0, cost: 0 },
+    { kit: quillon, slot: 'SPACE', ex: false, cooldown: 540, windup: 0, cost: 0 },
     { kit: quillon, slot: 'Q', ex: false, cooldown: 720, windup: 24, walk: 0, cost: 0 },
     { kit: quillon, slot: 'E', ex: false, cooldown: 480, windup: 36, walk: 0, cost: 0 },
     { kit: quillon, slot: 'E', ex: true, cooldown: 480, windup: 18, walk: 0, cost: 25 },
-    { kit: quillon, slot: 'R', ex: false, cooldown: 840, windup: 0, walk: 0, cost: 0 },
+    { kit: quillon, slot: 'R', ex: false, cooldown: 840, windup: 0, cost: 0 },
     { kit: quillon, slot: 'F', ex: false, cooldown: 600, windup: 48, walk: 0, cost: 100 },
   ];
 
@@ -390,7 +414,8 @@ describe('every slot of both kits', () => {
     ]);
     expect(champion(rig.state, 0).cooldowns[SLOTS.indexOf(row.slot)]).toBe(row.cooldown);
     expect(champion(rig.state, 0).energy).toBe(0);
-    if (row.windup > 0) expect(champion(rig.state, 0).vy).toBe(row.walk);
+    expect(row.walk === undefined).toBe(row.windup === 0);
+    if (row.walk !== undefined) expect(champion(rig.state, 0).vy).toBe(row.walk);
     rig.run(row.windup);
     expect(rig.events('castFired').map(({ step, e }) => ({ step, slot: e.slot, ex: e.ex }))).toEqual([
       { step: row.windup, slot: row.slot, ex: row.ex },
@@ -423,6 +448,7 @@ describe('Hargrim', () => {
     expect(rig.applied()).toEqual([[2, 'slow', 90]]);
     expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 30 }]);
     expect(rig.health(3)).toBe(160);
+    expectOneHit(rig);
     rig.clean();
   });
 
@@ -434,6 +460,7 @@ describe('Hargrim', () => {
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 26, 134], [3, 26, 134]]);
     expect(rig.applied()).toEqual([[2, 'slow', 120], [3, 'slow', 120]]);
     expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 50 }]);
+    expectOneHit(rig);
     rig.clean();
   });
 
@@ -465,6 +492,7 @@ describe('Hargrim', () => {
     expect(spawned?.e.radius).toBe(1.5);
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 12, 148]]);
     expect(rig.applied()).toEqual([[0, 'haste', 120], [2, 'stun', 30]]);
+    expectOneHit(rig);
     rig.clean();
   });
 
@@ -479,6 +507,7 @@ describe('Hargrim', () => {
     expect(rig.statuses(1)).toEqual([{ type: 'haste', percent: 30 }]);
     expect(rig.statuses(2)).toEqual([]);
     expect(rig.events('damage')).toEqual([]);
+    expectOneHit(rig);
     rig.clean();
   });
 
@@ -510,6 +539,7 @@ describe('Hargrim', () => {
     ]);
     rig.run(12);
     expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 2, 9);
+    expectStopsOnHit(rig);
     rig.clean();
   });
 
@@ -536,6 +566,7 @@ describe('Hargrim', () => {
       { type: 'stun' },
       { type: 'knockback', distance: 3, totalTicks: 10, dirX: 1, dirY: 0 },
     ]);
+    expectOneHit(rig);
     rig.clean();
   });
 
@@ -579,6 +610,7 @@ describe('Quillon', () => {
     rig.run(6 + 20, press('M1'));
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 11, 109]]);
     expect(rig.applied()).toEqual([]);
+    expectStopsOnHit(rig);
     rig.clean();
   });
 
@@ -601,6 +633,7 @@ describe('Quillon', () => {
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 14, 106]]);
     expect(rig.applied()).toEqual([[2, 'slow', 90]]);
     expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 40 }]);
+    expectStopsOnHit(rig);
     rig.clean();
   });
 
@@ -611,6 +644,7 @@ describe('Quillon', () => {
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 20, 100]]);
     expect(rig.applied()).toEqual([[2, 'slow', 120]]);
     expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 60 }]);
+    expectStopsOnHit(rig);
     rig.clean();
   });
 
@@ -645,6 +679,7 @@ describe('Quillon', () => {
     rig.run(24 + 50, press('Q'));
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 8, 112]]);
     expect(rig.applied()).toEqual([[2, 'root', 60]]);
+    expectStopsOnHit(rig);
     rig.clean();
   });
 
