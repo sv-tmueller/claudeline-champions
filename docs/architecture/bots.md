@@ -11,7 +11,10 @@ They read the full state; fairness comes from difficulty tiers, not hidden
 information.
 
 - Call `think` once per tick, before `step`; it never mutates the state or
-  touches `state.rng`, and returns `buttons` 0 until bots use abilities.
+  touches `state.rng`. A champion with a kit in `state.kits` presses at most one
+  slot per think, plus SHIFT for an EX variant (see Casting). A champion without
+  a kit never presses: `buttons` is 0. Casting needs the kits passed to
+  `createMatch`.
 - `inspect()` is read-only and returns a fresh copy of the intent and target the
   bot is acting on. It exists so tests and dev tools can observe decisions.
 - `createBot` throws `Error('Invalid bot: ...')` for a `playerId` that is not a
@@ -63,11 +66,12 @@ local steering to avoid champions and projectiles.
 
 Utility scoring over candidate intents: engage, kite, dodge a predicted
 projectile, retreat, peel for an ally, hold position, use the ultimate. Each
-champion kit ships a small bot profile describing preferred range and which
-slots are openers, escapes and finishers.
+champion has a small bot profile with a preferred range. The kit does not ship
+it: the bots derive the range from the kit data (see Profiles), and openers,
+escapes and finishers are not built.
 
-Built so far (movement only): engage, kite, retreat, plus idle. Idle means no
-enemy is alive: the bot stands and keeps its aim.
+Built so far: engage, kite, retreat, plus idle, and casting (see Casting). Idle
+means no enemy is alive: the bot stands and keeps its aim.
 
 Target: the bot keeps its current target while it is alive, unless another
 alive enemy is more than 1 m nearer. Otherwise the target is the nearest alive
@@ -89,6 +93,10 @@ makes kite start at `d < rangeMin` and end at `d > 1.2 rangeMin`, and retreat
 start at `h < 0.3` and end at `h > 0.36`. After idle the next decision starts
 again from engage.
 
+A stand needs a clear shot of a champion's width, not only a line of sight: see
+Clear shot. Wherever this document says a stand needs line of sight, it means
+that.
+
 Kite movement, from the acted intent, with `rangeMin` from the profile:
 
 - Closer than `rangeMin`: the first of five points 1 m away (straight away, then
@@ -100,29 +108,115 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
   tried again meanwhile. Trying them on every think made the bot alternate
   between one step along the wall and the step back into the corner, so it
   never left. At the spawn, or when no path exists, it stands for one think and
-  then tries the five points again.
-- At `rangeMin` or farther: stand when the target is in line of sight. Without
-  line of sight the bot follows the path to the nearest sight cell: a free cell
-  within 8 cells (4 m) of the bot, not the bot's own, whose centre has line of
-  sight at a distance in `[rangeMin, rangeMax]`. Ties go to the smaller squared
+  then tries the five points again. The escape has no progress bound until local
+  avoidance exists: a champion standing on the route, or within 0.9 m of the
+  spawn cell centre, keeps the bot pushing with a non-zero input and no kite
+  retry for as long as the chaser stays inside `rangeMin`.
+- At `rangeMin` or farther: stand when the target is in clear shot. Without a
+  clear shot the bot follows the path to the nearest sight cell: a free cell
+  within 8 cells (4 m) of the bot, not the bot's own, whose centre has a clear
+  shot of 0.5 m at a distance in `[rangeMin, rangeMax]`. Ties go to the smaller squared
   distance from the bot, then the lower cell index. With no such cell it follows
   the path to the target, which ends in line of sight.
 - No randomness: the aim draw stays the only use of the bot's rng.
 
-Profiles live in `packages/bots/src/profile.ts`, keyed by champion id. Until
-kits exist they are plain constants with a default; the roster-kit package
-decides whether they move into the kit modules.
+Profiles live in `packages/bots/src/profile.ts`, keyed by champion id:
+`profileFor(championId, kit?)`. Without a kit the table applies. Hargrim and
+Quillon have a rule: with a kit whose id equals the champion id, `rangeMax` is
+the top of the base M1 reach band minus the 1 m range margin (see Casting), and
+`rangeMin` is the rule's literal, because no kit field holds it: roster-v1 words
+it as backing away from an enemy inside 6 m. The table applies instead when the
+champion has no rule, there is no kit or the kit id differs, M1 has no band, or
+the derived `rangeMax` is at most 1 or at most `rangeMin`. Lumeth, Skerrow and
+other ids keep the table even with a kit until their kits exist. `KitDef` has no
+profile field and `createMatch` copies only the kit contract, so profiles stay in
+bots; the kit JSON must carry no bot fields.
 
-| Champion | rangeMin | rangeMax | Note                                         |
-| -------- | -------- | -------- | -------------------------------------------- |
-| hargrim  | 0        | 3        | melee, never kites                           |
-| quillon  | 6        | 13       | ranged, backs away inside 6 m                |
-| lumeth   | 6        | 10       | support, keeps range, no ally logic yet      |
-| skerrow  | 0        | 2.5      | assassin, closes in and never kites          |
-| default  | 4        | 8        | any other champion id                        |
+| Champion | rangeMin | rangeMax | rangeMax with a kit   | Note                                    |
+| -------- | -------- | -------- | --------------------- | --------------------------------------- |
+| hargrim  | 0        | 3        | M1 band top minus 1 m | melee, never kites                      |
+| quillon  | 6        | 13       | M1 band top minus 1 m | ranged, backs away inside 6 m           |
+| lumeth   | 6        | 10       | the table             | support, keeps range, no ally logic yet |
+| skerrow  | 0        | 2.5      | the table             | assassin, closes in and never kites     |
+| default  | 4        | 8        | the table             | any other champion id                   |
 
 Every `rangeMax` exceeds 1 m, so a bot never needs to stand inside another
-champion.
+champion. With the test kits Hargrim stands at 2 m and Quillon at 13 m.
+
+## Clear shot
+
+`clearShot(state, from, to, c)` in `packages/bots/src/sight.ts`: the sim's
+`hasLineOfSight` along the centre segment and along two segments shifted
+sideways by `c`, one each side, so a shot of radius `c` fits. A zero-length shot
+has only the centre segment. It is a pure function of the state and draws no
+random number. Why: a position on the edge of an obstacle's shadow has a line of
+sight, but every bolt with the smallest aim error hits the obstacle. Without the
+test both Quillons of the kit headless run stood on the edge of the pillar's
+shadow and never landed a bolt again.
+
+- A cast uses `c` = the radius of the first top-level projectile of the ability it
+  would press, or the champion radius 0.5 m when the ability has none.
+- A stand (engage, kite) and the sight-cell search use `c` = 0.5 m.
+
+## Casting
+
+`packages/bots/src/casting.ts` (not `cast.ts`: the sim has one) and
+`packages/bots/src/reach.ts`. The bot finds its kit in `state.kits` by champion id
+on every think and keeps no reference to it.
+
+Reach band of an ability, from kit data (`abilityReach`), with `CR` the champion
+radius 0.5 and `offset` starting at 0 along the top-level effects:
+
+| Effect                           | Band                                                                                      |
+| -------------------------------- | ----------------------------------------------------------------------------------------- |
+| `projectile`                     | `[0, offset + speed * lifetimeTicks / 60]`, multiplied first                              |
+| `meleeArc`                       | `[0, offset + radius + CR]`                                                               |
+| `area` on enemies or all, `self` | `[0, offset + radius + CR]`                                                               |
+| `area` `ahead d`                 | `[offset > 0 ? 0 : max(0, d - radius - CR), offset + d + radius + CR]`                    |
+| `area` `aim R`                   | `[0, offset + R + radius + CR]`                                                           |
+| `area` on allies                 | none                                                                                      |
+| `dash D`                         | for its `then` effects, `[0, offset + D + b.max]`: a dash stops at the first body it hits |
+| `teleport R`                     | none; adds R to `offset` for the effects after it                                         |
+| `applyStatus`, `shield`, `heal`  | none (they land on the caster)                                                            |
+
+The band of an ability is the hull of its effects' bands, null when no effect has
+one. A target is in reach when `band.min <= d <= band.max - RANGE_MARGIN`, both
+ends inclusive, with `d` the centre distance and `RANGE_MARGIN` 1 m: a target
+walking away at 5.5 m/s gains 0.825 m during a 9 tick windup.
+
+Gates, copied from steps 3b to 3d of the sim's `step` and read on the state the
+bot thinks on. Step 3b counts cooldowns down, step 3c fires a windup at 1, then
+step 3d tries a new cast. For each slot, with the ability it would cast:
+
+- the bot is alive, the acted intent is not idle and the acted target is an alive enemy;
+- windup: none in progress, or `windupLeft` is 1;
+- cooldown at most 1 (a 30 tick slot casts on ticks 0, 30 and 60);
+- energy: F needs 100, an EX variant 25, otherwise 0;
+- no `stun` and no `silence` (silence includes SPACE); under `root` an ability with
+  a top-level `dash` is skipped;
+- in reach, with a clear shot (see Clear shot) of the width of that ability;
+- the cast delay, below.
+
+Order and variants: the bot presses the first slot in F, R, E, Q, SPACE, M2, M1
+that passes, one slot per think. A slot listed in `kit.ex` casts its EX variant
+(buttons plus SHIFT) when the energy is at least 25 and the variant has a band;
+otherwise it casts its base ability without SHIFT. F always casts its base
+ability and is never sent with SHIFT. There is no energy reserve: EX spending
+keeps energy low, so in bot hands the ultimate fires only when the energy reaches
+100 while the EX slots cool down or are out of reach. An alternative not taken is
+to hold the EX variants while F is ready and the energy is at least 75.
+
+Cast delay: per slot, a run counts the consecutive thinks, this one included, on
+which the target was in reach with a clear shot of the ability the slot would cast.
+The slot may be pressed when the run exceeds `castDelay`, so `castDelay` thinks
+after the first think of the run. The run restarts when the test fails, on an
+idle or dead think, and when the acted target changes. It ignores cooldown,
+energy, status and windup, so a slot that comes off cooldown while the target
+stays in reach is pressed on the first tick the sim would cast it.
+
+Never pressed: an ability with no band (self and ally abilities: Hargrim Q, R and
+base SPACE, Quillon SPACE and R in the test kits), and any slot of a champion
+without a kit. Openers, escapes and finishers are not built.
 
 ## Aim
 
@@ -130,11 +224,14 @@ Lead moving targets using their current velocity; add a tier-dependent angular
 error.
 
 - Lead: with `D` the vector from shooter to target, `V` the target velocity and
-  `s` the nominal projectile speed (20 m/s), solve `a t^2 + b t + c = 0` with
+  `s` the projectile speed, solve `a t^2 + b t + c = 0` with
   `a = V.V - s^2`, `b = 2 D.V`, `c = D.D`. The time is the positive root,
   `(b + sqrt(b^2 - 4ac)) / (-2a)` for `b >= 0` and `2c / (sqrt(b^2 - 4ac) - b)`
   otherwise, which avoids a cancelling subtraction. The aim point is the target
   position plus `V t`.
+- Speed: the first top-level projectile of the ability winding up, or else of the
+  ability pressed on this think, or else the nominal 20 m/s (no kit, or no
+  projectile in it).
 - Fallback: aim at the target when `c = 0`, `a >= 0` (the target is at least as
   fast as the projectile) or `t` is not finite.
 - Error: the vector to the aim point turns by `2 atan(u)` with the rational
@@ -146,13 +243,16 @@ error.
 ## Difficulty tiers
 
 Easy, normal, hard. They differ in reaction delay (ticks between a change in
-the world and a change in intent), aim error, and dodge probability.
+the world and a change in intent), cast delay, aim error, and dodge probability.
+The cast delay is read as a reaction delay: the ticks between a change in the
+world (the target enters an ability's reach with a clear shot) and the press. It
+is half the reaction delay, rounded up.
 
-| Tier   | Reaction delay | Aim error (largest) | T (`tan` of half the error) | Dodge probability |
-| ------ | -------------- | ------------------- | --------------------------- | ----------------- |
-| easy   | 30 ticks       | 12 degrees          | 0.10510423526567646         | with dodging      |
-| normal | 15 ticks       | 6 degrees           | 0.0524077792830412          | with dodging      |
-| hard   | 6 ticks        | 2 degrees           | 0.017455064928217585        | with dodging      |
+| Tier   | Reaction delay | Cast delay | Aim error (largest) | T (`tan` of half the error) | Dodge probability |
+| ------ | -------------- | ---------- | ------------------- | --------------------------- | ----------------- |
+| easy   | 30 ticks       | 15 thinks  | 12 degrees          | 0.10510423526567646         | with dodging      |
+| normal | 15 ticks       | 8 thinks   | 6 degrees           | 0.0524077792830412          | with dodging      |
+| hard   | 6 ticks        | 3 thinks   | 2 degrees           | 0.017455064928217585        | with dodging      |
 
 Dodge probability arrives with dodging; profiles and scores are the same for
 every tier. The delay is a ring of `delay` records: the bot decides on the
@@ -165,7 +265,9 @@ Bots need to repeat only within one process. The bot owns its PRNG (mulberry32,
 seeded from `seed`), and `think` is a pure function of the state plus the bot's
 private state. A bot keeps no module-level state, iterates arrays in index
 order, never reads the wall clock or `Math.random`, never reads or writes
-`state.rng`, never mutates the state, and stores copies of numbers and ids
+`state.rng`, never mutates the state, adds no random draw for casting (the aim
+draw stays the only use of the bot's rng), finds the kit on every think instead
+of keeping it, and stores copies of numbers and ids
 rather than references into the state. The one exception is `gridArena`, the
 `state.arena` reference the bot keeps for an identity check: while the arena
 object is the same, the navigation grid and the path follower stay; a new arena
@@ -185,8 +287,10 @@ match replays exactly from its input stream.
 
 - A full match must finish: it waits for match flow, so the headless test runs
   a fixed 3600 ticks.
-- Local steering around champions and projectiles, dodging, abilities and
-  ally logic.
+- Local steering around champions and projectiles, dodging and ally logic.
+- Openers, escapes and finishers, and abilities that land on the caster or on
+  allies (self and ally abilities).
+- An energy reserve for the ultimate.
 
 ## Testing
 
@@ -194,7 +298,17 @@ Bot-versus-bot headless matches are integration tests: invariants must hold,
 and no `NaN` may appear. The headless test runs a 2v2 match of four bots on
 arena 1 for 3600 ticks with a mix of tiers, checks the sim invariants and the
 input rules every tick, and checks that `think` leaves the state's checksum
-unchanged. The determinism test runs the same match twice, and two matches
+unchanged. A second headless run puts a mirror 2v2 (Hargrim and Quillon on both
+teams, bots-local kits in `packages/bots/test/kits.ts`) through the same checks,
+with a press oracle: every press is checked on the state the bot thought on
+against a literal band table, the acted target, line of sight and a clear shot of
+the ability's width, the cooldown, the energy, stun, silence, root with a dash and
+the windup, and afterwards the sim must have started that cast, or a death, a
+stun, a silence or a root explains why not. The run must end with a death from a
+cast, every champion must start a cast, and one cast must be an EX. A
+shadow-edge test on arena 1 pins that a position where the centre line is clear
+and a shifted line hits the pillar gets no press and is not chosen as a sight
+cell. The determinism test runs the same match twice, and two matches
 stepped in turn, and compares input streams and final checksums in memory. See
 [testing](testing.md).
 
@@ -209,4 +323,8 @@ than 120 ticks, in the headless run and in a corner-start run: the same match
 with one bot in the north-east corner of arena 1 and a melee champion 2.83 m
 away on the diagonal, which the old stand rule left frozen for the whole 3600
 ticks. A bot pushed by another champion keeps a non-zero input and is not
-counted: local avoidance is not built.
+counted: local avoidance is not built. A unit test of the tracker drives it with
+stub bots and zero inputs over 10 observes: engaging far from the enemy gives 10,
+retreating at the spawn 0, retreating 1 m off it 10, kiting closer than
+`rangeMin` in sight 10, engaging in range 0, no alive enemy 0, and a non-zero
+input resets the run.

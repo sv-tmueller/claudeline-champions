@@ -36,6 +36,10 @@ describe('abilityReach', () => {
     expect(abilityReach(ability(bolt(21, 40)))).toEqual({ min: 0, max: 14 });
   });
 
+  it('multiplies before it divides: 11 x 33 over 60 is exactly 6.05, not 6.050000000000001', () => {
+    expect(abilityReach(ability(bolt(11, 33)))).toEqual({ min: 0, max: 6.05 });
+  });
+
   it('adds the champion radius to a melee arc', () => {
     expect(abilityReach(ability(arc(2.5)))).toEqual({ min: 0, max: 3 });
   });
