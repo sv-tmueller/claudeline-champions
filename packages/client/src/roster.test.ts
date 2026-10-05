@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { championName } from './roster';
+import { ROSTER_IDS, championName } from './roster';
 
 describe('champion display names', () => {
   it.each([
@@ -19,5 +19,15 @@ describe('champion display names', () => {
   it('does not read inherited object keys as names', () => {
     expect(championName('constructor')).toBe('constructor');
     expect(championName('toString')).toBe('toString');
+  });
+});
+
+describe('roster ids', () => {
+  it('lists the four champions in the order of docs/design/roster-v1.md', () => {
+    expect(ROSTER_IDS).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow']);
+  });
+
+  it('has a name for every id', () => {
+    for (const id of ROSTER_IDS) expect(championName(id)).not.toBe(id);
   });
 });
