@@ -777,6 +777,44 @@ describe('finisher', () => {
     expect(intentAfterDelay(state)).toEqual({ intent: 'retreat', targetId: 3 });
   });
 
+  it('targets the nearer of two qualifying enemies, in both id orders', () => {
+    // Nearer than 4 m the kite score tops the retreat score at 20 percent, and the finisher is never reached.
+    const near = 5;
+    const far = 10;
+    for (const [nearId, farId] of [
+      [2, 3],
+      [3, 2],
+    ] as const) {
+      const { state, me } = duelAt(0.15);
+      ch(state, 3).alive = true;
+      ch(state, 3).health = 0.1 * ch(state, 3).maxHealth;
+      put(state, nearId, me.x + near, 0);
+      put(state, farId, me.x + far, 0);
+      expect(intentAfterDelay(state)).toEqual({ intent: 'kite', targetId: nearId });
+    }
+  });
+
+  it('takes the lower id when two qualifying enemies are at the same distance', () => {
+    const { state, me } = duelAt(0.15);
+    ch(state, 3).alive = true;
+    ch(state, 3).health = 0.15 * ch(state, 3).maxHealth;
+    put(state, 2, me.x, 5);
+    put(state, 3, me.x, -5);
+    expect(intentAfterDelay(state).targetId).toBe(2);
+    put(state, 2, me.x, -5);
+    put(state, 3, me.x, 5);
+    expect(intentAfterDelay(state).targetId).toBe(2);
+  });
+
+  it('does not take a dead enemy as the finisher, and retreats from the live one', () => {
+    const { state } = duelAt(0.1, 6);
+    ch(state, 2).alive = false;
+    ch(state, 3).alive = true;
+    ch(state, 3).health = 0.5 * ch(state, 3).maxHealth;
+    put(state, 3, 4, 0);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'retreat', targetId: 3 });
+  });
+
   it('kites a finisher that is closer than rangeMin', () => {
     expect(intentAfterDelay(duelAt(0.15, 2).state)).toEqual({ intent: 'kite', targetId: 2 });
   });
