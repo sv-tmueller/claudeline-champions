@@ -3,7 +3,15 @@ import { orFail, waitForPhase, watchProblems } from './support';
 
 // The slots in the order of SLOTS in the sim, which is the order on screen.
 const SLOT_NAMES = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'];
-const HUD_ELEMENTS = ['health-bar', 'energy-bar', 'cooldown-icons', 'round-score', 'round-timer', 'kill-feed'];
+const HUD_ELEMENTS = [
+  'health-bar',
+  'energy-bar',
+  'cooldown-icons',
+  'round-score',
+  'round-timer',
+  'ring-warning',
+  'kill-feed',
+];
 // A round is 5400 ticks (90 s at 60 Hz) and the warmup before round 1 is 180 ticks.
 const ROUND_TICKS = 5400;
 const TICK_RATE = 60;
@@ -107,6 +115,9 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     expect(hud.score).toContain('first to 3');
     expect(hud.timer).toBe(timerText(hud.tick));
     expect(hud.visibleLines).toBe(0);
+    // The ring warning exists and stays hidden until the countdown before sudden death.
+    expect(await page.locator('[data-hud="ring-warning"]').getAttribute('data-visible')).toBe('false');
+    expect(await page.locator('[data-hud="ring-warning"]').isVisible()).toBe(false);
     // The result panel exists and stays hidden until the match ends. Its select
     // lists the roster in order: the champions with a kit link to a relaunch, the
     // others are greyed and have no link.

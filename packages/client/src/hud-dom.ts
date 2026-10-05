@@ -12,13 +12,15 @@ export function make(parent: HTMLElement, tag: string, attributes: Record<string
 
 /**
  * Builds the HUD under `root`, once at startup, and returns the elements the
- * `Hud` writes. The six `data-hud` elements carry the names of rules.md
+ * `Hud` writes. The seven `data-hud` elements carry the names of rules.md
  * section 8. States are data attributes that the e2e specs read: `data-ready`,
  * `data-windup` and `data-blocked` on a slot, `data-ready` on an energy mark,
  * `data-visible` on a kill-feed line and `data-team` on its names.
  * The timer also carries `data-sudden`, true while it shows the sudden death
- * text. `roundsToWin` is the "first to N" of the score. The ring warning, the
- * shield segment and the silence state are not built yet.
+ * text. The ring warning carries `data-visible`, `data-counting` (the countdown
+ * before the ring) and `data-outside` (the red edge). `roundsToWin` is the
+ * "first to N" of the score. The shield segment and the silence state are not
+ * built yet.
  */
 export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
   const health = make(root, 'div', { 'data-hud': 'health-bar' });
@@ -45,6 +47,25 @@ export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
   make(score, 'span', { 'data-part': 'goal' }, `first to ${roundsToWin}`);
   const timer = make(root, 'div', { 'data-hud': 'round-timer' });
 
+  // The warning's root covers the viewport so that it can draw the red edge. Its text
+  // sits on a panel of its own. Built hidden, not counting and not outside.
+  const warning = make(root, 'div', {
+    'data-hud': 'ring-warning',
+    'data-visible': 'false',
+    'data-counting': 'false',
+    'data-outside': 'false',
+  });
+  const warningPanel = make(warning, 'div', { 'data-part': 'ring-panel' });
+  const count = make(warningPanel, 'div', { 'data-part': 'ring-count' });
+  make(count, 'span', {}, 'Sudden death in');
+  const countdown = make(count, 'span', { 'data-part': 'ring-countdown' });
+  const size = make(warningPanel, 'div', { 'data-part': 'ring-size' });
+  make(size, 'span', {}, 'Ring');
+  const radius = make(size, 'span', { 'data-part': 'ring-radius' });
+  const away = make(size, 'span', { 'data-part': 'ring-away' });
+  const distance = make(away, 'span', { 'data-part': 'ring-distance' });
+  make(away, 'span', {}, 'outside');
+
   const feed = make(root, 'div', { 'data-hud': 'kill-feed' });
   const lines: HudHandles['lines'][number][] = [];
   for (let i = 0; i < KILL_FEED_LINES; i++) {
@@ -64,6 +85,12 @@ export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
     slots,
     score: scoreText,
     timer,
+    ring: {
+      root: warning as HudElement,
+      countdown: countdown as HudElement,
+      radius: radius as HudElement,
+      distance: distance as HudElement,
+    },
     lines,
   };
 }

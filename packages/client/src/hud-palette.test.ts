@@ -206,6 +206,37 @@ describe('HUD colours (hud.css)', () => {
   });
 });
 
+describe('ring warning (hud.css)', () => {
+  const { rules } = load(SHEETS[0] as Sheet);
+
+  function value(selectorPart: string, property: string): string | undefined {
+    return rules
+      .find((rule) => rule.selector.includes(selectorPart))
+      ?.declarations.find((d) => d.property === property)?.value;
+  }
+
+  it('draws the red edge as a shadow in the enemy colour while outside', () => {
+    const shadow = value("[data-hud='ring-warning'][data-outside='true']", 'box-shadow');
+    expect(shadow).toContain('var(--hud-enemy)');
+    expect(shadow).toMatch(/^inset /);
+  });
+
+  it('draws the outside text in the enemy colour', () => {
+    expect(value("[data-hud='ring-warning'][data-outside='true'] [data-part='ring-size']", 'color')).toBe(
+      'var(--hud-enemy)',
+    );
+  });
+
+  it('puts the text on a panel and leaves the edge on none', () => {
+    expect(value("[data-part='ring-panel']", 'background')).toBe('var(--hud-panel)');
+    expect(value("[data-hud='ring-warning']", 'background')).toBe('none');
+  });
+
+  it('hides the warning while it is not visible', () => {
+    expect(value("[data-hud='ring-warning'][data-visible='false']", 'display')).toBe('none');
+  });
+});
+
 describe('pointer events', () => {
   it('never reach the HUD, so a right click still reaches the canvas', () => {
     const { rules } = load(SHEETS[0] as Sheet);

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   CM_TEXT_LIMIT,
+  DM_TEXT_COUNT,
   FACING_KEY_LIMIT,
   INT_TEXT_COUNT,
   cmText,
+  dmText,
   facingKey,
   facingText,
   intText,
@@ -89,5 +91,26 @@ describe('percentText', () => {
 
   it('falls back to String past 100', () => {
     expect(percentText(101)).toBe('101');
+  });
+});
+
+describe('dmText', () => {
+  it('is the metres with one decimal for every decimetre in the table', () => {
+    for (let dm = 0; dm < DM_TEXT_COUNT; dm++) {
+      const text = `${(dm / 10).toFixed(1)} m`;
+      if (dmText(dm) !== text) expect(dmText(dm)).toBe(text);
+    }
+    expect(dmText(0)).toBe('0.0 m');
+    expect(dmText(124)).toBe('12.4 m');
+    expect(dmText(180)).toBe('18.0 m');
+  });
+
+  it('covers a ring of 18 m with room to spare', () => {
+    expect(DM_TEXT_COUNT).toBeGreaterThanOrEqual(400);
+  });
+
+  it('falls back to the formatter past the table', () => {
+    expect(dmText(DM_TEXT_COUNT)).toBe(`${(DM_TEXT_COUNT / 10).toFixed(1)} m`);
+    expect(dmText(-5)).toBe('-0.5 m');
   });
 });

@@ -165,9 +165,9 @@ same commit.
 ## HUD
 
 An HTML and CSS overlay under `#hud`, built once at startup by `hud-dom.ts`.
-It has six elements, named by `data-hud` after
+It has seven elements, named by `data-hud` after
 [rules.md](../design/rules.md) section 8: `health-bar`, `energy-bar`,
-`cooldown-icons`, `round-score`, `round-timer` and `kill-feed`.
+`cooldown-icons`, `round-score`, `round-timer`, `ring-warning` and `kill-feed`.
 
 - Health bar: the local champion's health as `ceil(health) / maxHealth` and a
   fill.
@@ -188,14 +188,26 @@ It has six elements, named by `data-hud` after
   0:00; once `match.ring` exists it shows "Sudden death" and the timer's
   `data-sudden` is true (rules.md section 8). After a round and after the match
   it keeps its last text. A state without `match` reads 0 : 0 and 1:30.
+- Ring warning: a `RingView` read from `state.match` and the local champion by
+  `readRingView` (`hud-views.ts`), visible only in the round phase. In the 600
+  ticks before sudden death it counts down "Sudden death in 10" to 1 from
+  `phaseTicks` (one tick before the ring is made it still reads 1, since the sim
+  makes the ring in the step that starts at 5400 phase ticks). Once `match.ring`
+  exists it shows "Ring 18.0 m", the ring's own radius, which falls to 3.0 m. While
+  the local champion is alive and outside the ring (`dx² + dy² > r²`, the sim's
+  own test: exactly on the radius is inside) `data-outside` is true: the distance
+  past the edge shows ("1.3 m outside") and a red edge draws along the viewport.
+  The element carries `data-visible`, `data-counting` and `data-outside`, and the
+  spans `ring-countdown`, `ring-radius` and `ring-distance`. Lengths are
+  decimetres from the table of `hook-text.ts` (`dmText`).
 - Kill feed: up to 5 lines for 300 ticks each. `feedback.ts` pushes a death as
   killer and victim, and names come from `roster.ts`. `routeEvents` makes no ring
   for a `projectileExpired` with the reason `roundEnd`: that shot was cut off by
   the round, and nothing was hit. The deciding death still reaches the feed,
   since the sim emits the deaths before `roundEnded`.
 
-Not built yet: the ring warning, the shield segment on the health bar, the
-silence state of a slot, the scoreboard and the menu.
+Not built yet: the shield segment on the health bar, the silence state of a
+slot, the scoreboard and the menu.
 
 ### Result screen and champion select
 
@@ -207,9 +219,9 @@ reached `roundsToWin`) and the final score, local first, written once. The panel
 holds the select: one entry per roster id in roster order. An id with a loaded
 kit is a link to `?champion=<id>&difficulty=<current>` (`data-available="true"`);
 following it reloads the page, so the kill feed, the views and the bots start
-fresh and the tick never goes back to 0 within a page. Lumeth and Skerrow are
-greyed (`data-available="false"`) until their kit files exist. There is no
-pre-match screen. Only the visible panel takes pointer events; the HUD takes
+fresh and the tick never goes back to 0 within a page. A roster champion without
+a kit file is greyed (`data-available="false"`) until its file exists. There is
+no pre-match screen. Only the visible panel takes pointer events; the HUD takes
 none.
 
 No e2e plays a match to the end: a full match of bots is thousands of ticks, and
@@ -237,7 +249,10 @@ data attributes: `data-ready`, `data-windup` and `data-blocked` on a slot,
 `result.css` follows the same rules with `--result-u` and `#result`, and one
 difference: the visible panel takes pointer events. The
 colours are hex custom properties on `#hud`. Panels are neutral black with
-alpha and every foreground element sits on one. Text is off-white, below 250 in
+alpha and every foreground element sits on one, with one exception: the ring
+warning's red edge, an inset shadow in `var(--hud-enemy)` along the viewport that
+shows while the local champion is outside the ring (rules.md section 8 asks for
+an edge, which cannot sit on a panel). The warning's text is on a panel. Text is off-white, below 250 in
 every channel. Allies and enemies use the health-bar colours. No colour is blue,
 purple or magenta, none falls in the pixel boxes the e2e specs count (white,
 the yellow ring, the magenta overlay) and none is within 80 of a champion body

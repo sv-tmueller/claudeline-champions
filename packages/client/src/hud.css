@@ -6,7 +6,8 @@
  * - nothing takes pointer events, so right clicks reach the canvas;
  * - no colour lands in the pixel boxes the e2e specs count (white, the yellow
  *   ring, the magenta overlay) or near a champion body colour;
- * - panels are neutral black with alpha, and every foreground element sits on one.
+ * - panels are neutral black with alpha, and every foreground element sits on one,
+ *   except the ring warning's red edge, which is a shadow along the viewport edge.
  */
 #hud {
   --hud-u: min(1vw, 1.78vh);
@@ -202,6 +203,64 @@
 }
 
 #hud [data-hud='round-timer'][data-sudden='true'] {
+  color: var(--hud-enemy);
+}
+
+/*
+ * Ring warning (rules.md section 8). The root covers the viewport and draws the
+ * red edge while the local champion is outside the ring; that edge is the one
+ * foreground element that sits on no panel. The text is on a panel under the
+ * round timer: the countdown before sudden death, then the ring radius and, while
+ * outside, the distance to its edge.
+ */
+#hud [data-hud='ring-warning'] {
+  inset: 0;
+  background: none;
+  border-radius: 0;
+}
+
+#hud [data-hud='ring-warning'][data-visible='false'] {
+  display: none;
+}
+
+#hud [data-hud='ring-warning'][data-outside='true'] {
+  box-shadow: inset 0 0 calc(var(--hud-u) * 6) calc(var(--hud-u) * 1.5) var(--hud-enemy);
+}
+
+#hud [data-part='ring-panel'] {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--hud-u) * 10.4);
+  transform: translateX(-50%);
+  padding: calc(var(--hud-u) * 0.3) calc(var(--hud-u) * 1);
+  background: var(--hud-panel);
+  border-radius: calc(var(--hud-u) * 0.5);
+  text-align: center;
+  white-space: nowrap;
+}
+
+#hud [data-part='ring-panel'] span + span {
+  margin-left: calc(var(--hud-u) * 0.5);
+}
+
+#hud [data-part='ring-countdown'],
+#hud [data-part='ring-radius'] {
+  font-weight: 700;
+}
+
+#hud [data-hud='ring-warning'][data-counting='true'] [data-part='ring-size'] {
+  display: none;
+}
+
+#hud [data-hud='ring-warning'][data-counting='false'] [data-part='ring-count'] {
+  display: none;
+}
+
+#hud [data-hud='ring-warning'][data-outside='false'] [data-part='ring-away'] {
+  display: none;
+}
+
+#hud [data-hud='ring-warning'][data-outside='true'] [data-part='ring-size'] {
   color: var(--hud-enemy);
 }
 

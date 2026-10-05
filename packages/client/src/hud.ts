@@ -2,16 +2,21 @@ import { EX_ENERGY_COST, MAX_ENERGY, ULTIMATE_ENERGY_COST, type MatchState, type
 import {
   SUDDEN_DEATH_TEXT,
   TIMER_TEXT,
+  createRingView,
   createRoundView,
   createSlotViews,
+  readRingView,
   readRoundView,
   readSlotViews,
   scoreIndex,
   scoreTexts,
+  type RingSource,
+  type RingView,
   type RoundView,
   type SlotSource,
   type SlotView,
 } from './hud-views';
+import { dmText, intText } from './hook-text';
 import { KILL_FEED_LINES, type KillFeed } from './kill-feed';
 import { championName } from './roster';
 
@@ -38,6 +43,8 @@ export interface HudHandles {
   slots: readonly { icon: HudElement; seconds: HudElement }[];
   score: HudElement;
   timer: HudElement;
+  /** The ring warning: its root carries the flags, the three spans carry the values. */
+  ring: { root: HudElement; countdown: HudElement; radius: HudElement; distance: HudElement };
   /** `KILL_FEED_LINES` lines, the oldest first. */
   lines: readonly { line: HudElement; killer: HudElement; victim: HudElement }[];
 }
@@ -47,7 +54,7 @@ export interface HudState {
   tick: number;
   /** Absent in free play, which reads as 0 : 0 and a full round. */
   match?: MatchState;
-  champions: readonly (SlotSource & { health: number; maxHealth: number })[];
+  champions: readonly (SlotSource & RingSource & { health: number; maxHealth: number })[];
 }
 
 const RING_NAME = 'Ring';
@@ -92,6 +99,7 @@ export class Hud {
   private readonly sides: string[];
   private readonly slotViews: SlotView[] = createSlotViews();
   private readonly round: RoundView = createRoundView();
+  private readonly ringView: RingView = createRingView();
 
   private healthKey = -1;
   private maxHealth = -1;
@@ -103,6 +111,14 @@ export class Hud {
   // 0 to 90 for the seconds shown, SUDDEN_KEY for the sudden death text, -1 for not written yet.
   private timerKey = -1;
   private suddenFlag = -1;
+  // The ring warning is built hidden, not counting and not outside, so each flag
+  // starts at 0 and the first update writes nothing for it. The values start at -1.
+  private ringVisible = 0;
+  private ringCounting = 0;
+  private ringOutside = 0;
+  private ringCountdown = -1;
+  private ringRadius = -1;
+  private ringDistance = -1;
   private readonly slotSeconds: number[] = [];
   private readonly slotReady: number[] = [];
   private readonly slotWindup: number[] = [];
@@ -151,6 +167,7 @@ export class Hud {
       this.updateSlots(champion);
     }
     this.updateRound(state);
+    this.updateRing(state);
     this.updateKillFeed(state.tick);
   }
 
@@ -233,6 +250,47 @@ export class Hud {
     if (sudden !== this.suddenFlag) {
       this.suddenFlag = sudden;
       this.handles.timer.setAttribute('data-sudden', flag(sudden === 1));
+    }
+  }
+
+  private updateRing(state: HudState): void {
+    const view = this.ringView;
+    const ring = this.handles.ring;
+    readRingView(state, this.localId, view);
+    const visible = view.visible ? 1 : 0;
+    if (visible !== this.ringVisible) {
+      this.ringVisible = visible;
+      ring.root.setAttribute('data-visible', flag(visible === 1));
+    }
+    // Hidden: keep the last values, the next round writes only what differs.
+    if (visible === 0) return;
+    const counting = view.countdown > 0 ? 1 : 0;
+    if (counting !== this.ringCounting) {
+      this.ringCounting = counting;
+      ring.root.setAttribute('data-counting', flag(counting === 1));
+    }
+    // Written in the countdown too (never outside then), so a flag left over from the
+    // last round clears in the update that shows the warning again.
+    const outside = view.outside ? 1 : 0;
+    if (outside !== this.ringOutside) {
+      this.ringOutside = outside;
+      ring.root.setAttribute('data-outside', flag(outside === 1));
+    }
+    if (counting === 1) {
+      if (view.countdown !== this.ringCountdown) {
+        this.ringCountdown = view.countdown;
+        ring.countdown.textContent = intText(view.countdown);
+      }
+      return;
+    }
+    if (view.radiusDm !== this.ringRadius) {
+      this.ringRadius = view.radiusDm;
+      ring.radius.textContent = dmText(view.radiusDm);
+    }
+    // The distance shows only outside the ring, so inside it is not written.
+    if (outside === 1 && view.distanceDm !== this.ringDistance) {
+      this.ringDistance = view.distanceDm;
+      ring.distance.textContent = dmText(view.distanceDm);
     }
   }
 

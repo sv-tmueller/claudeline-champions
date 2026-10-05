@@ -15,12 +15,15 @@ import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import {
   TIMER_TEXT,
+  createRingView,
   createRoundView,
   createSlotViews,
+  readRingView,
   readRoundView,
   readSlotViews,
   scoreIndex,
   scoreTexts,
+  type RingView,
   type RoundView,
   type SlotSource,
 } from './hud-views';
@@ -201,5 +204,113 @@ describe('scoreTexts', () => {
     expect(scoreIndex(3, 0, 4)).toBe(-1);
     expect(scoreIndex(3, -1, 0)).toBe(-1);
     expect(scoreTexts(3)[scoreIndex(3, 4, 0)]).toBeUndefined();
+  });
+});
+
+describe('ring view', () => {
+  const RING_X = 0;
+  const RING_Y = 0;
+
+  type RingState = { match?: MatchState; champions: { x: number; y: number; alive: boolean }[] };
+
+  function matchAt(phase: MatchPhase, phaseTicks: number, radius: number | null): RingState & { match: MatchState } {
+    return {
+      match: {
+        phase,
+        phaseTicks,
+        round: 1,
+        roundsToWin: 3,
+        score: { A: 0, B: 0 },
+        ring: radius === null ? null : { x: RING_X, y: RING_Y, radius, damagePerTick: 1 / 6 },
+      },
+      champions: [{ x: -12, y: 2, alive: true }],
+    };
+  }
+
+  function read(state: RingState): RingView {
+    const view = createRingView();
+    readRingView(state, 0, view);
+    return view;
+  }
+
+  const HIDDEN: RingView = { visible: false, countdown: 0, radiusDm: 0, distanceDm: 0, outside: false };
+
+  it('starts hidden', () => {
+    expect(createRingView()).toEqual(HIDDEN);
+  });
+
+  it('is hidden in the warmup, the round end and the match end, and without match flow', () => {
+    expect(read(matchAt('warmup', 5399, null))).toEqual(HIDDEN);
+    expect(read(matchAt('roundEnd', 10, 18))).toEqual(HIDDEN);
+    expect(read(matchAt('matchEnd', 0, 18))).toEqual(HIDDEN);
+    expect(read({ champions: [{ x: 0, y: 0, alive: true }] })).toEqual(HIDDEN);
+  });
+
+  it('is hidden in a round until 600 ticks are left', () => {
+    expect(read(matchAt('round', 0, null))).toEqual(HIDDEN);
+    expect(read(matchAt('round', 4799, null))).toEqual(HIDDEN);
+  });
+
+  it('counts down from 10 at 600 ticks left to 1 at 1 tick left', () => {
+    expect(read(matchAt('round', 4800, null))).toMatchObject({ visible: true, countdown: 10, outside: false });
+    expect(read(matchAt('round', 4859, null)).countdown).toBe(10);
+    expect(read(matchAt('round', 4860, null)).countdown).toBe(9);
+    expect(read(matchAt('round', 5399, null))).toMatchObject({ visible: true, countdown: 1 });
+  });
+
+  it('still shows 1 on the one tick between the last second and the ring, which the next step creates', () => {
+    // The sim creates the ring in the step that starts at 5400 phase ticks, so a frame between
+    // can read 5400 phase ticks with no ring yet.
+    expect(read(matchAt('round', 5400, null))).toMatchObject({ visible: true, countdown: 1 });
+  });
+
+  it('shows no radius or distance while it counts down', () => {
+    expect(read(matchAt('round', 5000, null))).toMatchObject({ radiusDm: 0, distanceDm: 0 });
+  });
+
+  it('shows the ring radius in decimetres, rounded, and no countdown once the ring exists', () => {
+    expect(read(matchAt('round', 5400, 18))).toMatchObject({ visible: true, countdown: 0, radiusDm: 180 });
+    expect(read(matchAt('round', 5500, 17.04))).toMatchObject({ radiusDm: 170 });
+    expect(read(matchAt('round', 5500, 17.05))).toMatchObject({ radiusDm: 171 });
+    expect(read(matchAt('round', 5500, 17.049999))).toMatchObject({ radiusDm: 170 });
+  });
+
+  it('reads the radius from the ring of the match, not the starting radius of the arena', () => {
+    expect(read(matchAt('round', 6000, 9.3)).radiusDm).toBe(93);
+  });
+
+  it('is inside, with its distance to the edge, while the champion is within the radius', () => {
+    // The champion stands at (-12, 2): 12.166 m from the centre, 5.83 m inside an 18 m ring.
+    const view = read(matchAt('round', 5400, 18));
+    expect(view.outside).toBe(false);
+    expect(view.distanceDm).toBe(58);
+  });
+
+  it('is outside, with the distance past the edge, once the radius passes the champion', () => {
+    const view = read(matchAt('round', 6200, 12));
+    expect(view.outside).toBe(true);
+    expect(view.distanceDm).toBe(2);
+  });
+
+  it('counts a champion exactly on the radius as inside, like the sim', () => {
+    const state = matchAt('round', 5400, 5);
+    state.champions[0] = { x: 3, y: 4, alive: true };
+    expect(read(state).outside).toBe(false);
+    state.champions[0] = { x: 3, y: 4.0001, alive: true };
+    expect(read(state).outside).toBe(true);
+  });
+
+  it('never shows a dead champion as outside', () => {
+    const state = matchAt('round', 6200, 12);
+    state.champions[0] = { x: -12, y: 2, alive: false };
+    expect(read(state)).toMatchObject({ visible: true, radiusDm: 120, outside: false, distanceDm: 0 });
+  });
+
+  it('refills the view it is given, back to hidden when the round ends', () => {
+    const view = createRingView();
+    readRingView(matchAt('round', 5400, 18), 0, view);
+    expect(view.visible).toBe(true);
+    readRingView(matchAt('roundEnd', 0, 18), 0, view);
+    expect(view).toEqual(HIDDEN);
   });
 });

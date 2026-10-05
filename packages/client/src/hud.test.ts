@@ -20,6 +20,7 @@ interface Rig {
     slots: { icon: Fake; seconds: Fake }[];
     score: Fake;
     timer: Fake;
+    ring: { root: Fake; countdown: Fake; radius: Fake; distance: Fake };
     lines: { line: Fake; killer: Fake; victim: Fake }[];
   };
 }
@@ -49,6 +50,7 @@ function rig(): Rig {
     slots: SLOTS.map(() => ({ icon: fake(), seconds: fake() })),
     score: fake(),
     timer: fake(),
+    ring: { root: fake(), countdown: fake(), radius: fake(), distance: fake() },
     lines: Array.from({ length: KILL_FEED_LINES }, () => ({ line: fake(), killer: fake(), victim: fake() })),
   };
   const feed = createKillFeed();
@@ -67,6 +69,10 @@ function allElements(elements: Rig['elements']): Fake[] {
     ...elements.slots.flatMap((slot) => [slot.icon, slot.seconds]),
     elements.score,
     elements.timer,
+    elements.ring.root,
+    elements.ring.countdown,
+    elements.ring.radius,
+    elements.ring.distance,
     ...elements.lines.flatMap((line) => [line.line, line.killer, line.victim]),
   ];
 }

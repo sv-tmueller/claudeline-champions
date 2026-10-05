@@ -50,3 +50,13 @@ export function percentText(percent: number): string {
   if (percent < 0) return PERCENT_TEXT[0] as string;
   return PERCENT_TEXT[percent + 1] ?? String(percent);
 }
+
+/** The decimetre table covers 0 to this minus 1: a ring or a distance up to 99.9 m. */
+export const DM_TEXT_COUNT = 1000;
+const DM_TEXT: string[] = [];
+for (let dm = 0; dm < DM_TEXT_COUNT; dm++) DM_TEXT.push(`${(dm / 10).toFixed(1)} m`);
+
+/** The text of a length in whole decimetres, in metres with one decimal: "12.4 m". */
+export function dmText(dm: number): string {
+  return DM_TEXT[dm] ?? `${(dm / 10).toFixed(1)} m`;
+}
