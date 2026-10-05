@@ -90,8 +90,8 @@ const feedback = new CombatFeedback(state.champions.length, impactRings, killFee
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 // Built before the models load, so the HUD shows while they do.
-const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed);
-const result = new ResultScreen(buildResult(resultRoot, kitIds, launch.difficulty), human.team);
+const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
+const result = new ResultScreen(buildResult(resultRoot, kitIds, launch.difficulty), human.team, roundsToWin);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 

@@ -6,6 +6,8 @@ import {
   createSlotViews,
   readRoundView,
   readSlotViews,
+  scoreIndex,
+  scoreTexts,
   type RoundView,
   type SlotSource,
   type SlotView,
@@ -62,6 +64,10 @@ const SECONDS_TEXT: readonly string[] = Array.from({ length: 100 }, (_, seconds)
   seconds === 0 ? '' : String(seconds),
 );
 
+function healthFill(key: number, max: number): string {
+  return `scaleX(${max > 0 ? Math.min(Math.max(key / max, 0), 1) : 0})`;
+}
+
 function flag(value: boolean): string {
   return value ? TRUE : FALSE;
 }
@@ -74,6 +80,15 @@ function flag(value: boolean): string {
  */
 export class Hud {
   private readonly names: string[];
+  // The texts of the local champion's health (a whole health from 0 to the maximum
+  // it was built for), the energy fill (0 to MAX_ENERGY) and the score, made once.
+  // A value past a table falls back to the template.
+  private readonly tableMaxHealth: number;
+  private readonly healthTexts: string[] = [];
+  private readonly healthFills: string[] = [];
+  private readonly energyFills: string[] = [];
+  private readonly scoreTable: string[];
+  private readonly roundsToWin: number;
   private readonly sides: string[];
   private readonly slotViews: SlotView[] = createSlotViews();
   private readonly round: RoundView = createRoundView();
@@ -99,11 +114,20 @@ export class Hud {
 
   constructor(
     private readonly handles: HudHandles,
-    champions: readonly { championId: string; team: TeamId }[],
+    champions: readonly { championId: string; team: TeamId; maxHealth: number }[],
     private readonly localId: number,
     private readonly killFeed: KillFeed,
+    roundsToWin: number,
   ) {
     const localTeam = champions[localId]?.team;
+    this.tableMaxHealth = champions[localId]?.maxHealth ?? 0;
+    for (let key = 0; key <= this.tableMaxHealth; key++) {
+      this.healthTexts.push(`${key} / ${this.tableMaxHealth}`);
+      this.healthFills.push(healthFill(key, this.tableMaxHealth));
+    }
+    for (let key = 0; key <= MAX_ENERGY; key++) this.energyFills.push(`scaleX(${key / MAX_ENERGY})`);
+    this.roundsToWin = roundsToWin;
+    this.scoreTable = scoreTexts(roundsToWin);
     this.names = champions.map((champion) => championName(champion.championId));
     this.sides = champions.map((champion) => (champion.team === localTeam ? SIDE_ALLY : SIDE_ENEMY));
     for (let i = 0; i < this.slotViews.length; i++) {
@@ -136,15 +160,18 @@ export class Hud {
     if (key === this.healthKey && max === this.maxHealth) return;
     this.healthKey = key;
     this.maxHealth = max;
-    this.handles.healthText.textContent = `${key} / ${max}`;
-    this.handles.healthFill.style.transform = `scaleX(${max > 0 ? Math.min(Math.max(key / max, 0), 1) : 0})`;
+    // The tables hold a whole health of the maximum the HUD was built for; any other
+    // health or maximum builds its text.
+    const tabled = max === this.tableMaxHealth ? this.healthTexts[key] : undefined;
+    this.handles.healthText.textContent = tabled ?? `${key} / ${max}`;
+    this.handles.healthFill.style.transform = (tabled !== undefined ? this.healthFills[key] : undefined) ?? healthFill(key, max);
   }
 
   private updateEnergy(energy: number): void {
     const key = Math.floor(Math.min(Math.max(energy, 0), MAX_ENERGY));
     if (key !== this.energyKey) {
       this.energyKey = key;
-      this.handles.energyFill.style.transform = `scaleX(${key / MAX_ENERGY})`;
+      this.handles.energyFill.style.transform = this.energyFills[key] ?? `scaleX(${key / MAX_ENERGY})`;
     }
     const ex = energy >= EX_ENERGY_COST ? 1 : 0;
     if (ex !== this.exReady) {
@@ -192,7 +219,8 @@ export class Hud {
     if (round.scoreA !== this.scoreA || round.scoreB !== this.scoreB) {
       this.scoreA = round.scoreA;
       this.scoreB = round.scoreB;
-      this.handles.score.textContent = `${round.scoreA} : ${round.scoreB}`;
+      this.handles.score.textContent =
+        this.scoreTable[scoreIndex(this.roundsToWin, round.scoreA, round.scoreB)] ?? `${round.scoreA} : ${round.scoreB}`;
     }
     // Outside the round phases the timer keeps what it shows.
     if (!round.live) return;

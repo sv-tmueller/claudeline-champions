@@ -221,7 +221,11 @@ and the e2e check that the hidden panel and its select exist.
 `Hud.update` runs once per stepping frame, after all of that frame's sim steps.
 It compares integers and booleans held in cache fields with the new values and
 writes the DOM only when one changed, so a steady frame writes and allocates
-nothing. The kill feed counts its pushes and expiries, and the HUD skips its
+nothing. The texts come from tables made in the constructor: the health text and
+fill per whole health up to the local champion's maximum, the energy fill per
+whole energy, and the score per pair up to the rounds to win (`scoreTexts` in
+`hud-views.ts`, shared with the result screen). A value past a table builds its
+text, so nothing is wrong outside the range, only slower. The kill feed counts its pushes and expiries, and the HUD skips its
 line loop while that count has not moved. The e2e specs read the states from
 data attributes: `data-ready`, `data-windup` and `data-blocked` on a slot,
 `data-ready` on an energy mark, `data-visible` on a kill-feed line,

@@ -97,3 +97,25 @@ export const TIMER_TEXT: readonly string[] = (() => {
   }
   return text;
 })();
+
+/**
+ * The index of the score `a : b` in `scoreTexts(roundsToWin)`, or -1 for a score
+ * past the rounds to win (the table has no entry there, so a caller falls back).
+ */
+export function scoreIndex(roundsToWin: number, a: number, b: number): number {
+  if (a < 0 || b < 0 || a > roundsToWin || b > roundsToWin) return -1;
+  return a * (roundsToWin + 1) + b;
+}
+
+/**
+ * The text "a : b" of every score from 0 : 0 to `roundsToWin` : `roundsToWin`,
+ * made once at startup and indexed by `scoreIndex`. The HUD and the result
+ * screen share it, so writing a score builds no string.
+ */
+export function scoreTexts(roundsToWin: number): string[] {
+  const texts: string[] = [];
+  for (let a = 0; a <= roundsToWin; a++) {
+    for (let b = 0; b <= roundsToWin; b++) texts.push(`${a} : ${b}`);
+  }
+  return texts;
+}

@@ -19,6 +19,8 @@ import {
   createSlotViews,
   readRoundView,
   readSlotViews,
+  scoreIndex,
+  scoreTexts,
   type RoundView,
   type SlotSource,
 } from './hud-views';
@@ -176,5 +178,28 @@ describe('round view', () => {
     expect(TIMER_TEXT[9]).toBe('0:09');
     expect(TIMER_TEXT[60]).toBe('1:00');
     expect(TIMER_TEXT[90]).toBe('1:30');
+  });
+});
+
+describe('scoreTexts', () => {
+  it.each([1, 3])('has one "a : b" text per score pair up to %i rounds to win', (roundsToWin) => {
+    const texts = scoreTexts(roundsToWin);
+    expect(texts).toHaveLength((roundsToWin + 1) ** 2);
+    for (let a = 0; a <= roundsToWin; a++) {
+      for (let b = 0; b <= roundsToWin; b++) expect(texts[scoreIndex(roundsToWin, a, b)], `${a} : ${b}`).toBe(`${a} : ${b}`);
+    }
+  });
+
+  it('keeps 3 : 1 and 1 : 3 apart, so the two scores are not transposed', () => {
+    expect(scoreTexts(3)[scoreIndex(3, 3, 1)]).toBe('3 : 1');
+    expect(scoreTexts(3)[scoreIndex(3, 1, 3)]).toBe('1 : 3');
+    expect(scoreTexts(1)[scoreIndex(1, 1, 0)]).toBe('1 : 0');
+  });
+
+  it('has no entry for a score past the rounds to win, so a caller falls back', () => {
+    expect(scoreIndex(3, 4, 0)).toBe(-1);
+    expect(scoreIndex(3, 0, 4)).toBe(-1);
+    expect(scoreIndex(3, -1, 0)).toBe(-1);
+    expect(scoreTexts(3)[scoreIndex(3, 4, 0)]).toBeUndefined();
   });
 });
