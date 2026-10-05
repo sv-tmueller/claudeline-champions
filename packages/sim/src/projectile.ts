@@ -1,13 +1,14 @@
 import type { Obstacle } from './arena';
 import { isPositiveInteger } from './area';
 import { CHAMPION_RADIUS, DT } from './constants';
-import { clamp, length, sweepCircle, sweepRect } from './geometry';
-import type { Point } from './geometry';
+import { clamp, length, sweepCircleAt, sweepRectAt } from './geometry';
+import type { Circle, Segment } from './geometry';
 import { landHit } from './energy';
 import { copyEffects } from './health';
 import { nextId } from './state';
 import type {
   CastRecord,
+  ChampionState,
   Effect,
   GameState,
   ProjectileEndReason,
@@ -109,117 +110,156 @@ export function spawnProjectile(
   return projectile.id;
 }
 
+/** The moving circle of the sweep in progress. `sweep` owns it and fills every field. */
+const seg: Segment = { x: 0.5, y: 0.5, dx: 0.5, dy: 0.5, r: 0.5 };
+/** The circle `sweep` tests the segment against, and the only writer of it. */
+const ring: Circle = { cx: 0.5, cy: 0.5, cr: 0.5 };
+/**
+ * The champions one sweep touches, in ascending (t, id) order, written in place: the first
+ * `contactCount` entries are live. `sweep` fills them before the first hit and reads them in
+ * the hit pass, and nothing a hit calls sweeps. They are double arrays from the start.
+ */
+const contactT: number[] = [0.5, 0.5, 0.5, 0.5];
+const contactId: number[] = [0, 0, 0, 0];
+let contactCount = 0;
+
 /**
  * A contact at t = 0 only blocks a projectile that moves into the obstacle, so a champion
  * pressed against a wall can still fire away from it. The grown shape is convex, so a
- * projectile that starts inside and moves away never touches it again.
+ * projectile that starts inside and moves away never touches it again. It reads `seg`.
  */
-function isApproaching(o: Obstacle, p0: Point, dx: number, dy: number): boolean {
-  if (o.type === 'circle') return (p0.x - o.x) * dx + (p0.y - o.y) * dy < 0;
+function isApproaching(o: Obstacle): boolean {
+  if (o.type === 'circle') return (seg.x - o.x) * seg.dx + (seg.y - o.y) * seg.dy < 0;
   const minX = o.x - o.w / 2;
   const maxX = o.x + o.w / 2;
   const minY = o.y - o.h / 2;
   const maxY = o.y + o.h / 2;
-  const qx = clamp(p0.x, minX, maxX);
-  const qy = clamp(p0.y, minY, maxY);
-  if (qx === p0.x && qy === p0.y) return true;
-  return (p0.x - qx) * dx + (p0.y - qy) * dy < 0;
+  const qx = clamp(seg.x, minX, maxX);
+  const qy = clamp(seg.y, minY, maxY);
+  if (qx === seg.x && qy === seg.y) return true;
+  return (seg.x - qx) * seg.dx + (seg.y - qy) * seg.dy < 0;
 }
 
-interface Blocker {
-  t: number;
-  reason: ProjectileEndReason;
+/** Lands one hit at time t along `seg`: the event, then the effects. */
+function hitAt(state: GameState, p: ProjectileState, t: number, targetId: number): void {
+  const pos = { x: seg.x + t * seg.dx + 0, y: seg.y + t * seg.dy + 0 };
+  state.events.push({
+    type: 'projectileHit',
+    projectileId: p.id,
+    ownerId: p.ownerId,
+    targetId,
+    x: pos.x,
+    y: pos.y,
+  });
+  landHit(state, p, targetId, p.effects, pos);
 }
 
-/** First obstacle or boundary reached within this tick's sweep; ties go to the first found. */
-function findBlocker(
+/** Ends the projectile at time t along `seg`. */
+function expireAt(
   state: GameState,
   p: ProjectileState,
-  p0: Point,
-  dx: number,
-  dy: number,
-): Blocker {
-  let best: Blocker = { t: Infinity, reason: 'obstacle' };
-  for (const o of state.arena.obstacles) {
-    if (!o.blocksProjectiles) continue;
-    const t =
-      o.type === 'circle'
-        ? sweepCircle(p0, dx, dy, o.x, o.y, o.r + p.radius)
-        : sweepRect(p0, dx, dy, o, p.radius);
-    if (t === Infinity || (t === 0 && !isApproaching(o, p0, dx, dy))) continue;
-    if (t < best.t) best = { t, reason: 'obstacle' };
-  }
-  const limitX = state.arena.size.width / 2 - p.radius;
-  const limitY = state.arena.size.height / 2 - p.radius;
-  const outward = (pos: number, d: number, limit: number): number => {
-    if (d > 0) return Math.max(0, (limit - pos) / d);
-    if (d < 0) return Math.max(0, (-limit - pos) / d);
-    return Infinity;
-  };
-  const boundary = Math.min(outward(p0.x, dx, limitX), outward(p0.y, dy, limitY));
-  if (boundary <= 1 && boundary < best.t) best = { t: boundary, reason: 'boundary' };
-  return best;
+  reason: ProjectileEndReason,
+  t: number,
+): void {
+  state.events.push({
+    type: 'projectileExpired',
+    projectileId: p.id,
+    reason,
+    x: seg.x + t * seg.dx + 0,
+    y: seg.y + t * seg.dy + 0,
+  });
 }
 
-/** Returns true when the projectile is gone after this tick's sweep. */
+/**
+ * Returns true when the projectile is gone after this tick's sweep. A tick that hits and ends
+ * nothing allocates nothing: no object, array or closure, and no double passed or returned
+ * through a call V8 may not inline (see `Segment`).
+ */
 function sweep(state: GameState, p: ProjectileState): boolean {
-  const p0 = { x: p.x, y: p.y };
-  const dx = p.vx * DT;
-  const dy = p.vy * DT;
-  const blocker = findBlocker(state, p, p0, dx, dy);
+  seg.x = p.x;
+  seg.y = p.y;
+  seg.dx = p.vx * DT;
+  seg.dy = p.vy * DT;
+  seg.r = p.radius;
 
-  const reach = CHAMPION_RADIUS + p.radius;
-  const contacts: { t: number; id: number }[] = [];
-  for (const c of state.champions) {
-    if (!c.alive || c.team === p.team || p.hitIds.includes(c.id)) continue;
-    const t = sweepCircle(p0, dx, dy, c.x, c.y, reach);
-    if (t <= 1 && t <= blocker.t) contacts.push({ t, id: c.id });
+  // The first obstacle reached, or Infinity; ties go to the first found.
+  let obstacleT = Infinity;
+  const obstacles = state.arena.obstacles;
+  for (let i = 0; i < obstacles.length; i++) {
+    const o = obstacles[i] as Obstacle;
+    if (!o.blocksProjectiles) continue;
+    let t: number;
+    if (o.type === 'circle') {
+      ring.cx = o.x;
+      ring.cy = o.y;
+      ring.cr = o.r + p.radius;
+      t = sweepCircleAt(seg, ring);
+    } else {
+      t = sweepRectAt(seg, o);
+    }
+    if (t === Infinity || (t === 0 && !isApproaching(o))) continue;
+    if (t < obstacleT) obstacleT = t;
   }
-  contacts.sort((a, b) => a.t - b.t || a.id - b.id);
 
-  const at = (t: number) => ({ x: p0.x + t * dx + 0, y: p0.y + t * dy + 0 });
-  const hit = (contact: { t: number; id: number }) => {
-    const pos = at(contact.t);
-    state.events.push({
-      type: 'projectileHit',
-      projectileId: p.id,
-      ownerId: p.ownerId,
-      targetId: contact.id,
-      x: pos.x,
-      y: pos.y,
-    });
-    landHit(state, p, contact.id, p.effects, pos);
-  };
-  const expire = (reason: ProjectileEndReason, t: number) => {
-    const pos = at(t);
-    state.events.push({
-      type: 'projectileExpired',
-      projectileId: p.id,
-      reason,
-      x: pos.x,
-      y: pos.y,
-    });
-  };
+  // The arena boundary, where the centre reaches the walls shrunk by the radius.
+  const limitX = state.arena.size.width / 2 - p.radius;
+  const limitY = state.arena.size.height / 2 - p.radius;
+  let boundaryX = Infinity;
+  if (seg.dx > 0) boundaryX = Math.max(0, (limitX - seg.x) / seg.dx);
+  else if (seg.dx < 0) boundaryX = Math.max(0, (-limitX - seg.x) / seg.dx);
+  let boundaryY = Infinity;
+  if (seg.dy > 0) boundaryY = Math.max(0, (limitY - seg.y) / seg.dy);
+  else if (seg.dy < 0) boundaryY = Math.max(0, (-limitY - seg.y) / seg.dy);
+  const boundary = Math.min(boundaryX, boundaryY);
+  const boundaryFirst = boundary <= 1 && boundary < obstacleT;
+  const blockerT = boundaryFirst ? boundary : obstacleT;
 
+  contactCount = 0;
+  const reach = CHAMPION_RADIUS + p.radius;
+  const champions = state.champions;
+  for (let i = 0; i < champions.length; i++) {
+    const c = champions[i] as ChampionState;
+    if (!c.alive || c.team === p.team || p.hitIds.includes(c.id)) continue;
+    ring.cx = c.x;
+    ring.cy = c.y;
+    ring.cr = reach;
+    const t = sweepCircleAt(seg, ring);
+    if (!(t <= 1 && t <= blockerT)) continue;
+    // Insert after every contact that is earlier, or equal in t with a lower id.
+    let k = contactCount;
+    while (k > 0) {
+      const before = contactT[k - 1] as number;
+      if (before < t || (before === t && (contactId[k - 1] as number) < c.id)) break;
+      contactT[k] = before;
+      contactId[k] = contactId[k - 1] as number;
+      k--;
+    }
+    contactT[k] = t;
+    contactId[k] = c.id;
+    contactCount++;
+  }
+
+  const n = contactCount;
   if (!p.pierce) {
-    const first = contacts[0];
-    if (first) {
-      hit(first);
-      expire('hit', first.t);
+    if (n > 0) {
+      const t = contactT[0] as number;
+      hitAt(state, p, t, contactId[0] as number);
+      expireAt(state, p, 'hit', t);
       return true;
     }
   } else {
-    for (const contact of contacts) {
-      hit(contact);
-      p.hitIds.push(contact.id);
+    for (let i = 0; i < n; i++) {
+      const id = contactId[i] as number;
+      hitAt(state, p, contactT[i] as number, id);
+      p.hitIds.push(id);
     }
   }
-  if (blocker.t <= 1) {
-    expire(blocker.reason, blocker.t);
+  if (blockerT <= 1) {
+    expireAt(state, p, boundaryFirst ? 'boundary' : 'obstacle', blockerT);
     return true;
   }
-  p.x += dx;
-  p.y += dy;
+  p.x += seg.dx;
+  p.y += seg.dy;
   return false;
 }
 
