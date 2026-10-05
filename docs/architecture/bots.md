@@ -81,11 +81,11 @@ id.
 With `d` the distance to the target, `h` health over maximum health, and
 `[rangeMin, rangeMax]` from the profile, scores are clamped to 0 to 1:
 
-| Intent  | Score                                                | Movement                                                                                               |
-| ------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target |
-| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                   |
-| retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there        |
+| Intent  | Score                                                | Movement                                                                                                                                   |
+| ------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                                     |
+| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                                                       |
+| retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there, unless a finisher qualifies, see Finisher |
 
 Hysteresis: the bot switches only when the best other intent scores more than
 the current one plus 0.1. Ties go to retreat, then kite, then engage. This
@@ -103,7 +103,12 @@ health every champion of the kit headless run retreated to its spawn and the
 match froze with no kill; a bot that can win the trade should take it. The rule
 is a pure function of the state and draws no random number, and it runs inside
 `decide`, so the reaction delay applies to it like to any decision. When no
-enemy qualifies, retreat is as above.
+enemy qualifies, retreat is as above. A finisher think ends the retreat: the
+engage or kite it decides is what the next think reads as the current intent,
+so once that enemy leaves reach, the bot engages again instead of resuming the
+retreat in the 0.30 to 0.36 band, and the retreat starts again below 0.3. The
+rule also runs for a bot with no kit, which never presses: such a bot stands at
+`rangeMax` next to a weak enemy instead of retreating.
 
 A stand needs a clear shot of a champion's width, not only a line of sight: see
 Clear shot. Wherever this document says a stand needs line of sight, it means
@@ -172,7 +177,7 @@ error (up to 12 degrees on easy) moves off the centre-to-centre segment.
 
 - A cast uses `c` = the radius of the first top-level projectile of the ability it
   would press, or the champion radius 0.5 m when the ability has none.
-- A stand (engage, kite) and the sight-cell search use `c` = 0.5 m.
+- A stand (engage, kite), the sight-cell search and the finisher use `c` = 0.5 m.
 
 ## Casting
 
