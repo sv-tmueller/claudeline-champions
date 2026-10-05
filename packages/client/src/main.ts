@@ -16,8 +16,9 @@ import { createChampionLooks, lookMode, type ChampionLooks } from './champion-lo
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
 import { readDevLaunch } from './dev-launch';
 import { createAreaViews, createProjectileViews } from './entity-views';
-import { CombatFeedback, flashText, routeEvents } from './feedback';
+import { CombatFeedback, flashTexts, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
+import { cmText, facingKey, facingText, intText, percentText } from './hook-text';
 import { Hud } from './hud';
 import { buildHud } from './hud-dom';
 import { createImpactRings } from './impact-rings';
@@ -147,51 +148,54 @@ function sampleAim(): void {
   aimY = hit.y;
 }
 
-// The text of every tick up to ten minutes, made once at startup. The tick
-// hook changes on every tick and the e2e tests read it to pace themselves. A
-// change-guarded String(state.tick) instead read about 256 B of garbage per
-// measurement window in the heap probe in e2e/combat.spec.ts (PR #42 tester
-// round 2), right at its limit, so the table stays. It costs about 1.24 MB once.
-// Past the table it falls back to String().
-const TICK_TEXT_COUNT = 36_000;
-const TICK_TEXT: string[] = [];
-for (let tick = 0; tick < TICK_TEXT_COUNT; tick++) TICK_TEXT.push(String(tick));
+// The hooks are written with setAttribute and text from tables made at startup
+// (hook-text.ts, flashTexts), and only when the value changed, so a steady frame
+// builds no string. A dataset write allocated about 100 B per window in the heap
+// probe, and a String(), a template or a toFixed() leaves garbage on every
+// change. The position is two hooks, p0x and p0y, since one "x,y" text cannot
+// come from a table, and so is every bar (data-bar0 to data-barN).
+const canvas = renderer.domElement;
+const BAR_ATTRIBUTES = state.champions.map((_, id) => `data-bar${id}`);
+const FLASH_TEXTS = flashTexts(state.champions.length);
 
 // The last value written to each of these hooks, so a steady frame builds no
 // strings. Fields of an object, not `let`s: a number in a closure slot is a new
-// heap number on every store.
+// heap number on every store. `facing` is the key in milliradians.
 const wrote = { tick: -1, x: NaN, y: NaN, facing: NaN, round: -1, phase: '' };
 
 function writeHooks(): void {
-  const dataset = renderer.domElement.dataset;
   if (state.tick !== wrote.tick) {
     wrote.tick = state.tick;
-    dataset['tick'] = TICK_TEXT[state.tick] ?? String(state.tick);
+    canvas.setAttribute('data-tick', intText(state.tick));
   }
   // The match phase and the round, for the e2e specs: a phase is the sim's own string.
   const match = state.match;
   if (match !== undefined) {
     if (match.phase !== wrote.phase) {
       wrote.phase = match.phase;
-      dataset['phase'] = match.phase;
+      canvas.setAttribute('data-phase', match.phase);
     }
     if (match.round !== wrote.round) {
       wrote.round = match.round;
-      dataset['round'] = TICK_TEXT[match.round] ?? String(match.round);
+      canvas.setAttribute('data-round', intText(match.round));
     }
   }
   const champion = state.champions[HUMAN_ID];
   if (!champion) return;
   const x = Math.round(champion.x * 100);
-  const y = Math.round(champion.y * 100);
-  if (x !== wrote.x || y !== wrote.y) {
+  if (x !== wrote.x) {
     wrote.x = x;
-    wrote.y = y;
-    dataset['p0'] = `${x},${y}`;
+    canvas.setAttribute('data-p0x', cmText(x));
   }
-  if (champion.facing !== wrote.facing) {
-    wrote.facing = champion.facing;
-    dataset['f0'] = champion.facing.toFixed(3);
+  const y = Math.round(champion.y * 100);
+  if (y !== wrote.y) {
+    wrote.y = y;
+    canvas.setAttribute('data-p0y', cmText(y));
+  }
+  const facing = facingKey(champion.facing);
+  if (facing !== wrote.facing) {
+    wrote.facing = facing;
+    canvas.setAttribute('data-f0', facingText(facing));
   }
 }
 
@@ -199,27 +203,26 @@ function writeHooks(): void {
 const written = { projectiles: -1, areas: -1, hits: -1, deaths: -1, flashMask: -1, rings: -1 };
 
 function writeCombatHooks(): void {
-  const dataset = renderer.domElement.dataset;
   if (projectileViews.count !== written.projectiles) {
     written.projectiles = projectileViews.count;
-    dataset['projectiles'] = String(written.projectiles);
+    canvas.setAttribute('data-projectiles', intText(written.projectiles));
   }
   if (areaViews.count !== written.areas) {
     written.areas = areaViews.count;
-    dataset['areas'] = String(written.areas);
+    canvas.setAttribute('data-areas', intText(written.areas));
   }
   if (feedback.hits !== written.hits) {
     written.hits = feedback.hits;
-    dataset['hits'] = String(written.hits);
+    canvas.setAttribute('data-hits', intText(written.hits));
   }
   if (feedback.deaths !== written.deaths) {
     written.deaths = feedback.deaths;
-    dataset['deaths'] = String(written.deaths);
+    canvas.setAttribute('data-deaths', intText(written.deaths));
   }
   const mask = feedback.flashMask(state.tick);
   if (mask !== written.flashMask) {
     written.flashMask = mask;
-    dataset['flashing'] = flashText(mask);
+    canvas.setAttribute('data-flashing', FLASH_TEXTS[mask] ?? '');
   }
 }
 
@@ -266,10 +269,12 @@ function draw(alpha: number): void {
   // Only draw retires a ring, so the count is written here.
   if (impactRings.visibleCount !== written.rings) {
     written.rings = impactRings.visibleCount;
-    renderer.domElement.dataset['rings'] = String(written.rings);
+    canvas.setAttribute('data-rings', intText(written.rings));
   }
   if (healthBars.update(state.champions, drawnPoses)) {
-    renderer.domElement.dataset['bars'] = healthBars.hookText();
+    for (let id = 0; id < BAR_ATTRIBUTES.length; id++) {
+      if (healthBars.changed(id)) canvas.setAttribute(BAR_ATTRIBUTES[id] as string, percentText(healthBars.percent(id)));
+    }
   }
   updateChampionCircles(overlay, drawnPoses);
   render();

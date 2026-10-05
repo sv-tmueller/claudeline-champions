@@ -54,6 +54,16 @@ export function flashText(mask: number): string {
   return ids.join(',');
 }
 
+/**
+ * The flash text of every mask of `championCount` champions, indexed by mask.
+ * Made once at startup, so writing the flash hook builds no string.
+ */
+export function flashTexts(championCount: number): string[] {
+  const texts: string[] = [];
+  for (let mask = 0; mask < 2 ** championCount; mask++) texts.push(flashText(mask));
+  return texts;
+}
+
 /** Flash windows, hit and death counters, the impact rings and the kill feed. */
 export class CombatFeedback implements FeedbackHandlers {
   /** Running total of projectile hits. */

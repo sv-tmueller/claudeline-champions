@@ -30,6 +30,8 @@ function barMaterial(color: string, opacity: number): SpriteMaterial {
 export class HealthBars {
   readonly group = new Group();
   private readonly percents: number[];
+  // 1 for a champion whose percent changed in the latest update, else 0.
+  private readonly changes: number[];
   private readonly fills: Sprite[] = [];
   private readonly backs: Sprite[] = [];
 
@@ -38,6 +40,7 @@ export class HealthBars {
     const ally = barMaterial(ALLY_BAR_COLOUR, 1);
     const enemy = barMaterial(ENEMY_BAR_COLOUR, 1);
     this.percents = champions.map(() => -2);
+    this.changes = champions.map(() => 0);
     for (const champion of champions) {
       const backSprite = new Sprite(back);
       backSprite.renderOrder = BACK_ORDER;
@@ -54,11 +57,13 @@ export class HealthBars {
 
   /**
    * Moves and scales the bars to the champions' health and drawn poses.
-   * Returns true when a reported percent changed. Allocates nothing.
+   * Returns true when a reported percent changed, and `changed(i)` says which
+   * ones did in this update. Allocates nothing.
    */
   update(champions: readonly ChampionState[], poses: readonly Pose[]): boolean {
     let changed = false;
     for (let i = 0; i < champions.length; i++) {
+      this.changes[i] = 0;
       const champion = champions[i];
       const pose = poses[i];
       const back = this.backs[i];
@@ -69,6 +74,7 @@ export class HealthBars {
       const percent = champion.alive ? Math.round((100 * champion.health) / champion.maxHealth) : -1;
       if (percent !== this.percents[i]) {
         this.percents[i] = percent;
+        this.changes[i] = 1;
         changed = true;
       }
       if (!champion.alive) continue;
@@ -79,9 +85,14 @@ export class HealthBars {
     return changed;
   }
 
-  /** Fill percent per champion in id order, "x" for a hidden bar. */
-  hookText(): string {
-    return this.percents.map((percent) => (percent < 0 ? 'x' : String(percent))).join(',');
+  /** The fill percent of champion `i` in the latest update, -1 for a hidden bar. */
+  percent(i: number): number {
+    return this.percents[i] ?? -1;
+  }
+
+  /** True when champion `i`'s percent changed in the latest `update`. */
+  changed(i: number): boolean {
+    return this.changes[i] === 1;
   }
 }
 

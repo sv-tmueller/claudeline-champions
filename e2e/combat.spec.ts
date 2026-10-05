@@ -99,6 +99,8 @@ async function readHooks(page: Page): Promise<Hooks> {
     if (!canvas) throw new Error('no canvas');
     const d = canvas.dataset;
     const list = (value: string | undefined): string[] => (value ? value.split(',') : []);
+    // One hook per champion, data-bar0 to data-bar3: the fill percent, x for a hidden bar.
+    const bars = [0, 1, 2, 3].map((id) => d[`bar${id}`] ?? '');
     return {
       tick: Number(d['tick']),
       projectiles: Number(d['projectiles']),
@@ -107,7 +109,7 @@ async function readHooks(page: Page): Promise<Hooks> {
       deaths: Number(d['deaths']),
       rings: Number(d['rings']),
       flashing: list(d['flashing']),
-      bars: list(d['bars']),
+      bars,
       debugShots: Number(d['debugShots']),
       phase: d['phase'] ?? '',
       m1Ready: document.querySelector('[data-slot="M1"]')?.getAttribute('data-ready') ?? null,

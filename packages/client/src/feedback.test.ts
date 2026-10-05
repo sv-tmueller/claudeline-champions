@@ -13,6 +13,7 @@ import {
   CombatFeedback,
   FLASH_TICKS,
   flashText,
+  flashTexts,
   routeEvents,
   type FeedbackHandlers,
 } from './feedback';
@@ -146,6 +147,16 @@ describe('combat feedback', () => {
     expect(feedback.flashMask(100)).toBe(0b101);
     expect(flashText(0b101)).toBe('0,2');
     expect(flashText(0)).toBe('');
+  });
+
+  it('tables the flash text of every mask for the champion count, equal to flashText', () => {
+    for (const count of [1, 2, 4]) {
+      const table = flashTexts(count);
+      expect(table).toHaveLength(2 ** count);
+      for (let mask = 0; mask < table.length; mask++) expect(table[mask], `${count} champions, mask ${mask}`).toBe(flashText(mask));
+    }
+    expect(flashTexts(4)[0b101]).toBe('0,2');
+    expect(flashTexts(4)[0b1111]).toBe('0,1,2,3');
   });
 
   it('ignores a champion id it does not know', () => {

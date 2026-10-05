@@ -123,22 +123,29 @@ sim steps first and the views read its state afterwards.
   and the faded dead grey.
 - `debug-shot.ts`: the dev-only F4 shot above.
 - `bot-driver.ts`, `match-setup.ts` and `launch.ts`: see Launch and match.
-- Canvas data hooks: `data-tick`, `data-p0`, `data-f0`, `data-projectiles`,
-  `data-areas`, `data-hits`, `data-deaths`, `data-flashing`, `data-rings`,
-  `data-bars`, `data-overlay`, `data-debugShots`, `data-phase` (the sim's phase
+- Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's
+  position in centimetres), `data-f0` (its facing in radians, three decimals),
+  `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
+  `data-rings`, `data-bar0` to `data-bar3` (a champion's fill percent, "x" for a
+  hidden bar), `data-overlay`, `data-debugShots`, `data-phase` (the sim's phase
   string: warmup, round, roundEnd or matchEnd), `data-round` and the readiness
   flags `data-rendered` and `data-arena`. The e2e specs read them and pace
-  themselves by `data-tick`. A hook is written only when its value changes.
+  themselves by `data-tick`. A hook is written only when its value changes, with
+  `setAttribute` and text from the tables of `hook-text.ts` (integers, signed
+  centimetres, facing in milliradians, percents) and `flashTexts` in
+  `feedback.ts`, all made once at startup, so a change write builds no string.
+  A table falls back to the formatter past its range. A position is two hooks and
+  a bar is one hook per champion because a combined "x,y" or "a,b,c,d" text
+  cannot come from a table.
 
-The frame path allocates nothing in steady state: views are pooled, text is
-written only on a change, and the numbers a frame carries live in object
-fields. The combat spec measures it with a heap probe, see
+The frame path allocates nothing in steady state: views are pooled, text comes
+from tables and is written only on a change, and the numbers a frame carries live
+in object fields. The combat spec measures it with a heap probe, see
 [testing](testing.md). A match of bots is never in a steady state: hook and HUD
-values change in every window, and a change write that builds a string
-(`flashText`, `hookText`, the `p0` and `f0` hooks, the health and energy
-templates, the score) allocates by design. So the probe runs in the sandbox,
-where a casting champion in a stationary scene keeps the writes to a table of
-constants. The HUD writes its state with `setAttribute` and not `dataset`: in the
+values change in every window. The change writes come from tables and so build
+no string, but the sandbox, where a casting champion in a stationary scene
+changes almost nothing, stays the scene of the probe that needs no bot.
+The HUD writes its state with `setAttribute` and not `dataset`: in the
 probe a `dataset` write allocated about 100 B per window whenever a slot
 changed, and `setAttribute` allocated none.
 
