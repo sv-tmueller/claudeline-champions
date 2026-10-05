@@ -414,6 +414,17 @@ describe('who a projectile hits', () => {
     expect(hits.map((h) => h.targetId)).toEqual([2]);
   });
 
+  it('lands the hits of one piercing sweep in order of contact, not of champion id', () => {
+    const state = open();
+    // 120 m/s is 2 m per tick: from x = -5 the sweep reaches champion 3 before champion 2.
+    place(state, 3, -4.2, 0);
+    place(state, 2, -3.2, 0);
+    spawnProjectile(state, spec({ pierce: true, speed: 120 }));
+    step(state, []);
+    expect(ofType(state.events, 'projectileHit').map((h) => h.targetId)).toEqual([3, 2]);
+    expect(state.projectiles[0]?.hitIds).toEqual([3, 2]);
+  });
+
   it('lets the lower projectile id kill and skips the dead champion for the next', () => {
     const state = open();
     place(state, 2, 3, 0);
