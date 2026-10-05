@@ -20,25 +20,32 @@ import { arena01, config2v2, configMirror, jsonKits } from './helpers';
  * test takes the lowest round of each scene. The limit sits between main's lowest scene figure
  * and the branch's highest, on both platforms.
  *
- * Per-think figures in bytes, the lowest round of each scene (main is the test run against
- * `packages/bots/src` at b09b437; macOS is an Apple silicon host on Node 22.23, three runs; the
- * runner is the unit job of the draft pull request, ubuntu-latest, Node 22):
+ * Per-think figures in bytes, the lowest round of each scene. Main is this test run against
+ * `packages/bots/src` at b09b437 (the three deadlock scenes read what main does there: a retreat
+ * or a stand, since main has no rule); macOS is an Apple silicon host on Node 22.23, two to four
+ * runs; the runner is the unit job of a draft pull request, ubuntu-latest on Node 22, two runs.
+ * The sizes of the allocations are alike on both platforms; a figure moves by up to 100 B from
+ * one run to the next, and the three deadlock scenes differ by about 900 B between the platforms.
  *
- *   scene                  main, macOS      main, runner   branch, macOS   branch, runner
- *   press                  4784 to 5936     RUNNER_MAIN    0               RUNNER_BRANCH
- *   engage stand           4168 to 5368     RUNNER_MAIN    0               RUNNER_BRANCH
- *   path follow            5568 to 5664     RUNNER_MAIN    0               RUNNER_BRANCH
- *   kite, no clear shot    52904 to 56056   RUNNER_MAIN    0               RUNNER_BRANCH
- *   kite step              8648 to 9704     RUNNER_MAIN    0               RUNNER_BRANCH
- *   retreat                5856 to 5984     RUNNER_MAIN    0               RUNNER_BRANCH
+ *   scene                main, macOS     main, runner    branch, macOS  branch, runner
+ *   press                4784 to 5936    5936 to 5984    0              0
+ *   engage stand         4168 to 5416    5368 to 5416    0              0
+ *   path follow          5568 to 5712    5616 to 5664    0              0
+ *   kite, no clear shot  52904 to 56056  56024 to 56056  0              0
+ *   kite step            8648 to 9704    9656 to 9704    0              0
+ *   retreat              5856 to 5984    5984            0              0
+ *   deadlock advance     5776            5760            0              0
+ *   deadlock flee        8656            9584            0              0
+ *   deadlock stand       8512            9472            0              0
  *
- * The branch reads 0 in the lowest round of every scene on macOS, and at most 288 in a round
- * that V8 spends tiering up. The mutations that put a cost back each go over the bound alone: a
- * `{ slot, ex }` object per slot reads 280, the kit derived again on every think 480, the two
- * shifted points of a clear shot made fresh 720 (2880 in the scan), a cell centre object in the
- * sight scan 10296. It cannot see one small object per think: a fresh returned input reads 96,
- * and the decision record is smaller still. The unit tests pin the returned input as the bot's
- * own record, and review covers the decision record.
+ * The branch reads 0 in the lowest round of every scene, and 256 in one round of the press scene
+ * while V8 tiers up (the other two read 0). The mutations that put a cost back each go over the
+ * bound alone: a `{ slot, ex }` object per slot reads 280 in every scene, the kit derived again on
+ * every think 480 to 632, the two shifted points of a clear shot made fresh 720 to 2880 in the
+ * scenes that test a shot, a cell centre object in the sight scan 10296. It cannot see one small
+ * object per think: a fresh returned input reads 96, and the decision record is smaller still.
+ * The unit tests pin the returned input as the bot's own record, and review covers the decision
+ * record.
  *
  * A plan (A star, the path split, the fallback search), a fresh follower after a goal or intent
  * change, and `inspect()` allocate by design and are outside the steady state: the scenes never

@@ -319,6 +319,12 @@ makes that true, and what stays outside it:
   distance from one `hypot2` call site.
 - The scratch of the shot test and the scan is per bot, so two bots never share it.
   A direct call of `clearShot` or `nearestSightCell` without a scratch allocates one.
+- V8 gives every object literal with the same keys in the same order one shape, across
+  all code in the process, and a field that any of them filled with a small integer or an
+  object is no longer a double field. A store into such a field boxes the double (16 B).
+  A scratch with a key as common as `value` was measured doing that under Vitest, so the
+  distance box has the key `metres`. The heap check is what notices a scratch that
+  loses its double fields.
 
 Outside the steady state, by design: a plan (A star, `splitPath`, the fallback search),
 a fresh path follower after a goal or intent change, the grid and the tables built for a
