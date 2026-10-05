@@ -583,7 +583,9 @@ describe('kite corner and line of sight', () => {
 describe('retreat', () => {
   it('walks to its own spawn away from the target and stops there', () => {
     const state = setup(arena01);
-    kill(state, 1, 3);
+    // A teammate at full health keeps the team ahead (1.2 against 1), so the bot retreats. Alone, at
+    // 0.2 against 1 and out of reach, it would advance: that is the deadlock rule, deadlock.test.ts.
+    kill(state, 3);
     const me = put(state, 0, -6, 3);
     const target = put(state, 2, 0, 3);
     me.health = 0.2 * me.maxHealth;

@@ -91,7 +91,7 @@ With `d` the distance to the target, `h` health over maximum health, and
 | ------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                                     |
 | kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                                                       |
-| retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there, unless a finisher qualifies, see Finisher |
+| retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there, unless a finisher qualifies, see Finisher, or the deadlock rule advances, see Deadlock |
 
 Hysteresis: the bot switches only when the best other intent scores more than
 the current one plus 0.1. Ties go to retreat, then kite, then engage. This
@@ -118,6 +118,32 @@ the enemy is beyond `rangeMin`, so the retreat resumes while the retreat score
 ties or beats engage (health up to about 0.33). The rule also runs for a bot
 with no kit, which never presses: such a bot stands within `rangeMax` of a weak
 enemy instead of retreating.
+
+Deadlock: when every champion of a match is below 36 percent health, each one walks to its spawn
+and stands there, nobody is in reach of anybody and the match never ends (the kit headless run of
+#58 froze this way with health 3, 27, 26 and 13). A retreating bot therefore advances on its target
+instead of walking to its spawn when both hold on the current state:
+
+- no alive enemy is within `rangeMax` of the profile with a clear shot of 0.5 m (it is not in
+  reach of anybody, the finisher test without the health filter);
+- its team is not ahead: the sum of `health / maxHealth` over the alive champions of its team, the
+  bot included, summed in id order, is at most the same sum over the alive enemies. Equal sums are
+  not ahead, so on a tie both teams advance; the team that is ahead stays, so the leading team's
+  low bot waits at its spawn by design.
+
+The advance uses the sight logic of a kite beyond `rangeMin`, toward the acted target: it stands
+while the target is within `rangeMax` with a clear shot (the cast logic is not tied to the intent,
+so a standing bot casts), else walks to the nearest sight cell (see Kite movement), else along the
+path to the target. The intent and the finisher rule do not change: the bot still retreats, and a
+finisher still takes over when an enemy that qualifies comes into reach.
+
+The advance is latched. Once begun it goes on, and the bot stands in reach to cast, until the acted
+intent is not retreat, the acted target is another champion, the team gets ahead or the bot dies (a
+bot revived at a new round starts afresh). Why: without a latch a bot behind on health, say a Quillon
+against a Hargrim ahead and standing at its spawn, advances until the target is within `rangeMax`,
+then the first rule no longer holds, so it steps back out of reach, and again, and its cast run
+restarts on every other think and nothing ever lands. The latch is per bot state and is rewritten in
+place, so the think stays allocation free.
 
 A stand needs a clear shot of a champion's width, not only a line of sight: see
 Clear shot. Wherever this document says a stand needs line of sight, it means
@@ -420,15 +446,31 @@ A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the
 grid (a path exists between the free cells nearest the two champions) and the
 bot is not in a stand this document describes: engage in range with line of
-sight, kite in `[rangeMin, rangeMax]` with line of sight, or retreat within 0.5
-m of its own spawn. Idle counts as standing, and a cornered kiter closer than
-`rangeMin` counts. Any other tick resets the run. No bot may stall for more
+sight, kite in `[rangeMin, rangeMax]` with line of sight, retreat within 0.5 m
+of its own spawn while the team of the bot is ahead or an enemy is in its reach (with
+no enemy in reach and the team not ahead the deadlock rule says advance, so that stand
+is a stall), or retreat standing in reach of its target with a clear shot (the latched
+stand, which casts). The tracker works the team sums and the reach out with its own
+oracle (`clearShotOracle`), not with the code of the bot. Idle counts as standing, and a
+cornered kiter closer than `rangeMin` counts. Any other tick resets the run. No bot may stall for more
 than 120 ticks, in the headless run and in a corner-start run: the same match
 with one bot in the north-east corner of arena 1 and a melee champion 2.83 m
 away on the diagonal, which the old stand rule left frozen for the whole 3600
 ticks. A bot pushed by another champion keeps a non-zero input and is not
 counted: local avoidance is not built. A unit test of the tracker drives it with
 stub bots and zero inputs over 10 observes: engaging far from the enemy gives 10,
-retreating at the spawn 0, retreating 1 m off it 10, kiting closer than
-`rangeMin` in sight 10, engaging in range 0, no alive enemy 0, and a non-zero
-input resets the run.
+retreating at the spawn while the team is ahead 0, retreating at the spawn while the team
+is not ahead and nothing is in reach 10, retreating at the spawn with an enemy in reach
+(the target or another one) 0, with the enemy in range behind an obstacle 10, retreating
+1 m off the spawn 10, retreating in reach of the target with a clear shot away from the
+spawn 0, kiting closer than `rangeMin` in sight 10, engaging in range 0, no alive enemy
+0, and a non-zero input resets the run.
+
+`packages/bots/test/deadlock.test.ts` pins the rule. Unit scenes on frozen states cover
+the advance, the stay of a team that is ahead, the tie (a mirror where all four advance),
+the sum over the alive champions of the team, the flight when an enemy is in reach, the
+walk around a pillar to a sight cell, and the latch with each of its four ends. A match
+test replays the final state of the #58 run (health 3, 27, 26 and 13 of 160, 120, 160 and
+120, everyone at its spawn, seeds 101 to 104) on both kit sets: the two bots of the team
+that is behind are 1 m from their spawns within their reaction delay and a second, and a
+death follows within 3600 ticks.

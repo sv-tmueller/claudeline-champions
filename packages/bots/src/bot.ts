@@ -124,6 +124,41 @@ function finisher(
 }
 
 /**
+ * Whether the bot's team is ahead: the sum of health over maximum health of its alive champions,
+ * the bot included, is more than the same sum of the enemy's alive champions. Summed in id order,
+ * so the result is the same on every platform; equal sums are not ahead.
+ */
+function teamAhead(state: GameState, me: ChampionState): boolean {
+  let own = 0;
+  let enemy = 0;
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (!c.alive) continue;
+    if (c.team === me.team) own += c.health / c.maxHealth;
+    else enemy += c.health / c.maxHealth;
+  }
+  return own > enemy;
+}
+
+/** Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. */
+function enemyInReach(
+  state: GameState,
+  me: ChampionState,
+  profile: BotProfile,
+  sight: SightScratch,
+  dist: Measure,
+): boolean {
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (!c.alive || c.team === me.team) continue;
+    distanceInto(dist, me, c);
+    if (dist.metres > profile.rangeMax) continue;
+    if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) return true;
+  }
+  return false;
+}
+
+/**
  * The spawn point of the bot's slot, written into `out`: its rank among its teammates by id, as
  * createMatch places them. False, with `out` untouched, when the arena has no such spawn.
  */
@@ -237,6 +272,11 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   // kite candidate, the step back into the corner blocks all five again, and the bot dithers.
   let wasEscaping = false;
   let escaping = false;
+  // True while a retreating bot advances on its target instead of walking to its spawn (see the
+  // retreat case of `move`), and the target it advances on. Cleared when the acted intent is not
+  // retreat, when the acted target is another one, when the team gets ahead and when the bot dies.
+  let advancing = false;
+  let advanceTargetId = -1;
   let grid: NavGrid | undefined;
   let gridArena: GameState['arena'] | undefined;
   let aimU = 0.5;
@@ -295,8 +335,37 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     command.moveY = 0;
   }
 
+  /**
+   * The sight logic of a bot that wants a shot at its target, the one a kite uses beyond rangeMin:
+   * stand while the target has a clear shot (and, with `requireRange`, is within rangeMax), else
+   * walk to the nearest cell that has one at a distance in [rangeMin, rangeMax], else along the
+   * path to the target, which ends in line of sight. Reads the distance to the target from `dist`.
+   */
+  function seekShot(
+    state: GameState,
+    g: NavGrid,
+    me: ChampionState,
+    target: ChampionState,
+    profile: BotProfile,
+    requireRange: boolean,
+  ): void {
+    if (
+      (!requireRange || dist.metres <= profile.rangeMax) &&
+      clearShot(state, me, target, SIGHT_CLEARANCE, sight)
+    ) {
+      return stand();
+    }
+    sight.rangeMin = profile.rangeMin;
+    sight.rangeMax = profile.rangeMax;
+    const cell = nearestSightCellIn(g, state, me, target, SIGHT_RADIUS, sight);
+    if (cell < 0) return follow('target', g, me, target);
+    cellCenterInto(goalPoint, g, cell);
+    return follow('sight', g, me, goalPoint);
+  }
+
   /** The move of the acted intent, written into `command`. */
   function move(state: GameState, me: ChampionState, profile: BotProfile): void {
+    if (acted.intent !== 'retreat') advancing = false;
     const target = enemyAlive(state, me, acted.targetId);
     if (acted.intent === 'idle' || target === undefined) return stand();
     distanceInto(dist, me, target);
@@ -319,15 +388,26 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
           escaping = command.moveX !== 0 || command.moveY !== 0;
           return;
         }
-        if (clearShot(state, me, target, SIGHT_CLEARANCE, sight)) return stand();
-        sight.rangeMin = profile.rangeMin;
-        sight.rangeMax = profile.rangeMax;
-        const cell = nearestSightCellIn(g, state, me, target, SIGHT_RADIUS, sight);
-        if (cell < 0) return follow('target', g, me, target);
-        cellCenterInto(goalPoint, g, cell);
-        return follow('sight', g, me, goalPoint);
+        return seekShot(state, g, me, target, profile, false);
       }
       case 'retreat': {
+        // The deadlock rule: a retreating bot advances on its target when no enemy is in its reach
+        // and its team is not ahead. Without it every champion of a match at low health walks to
+        // its spawn and stands there for good. The advance is latched: once begun it goes on, and it
+        // stands in reach to cast, until the intent leaves retreat, the target changes or the team
+        // gets ahead. Without the latch a bot at the edge of its reach steps back out of it, so its
+        // cast run starts over on every other think and nothing lands.
+        const ahead = teamAhead(state, me);
+        if (advancing && (acted.targetId !== advanceTargetId || ahead)) advancing = false;
+        if (!advancing && !ahead && !enemyInReach(state, me, profile, sight, dist)) {
+          advancing = true;
+          advanceTargetId = acted.targetId;
+        }
+        if (advancing) {
+          // enemyInReach measured other enemies: measure the target again.
+          distanceInto(dist, me, target);
+          return seekShot(state, g, me, target, profile, true);
+        }
         if (!ownSpawnInto(spawnPoint, state, me)) return stand();
         return follow('spawn', g, me, spawnPoint);
       }
@@ -416,6 +496,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       const me = state.champions[playerId];
       if (me === undefined) return fail(`no champion ${playerId} in the state`);
       if (!me.alive) {
+        advancing = false;
         runs.fill(0);
         input.moveX = 0;
         input.moveY = 0;

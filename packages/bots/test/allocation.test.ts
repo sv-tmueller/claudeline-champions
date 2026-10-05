@@ -89,6 +89,8 @@ interface Scene {
   intent: Intent;
   /** Whether the scene presses a button on every measured think. */
   presses: boolean;
+  /** Whether the bot moves on every measured think (it stands still otherwise). */
+  moves: boolean;
 }
 
 function ch(state: GameState, id: number): ChampionState {
@@ -113,13 +115,14 @@ function scene(
   id: number,
   intent: Intent,
   presses: boolean,
+  moves: boolean,
   arrange: (state: GameState, bot: Bot) => void,
 ): Scene {
   const state = createMatch(configMirror(), arena01, 1, jsonKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', 5);
   arrange(state, bot);
-  return { name, state, bot, intent, presses };
+  return { name, state, bot, intent, presses, moves };
 }
 
 /** Thinks until the reaction delay has passed, so the bot acts on what it decided. */
@@ -131,26 +134,26 @@ function buildScenes(): Scene[] {
   return [
     // A press: Quillon 8 m from Hargrim on a clear lane, run over the cast delay, cooldowns 0,
     // energy 60 (an EX press, no ultimate): chooseCast, the aim lead and the error rotation.
-    scene('press', 1, 'engage', true, (state) => {
+    scene('press', 1, 'engage', true, false, (state) => {
       put(state, 1, -4, -3);
       put(state, 2, 4, -3);
       ch(state, 1).energy = 60;
     }),
     // An engage stand: Hargrim 1.5 m from Hargrim, every slot on cooldown, so no press.
-    scene('engage stand', 0, 'engage', false, (state) => {
+    scene('engage stand', 0, 'engage', false, false, (state) => {
       put(state, 0, -3, 3);
       put(state, 2, -1.5, 3);
       ch(state, 0).cooldowns.fill(100);
     }),
     // A path follow: Hargrim at its spawn walking 24 m to Hargrim across the arena. The state
     // is frozen, so the plan ages past the 6 thinks of the segment test and replans every 30th.
-    scene('path follow', 0, 'engage', false, (state) => {
+    scene('path follow', 0, 'engage', false, true, (state) => {
       put(state, 0, -12, 2);
       put(state, 2, 12, 2);
     }),
     // A kite without a clear shot: Quillon starts kiting 3 m from Hargrim, then stands 7 m away
     // with the pillar between them, so the bot scans for a sight cell and follows the path to it.
-    scene('kite, no clear shot', 1, 'kite', false, (state, bot) => {
+    scene('kite, no clear shot', 1, 'kite', false, true, (state, bot) => {
       put(state, 1, -3.5, -4);
       put(state, 2, -0.5, -4);
       settle(bot, state);
@@ -160,16 +163,40 @@ function buildScenes(): Scene[] {
     }),
     // A kite step: Quillon 2 m from Hargrim steps away, the five-point test on every think, every
     // slot on cooldown, so no press.
-    scene('kite step', 1, 'kite', false, (state) => {
+    scene('kite step', 1, 'kite', false, true, (state) => {
       put(state, 1, -3.5, -4);
       put(state, 2, -1.5, -4);
       ch(state, 1).cooldowns.fill(100);
     }),
     // A retreat: Quillon at 20 percent health walks to its spawn, the enemy beyond rangeMax.
-    scene('retreat', 1, 'retreat', false, (state) => {
+    scene('retreat', 1, 'retreat', false, true, (state) => {
       put(state, 1, -4, -3);
       put(state, 2, 12, 2);
       ch(state, 1).health = 0.2 * ch(state, 1).maxHealth;
+    }),
+    // The deadlock advance: Quillon at 20 percent health with its team behind (0.2 against 1) and
+    // no enemy in reach, so the retreating bot walks the path to its target.
+    scene('deadlock advance', 1, 'retreat', false, true, (state) => {
+      put(state, 1, -10, -2);
+      put(state, 2, 10, 2);
+      ch(state, 1).health = 0.2 * ch(state, 1).maxHealth;
+    }),
+    // The deadlock flee: the same bot with an enemy in its reach (7 m away, a clear lane) and no
+    // latch, so every think reads the team sums and scans the enemies before it walks to its spawn.
+    scene('deadlock flee', 1, 'retreat', true, true, (state) => {
+      put(state, 1, -6, -3);
+      put(state, 2, 1, -3);
+      ch(state, 1).health = 0.2 * ch(state, 1).maxHealth;
+    }),
+    // The deadlock stand: the same bot has begun to advance, the enemy steps into reach, and the
+    // latched bot stands there with every slot on cooldown, so no press.
+    scene('deadlock stand', 1, 'retreat', false, false, (state, bot) => {
+      put(state, 1, -10, -2);
+      put(state, 2, 10, 2);
+      ch(state, 1).health = 0.2 * ch(state, 1).maxHealth;
+      settle(bot, state);
+      put(state, 2, -3, -3);
+      ch(state, 1).cooldowns.fill(100);
     }),
   ];
 }
@@ -186,6 +213,7 @@ describe('think allocation', () => {
       for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
       let best = Infinity;
       let presses = 0;
+      let moves = 0;
       const figures: number[] = [];
       for (let round = 0; round < ROUNDS; round++) {
         for (let i = 0; i < WINDOW; i++) {
@@ -194,6 +222,7 @@ describe('think allocation', () => {
           const after = heap();
           deltas[i] = after - before;
           if (input.buttons !== 0) presses++;
+          if (input.moveX !== 0 || input.moveY !== 0) moves++;
         }
         const figure = median(deltas, WINDOW) - emptyPairMedian();
         figures.push(figure);
@@ -208,6 +237,8 @@ describe('think allocation', () => {
       expect(s.bot.inspect().intent, s.name).toBe(s.intent);
       if (s.presses) expect(presses, `${s.name} presses`).toBe(ROUNDS * WINDOW);
       else expect(presses, `${s.name} presses`).toBe(0);
+      if (s.moves) expect(moves, `${s.name} moves`).toBe(ROUNDS * WINDOW);
+      else expect(moves, `${s.name} moves`).toBe(0);
     }
 
     expect(
