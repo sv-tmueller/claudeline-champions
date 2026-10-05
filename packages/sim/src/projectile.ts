@@ -6,7 +6,13 @@ import type { Point } from './geometry';
 import { landHit } from './energy';
 import { copyEffects } from './health';
 import { nextId } from './state';
-import type { Effect, GameState, ProjectileEndReason, ProjectileState } from './state';
+import type {
+  CastRecord,
+  Effect,
+  GameState,
+  ProjectileEndReason,
+  ProjectileState,
+} from './state';
 
 export interface ProjectileSpec {
   ownerId: number;
@@ -62,8 +68,16 @@ export function spawnProjectile(
   }
   if (typeof spec.pierce !== 'boolean') return fail('pierce must be a boolean');
   const effects = copyEffects(spec.effects, fail);
-  if (castId !== null && !state.casts.some((c) => c.id === castId)) {
-    return fail(`unknown cast ${castId}`);
+  if (castId !== null) {
+    // A plain loop: a closure over `castId` here would allocate on every spawn.
+    const { casts } = state;
+    let known = false;
+    for (let i = 0; i < casts.length; i++) {
+      if ((casts[i] as CastRecord).id !== castId) continue;
+      known = true;
+      break;
+    }
+    if (!known) return fail(`unknown cast ${castId}`);
   }
 
   const projectile: ProjectileState = {
