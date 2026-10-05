@@ -4,7 +4,7 @@ Status: v1 principles, checked by `tools/blender/test_arena_principles.py`. Two 
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.1, 4.7, 8.1 and 10
 Companion document: [game rules and controls](rules.md)
 
-This document sets the rules every arena must follow. It contains no coordinates. Layouts live in the arena definition files, which follow the data format in section 8.1 of the spec. Section 8 lists the arenas.
+This document sets the rules every arena must follow. It contains no specific arena layout. Layouts live in the arena definition files, which follow the data format in section 8.1 of the spec. Section 8 lists the arenas.
 
 `[spec]` marks a value copied from the design spec. `[tuned]` marks a value chosen here, which a balance pass may move.
 
