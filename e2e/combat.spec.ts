@@ -51,28 +51,39 @@ const RING_SLACK_TICKS = 4;
 // as the sim's get sim/, so a bots file such as bot.ts never matches a client
 // entry. Bytes of an inlined callee land on its caller, so bots bytes inlined
 // into the glue would still show in bot-driver.ts.
-// V8 inlines main.ts's frame into three's animation callback, so the bytes of
-// frame's own body are attributed to onAnimationFrame: that one three function
-// counts too, and nothing else in three does.
+// The measured windows run through the client's dev-only hook, window.__runProbeFrames
+// (frameMany in main.ts), which calls frame directly. No frame of a measured
+// window runs through three's animation callback or the fake clock's
+// requestAnimationFrame, so onAnimationFrame is not counted. It was counted
+// while the windows ran on the fake clock, and then it held the bytes of frame
+// (inlined into it by V8) next to the boxed timer ids of the fake clock, which
+// no change of the client controlled (see testing.md). The hook's own function,
+// frameMany, is counted like every function of main.ts, and the bytes of every
+// callee V8 inlines into it land on it, so excluding it would hide a regression
+// (the escaping array in frame passed with the hook excluded).
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:/;
+// Three's own animation callback. It is logged and never counted.
+const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // The sweep files of the sim. Their garbage is huge today (about 790 KB per
 // window, in projectile.ts and geometry.ts) and #49 removes most of it, so the
 // sanity floor below leaves them out and no merge order moves it.
 const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
-// Measured in a warm steady state: 0 bytes in every counted function but
-// onAnimationFrame, which shows 0 to 72 B per window in the clean mode (three's
-// own callback and the inlined frame, cause not isolated) and about 1100 B in the
-// bad mode (see the retries below). Each of these fails the limit, with the
-// figures of the pull request: an escaping array in frame (about 1300 B), a
-// template string written to a hook every frame (about 2500 B), a closure made per
-// call in routeEvents (about 1700 B), an escaping object in draw (about 10.7 KB), a
-// fresh literal from toPlayerInput (about 1350 B), a template string per Hud.update
-// call (about 1300 B), an escaping array per BotDriver.think call (about 970 B) and
-// a template string per ResultScreen.update call (about 750 B).
-// The limit stays just above the clean figure so the small ones are caught. See
-// testing.md.
-const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
+// Measured in a warm steady state: every counted function reads 0 B but the
+// hook's frameMany, which reads 276 to 540 B per window (9 to 18 B per frame, one
+// boxed number per frame, whatever its argument: it stayed with the timestamp
+// as an argument, as an integer, in a field of the loop clock and with no
+// argument at all) and counts the bytes of the callees inlined into it. The limit
+// is 640 B: about 100 B above the largest clean window in 35 attempts. Each of
+// these fails it, with the figures of the pull request, as the bytes of the
+// worst window: an escaping array in frame (1324 to 1520 B), a template string
+// written to a hook every frame (2340 to 2736 B), a closure made per call in
+// routeEvents (1996 to 2324 B), an escaping object in draw (10.9 to 11.2 KB), a
+// fresh literal from toPlayerInput (1776 to 1820 B), a template string per
+// Hud.update call (1432 to 1736 B), an escaping array per BotDriver.think call
+// (1424 to 1480 B) and a template string per ResultScreen.update call (1048 to
+// 1120 B). See testing.md.
+const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code, the fake clock's timers and three's
 // render. About 344 KB per window was the lowest figure measured on the sandbox
@@ -143,9 +154,9 @@ interface Allocations {
   /** Bytes outside the sweep files of the sim, for the sanity floor. */
   outsideSweep: number;
   combat: number;
-  /** Bytes in three's onAnimationFrame, where the inlined frame function lands. */
+  /** Bytes in three's onAnimationFrame. Logged, not counted: no measured frame runs through it. */
   onAnimationFrame: number;
-  /** Bytes in the fake clock's own requestAnimationFrame, which holds them when it is not inlined. */
+  /** Bytes in the fake clock's own requestAnimationFrame. Logged, not counted; it reads 0 B when no frame uses it. */
   fakeRequestAnimationFrame: number;
   /** Bytes per "file:function" for the combat code, for the failure message. */
   combatByFunction: Record<string, number>;
@@ -163,9 +174,9 @@ function summarise(root: ProfileNode): Allocations {
     const key = `${prefix}${url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
     if (!SWEEP_FILES.test(key)) result.outsideSweep += node.selfSize;
     if (key === ':requestAnimationFrame') result.fakeRequestAnimationFrame += node.selfSize;
+    if (ON_ANIMATION_FRAME.test(key)) result.onAnimationFrame += node.selfSize;
     if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
       result.combat += node.selfSize;
-      if (key.endsWith(':onAnimationFrame')) result.onAnimationFrame += node.selfSize;
       result.combatByFunction[key] = (result.combatByFunction[key] ?? 0) + node.selfSize;
     }
     pending.push(...node.children);
@@ -173,14 +184,11 @@ function summarise(root: ProfileNode): Allocations {
   return result;
 }
 
-// Playwright's clock fires one animation frame per 16 ms of fake time, so
-// runFor(480) fires exactly 30 frames (counted with a requestAnimationFrame
-// loop: 30 callbacks and 29 to 30 sim ticks), where thirty runFor(17) fire 31
-// or 32. A window is one runFor call with no hook read between its frames.
+// A window is one page.evaluate call of the client's dev-only hook, which runs
+// 30 frames 16.67 ms apart, one sim tick each, with no hook read between them.
 const WINDOW_FRAMES = 30;
-const WINDOW_MS = WINDOW_FRAMES * 16;
-// A window is 28 to 29 ticks. A shot flies 27 m at 10 m/s, 162 ticks or 5.6 to
-// 5.8 windows, from the spawn to the east boundary.
+// A shot flies 27 m at 10 m/s, 162 ticks or 5.4 windows, from the spawn to the
+// east boundary.
 const WINDOWS_PER_FLIGHT = 6;
 // Volleys the engine warms up on before the measured one. The depth does not
 // change the bad mode of the heap probe (decision 9 of batch #32: 4 and 8
@@ -204,14 +212,29 @@ const WARMUP_BUDGET_TICKS = 200;
 // 5 s), so 240 s is a margin of more than 3x.
 const TEST_TIMEOUT_MS = 240_000;
 
-/** Runs one window of frames, 480 ms of fake time, in one call. */
+/**
+ * Runs one window of frames in one call, through the client's dev-only hook
+ * (frameMany in main.ts). The hook calls the frame function directly with
+ * synthetic timestamps, so neither the fake clock nor three's animation loop
+ * runs a frame, and the clock stays paused.
+ */
 async function runWindow(page: Page): Promise<void> {
-  await page.clock.runFor(WINDOW_MS);
+  await page.evaluate((frames) => {
+    const hook = (window as unknown as { __runProbeFrames?: (frames: number) => void }).__runProbeFrames;
+    if (!hook) throw new Error('the dev-only frame hook is missing');
+    hook(frames);
+  }, WINDOW_FRAMES);
 }
 
-/** Eight shots in the same frame. */
+/**
+ * Eight shots in the same frame. A key press is dispatched in the page before
+ * its call returns, and the shot count is read back, so every shot is in the
+ * state before the next window runs.
+ */
 async function fireVolley(page: Page): Promise<void> {
+  const before = (await readHooks(page)).debugShots;
   for (let shot = 0; shot < SHOTS; shot++) await page.keyboard.press('F4');
+  expect((await readHooks(page)).debugShots, 'every F4 press of the volley fired').toBe(before + SHOTS);
 }
 
 /**
@@ -230,29 +253,25 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
   return summarise(profile.head as ProfileNode);
 }
 
-// The heap probe has two modes, on the CI runner (about 3 runs in 10, decision 9
-// of batch #32) and, with a fresh browser for step 8 under four parallel
-// workers, locally (decision 10; the investigation of package #41 measured 12 of
-// 20 attempts). In the clean mode onAnimationFrame reads 0 to 48 B per window.
-// In the bad mode it reads 970 to 1200 B (about 36 B per frame), in every window
-// of the run. The bytes only move. Playwright's fake clock hands out ids of 1e12
-// and up, which are not small integers, so each requestAnimationFrame call boxes
-// about three heap numbers (36 B). In the clean mode the fake clock's own
-// requestAnimationFrame function holds them (about 1075 B per window); in the bad
-// mode Maglev inlines it into three's onAnimationFrame and that function holds
-// them, while the fake function reads 0. The totals are equal (about 790 KB per
-// window in both modes), and turning Maglev's inlining off removes the mode (0 of
-// 16 attempts), so the client allocates nothing in either mode. Making the loop
-// clock's fields doubles from creation (10 of 20 bad) and having draw read the
-// clock itself (9 of 20) changed nothing, and neither was kept. Nothing in the
-// client or the test controls the inlining. Each attempt logs total,
-// onAnimationFrame and fake requestAnimationFrame bytes per window, so a log
-// shows which mode it was in.
-// Two retries are a net. The bad mode only adds bytes, so a regression of more
-// than 256 B fails every clean attempt, and every bad attempt fails anyway; only
-// a marginal one near the limit can pass on a retry. A regression of the sizes
-// measured (1304 B and up) fails all three attempts. The global retries stay 0 in
-// playwright.config.ts.
+// The heap probe once had two modes on the CI runner, which retries could not
+// cover (batch #53, decisions 5 and 13 to 16). Playwright's fake clock hands out
+// timer ids of 1e12 and up, which are not small integers, so each
+// requestAnimationFrame call boxed about three heap numbers (36 B per frame).
+// Which function held them depended on Maglev's inlining: the fake clock's own
+// requestAnimationFrame (a clean figure, 0 to 72 B in onAnimationFrame), or
+// three's onAnimationFrame, where the bytes land when Maglev inlines the fake
+// clock's callback into it (the bad mode, about 1100 B per window, which the
+// runner entered in every attempt once the sandbox scene was heavy). The totals
+// were equal in both modes. The windows now run through the dev-only hook and
+// no frame goes through the fake clock, so neither function shows a byte and the
+// fake requestAnimationFrame figure of the log line reads 0 (a nonzero figure
+// means a window ran frames through the clock). The log line keeps its four
+// figures, total, onAnimationFrame, fake requestAnimationFrame and outside the
+// sweep files, and adds the counted combat bytes of the window as a fifth.
+// Two retries stay a net for now. A regression of more than 640 B fails every
+// clean attempt; only a marginal one near the limit can pass on a retry. A
+// regression of the sizes measured (1048 B and up) fails all three attempts. The
+// global retries stay 0 in playwright.config.ts.
 test.describe.configure({ retries: 2 });
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
@@ -361,12 +380,12 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
       lowestOutsideSweep = Math.min(lowestOutsideSweep, allocations.outsideSweep);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
       figures.push(
-        `${allocations.total}/${allocations.onAnimationFrame}/${allocations.fakeRequestAnimationFrame}/${allocations.outsideSweep}`,
+        `${allocations.total}/${allocations.onAnimationFrame}/${allocations.fakeRequestAnimationFrame}/${allocations.outsideSweep}/${allocations.combat}`,
       );
     }
-    // One line per attempt, so every log shows which mode the run was in.
+    // One line per attempt, so every log shows the figures of its windows.
     console.log(
-      `heap probe attempt ${test.info().retry}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files: ${figures.join(' ')}`,
+      `heap probe attempt ${test.info().retry}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted combat code: ${figures.join(' ')}`,
     );
     await page.mouse.up();
     hooks = await readHooks(page);
