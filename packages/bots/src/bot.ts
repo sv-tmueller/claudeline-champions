@@ -73,6 +73,29 @@ function chooseTarget(state: GameState, me: ChampionState, currentId: number): n
   return nearest.id;
 }
 
+/**
+ * The nearest alive enemy within `rangeMax` with a clear shot whose health fraction is at most
+ * `health`, the bot's own; a tie in distance goes to the lower id. Undefined when there is none.
+ */
+function finisher(
+  state: GameState,
+  me: ChampionState,
+  profile: BotProfile,
+  health: number,
+): ChampionState | undefined {
+  let best: ChampionState | undefined;
+  let bestDistance = Infinity;
+  for (const c of state.champions) {
+    if (!c.alive || c.team === me.team || c.health / c.maxHealth > health) continue;
+    const d = distanceBetween(me, c);
+    if (d > profile.rangeMax || d >= bestDistance) continue;
+    if (!clearShot(state, me, c, SIGHT_CLEARANCE)) continue;
+    best = c;
+    bestDistance = d;
+  }
+  return best;
+}
+
 /** The spawn point of the bot's slot: its rank among its teammates by id, as createMatch places them. */
 function ownSpawn(state: GameState, me: ChampionState): Vec2 | undefined {
   let slot = 0;
@@ -165,12 +188,24 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       return;
     }
     const current: ScoredIntent = decided.intent === 'idle' ? 'engage' : decided.intent;
-    const scores = scoreIntents(
-      distanceBetween(me, target),
-      me.health / me.maxHealth,
-      profile.rangeMin,
-    );
-    decided = { intent: chooseIntent(current, scores), targetId };
+    const health = me.health / me.maxHealth;
+    const scores = scoreIntents(distanceBetween(me, target), health, profile.rangeMin);
+    const intent = chooseIntent(current, scores);
+    if (intent === 'retreat') {
+      // A finisher: an enemy in reach with a clear shot and no more health than the bot has. The
+      // bot does not retreat from it: it engages or kites it instead, and it is the target.
+      const weak = finisher(state, me, profile, health);
+      if (weak !== undefined) {
+        const against = scoreIntents(distanceBetween(me, weak), health, profile.rangeMin);
+        against.retreat = 0;
+        decided = {
+          intent: chooseIntent(current === 'retreat' ? 'engage' : current, against),
+          targetId: weak.id,
+        };
+        return;
+      }
+    }
+    decided = { intent, targetId };
   }
 
   /** Path following with a fresh follower when the goal kind differs from the previous think's. */

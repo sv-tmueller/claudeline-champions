@@ -720,3 +720,64 @@ describe('aim error', () => {
     }
   });
 });
+
+describe('finisher', () => {
+  // Quillon (id 1, band [6, 13]) at 20 percent health, 8 m from Lumeth (id 2) on open ground.
+  function duelAt(enemyHealth: number, distance = 8, arena: ArenaDef = open, h = 0) {
+    const state = setup(arena);
+    kill(state, 0, 3);
+    const me = put(state, 1, -4, h);
+    const enemy = put(state, 2, -4 + distance, h);
+    me.health = 0.2 * me.maxHealth;
+    enemy.health = enemyHealth * enemy.maxHealth;
+    return { state, me, enemy };
+  }
+  const intentAfterDelay = (state: GameState) => {
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    return bot.inspect();
+  };
+
+  it('engages an enemy in reach at 15 percent instead of retreating at 20 percent', () => {
+    expect(intentAfterDelay(duelAt(0.15).state)).toEqual({ intent: 'engage', targetId: 2 });
+  });
+
+  it('retreats from an enemy at 25 percent', () => {
+    expect(intentAfterDelay(duelAt(0.25).state)).toEqual({ intent: 'retreat', targetId: 2 });
+  });
+
+  it('engages an enemy at exactly the bot health fraction', () => {
+    expect(intentAfterDelay(duelAt(0.2).state).intent).toBe('engage');
+  });
+
+  it('retreats when the weak enemy is beyond rangeMax', () => {
+    const { rangeMax } = profileFor('quillon');
+    expect(rangeMax).toBe(13);
+    expect(intentAfterDelay(duelAt(0.15, 13.5).state).intent).toBe('retreat');
+    expect(intentAfterDelay(duelAt(0.15, 13).state).intent).toBe('engage');
+  });
+
+  it('retreats when the weak enemy has no clear shot, on the edge of the pillar shadow', () => {
+    const edge = duelAt(0.15, 8, arena01, 1.6);
+    expect(hasLineOfSight(edge.state, edge.me, edge.enemy)).toBe(true);
+    expect(clearShotOracle(edge.state, edge.me, edge.enemy, 0.5)).toBe(false);
+    expect(intentAfterDelay(edge.state).intent).toBe('retreat');
+    const clear = duelAt(0.15, 8, arena01, 2.1);
+    expect(clearShotOracle(clear.state, clear.me, clear.enemy, 0.5)).toBe(true);
+    expect(intentAfterDelay(clear.state).intent).toBe('engage');
+  });
+
+  it('targets the finisher, not the nearer enemy that is healthy', () => {
+    const { state } = duelAt(0.1, 10);
+    ch(state, 3).alive = true;
+    put(state, 3, 2, 0);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'engage', targetId: 2 });
+    // Without the finisher the nearer enemy is the target, and the bot retreats.
+    ch(state, 2).health = ch(state, 2).maxHealth;
+    expect(intentAfterDelay(state)).toEqual({ intent: 'retreat', targetId: 3 });
+  });
+
+  it('kites a finisher that is closer than rangeMin', () => {
+    expect(intentAfterDelay(duelAt(0.15, 2).state)).toEqual({ intent: 'kite', targetId: 2 });
+  });
+});

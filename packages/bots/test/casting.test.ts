@@ -282,6 +282,18 @@ describe('clear shot', () => {
   });
 });
 
+describe('finisher', () => {
+  it('presses at an enemy at 15 percent in reach while the bot is at 20 percent, as the engaging bot', () => {
+    const state = quillonDuel();
+    ch(state, 1).health = 0.2 * ch(state, 1).maxHealth;
+    ch(state, 2).health = 0.15 * ch(state, 2).maxHealth;
+    const bot = createBot(1, 'hard', 1);
+    const press = firstPress(bot, state, 100);
+    expect(press?.input.buttons).toBe(Button.E);
+    expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
+  });
+});
+
 describe('windups', () => {
   it('waits for a windup and casts on the tick it fires', () => {
     const kit = quietKit('tester', {
