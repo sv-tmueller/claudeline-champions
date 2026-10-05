@@ -66,11 +66,13 @@ port 5173, which Playwright starts itself.
   wall-clock wait, so a slow machine cannot change what it sees. The combat
   spec installs a paused Playwright clock and runs it frame by frame.
 - Global retries are 0 in `playwright.config.ts`. A flaky spec is a bug.
-- `combat.spec.ts` has file-scoped retries of 2, as a net for a marginal probe
-  regression near the limit (see below). A combat.spec that shows "flaky" in a CI
-  log (passed on a retry) is a failed attempt: read its log line, and treat a
-  failure anywhere but the probe assertion as real. A regression fails all three
-  attempts; only a marginal one near the limit can pass on a retry.
+- `combat.spec.ts` has file-scoped retries of 2. Two retries stay because 1
+  runner attempt in 6 on 791b232 (job 111860976393) failed the probe with a
+  first-window spike of 3636 B in `main.ts:writeCombatHooks` (4020 B counted,
+  cause not isolated), and its retry passed. A flaky combat.spec whose failed
+  attempt shows this spike is that case; any other failure is real. A retry also
+  lets a marginal regression near the limit pass; a regression of the sizes
+  measured fails all three attempts.
 
 ### The heap probe
 
@@ -117,12 +119,15 @@ a plain heap delta is not needed.
   such as `bot.ts` never matches a client entry. Bytes of an inlined callee land
   on its caller: V8 inlines `frame` and its callees into `frameMany`, so their
   bytes show on it.
-- The limit is 640 B per window. Every counted function reads 0 B except
-  `frameMany`, which reads 276 to 540 B (9 to 18 B per frame, one boxed number per
-  frame at the call into `frame`, which stays whatever the shape of the hook: the
-  timestamp as an argument, as an integer, in a field of the loop clock, and with
-  no argument at all, so no number crosses the call) and carries the bytes of
-  whatever V8 inlines into it. The limit is about 100 B above the largest clean
+- The limit is 640 B per window. In the windows measured locally every counted
+  function reads 0 B except `frameMany`, which reads 276 to 540 B (9 to 18 B per
+  frame, one boxed number per frame at the call into `frame`, which stays whatever
+  the shape of the hook: the timestamp as an argument, as an integer, in a field
+  of the loop clock, and with no argument at all (where no number crosses the
+  call)) and carries the bytes of whatever V8 inlines into it. The runner showed
+  one other window: 1 attempt in 6 on 791b232 (job 111860976393) read a
+  first-window spike of 3636 B in `main.ts:writeCombatHooks` (4020 B counted,
+  cause not isolated), which the retry covers. The limit is about 100 B above the largest clean
   window of 35 attempts and below every mutation below (1048 B and up). It was
   read on a copy of the spec with the limit at 1 B and no retries; to read the
   per-function figures, run that copy and read the "combat code allocated" line
@@ -130,10 +135,11 @@ a plain heap delta is not needed.
   with it excluded, the escaping array in `frame` and the `ResultScreen.update`
   template passed, because V8 inlines their code into `frameMany`.
 - The sanity floor: the lowest window outside the sim's three sweep files
-  (`projectile.ts`, `geometry.ts` and `area.ts`, whose garbage is large and moves
-  with the sweep fix in #49) must exceed 80 KB, about a quarter of the lowest
-  figure measured with the hook, 277 KB. The floor only proves that the profiler
-  sees garbage.
+  (`projectile.ts`, `geometry.ts` and `area.ts`, whose garbage was about 790 KB
+  per window until #62 and is 5.7 to 18 KB now, total minus outside the sweep
+  files in 9 windows of a local run on 66f4828) must exceed 80 KB, about a third
+  of the lowest figure measured with the hook on a head that contains #62,
+  264,652 B. The floor only proves that the profiler sees garbage.
 - The mutation rule: a change to the probe, its pattern or the frame path is
   checked by applying each of these alone and seeing the spec fail on every
   attempt (all three, with the retries): an escaping array in `frame`, a template
@@ -159,7 +165,7 @@ a plain heap delta is not needed.
   the fake clock's own function holds them (about 1075 B per window); in the bad
   mode (about 1100 B per window) Maglev inlines it into `onAnimationFrame`. The
   runner entered the bad mode in every attempt once the sandbox had kits, match
-  flow and a driven bot (run 37335049730, batch #53 decision 5), so retries could
+  flow and a driven bot (run 37335049730, batch #53 decisions 5 and 13), so retries could
   not cover it. Turning Maglev's inlining off removed the mode but made the
   counted functions allocate 6.6 to 7 KB per window (boxed doubles at the call
   boundaries that no longer inline), so the flag was dropped. Loop fields as

@@ -278,13 +278,16 @@ function frame(now: number): void {
 }
 
 // The timestamp of the dev-only probe hook below, in the same closure as frame.
+// Set once from performance.now() on the first call (the paused fake clock in
+// combat.spec, in a warm-up window), so the first probe frame moves the loop
+// clock forward; later frames read no clock.
 let probeNow = -1;
 
 /**
  * Runs `count` frames with synthetic timestamps one sim tick apart, without the
  * animation loop. Only the dev-only hook calls it, and a build drops it. The
  * heap probe counts this function like the rest of main.ts: V8 inlines the frame
- * into it, so the frame's bytes land here, and the hook's own cost is about 10 to
+ * into it, so the frame's bytes land here, and the hook's own cost is 9 to
  * 18 B per frame (see testing.md).
  */
 function frameMany(count: number): void {

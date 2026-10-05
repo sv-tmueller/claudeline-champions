@@ -23,7 +23,7 @@ shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
-`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|frameMany' packages/client/dist`,
+`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now' packages/client/dist`,
 which must print nothing. The same guard hides the dev-only probe hook,
 `window.__runProbeFrames`, which `combat.spec.ts` uses to run its heap-probe
 windows (see [testing](testing.md)).
