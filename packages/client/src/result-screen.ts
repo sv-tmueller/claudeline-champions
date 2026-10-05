@@ -42,7 +42,7 @@ export class ResultScreen {
     if (match === undefined || match.phase !== 'matchEnd') {
       if (this.visible !== 0) {
         this.visible = 0;
-        this.handles.panel.dataset['visible'] = FALSE;
+        this.handles.panel.setAttribute('data-visible', FALSE);
       }
       return;
     }
@@ -60,7 +60,7 @@ export class ResultScreen {
     }
     if (this.visible !== 1) {
       this.visible = 1;
-      this.handles.panel.dataset['visible'] = TRUE;
+      this.handles.panel.setAttribute('data-visible', TRUE);
     }
   }
 }

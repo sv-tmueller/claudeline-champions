@@ -13,11 +13,17 @@ import {
 import { KILL_FEED_LINES, type KillFeed } from './kill-feed';
 import { championName } from './roster';
 
-/** The part of an element the HUD writes. `HTMLElement` satisfies it, and so does a counting fake. */
+/**
+ * The part of an element the HUD writes. `HTMLElement` satisfies it, and so does
+ * a counting fake. State goes into `data-*` attributes through `setAttribute`
+ * and not through `dataset`: in the heap probe (e2e/combat.spec.ts) a `dataset`
+ * write allocated about 100 B per window in the counted code whenever a slot
+ * changed, and `setAttribute` allocated none.
+ */
 export interface HudElement {
   textContent: string | null;
   style: { transform: string };
-  dataset: Record<string, string | undefined>;
+  setAttribute(name: string, value: string): void;
 }
 
 export interface HudHandles {
@@ -143,12 +149,12 @@ export class Hud {
     const ex = energy >= EX_ENERGY_COST ? 1 : 0;
     if (ex !== this.exReady) {
       this.exReady = ex;
-      this.handles.exMark.dataset['ready'] = flag(ex === 1);
+      this.handles.exMark.setAttribute('data-ready', flag(ex === 1));
     }
     const ultimate = energy >= ULTIMATE_ENERGY_COST ? 1 : 0;
     if (ultimate !== this.ultimateReady) {
       this.ultimateReady = ultimate;
-      this.handles.ultimateMark.dataset['ready'] = flag(ultimate === 1);
+      this.handles.ultimateMark.setAttribute('data-ready', flag(ultimate === 1));
     }
   }
 
@@ -165,17 +171,17 @@ export class Hud {
       const ready = view.seconds === 0 ? 1 : 0;
       if (ready !== this.slotReady[i]) {
         this.slotReady[i] = ready;
-        handle.icon.dataset['ready'] = flag(ready === 1);
+        handle.icon.setAttribute('data-ready', flag(ready === 1));
       }
       const windup = view.windup ? 1 : 0;
       if (windup !== this.slotWindup[i]) {
         this.slotWindup[i] = windup;
-        handle.icon.dataset['windup'] = flag(windup === 1);
+        handle.icon.setAttribute('data-windup', flag(windup === 1));
       }
       const blocked = view.blocked ? 1 : 0;
       if (blocked !== this.slotBlocked[i]) {
         this.slotBlocked[i] = blocked;
-        handle.icon.dataset['blocked'] = flag(blocked === 1);
+        handle.icon.setAttribute('data-blocked', flag(blocked === 1));
       }
     }
   }
@@ -198,7 +204,7 @@ export class Hud {
     const sudden = round.suddenDeath ? 1 : 0;
     if (sudden !== this.suddenFlag) {
       this.suddenFlag = sudden;
-      this.handles.timer.dataset['sudden'] = flag(sudden === 1);
+      this.handles.timer.setAttribute('data-sudden', flag(sudden === 1));
     }
   }
 
@@ -213,19 +219,19 @@ export class Hud {
       const shown = i < feed.count ? 1 : 0;
       if (shown !== this.lineShown[i]) {
         this.lineShown[i] = shown;
-        handle.line.dataset['visible'] = flag(shown === 1);
+        handle.line.setAttribute('data-visible', flag(shown === 1));
       }
       if (shown === 0) continue;
       const entry = feed.line(i);
       if (entry.killerId !== this.lineKiller[i]) {
         this.lineKiller[i] = entry.killerId;
         handle.killer.textContent = this.names[entry.killerId] ?? RING_NAME;
-        handle.killer.dataset['team'] = this.sides[entry.killerId] ?? SIDE_RING;
+        handle.killer.setAttribute('data-team', this.sides[entry.killerId] ?? SIDE_RING);
       }
       if (entry.victimId !== this.lineVictim[i]) {
         this.lineVictim[i] = entry.victimId;
         handle.victim.textContent = this.names[entry.victimId] ?? RING_NAME;
-        handle.victim.dataset['team'] = this.sides[entry.victimId] ?? SIDE_RING;
+        handle.victim.setAttribute('data-team', this.sides[entry.victimId] ?? SIDE_RING);
       }
     }
   }

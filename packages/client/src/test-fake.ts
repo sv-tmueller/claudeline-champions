@@ -7,21 +7,14 @@ export type Fake = HudElement & { log: string[] };
 
 export function fake(): Fake {
   const log: string[] = [];
-  const dataset = new Proxy<Record<string, string | undefined>>(
-    {},
-    {
-      set(target, key, value: string) {
-        log.push(`data-${String(key)}=${value}`);
-        target[key as string] = value;
-        return true;
-      },
-    },
-  );
   let text: string | null = '';
   let transform = '';
   return {
     log,
-    dataset,
+    // No `dataset`: the HUD writes attributes with setAttribute, see HudElement.
+    setAttribute(name: string, value: string) {
+      log.push(`${name}=${value}`);
+    },
     style: {
       get transform() {
         return transform;
