@@ -1,0 +1,80 @@
+/*
+ * The result panel shown at the end of a match. The rules of hud.css hold here
+ * too, and packages/client/src/hud-palette.test.ts checks them over this file:
+ * - colours are hex literals, and only in the custom properties of #result;
+ * - every size derives from --result-u, so the panel scales with the window;
+ * - no colour lands in the pixel boxes the e2e specs count or near a champion
+ *   body colour, and none is blue, purple or magenta;
+ * - the one difference: the visible panel takes pointer events, and its links
+ *   inherit them, because the champion links are clicked. #result itself takes
+ *   none, and so does the hidden panel.
+ */
+#result {
+  --result-u: min(1vw, 1.78vh);
+  --result-panel: #000000d9;
+  --result-text: #e6e9ee;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--result-text);
+  font-family: system-ui, sans-serif;
+  font-size: calc(var(--result-u) * 1.8);
+  line-height: 1.2;
+}
+
+#result * {
+  box-sizing: border-box;
+}
+
+#result [data-result='panel'] {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--result-u) * 1.2);
+  min-width: calc(var(--result-u) * 36);
+  padding: calc(var(--result-u) * 3) calc(var(--result-u) * 4);
+  background: var(--result-panel);
+  border-radius: calc(var(--result-u) * 1);
+  text-align: center;
+}
+
+#result [data-result='panel'][data-visible='true'] {
+  display: flex;
+  pointer-events: auto;
+}
+
+#result [data-part='title'] {
+  font-size: calc(var(--result-u) * 5);
+  font-weight: 700;
+}
+
+#result [data-part='score'] {
+  font-size: calc(var(--result-u) * 3);
+  font-weight: 700;
+}
+
+#result [data-part='select-label'] {
+  margin-top: calc(var(--result-u) * 1);
+  font-size: calc(var(--result-u) * 1.4);
+}
+
+#result [data-part='select'] {
+  display: flex;
+  gap: calc(var(--result-u) * 1.5);
+}
+
+#result [data-champion] {
+  padding: calc(var(--result-u) * 0.6) calc(var(--result-u) * 1.2);
+  border: calc(var(--result-u) * 0.15) solid var(--result-text);
+  border-radius: calc(var(--result-u) * 0.5);
+  color: var(--result-text);
+  text-decoration: none;
+}
+
+#result [data-champion][data-available='false'] {
+  opacity: 0.35;
+}

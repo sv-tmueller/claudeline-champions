@@ -1,50 +1,11 @@
 import { RING_SOURCE_ID, SLOTS, createMatch, parseArenaDef, type CastState, type GameState } from '@claudeline/sim';
 import { describe, expect, it, vi } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
-import { Hud, type HudElement, type HudHandles } from './hud';
+import { Hud, type HudHandles } from './hud';
 import { KILL_FEED_LINES, KILL_FEED_TICKS, createKillFeed, type KillFeed } from './kill-feed';
 import type { SlotSource } from './hud-views';
+import { fake, type Fake } from './test-fake';
 import { TEST_KITS } from './test-kits';
-
-// A stand-in for an element that logs every write, so a test can say how
-// often and with what the HUD touched the DOM. No jsdom: the client tests run in node.
-type Fake = HudElement & { log: string[] };
-
-function fake(): Fake {
-  const log: string[] = [];
-  const dataset = new Proxy<Record<string, string | undefined>>(
-    {},
-    {
-      set(target, key, value: string) {
-        log.push(`data-${String(key)}=${value}`);
-        target[key as string] = value;
-        return true;
-      },
-    },
-  );
-  let text: string | null = '';
-  let transform = '';
-  return {
-    log,
-    dataset,
-    style: {
-      get transform() {
-        return transform;
-      },
-      set transform(value: string) {
-        log.push(`transform=${value}`);
-        transform = value;
-      },
-    },
-    get textContent() {
-      return text;
-    },
-    set textContent(value: string | null) {
-      log.push(`text=${String(value)}`);
-      text = value;
-    },
-  };
-}
 
 interface Rig {
   hud: Hud;

@@ -2,7 +2,7 @@ import { SLOTS } from '@claudeline/sim';
 import type { HudElement, HudHandles } from './hud';
 import { KILL_FEED_LINES } from './kill-feed';
 
-function make(parent: HTMLElement, tag: string, attributes: Record<string, string> = {}, text = ''): HTMLElement {
+export function make(parent: HTMLElement, tag: string, attributes: Record<string, string> = {}, text = ''): HTMLElement {
   const element = document.createElement(tag);
   for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
   if (text) element.textContent = text;
