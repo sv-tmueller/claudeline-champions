@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
-import type { ChampionState, GameState, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
+import type { ChampionState, GameState, MatchConfig, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
+import type { MatchRun } from './helpers';
 import {
   checkInvariants,
   clearShotOracle,
@@ -19,6 +20,24 @@ const TICKS = 3600;
 // after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3.
 const SEEDS = [101, 102, 103, 104];
 const TIERS = ['easy', 'normal', 'hard', 'normal'] as const;
+// The 3v3 that must start an ultimate: seeds and tiers pinned for that alone (see its test).
+const ULTIMATE_SEEDS = [101, 102, 103, 104, 105, 106];
+const ULTIMATE_TIERS = ['hard', 'hard', 'hard', 'hard', 'hard', 'hard'] as const;
+
+/** Hargrim and two Quillons on each team. */
+function config3v3(): MatchConfig {
+  return {
+    teamSize: 3,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'quillon', team: 'A' },
+      { championId: 'quillon', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
 
 interface Band {
   min: number;
@@ -187,82 +206,125 @@ function explained(events: readonly SimEvent[], press: Press): boolean {
   return false;
 }
 
-describe.each(KIT_SETS)('headless 2v2 match of bots with $name', (set) => {
+/** What a played match leaves for the tests to assert on. */
+interface Played {
+  state: GameState;
+  worst: { id: number; from: number; length: number; intent: string };
+  started: number[];
+  exStarted: number[];
+  ultimates: number[];
+  /** A champion that had a cast fire killed an enemy. */
+  killed: boolean;
+  summary: string;
+}
+
+/**
+ * Plays `TICKS` ticks of a match of bots and checks every tick: the bots leave the state alone, every
+ * input is valid, every press passes the oracle of `set` on the state the bot thought on and the sim
+ * starts it (or something explains why not), the invariants hold, and the stall tracker is fed.
+ */
+function play(set: KitSet, run: MatchRun): Played {
+  const { state, bots } = run;
+  const tracker = createStallTracker(state, bots);
+  const started = state.champions.map(() => 0);
+  const exStarted = state.champions.map(() => 0);
+  const ultimates = state.champions.map(() => 0);
+  const fired = new Set<number>();
+  let killed = false;
+  let firstDeath = -1;
+  const presses = state.champions.map(() => 0);
+
+  for (let t = 0; t < TICKS; t++) {
+    const before = checksum(state);
+    const inputs = bots.map((bot) => {
+      const input = bot.think(state);
+      expect(checksum(state), `tick ${t}`).toBe(before);
+      return input;
+    });
+    const pending: Press[] = [];
+    state.champions.forEach((c, id) => {
+      const input = inputs[id];
+      if (input === undefined) throw new Error(`no input ${id}`);
+      expect(validInput(input, kitOf(state, c)), `tick ${t} champion ${id}`).toBe(true);
+      const pressed = pressedSlot(input);
+      const acted = bots[id]?.inspect();
+      if (pressed === null || acted === undefined) return;
+      presses[id] = (presses[id] ?? 0) + 1;
+      const { problems, key, gates } = pressProblems(state, c, pressed, acted.targetId, set);
+      expect(problems, `tick ${t} champion ${id} pressed ${key}: ${gates}`).toEqual([]);
+      pending.push({ id, slot: pressed.slot, ex: pressed.ex, key, gates });
+    });
+    tracker.observe(inputs);
+    const tick = state.tick;
+    // The inputs are the bots' own records; step reads them and keeps no reference.
+    step(state, inputs);
+
+    for (const press of pending) {
+      expect(
+        explained(state.events, press),
+        `tick ${tick} champion ${press.id} pressed ${press.slot}${press.ex ? ' with SHIFT' : ''} and the sim started nothing: ${press.gates}`,
+      ).toBe(true);
+    }
+    for (const e of state.events) {
+      if (e.type === 'castStarted') {
+        started[e.championId] = (started[e.championId] ?? 0) + 1;
+        if (e.ex) exStarted[e.championId] = (exStarted[e.championId] ?? 0) + 1;
+        if (e.slot === 'F') ultimates[e.championId] = (ultimates[e.championId] ?? 0) + 1;
+      } else if (e.type === 'castFired') {
+        fired.add(e.championId);
+      } else if (e.type === 'death') {
+        if (firstDeath < 0) firstDeath = tick;
+        const victim = state.champions[e.targetId];
+        const killer = state.champions[e.sourceId];
+        if (victim && killer && victim.team !== killer.team && fired.has(e.sourceId)) killed = true;
+      }
+    }
+    expect(checkInvariants(state)).toEqual([]);
+    expect(Number.isFinite(checksum(state))).toBe(true);
+  }
+
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  return { state, worst: tracker.worst(), started, exStarted, ultimates, killed, summary };
+}
+
+function expectNoStall(played: Played): void {
+  const { worst } = played;
+  expect(
+    worst.length,
+    `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent}`,
+  ).toBeLessThanOrEqual(120);
+}
+
+describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
   it('a 2v2 of four bots on two kits ends with a death from a cast within 3600 ticks', () => {
     const run = createRun(SEEDS, TIERS, 7, { config: configMirror(), kits: set.kits() });
-    const { state, bots } = run;
-    const tracker = createStallTracker(state, bots);
-    const started = state.champions.map(() => 0);
-    const exStarted = state.champions.map(() => 0);
-    const ultimates = state.champions.map(() => 0);
-    const fired = new Set<number>();
-    let killed = false;
-    let firstDeath = -1;
-    const presses = state.champions.map(() => 0);
-
-    for (let t = 0; t < TICKS; t++) {
-      const before = checksum(state);
-      const inputs = bots.map((bot) => {
-        const input = bot.think(state);
-        expect(checksum(state), `tick ${t}`).toBe(before);
-        return input;
-      });
-      const pending: Press[] = [];
-      state.champions.forEach((c, id) => {
-        const input = inputs[id];
-        if (input === undefined) throw new Error(`no input ${id}`);
-        expect(validInput(input, kitOf(state, c)), `tick ${t} champion ${id}`).toBe(true);
-        const pressed = pressedSlot(input);
-        const acted = bots[id]?.inspect();
-        if (pressed === null || acted === undefined) return;
-        presses[id] = (presses[id] ?? 0) + 1;
-        const { problems, key, gates } = pressProblems(state, c, pressed, acted.targetId, set);
-        expect(problems, `tick ${t} champion ${id} pressed ${key}: ${gates}`).toEqual([]);
-        pending.push({ id, slot: pressed.slot, ex: pressed.ex, key, gates });
-      });
-      tracker.observe(inputs);
-      const tick = state.tick;
-      step(state, inputs);
-
-      for (const press of pending) {
-        expect(
-          explained(state.events, press),
-          `tick ${tick} champion ${press.id} pressed ${press.slot}${press.ex ? ' with SHIFT' : ''} and the sim started nothing: ${press.gates}`,
-        ).toBe(true);
-      }
-      for (const e of state.events) {
-        if (e.type === 'castStarted') {
-          started[e.championId] = (started[e.championId] ?? 0) + 1;
-          if (e.ex) exStarted[e.championId] = (exStarted[e.championId] ?? 0) + 1;
-          if (e.slot === 'F') ultimates[e.championId] = (ultimates[e.championId] ?? 0) + 1;
-        } else if (e.type === 'castFired') {
-          fired.add(e.championId);
-        } else if (e.type === 'death') {
-          if (firstDeath < 0) firstDeath = tick;
-          const victim = state.champions[e.targetId];
-          const killer = state.champions[e.sourceId];
-          if (victim && killer && victim.team !== killer.team && fired.has(e.sourceId)) killed = true;
-        }
-      }
-      expect(checkInvariants(state)).toEqual([]);
-      expect(Number.isFinite(checksum(state))).toBe(true);
-    }
-
-    const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
-    expect(killed, summary).toBe(true);
-    state.champions.forEach((c, id) => {
-      expect(started[id], `champion ${id} started no cast: ${summary}`).toBeGreaterThan(0);
+    const played = play(set, run);
+    expect(played.killed, played.summary).toBe(true);
+    played.state.champions.forEach((c, id) => {
+      expect(played.started[id], `champion ${id} started no cast: ${played.summary}`).toBeGreaterThan(0);
     });
     expect(
-      exStarted.some((n) => n > 0),
-      `no EX cast: ${summary}`,
+      played.exStarted.some((n) => n > 0),
+      `no EX cast: ${played.summary}`,
     ).toBe(true);
-    expect(state.tick).toBe(TICKS);
-    const worst = tracker.worst();
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
+  }, 30_000);
+
+  // The 2v2 above ends its fights by tick 700 with the energy bar at 75 at most (the energy of a
+  // champion comes from damage, and four champions die quickly), so the ultimate never fires in it:
+  // 9000 matches of that mirror on the shipped kits (seeds 4 to 12003 in groups of four, three tier
+  // sets, each stopped when one champion was left) gave no F cast. A 3v3 (Hargrim and two Quillons a side) lasts longer and its bar reaches 100. These
+  // seeds and tiers are pinned for this criterion alone; the death run above keeps its seeds.
+  it('a 3v3 of six bots on two kits starts an ultimate within 3600 ticks', () => {
+    const run = createRun(ULTIMATE_SEEDS, ULTIMATE_TIERS, 7, { config: config3v3(), kits: set.kits() });
+    const played = play(set, run);
     expect(
-      worst.length,
-      `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent}`,
-    ).toBeLessThanOrEqual(120);
+      played.ultimates.some((n) => n > 0),
+      `no F cast: ${played.summary}`,
+    ).toBe(true);
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
   }, 30_000);
 });
 
