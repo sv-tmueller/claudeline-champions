@@ -65,8 +65,8 @@ fields. The combat spec measures it with a heap probe, see
 
 The colours that the world view draws are constants in these files. Champion
 model colours must stay clear of them, and `tools/blender/test_champion_models.py`
-copies them, except `BAR_BACK_COLOUR`, which it does not copy, so a change here
-changes that list in the same commit.
+copies all of them but `BAR_BACK_COLOUR`, so a change here changes that list in the
+same commit.
 
 | File | Constants |
 |------|-----------|

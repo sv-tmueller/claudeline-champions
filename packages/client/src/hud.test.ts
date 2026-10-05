@@ -1,4 +1,4 @@
-import { SLOTS, createMatch, parseArenaDef, type GameState } from '@claudeline/sim';
+import { RING_SOURCE_ID, SLOTS, createMatch, parseArenaDef, type CastState, type GameState } from '@claudeline/sim';
 import { describe, expect, it, vi } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import { Hud, type HudElement, type HudHandles } from './hud';
@@ -204,6 +204,38 @@ describe('HUD health', () => {
   });
 });
 
+describe('HUD clamps', () => {
+  it('clamps the health fill to full when health is above the maximum', () => {
+    const { hud, state, elements } = rig();
+    local(state).maxHealth = 160;
+    local(state).health = 170;
+    hud.update(state);
+    expect(elements.healthFill.log).toEqual(['transform=scaleX(1)']);
+  });
+
+  it('clamps the health fill to empty when health is negative', () => {
+    const { hud, state, elements } = rig();
+    local(state).maxHealth = 160;
+    local(state).health = -3;
+    hud.update(state);
+    expect(elements.healthFill.log).toEqual(['transform=scaleX(0)']);
+  });
+
+  it('clamps the energy fill to full above 100', () => {
+    const { hud, state, elements } = rig();
+    local(state).energy = 130;
+    hud.update(state);
+    expect(elements.energyFill.log).toEqual(['transform=scaleX(1)']);
+  });
+
+  it('clamps the energy fill to empty below 0', () => {
+    const { hud, state, elements } = rig();
+    local(state).energy = -10;
+    hud.update(state);
+    expect(elements.energyFill.log).toEqual(['transform=scaleX(0)']);
+  });
+});
+
 describe('HUD energy', () => {
   it('flips the EX mark once at 25', () => {
     const { hud, state, elements } = rig();
@@ -263,12 +295,27 @@ describe('HUD cooldowns and windup', () => {
     expect(elements.slots[3]?.icon.log).toEqual(['data-ready=true']);
   });
 
+  it('shows 99 up to 5940 ticks of cooldown and the number itself above', () => {
+    const { hud, state, elements } = rig();
+    const source: SlotSource = local(state);
+    source.cooldowns = [5940, 0, 0, 0, 0, 0, 0];
+    hud.update(state);
+    expect(elements.slots[0]?.seconds.log).toEqual(['text=99']);
+    source.cooldowns = [5941, 0, 0, 0, 0, 0, 0];
+    hud.update(state);
+    expect(elements.slots[0]?.seconds.log).toEqual(['text=99', 'text=100']);
+    source.cooldowns = [6000, 0, 0, 0, 0, 0, 0];
+    hud.update(state);
+    expect(elements.slots[0]?.seconds.log).toEqual(['text=99', 'text=100']);
+  });
+
   it('writes the windup flag on all seven slots once', () => {
     const { hud, state, elements } = rig();
     const source: SlotSource = local(state);
     hud.update(state);
     clearLogs(elements);
-    source.cast = { slot: 'Q' };
+    const windup: CastState = { castId: 1, slot: 'Q', ex: false, windupTicks: 12, windupLeft: 12 };
+    source.cast = windup;
     hud.update(state);
     for (const slot of elements.slots) expect(slot.icon.log).toEqual(['data-windup=true']);
     expect(writeCount(elements)).toBe(7);
@@ -319,7 +366,7 @@ describe('HUD kill feed', () => {
   });
 
   it('reads no line while the feed has not changed', () => {
-    const { hud, state, feed } = rig();
+    const { hud, state, feed, elements } = rig();
     state.tick = 100;
     feed.push(100, 2, 0);
     hud.update(state);
@@ -329,6 +376,8 @@ describe('HUD kill feed', () => {
     expect(read).not.toHaveBeenCalled();
     state.tick = 100 + KILL_FEED_TICKS;
     hud.update(state);
+    // The expiry changed the feed, so the loop ran and hid the line without reading it.
+    expect(elements.lines[0]?.line.log).toEqual(['data-visible=true', 'data-visible=false']);
     expect(read).not.toHaveBeenCalled();
     feed.push(state.tick, 0, 2);
     hud.update(state);
@@ -370,7 +419,7 @@ describe('HUD kill feed', () => {
 
   it('names an unknown killer as the ring', () => {
     const { hud, state, feed, elements } = rig();
-    feed.push(0, -1, 1);
+    feed.push(0, RING_SOURCE_ID, 1);
     hud.update(state);
     expect(elements.lines[0]?.killer.log).toEqual(['text=Ring', 'data-team=ring']);
     expect(elements.lines[0]?.victim.log).toEqual(['text=Quillon', 'data-team=ally']);

@@ -1,6 +1,5 @@
-import { SLOTS } from '@claudeline/sim';
+import { DEFAULT_ROUNDS_TO_WIN, SLOTS } from '@claudeline/sim';
 import type { HudElement, HudHandles } from './hud';
-import { ROUNDS_TO_WIN } from './hud-views';
 import { KILL_FEED_LINES } from './kill-feed';
 
 function make(parent: HTMLElement, tag: string, attributes: Record<string, string> = {}, text = ''): HTMLElement {
@@ -41,7 +40,7 @@ export function buildHud(root: HTMLElement): HudHandles {
 
   const score = make(root, 'div', { 'data-hud': 'round-score' });
   const scoreText = make(score, 'span', { 'data-part': 'score' });
-  make(score, 'span', { 'data-part': 'goal' }, `first to ${ROUNDS_TO_WIN}`);
+  make(score, 'span', { 'data-part': 'goal' }, `first to ${DEFAULT_ROUNDS_TO_WIN}`);
   const timer = make(root, 'div', { 'data-hud': 'round-timer' });
 
   const feed = make(root, 'div', { 'data-hud': 'kill-feed' });

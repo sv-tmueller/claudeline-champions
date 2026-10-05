@@ -1,13 +1,18 @@
-import { SLOTS, createMatch, parseArenaDef } from '@claudeline/sim';
+import {
+  DEFAULT_ROUNDS_TO_WIN,
+  EX_ENERGY_COST,
+  MAX_ENERGY,
+  ROUND_TICKS,
+  SLOTS,
+  ULTIMATE_ENERGY_COST,
+  createMatch,
+  parseArenaDef,
+  type CastState,
+} from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import {
-  EX_MARK,
-  MAX_ENERGY,
-  ROUNDS_TO_WIN,
-  ROUND_TICKS,
   TIMER_TEXT,
-  ULTIMATE_COST,
   createRoundView,
   createSlotViews,
   readRoundView,
@@ -34,15 +39,23 @@ function localChampion(): SlotSource {
   return champion;
 }
 
+// The HUD reads these from the sim. The literals pin them to rules.md sections 1 to 3.
 describe('HUD constants', () => {
   it('match rules.md sections 1 to 3', () => {
-    expect(EX_MARK).toBe(25);
-    expect(ULTIMATE_COST).toBe(100);
+    expect(EX_ENERGY_COST).toBe(25);
+    expect(ULTIMATE_ENERGY_COST).toBe(100);
     expect(MAX_ENERGY).toBe(100);
     expect(ROUND_TICKS).toBe(5400);
-    expect(ROUNDS_TO_WIN).toBe(3);
+    expect(DEFAULT_ROUNDS_TO_WIN).toBe(3);
   });
 });
+
+/** A source with ready slots, the shape of a real champion. */
+function source(overrides: Partial<SlotSource> = {}): SlotSource {
+  return { energy: 0, cooldowns: [0, 0, 0, 0, 0, 0, 0], cast: null, ...overrides };
+}
+
+const WINDUP: CastState = { castId: 1, slot: 'Q', ex: false, windupTicks: 12, windupLeft: 12 };
 
 describe('slot views', () => {
   it('creates seven views, one per slot', () => {
@@ -67,36 +80,28 @@ describe('slot views', () => {
 
   it('shows the remaining cooldown in whole seconds, rounded up', () => {
     const views = createSlotViews();
-    readSlotViews({ energy: 100, cooldowns: [61, 60, 1, 0, 120, 121, 599] }, views);
+    readSlotViews(source({ energy: 100, cooldowns: [61, 60, 1, 0, 120, 121, 599] }), views);
     expect(views.map((v) => v.seconds)).toEqual([2, 1, 1, 0, 2, 3, 10]);
   });
 
   it('dims every slot during a windup', () => {
     const views = createSlotViews();
-    readSlotViews({ energy: 0, cast: { slot: 'Q' } }, views);
+    readSlotViews(source({ cast: WINDUP }), views);
     expect(views.every((v) => v.windup)).toBe(true);
-    readSlotViews({ energy: 0, cast: null }, views);
-    expect(views.some((v) => v.windup)).toBe(false);
-  });
-
-  it('reads a source without cooldowns or cast as ready', () => {
-    const views = createSlotViews();
-    readSlotViews({ energy: 100, cooldowns: [5, 5, 5, 5, 5, 5, 5], cast: {} }, views);
-    readSlotViews({ energy: 100 }, views);
-    expect(views.map((v) => v.seconds)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    readSlotViews(source({ cast: null }), views);
     expect(views.some((v) => v.windup)).toBe(false);
   });
 
   it('keeps the identity of its view objects', () => {
     const views = createSlotViews();
     const before = [...views];
-    readSlotViews({ energy: 0, cooldowns: [1, 2, 3, 4, 5, 6, 7] }, views);
+    readSlotViews(source({ cooldowns: [1, 2, 3, 4, 5, 6, 7] }), views);
     for (let i = 0; i < views.length; i++) expect(views[i]).toBe(before[i]);
   });
 
   it('reads a short cooldowns array as ready for the missing slots', () => {
     const views = createSlotViews();
-    readSlotViews({ energy: 100, cooldowns: [90] }, views);
+    readSlotViews(source({ energy: 100, cooldowns: [90] }), views);
     expect(views.map((v) => v.seconds)).toEqual([2, 0, 0, 0, 0, 0, 0]);
   });
 });

@@ -1,9 +1,6 @@
-import type { TeamId } from '@claudeline/sim';
+import { EX_ENERGY_COST, MAX_ENERGY, ULTIMATE_ENERGY_COST, type TeamId } from '@claudeline/sim';
 import {
-  EX_MARK,
-  MAX_ENERGY,
   TIMER_TEXT,
-  ULTIMATE_COST,
   createRoundView,
   createSlotViews,
   readRoundView,
@@ -136,12 +133,12 @@ export class Hud {
       this.energyKey = key;
       this.handles.energyFill.style.transform = `scaleX(${key / MAX_ENERGY})`;
     }
-    const ex = energy >= EX_MARK ? 1 : 0;
+    const ex = energy >= EX_ENERGY_COST ? 1 : 0;
     if (ex !== this.exReady) {
       this.exReady = ex;
       this.handles.exMark.dataset['ready'] = flag(ex === 1);
     }
-    const ultimate = energy >= ULTIMATE_COST ? 1 : 0;
+    const ultimate = energy >= ULTIMATE_ENERGY_COST ? 1 : 0;
     if (ultimate !== this.ultimateReady) {
       this.ultimateReady = ultimate;
       this.handles.ultimateMark.dataset['ready'] = flag(ultimate === 1);
