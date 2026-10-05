@@ -93,4 +93,4 @@ Layouts are in `data/arenas/<id>.json`, and both use the ring values of section 
 
 `arena01` breaks two rules of this document, and it is grandfathered. Six of its blocking obstacles are 1.5 m high, where section 5 asks for at least 1.8 m. Its corners are 10.7 m from the nearest blocking obstacle, where section 6 asks for at most 8 m. It cannot change, because every sim fixture checksums `state.arena`, so a new height or a new obstacle would move every checksum. No other arena may break a rule.
 
-`tools/blender/test_arena_principles.py` checks sections 3 to 7 against every committed arena. It expects no problem for `arena02` and pins exactly these two for `arena01`, so a third deviation, or a repair of one of these, fails the test.
+`tools/blender/test_arena_principles.py` checks sections 3 to 7 against every file in `data/arenas`, so a new arena is checked without an edit to the test. It expects no problem from any arena except `arena01`, for which it pins exactly these two, so a third deviation, or a repair of one of these, fails the test.
