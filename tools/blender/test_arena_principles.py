@@ -321,8 +321,12 @@ class CommittedArenaTests(unittest.TestCase):
                 json.dump(repaired, f)
             self.assertEqual(unexpected_deviations(tmp), {"arena01": []})
 
-    def test_arena02_follows_every_principle(self):
-        self.assertEqual(principle_problems(load_arena("arena02")), [])
+    def test_every_arena_but_the_grandfathered_one_follows_every_principle(self):
+        for arena_id in committed_arena_ids(ARENAS_DIR):
+            if arena_id in ALLOWED_DEVIATIONS:
+                continue
+            with self.subTest(arena=arena_id):
+                self.assertEqual(principle_problems(load_arena(arena_id)), [])
 
     def test_arena01_breaks_exactly_its_two_known_deviations(self):
         # Six blocking obstacles are 1.5 m high, and the corners are 10.7 m from blocking cover.
@@ -333,7 +337,7 @@ class CommittedArenaTests(unittest.TestCase):
 
     def test_arena02_layout_numbers(self):
         arena = load_arena("arena02")
-        share = sum(area(o) for o in arena["obstacles"]) / 600
+        share = sum(area(o) for o in arena["obstacles"]) / (arena["size"]["width"] * arena["size"]["height"])
         self.assertAlmostEqual(share, 0.0602, places=3)
         self.assertAlmostEqual(max_cover_distance(arena), 7.49, places=2)
         # The 0.05 m grid gives 28.26 m2. The exact end circle is 28.274 m2.
@@ -343,9 +347,11 @@ class CommittedArenaTests(unittest.TestCase):
 class PrincipleCheckTests(unittest.TestCase):
     """Each check must be able to fail, so a bad layout cannot pass in CI. Each case mutates arena02."""
 
-    def assertBreaks(self, rule, change):
+    def assertBreaks(self, rule, change, text=None):
         problems = principle_problems(mutated("arena02", change))
         self.assertIn(rule, rule_names(problems), problems)
+        if text is not None:
+            self.assertTrue(any(text in p for p in problems), "%r not in %r" % (text, problems))
 
     def test_team_sides(self):
         self.assertBreaks("team sides", lambda a: a["spawns"]["teamA"].__setitem__(2, [0.5, 0]))
@@ -354,7 +360,12 @@ class PrincipleCheckTests(unittest.TestCase):
         self.assertBreaks("opposing spawns", lambda a: a["spawns"]["teamB"].__setitem__(0, [8, 2]))
 
     def test_pair_spacing(self):
-        self.assertBreaks("2v2 pair", lambda a: a["spawns"]["teamA"].__setitem__(1, [-11, -0.5]))
+        # 5.00 m apart and mirrored, so only the spacing message applies.
+        self.assertBreaks(
+            "2v2 pair",
+            lambda a: a["spawns"]["teamA"].__setitem__(slice(0, 2), [[-11, 2.5], [-11, -2.5]]),
+            "the range is",
+        )
 
     def test_pair_mirror(self):
         self.assertBreaks("2v2 pair", lambda a: a["spawns"]["teamA"].__setitem__(1, [-11, -1.5]))
@@ -414,7 +425,7 @@ class PrincipleCheckTests(unittest.TestCase):
         self.assertBreaks("gaps", lambda a: a["obstacles"][6].update(y=9.0))
 
     def test_gap_between_obstacles(self):
-        # The pillar reaches x = -4.5 + 0.41 m from the corner of the low wall.
+        # The pillar at (-5.5, 6) is 0.41 m from the corner (-4.5, 5) of low wall 8.
         self.assertBreaks("gaps", lambda a: a["obstacles"][2].update(x=-5.5))
 
     def test_cover_reach(self):
