@@ -13,7 +13,7 @@ import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, clearShotOracle, config2v2 } from './helpers';
+import { arena01, clearShotOracle, config2v2, configMirror, jsonKits } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const STEP = 5.5 / 60;
@@ -107,7 +107,7 @@ describe('think output', () => {
     expect(bot.inspect()).toEqual({ intent: 'idle', targetId: -1 });
   });
 
-  it('returns a valid input every tick, always the bot own record', () => {
+  it("returns a valid input every tick, always the bot's own record", () => {
     const state = setup();
     kill(state, 1, 3);
     const bots = new Map([[0, createBot(0, 'hard', 3)]]);
@@ -663,6 +663,86 @@ describe('aim lead', () => {
     expect(Math.hypot(input.aimX / 100 - target.x, input.aimY / 100 - target.y)).toBeGreaterThan(1);
     expect(input.aimY).toBeGreaterThan(100);
   });
+
+  // `think` writes the lead and the error turn out over locals (an allocation-free form). This
+  // replays the aim of a few thousand frozen states, drawn from a seed, with the chain of aim.ts
+  // that the form replaced: the bot's first aim draw replayed from its seed, then `leadPoint`,
+  // `rotateByHalfTangent` and `roundAim`. The states cover a target walking at the shooter and
+  // away from it, one at least as fast as the projectile, a zero offset, and the projectile
+  // speeds of the shipped kits through a cast in its windup (the speed of the winding-up ability
+  // is the one the aim leads with), and no cast (the nominal speed).
+  it('matches the reference chain on random frozen states, to the centimetre', () => {
+    const rng = createRng(20241005);
+    const kits = jsonKits();
+    const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
+    const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, speeds: new Set<number>() };
+    let checked = 0;
+    for (let i = 0; i < 4000; i++) {
+      const state = createMatch(configMirror(), open, 1, jsonKits());
+      const botId = i % 2;
+      const enemyId = 2 + (Math.floor(i / 2) % 2);
+      for (const id of [0, 1, 2, 3]) if (id !== botId && id !== enemyId) kill(state, id);
+      const me = put(state, botId, (rng.next() - 0.5) * 20, (rng.next() - 0.5) * 12);
+      const target = ch(state, enemyId);
+      const zero = i % 17 === 0;
+      target.x = zero ? me.x : me.x + (rng.next() - 0.5) * 24;
+      target.y = zero ? me.y : me.y + (rng.next() - 0.5) * 16;
+      const speedOfTarget = rng.next() * 30;
+      const heading = rng.next() * 2 * Math.PI;
+      target.vx = Math.cos(heading) * speedOfTarget;
+      target.vy = Math.sin(heading) * speedOfTarget;
+
+      // Half the states have a cast winding up, which sets the speed the aim leads with.
+      let speed = NOMINAL_PROJECTILE_SPEED;
+      if (i % 2 === 1) {
+        const slot = slots[Math.floor(rng.next() * slots.length)] as (typeof slots)[number];
+        const kit = kits.find((k) => k.id === me.championId);
+        const base = kit?.slots[slot];
+        const variant = base?.ex !== undefined && rng.next() < 0.5;
+        const spec = variant ? base?.ex : base;
+        const first = spec?.effects[0];
+        if (first !== undefined && first.type === 'projectile') speed = first.speed;
+        me.cast = { castId: 1, slot, ex: variant, windupTicks: 30, windupLeft: 10 };
+      }
+
+      // The edges of the lead: on a line with the shooter a target that stands still across it or
+      // at exactly the speed of the projectile, toward the shooter and away, makes `b` or `a` zero.
+      if (i % 13 === 0 && !zero) {
+        target.y = me.y;
+        target.vy = 0;
+        target.vx = i % 26 === 0 ? 0 : target.x > me.x ? -speed : speed;
+      }
+
+      const seed = 1 + Math.floor(rng.next() * 1e6);
+      const bot = createBot(botId, 'hard', seed);
+      const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+      expect(bot.inspect().targetId, `state ${i}`).toBe(enemyId);
+
+      const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
+      const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, speed);
+      const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+      const expected = [roundAim(me.x + turned.x), roundAim(me.y + turned.y)];
+      expect([input.aimX, input.aimY], `state ${i}, speed ${speed}, seed ${seed}`).toEqual(expected);
+      checked++;
+
+      const dx = target.x - me.x;
+      const dy = target.y - me.y;
+      const b = 2 * (dx * target.vx + dy * target.vy);
+      if (dx === 0 && dy === 0) seen.zero++;
+      else if (target.vx * target.vx + target.vy * target.vy >= speed * speed) seen.fast++;
+      else if (b < 0) seen.approach++;
+      else seen.retreat++;
+      seen.speeds.add(speed);
+    }
+    expect(checked).toBe(4000);
+    // Every branch of the lead is reached, many times.
+    expect(seen.approach).toBeGreaterThan(300);
+    expect(seen.retreat).toBeGreaterThan(300);
+    expect(seen.fast).toBeGreaterThan(300);
+    expect(seen.zero).toBeGreaterThan(100);
+    // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25.
+    for (const speed of [12, 14, 20, 22, 25]) expect([...seen.speeds], `speed ${speed}`).toContain(speed);
+  });
 });
 
 describe('aim error', () => {
@@ -864,7 +944,7 @@ describe('the returned input', () => {
     return state;
   }
 
-  it('is the bot own record: the next think overwrites it, whatever the path', () => {
+  it("is the bot's own record: the next think overwrites it, whatever the path", () => {
     const state = duel();
     const bot = createBot(0, 'hard', 1);
     expect(bot.think(state)).toBe(bot.think(state));
@@ -882,14 +962,18 @@ describe('the returned input', () => {
     expect(createBot(0, 'hard', 1).think(state)).not.toBe(createBot(0, 'hard', 1).think(state));
   });
 
-  it('is written in every field again on each think', () => {
+  it('is written in every field again on each think, on the acting path and on the dead path', () => {
     const state = duel();
     const bot = createBot(0, 'hard', 1);
+    // Past the reaction delay the bot acts: it engages and walks toward its target 6 m away.
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
     const input = bot.think(state);
     const expected = { ...input };
+    expect(input.moveX, 'it walks east').toBe(1);
     // A caller that writes garbage into the record does not corrupt the next think.
-    (input as { moveX: number }).moveX = 1;
-    input.moveY = -1;
+    (input as { moveX: number }).moveX = -1;
+    (input as { moveY: number }).moveY = 1;
     input.aimX = 123456;
     input.aimY = -98765;
     input.buttons = 77;

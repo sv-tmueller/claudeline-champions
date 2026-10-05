@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { createMeasure, distanceInto, hypot2 } from '../src/hypot';
 import { createRng } from '../src/rng';
 
-// `Math.hypot(a, b)` allocates about 32 bytes per call in V8 (its rest arguments), so the think path
-// cannot call it. `hypot2` is V8's own algorithm for two arguments (scale by the larger, Kahan
-// sum of squares, square root, scale back), written with plain doubles. Every operation is
-// IEEE correctly rounded, so it gives the bits `Math.hypot` gives. The bots' decisions stay what
-// they were, and no bot output depends on the CPU through it.
+// `Math.hypot(a, b)` allocates about 32 bytes per call in V8 (its rest arguments), so the think
+// path cannot call it. `hypot2` is V8's own algorithm for two arguments (scale by the larger, Kahan
+// sum of squares, square root, scale back), written with plain doubles. Every operation is IEEE
+// correctly rounded, so it gives the bits `Math.hypot` gives. The bots' decisions stay what they
+// were, and no bot output depends on the CPU through it.
+//
+// The reference is the `Math.hypot` of the V8 these tests run on (Node 22). If an upgrade to Node
+// 24 or later fails them, V8 has changed `Math.hypot`: that is a decision to make (follow it or
+// keep these bits), not a bug in the bots.
 
 function same(a: number, b: number): boolean {
   return Object.is(a, b);
