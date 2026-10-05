@@ -1,4 +1,4 @@
-import { createMatch, parseArenaDef, step, type PlayerInput } from '@claudeline/sim';
+import { DEFAULT_ROUNDS_TO_WIN, createMatch, parseArenaDef, step, type PlayerInput } from '@claudeline/sim';
 import {
   Color,
   DirectionalLight,
@@ -79,7 +79,7 @@ const feedback = new CombatFeedback(state.champions.length, impactRings, killFee
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 // Built before the models load, so the HUD shows while they do.
-const hud = new Hud(buildHud(hudRoot), state.champions, HUMAN_ID, killFeed);
+const hud = new Hud(buildHud(hudRoot, DEFAULT_ROUNDS_TO_WIN), state.champions, HUMAN_ID, killFeed);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 

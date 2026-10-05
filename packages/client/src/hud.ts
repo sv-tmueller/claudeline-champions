@@ -1,5 +1,6 @@
-import { EX_ENERGY_COST, MAX_ENERGY, ULTIMATE_ENERGY_COST, type TeamId } from '@claudeline/sim';
+import { EX_ENERGY_COST, MAX_ENERGY, ULTIMATE_ENERGY_COST, type MatchState, type TeamId } from '@claudeline/sim';
 import {
+  SUDDEN_DEATH_TEXT,
   TIMER_TEXT,
   createRoundView,
   createSlotViews,
@@ -36,10 +37,14 @@ export interface HudHandles {
 /** What `update` reads from the game state. */
 export interface HudState {
   tick: number;
+  /** Absent in free play, which reads as 0 : 0 and a full round. */
+  match?: MatchState;
   champions: readonly (SlotSource & { health: number; maxHealth: number })[];
 }
 
 const RING_NAME = 'Ring';
+// The timer key of the sudden death text, past the 91 keys of the seconds.
+const SUDDEN_KEY = 100;
 const SIDE_ALLY = 'ally';
 const SIDE_ENEMY = 'enemy';
 const SIDE_RING = 'ring';
@@ -74,7 +79,9 @@ export class Hud {
   private ultimateReady = -1;
   private scoreA = -1;
   private scoreB = -1;
-  private secondsLeft = -1;
+  // 0 to 90 for the seconds shown, SUDDEN_KEY for the sudden death text, -1 for not written yet.
+  private timerKey = -1;
+  private suddenFlag = -1;
   private readonly slotSeconds: number[] = [];
   private readonly slotReady: number[] = [];
   private readonly slotWindup: number[] = [];
@@ -181,9 +188,17 @@ export class Hud {
       this.scoreB = round.scoreB;
       this.handles.score.textContent = `${round.scoreA} : ${round.scoreB}`;
     }
-    if (round.secondsLeft !== this.secondsLeft) {
-      this.secondsLeft = round.secondsLeft;
-      this.handles.timer.textContent = TIMER_TEXT[round.secondsLeft] ?? '';
+    // Outside the round phases the timer keeps what it shows.
+    if (!round.live) return;
+    const key = round.suddenDeath ? SUDDEN_KEY : round.secondsLeft;
+    if (key !== this.timerKey) {
+      this.timerKey = key;
+      this.handles.timer.textContent = round.suddenDeath ? SUDDEN_DEATH_TEXT : (TIMER_TEXT[round.secondsLeft] ?? '');
+    }
+    const sudden = round.suddenDeath ? 1 : 0;
+    if (sudden !== this.suddenFlag) {
+      this.suddenFlag = sudden;
+      this.handles.timer.dataset['sudden'] = flag(sudden === 1);
     }
   }
 

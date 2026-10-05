@@ -114,6 +114,11 @@ describe('HUD colour palette (hud.css)', () => {
     expect(team('enemy')).toBe('var(--hud-enemy)');
   });
 
+  it('draws the sudden death timer in the enemy colour', () => {
+    const sudden = rules.find((rule) => rule.selector.includes("data-sudden='true'"));
+    expect(sudden?.declarations.find((d) => d.property === 'color')?.value).toBe('var(--hud-enemy)');
+  });
+
   it('makes translucent colours neutral grey or black', () => {
     const translucent = colours.filter((d) => alphaOf(d.value) < 255);
     expect(translucent.length).toBeGreaterThanOrEqual(1);

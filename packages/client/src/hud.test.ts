@@ -4,6 +4,7 @@ import arena01Json from '../../../data/arenas/arena01.json';
 import { Hud, type HudElement, type HudHandles } from './hud';
 import { KILL_FEED_LINES, KILL_FEED_TICKS, createKillFeed, type KillFeed } from './kill-feed';
 import type { SlotSource } from './hud-views';
+import { TEST_KITS } from './test-kits';
 
 // A stand-in for an element that logs every write, so a test can say how
 // often and with what the HUD touched the DOM. No jsdom: the client tests run in node.
@@ -72,9 +73,11 @@ function rig(): Rig {
         { championId: 'lumeth', team: 'B' },
         { championId: 'skerrow', team: 'B' },
       ],
+      roundsToWin: 3,
     },
     parseArenaDef(arena01Json),
     1,
+    TEST_KITS,
   );
   const elements = {
     healthText: fake(),
@@ -125,7 +128,7 @@ describe('HUD first update', () => {
   it('writes every element once', () => {
     const { hud, state, elements } = rig();
     hud.update(state);
-    expect(elements.healthText.log).toEqual(['text=120 / 120']);
+    expect(elements.healthText.log).toEqual(['text=160 / 160']);
     expect(elements.healthFill.log).toEqual(['transform=scaleX(1)']);
     expect(elements.energyFill.log).toEqual(['transform=scaleX(0)']);
     expect(elements.exMark.log).toEqual(['data-ready=false']);
@@ -139,7 +142,7 @@ describe('HUD first update', () => {
       ]);
     }
     expect(elements.score.log).toEqual(['text=0 : 0']);
-    expect(elements.timer.log).toEqual(['text=1:30']);
+    expect(elements.timer.log).toEqual(['text=1:30', 'data-sudden=false']);
     for (const { line, killer, victim } of elements.lines) {
       expect(line.log).toEqual(['data-visible=false']);
       expect(killer.log).toEqual([]);
@@ -164,8 +167,8 @@ describe('HUD health', () => {
     clearLogs(elements);
     local(state).health = 90.5;
     hud.update(state);
-    expect(elements.healthText.log).toEqual(['text=91 / 120']);
-    expect(elements.healthFill.log).toEqual([`transform=scaleX(${91 / 120})`]);
+    expect(elements.healthText.log).toEqual(['text=91 / 160']);
+    expect(elements.healthFill.log).toEqual([`transform=scaleX(${91 / 160})`]);
     expect(writeCount(elements)).toBe(2);
   });
 
@@ -196,10 +199,10 @@ describe('HUD health', () => {
     hud.update(state);
     local(state).health = 0.2;
     hud.update(state);
-    expect(elements.healthText.log.at(-1)).toBe('text=1 / 120');
+    expect(elements.healthText.log.at(-1)).toBe('text=1 / 160');
     local(state).health = 0;
     hud.update(state);
-    expect(elements.healthText.log.at(-1)).toBe('text=0 / 120');
+    expect(elements.healthText.log.at(-1)).toBe('text=0 / 160');
     expect(elements.healthFill.log.at(-1)).toBe('transform=scaleX(0)');
   });
 });
@@ -327,26 +330,122 @@ describe('HUD cooldowns and windup', () => {
   });
 });
 
+function match(state: GameState): NonNullable<GameState['match']> {
+  if (!state.match) throw new Error('no match flow');
+  return state.match;
+}
+
 describe('HUD round', () => {
-  it('writes the timer at tick 0 and again at 60, not in between', () => {
+  const RING = { x: 0, y: 0, radius: 12, damagePerTick: 0.1 };
+
+  it('shows the full round in the warmup', () => {
     const { hud, state, elements } = rig();
-    hud.update(state);
-    expect(elements.timer.log).toEqual(['text=1:30']);
-    for (let tick = 1; tick < 60; tick++) {
-      state.tick = tick;
+    for (const phaseTicks of [0, 90, 179]) {
+      match(state).phaseTicks = phaseTicks;
       hud.update(state);
     }
-    expect(elements.timer.log).toEqual(['text=1:30']);
-    state.tick = 60;
-    hud.update(state);
-    expect(elements.timer.log).toEqual(['text=1:30', 'text=1:29']);
+    expect(elements.timer.log).toEqual(['text=1:30', 'data-sudden=false']);
   });
 
-  it('holds the timer at 0:00', () => {
+  it('writes the timer for round ticks 0, 59 and 60 and 5400', () => {
     const { hud, state, elements } = rig();
-    state.tick = 6000;
+    match(state).phase = 'round';
+    for (const [phaseTicks, text] of [
+      [0, '1:30'],
+      [59, '1:30'],
+      [60, '1:29'],
+      [5400, '0:00'],
+    ] as const) {
+      match(state).phaseTicks = phaseTicks;
+      hud.update(state);
+      expect(elements.timer.log.filter((entry) => entry.startsWith('text=')).at(-1), `phase tick ${phaseTicks}`).toBe(
+        `text=${text}`,
+      );
+    }
+    // Written at 1:30 once, then at 1:29 and 0:00.
+    expect(elements.timer.log.filter((entry) => entry.startsWith('text='))).toEqual([
+      'text=1:30',
+      'text=1:29',
+      'text=0:00',
+    ]);
+  });
+
+  it('writes sudden death and its flag once when the ring comes, and the time again when it goes', () => {
+    const { hud, state, elements } = rig();
+    match(state).phase = 'round';
+    match(state).phaseTicks = 5400;
     hud.update(state);
-    expect(elements.timer.log).toEqual(['text=0:00']);
+    clearLogs(elements);
+    match(state).phaseTicks = 5401;
+    match(state).ring = RING;
+    hud.update(state);
+    expect(elements.timer.log).toEqual(['text=Sudden death', 'data-sudden=true']);
+    match(state).phaseTicks = 5402;
+    hud.update(state);
+    hud.update(state);
+    expect(elements.timer.log).toEqual(['text=Sudden death', 'data-sudden=true']);
+    // The next round: the ring is gone and the clock starts again.
+    clearLogs(elements);
+    match(state).ring = null;
+    match(state).phaseTicks = 0;
+    hud.update(state);
+    expect(elements.timer.log).toEqual(['text=1:30', 'data-sudden=false']);
+  });
+
+  it('keeps the timer text after the round is decided', () => {
+    const { hud, state, elements } = rig();
+    match(state).phase = 'round';
+    match(state).phaseTicks = 600;
+    hud.update(state);
+    clearLogs(elements);
+    match(state).phase = 'roundEnd';
+    match(state).phaseTicks = 0;
+    hud.update(state);
+    match(state).phase = 'matchEnd';
+    hud.update(state);
+    expect(elements.timer.log).toEqual([]);
+  });
+
+  it('keeps sudden death on the timer through the pause after the round', () => {
+    const { hud, state, elements } = rig();
+    match(state).phase = 'round';
+    match(state).phaseTicks = 5500;
+    match(state).ring = RING;
+    hud.update(state);
+    clearLogs(elements);
+    match(state).phase = 'roundEnd';
+    match(state).phaseTicks = 1;
+    hud.update(state);
+    expect(elements.timer.log).toEqual([]);
+  });
+
+  it('writes a new score once', () => {
+    const { hud, state, elements } = rig();
+    hud.update(state);
+    expect(elements.score.log).toEqual(['text=0 : 0']);
+    match(state).phase = 'roundEnd';
+    match(state).score = { A: 1, B: 0 };
+    hud.update(state);
+    hud.update(state);
+    expect(elements.score.log).toEqual(['text=0 : 0', 'text=1 : 0']);
+  });
+
+  it('reads a state without match flow as 0 : 0 and 1:30', () => {
+    const { hud, state, elements } = rig();
+    delete state.match;
+    hud.update(state);
+    expect(elements.score.log).toEqual(['text=0 : 0']);
+    expect(elements.timer.log).toEqual(['text=1:30', 'data-sudden=false']);
+  });
+
+  it('writes nothing on a second update of a round in progress', () => {
+    const { hud, state, elements } = rig();
+    match(state).phase = 'round';
+    match(state).phaseTicks = 1234;
+    hud.update(state);
+    clearLogs(elements);
+    hud.update(state);
+    expect(writeCount(elements)).toBe(0);
   });
 });
 
@@ -389,8 +488,7 @@ describe('HUD kill feed', () => {
     state.tick = 100;
     feed.push(100, 2, 0);
     hud.update(state);
-    // The timer moves with the tick, so it is left out of the counts.
-    const others = (): number => writeCount(elements) - elements.timer.log.length;
+    const others = (): number => writeCount(elements);
     clearLogs(elements);
     state.tick = 100 + KILL_FEED_TICKS - 1;
     hud.update(state);

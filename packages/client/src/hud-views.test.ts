@@ -8,6 +8,8 @@ import {
   createMatch,
   parseArenaDef,
   type CastState,
+  type MatchPhase,
+  type MatchState,
 } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
@@ -17,6 +19,7 @@ import {
   createSlotViews,
   readRoundView,
   readSlotViews,
+  type RoundView,
   type SlotSource,
 } from './hud-views';
 
@@ -107,19 +110,36 @@ describe('slot views', () => {
 });
 
 describe('round view', () => {
-  function timer(tick: number): string {
-    const view = createRoundView();
-    readRoundView({ tick }, view);
-    return TIMER_TEXT[view.secondsLeft] as string;
+  function matchAt(phase: MatchPhase, phaseTicks: number, over: Partial<MatchState> = {}): { match: MatchState } {
+    return {
+      match: { phase, phaseTicks, round: 1, roundsToWin: 3, score: { A: 0, B: 0 }, ring: null, ...over },
+    };
   }
 
-  it('starts at 0 : 0 with 90 seconds left', () => {
+  function read(state: { match?: MatchState }): RoundView {
     const view = createRoundView();
-    readRoundView({ tick: 0 }, view);
-    expect(view).toEqual({ scoreA: 0, scoreB: 0, secondsLeft: 90 });
+    readRoundView(state, view);
+    return view;
+  }
+
+  function timer(phaseTicks: number): string {
+    return TIMER_TEXT[read(matchAt('round', phaseTicks)).secondsLeft] as string;
+  }
+
+  it('starts at 0 : 0 with 90 seconds left, no sudden death, and a running timer', () => {
+    expect(createRoundView()).toEqual({ scoreA: 0, scoreB: 0, secondsLeft: 90, suddenDeath: false, live: true });
   });
 
-  it('counts the timer down by tick', () => {
+  it('reads a state without match flow as 0 : 0 and 90 seconds', () => {
+    expect(read({})).toEqual({ scoreA: 0, scoreB: 0, secondsLeft: 90, suddenDeath: false, live: true });
+  });
+
+  it('shows the full round in the warmup, where the round clock has not started', () => {
+    expect(read(matchAt('warmup', 0))).toMatchObject({ secondsLeft: 90, live: true, suddenDeath: false });
+    expect(read(matchAt('warmup', 179))).toMatchObject({ secondsLeft: 90, live: true });
+  });
+
+  it('counts the timer down by the ticks of the round phase', () => {
     expect(timer(0)).toBe('1:30');
     expect(timer(59)).toBe('1:30');
     expect(timer(60)).toBe('1:29');
@@ -128,9 +148,26 @@ describe('round view', () => {
     expect(timer(5399)).toBe('0:01');
   });
 
-  it('holds at 0:00', () => {
+  it('holds at 0:00 until the ring comes', () => {
     expect(timer(5400)).toBe('0:00');
     expect(timer(6000)).toBe('0:00');
+  });
+
+  it('reads sudden death from the ring, not from the clock', () => {
+    const ring = { x: 0, y: 0, radius: 12, damagePerTick: 0.1 };
+    expect(read(matchAt('round', 5400)).suddenDeath).toBe(false);
+    expect(read(matchAt('round', 5401, { ring })).suddenDeath).toBe(true);
+  });
+
+  it('reads the score of the match', () => {
+    const view = read(matchAt('roundEnd', 10, { score: { A: 2, B: 1 } }));
+    expect([view.scoreA, view.scoreB]).toEqual([2, 1]);
+  });
+
+  it('stops the timer after the round and after the match', () => {
+    expect(read(matchAt('roundEnd', 0)).live).toBe(false);
+    expect(read(matchAt('matchEnd', 0)).live).toBe(false);
+    expect(read(matchAt('round', 0)).live).toBe(true);
   });
 
   it('has a text for every whole second from 0 to 90', () => {
