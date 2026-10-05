@@ -18,7 +18,7 @@ import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import { createRng } from '../src/rng';
 import { arena01, clearShotOracle } from './helpers';
-import { boltAbility, boltSlot, quietAbility, quietKit, quillonKit } from './kits';
+import { boltAbility, boltSlot, quietAbility, quietKit, quietSlot, quillonKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 
@@ -691,5 +691,65 @@ describe('the kit cache', () => {
     for (let i = 0; i < TIERS.hard.delay + 1; i++) bot.think(asHargrim);
     // Hargrim never kites: it stands 3 m from its enemy.
     expect(bot.inspect().intent).toBe('engage');
+  });
+});
+
+describe('energy reserve for the ultimate', () => {
+  // Hold the EX variants while F is ready, has a reach band and the energy is at least 75, so the
+  // bar can reach the 100 that F costs. An EX press spends 25, which is why the line is at 75.
+  const THINKS = TIERS.hard.delay + TIERS.hard.castDelay + ENOUGH;
+  const F_INDEX = 6;
+  const bolt = () => boltAbility(20, 30);
+
+  interface Scene {
+    energy: number;
+    /** The cooldown of F, in ticks; at most 1 counts as ready. */
+    fCooldown?: number;
+    /** Whether F has a reach band. */
+    fBand?: boolean;
+    /** The lifetime of the base M2 bolt, in ticks; its reach is 20 x lifetime / 60. */
+    baseLifetime?: number;
+  }
+
+  /** What the tester presses 5 m from its enemy with an M2 that has an EX variant: null for nothing. */
+  function pressOf(scene: Scene): number | null {
+    const kit = quietKit('tester', {
+      M2: boltSlot(20, scene.baseLifetime ?? 30, { ex: bolt() }),
+      F: scene.fBand === false ? quietSlot() : boltSlot(20, 30, { cooldownTicks: 600 }),
+    });
+    const state = duel(kit);
+    const me = ch(state, 0);
+    me.energy = scene.energy;
+    me.cooldowns[F_INDEX] = scene.fCooldown ?? 0;
+    return firstPress(createBot(0, 'hard', 1), state, THINKS)?.input.buttons ?? null;
+  }
+
+  it('holds the EX variant at 75 energy with F ready, and spends it at 74', () => {
+    expect(pressOf({ energy: 74 })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 75 })).toBe(Button.M2);
+    expect(pressOf({ energy: 99 })).toBe(Button.M2);
+  });
+
+  it('spends the EX variant at 80 energy when F is on cooldown, and holds it when F is ready at 1 tick', () => {
+    expect(pressOf({ energy: 80, fCooldown: 2 })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 80, fCooldown: 1 })).toBe(Button.M2);
+    expect(pressOf({ energy: 80, fCooldown: 0 })).toBe(Button.M2);
+  });
+
+  it('spends the EX variant at 80 energy when F has no reach band: an ultimate that reaches only allies', () => {
+    expect(pressOf({ energy: 80, fBand: false })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 80, fBand: false, fCooldown: 600 })).toBe(Button.M2 | Button.SHIFT);
+  });
+
+  it('presses F itself at 100 energy', () => {
+    expect(pressOf({ energy: 100 })).toBe(Button.F);
+  });
+
+  it('takes the reach of the base ability while the EX variant is held, and of the EX variant when it is spent', () => {
+    // The base M2 reaches 5 m (15 ticks), so a target 5 m away is outside its margin of 1 m; the
+    // EX variant reaches 10 m.
+    expect(pressOf({ energy: 74, baseLifetime: 15 })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 80, baseLifetime: 15 })).toBeNull();
+    expect(pressOf({ energy: 80, baseLifetime: 15, fCooldown: 2 })).toBe(Button.M2 | Button.SHIFT);
   });
 });

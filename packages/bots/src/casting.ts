@@ -128,13 +128,30 @@ function hasDash(ability: AbilitySpec): boolean {
   return false;
 }
 
+/** The slot index of F. */
+const F_INDEX = SLOTS.indexOf('F');
+
+/**
+ * The energy from which the EX variants are held while F is ready: what F costs less what one EX
+ * press spends, so the bar can reach the cost of F instead of falling back by an EX cast first.
+ */
+export const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
+
 /**
  * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
- * `kit.ex`, has a variant with a reach band (the cache holds one only then), and the champion has
- * the energy. F never does.
+ * `kit.ex`, has a variant with a reach band (the cache holds one only then), the champion has
+ * the energy, and F is not holding the energy back. F holds it back while it is ready (its
+ * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band and the
+ * energy is at least `EX_RESERVE_ENERGY`: a support ultimate that reaches allies only has no band
+ * and must not freeze the EX variants for good. F never has an EX variant.
  */
 function exFor(cache: KitCache, index: number, me: ChampionState): boolean {
-  return cache.hasEx[index] === 1 && me.energy >= EX_ENERGY_COST;
+  if (cache.hasEx[index] !== 1 || me.energy < EX_ENERGY_COST) return false;
+  const holding =
+    cache.hasBase[F_INDEX] === 1 &&
+    (me.cooldowns[F_INDEX] as number) <= 1 &&
+    me.energy >= EX_RESERVE_ENERGY;
+  return !holding;
 }
 
 /**

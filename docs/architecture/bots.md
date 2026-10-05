@@ -232,12 +232,21 @@ step 3d tries a new cast. For each slot, with the ability it would cast:
 
 Order and variants: the bot presses the first slot in F, R, E, Q, SPACE, M2, M1
 that passes, one slot per think. A slot listed in `kit.ex` casts its EX variant
-(buttons plus SHIFT) when the energy is at least 25 and the variant has a band;
-otherwise it casts its base ability without SHIFT. F always casts its base
-ability and is never sent with SHIFT. There is no energy reserve: EX spending
-keeps energy low, so in bot hands the ultimate fires only when the energy reaches
-100 while the EX slots cool down or are out of reach. An alternative not taken is
-to hold the EX variants while F is ready and the energy is at least 75.
+(buttons plus SHIFT) when the energy is at least 25, the variant has a band and F
+is not holding the energy back; otherwise it casts its base ability without
+SHIFT. F always casts its base ability and is never sent with SHIFT.
+
+Energy reserve: F holds the energy back while F is ready (its cooldown is at most 1,
+as the cast gate reads it), its base ability has a reach band and the energy is at
+least 75, which is the 100 that F costs less the 25 of one EX press. The EX variants are
+then not cast, and the band and the shot width the slot is tested with are those of
+its base ability, so a slot whose base reach is shorter than its EX reach waits for
+the target to come in. Why: greedy EX spending kept the energy of the kit headless
+run under 66, so the ultimate never fired. Only an ultimate with a band holds the
+reserve: a support ultimate that reaches allies only (no band) would otherwise keep
+every EX variant held for good at 75 energy or more. The cost is that a bot at 75 energy
+or more does without its EX variants until F is cast, F goes on cooldown, or the bar
+falls below 75, even when no enemy is in F's reach.
 
 Cast delay: per slot, a run counts the consecutive thinks, this one included, on
 which the target was in reach with a clear shot of the ability the slot would cast.
@@ -369,7 +378,6 @@ match replays exactly from its input stream.
 - Local steering around champions and projectiles, dodging and ally logic.
 - Openers and escapes, and abilities that land on the caster or on
   allies (self and ally abilities).
-- An energy reserve for the ultimate.
 
 ## Testing
 
