@@ -23,6 +23,7 @@ const simMtsFile = 'packages/sim/src/virtual.mts';
 const simTestFile = 'packages/sim/test/virtual.test.ts';
 const botsFile = 'packages/bots/src/virtual.ts';
 const botsCtsFile = 'packages/bots/src/virtual.cts';
+const botsTestFile = 'packages/bots/test/virtual.test.ts';
 const clientFile = 'packages/client/src/virtual.ts';
 
 type Case = { name: string; file: string; code: string; rule: string | null };
@@ -124,6 +125,57 @@ const cases: Case[] = [
     name: 'bots imports a sibling file with sim in its name',
     file: botsFile,
     code: "import './simplify';",
+    rule: null,
+  },
+  {
+    name: 'bots test imports sim test helpers by relative path',
+    file: botsTestFile,
+    code: "import '../../sim/test/helpers';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'bots test imports sim source by relative path',
+    file: botsTestFile,
+    code: "import '../../sim/src/step';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'bots test imports a kit data file',
+    file: botsTestFile,
+    code: "import kit from '../../../data/kits/hargrim.json'; export { kit };",
+    rule: null,
+  },
+  {
+    name: 'bots test imports bots source by relative path',
+    file: botsTestFile,
+    code: "import '../src/sight';",
+    rule: null,
+  },
+  { name: 'bots calls Date.now', file: botsFile, code: 'export const t = Date.now();', rule: PROPERTIES },
+  { name: 'bots calls Math.random', file: botsFile, code: 'export const r = Math.random();', rule: PROPERTIES },
+  {
+    name: 'bots calls performance.now',
+    file: botsFile,
+    code: 'export const t = performance.now();',
+    rule: PROPERTIES,
+  },
+  { name: 'bots reads the global Date', file: botsFile, code: 'export const x = Date;', rule: GLOBALS },
+  {
+    name: 'bots reads the global performance',
+    file: botsFile,
+    code: 'export const x = performance;',
+    rule: GLOBALS,
+  },
+  {
+    name: 'bots uses Math.hypot and Math.sqrt',
+    file: botsFile,
+    code: 'export const v = Math.hypot(3, 4) + Math.sqrt(2);',
+    rule: null,
+  },
+  {
+    name: 'bots test calls Date.now and Math.random',
+    file: botsTestFile,
+    code: 'export const v = Date.now() + Math.random();',
     rule: null,
   },
   {

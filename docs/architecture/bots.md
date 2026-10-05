@@ -296,9 +296,10 @@ object (for example from `cloneState` each tick) rebuilds the grid and resets
 the follower, so such a caller pays a rebuild every tick. The tier table and
 each tier are frozen and readonly. Decisions use only `+ - * /`,
 comparisons, `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`, `hypot`,
-`imul` and the sim's public exports. Bots do not use the sim's `dmath`. Review
-enforces this; a lint row for `Math.random`, `Date` and `performance` in bots
-source is a follow-up.
+`imul` and the sim's public exports. Bots do not use the sim's `dmath`. Lint
+bans `Date`, `performance`, `Math.random`, `Date.now` and `performance.now` in
+bots source (the sim's transcendental-math ban is not copied: bots output is not
+promised bit-identical across platforms); review enforces the rest.
 
 Bot output is not promised to be bit-identical across platforms, so no checksum
 fixture of a bot-driven match is committed (batch #32 decision 1). A recorded

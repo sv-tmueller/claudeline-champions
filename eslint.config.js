@@ -123,6 +123,24 @@ const simProperties = [
     message: `Math.${property} ${MATH_PORT}`,
   })),
 ];
+// bots decisions repeat from the state, the seed and the tick (spec section 4.8): no clock and
+// no unseeded randomness. The sim's math ban is not copied; bots tests may use all of these.
+const BOTS_CLOCK = 'bots never read the wall clock (spec section 4.8); decisions come from the state.';
+const botsGlobals = [
+  'error',
+  { name: 'Date', message: BOTS_CLOCK },
+  { name: 'performance', message: BOTS_CLOCK },
+];
+const botsProperties = [
+  'error',
+  {
+    object: 'Math',
+    property: 'random',
+    message: 'bots draw from their own seeded PRNG (packages/bots/src/rng.ts).',
+  },
+  { object: 'Date', property: 'now', message: BOTS_CLOCK },
+  { object: 'performance', property: 'now', message: BOTS_CLOCK },
+];
 const simSyntax = [
   ...noDynamicImport,
   { selector: "BinaryExpression[operator='**']", message: POW },
@@ -172,12 +190,17 @@ export default defineConfig(
     rules: {
       'no-restricted-imports': boundaryRule([...botsPatterns(['@claudeline/sim']), relativeIntoSim]),
       'no-restricted-syntax': noDynamicImport,
+      'no-restricted-globals': botsGlobals,
+      'no-restricted-properties': botsProperties,
     },
   },
   {
     files: ['packages/bots/test/**/*.ts'],
     rules: {
-      'no-restricted-imports': boundaryRule(botsPatterns(['@claudeline/sim', 'vitest'])),
+      'no-restricted-imports': boundaryRule([
+        ...botsPatterns(['@claudeline/sim', 'vitest']),
+        relativeIntoSim,
+      ]),
     },
   },
 );
