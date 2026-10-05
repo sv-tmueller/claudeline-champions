@@ -30,13 +30,22 @@ describe('bot driver', () => {
     expect(inputs.map((input) => input !== undefined)).toEqual([false, false, true, false]);
   });
 
-  it('writes a fresh input object on every call, since the bot returns one', () => {
+  it('writes the bot own record on every call, which step copies', () => {
     const { state, botIds, inputs } = setup();
     const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
     driver.think(state, inputs);
     const first = inputs[1];
+    expect(first).toBeDefined();
+    // The bots reuse one record each and overwrite it on their next think.
     driver.think(state, inputs);
-    expect(inputs[1]).not.toBe(first);
+    expect(inputs[1]).toBe(first);
+    // step copies what it reads: garbage written into the record afterwards changes nothing.
+    step(state, inputs);
+    const aim = [state.champions[1]?.aimX, state.champions[1]?.aimY];
+    if (first === undefined) throw new Error('no input');
+    first.aimX = 123456;
+    first.aimY = -654321;
+    expect([state.champions[1]?.aimX, state.champions[1]?.aimY]).toEqual(aim);
   });
 
   // The reference bots are made the way the driver says it makes them: one

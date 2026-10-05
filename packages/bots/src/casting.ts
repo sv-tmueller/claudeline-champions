@@ -1,13 +1,18 @@
 import { Button, CHAMPION_RADIUS, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } from '@claudeline/sim';
 import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
-import { abilityReach, inReach } from './reach';
-import { clearShot } from './sight';
+import { distanceInto } from './hypot';
+import type { Measure } from './hypot';
+import { profileFor } from './profile';
+import type { BotProfile } from './profile';
+import { RANGE_MARGIN, abilityReach } from './reach';
+import { clearShotWith } from './sight';
+import type { SightScratch } from './sight';
 
 // Casting: which slot a bot presses on a think. The gates copy steps 3b to 3d of the sim's `step`
 // (cooldowns count down, then a windup fires at 1, then a new cast may start), read on the state
 // the bot thinks on. Not named `cast.ts`: the sim has one.
 
-/** A slot to press and whether to hold SHIFT for its EX variant. */
+/** A slot to press and whether to hold SHIFT for its EX variant. A bot owns one and rewrites it. */
 export interface CastChoice {
   slot: Slot;
   ex: boolean;
@@ -21,6 +26,92 @@ export function findKit(state: GameState, championId: string): KitDef | undefine
     if (kit.id === championId) return kit;
   }
   return undefined;
+}
+
+/**
+ * What a bot derives from a kit, kept so a think does not derive it again: per slot (in SLOTS
+ * order) the reach band of the base ability and of its EX variant, the width of the shot of each,
+ * and the profile. It is rebuilt when the kit found is another object or the champion id
+ * changes, an identity check like the navigation grid's arena check. A kit mutated in place is
+ * not supported.
+ *
+ * The numbers live in typed arrays and in one profile object whose fields are always doubles. A
+ * `{ min, max }` object holds 0 as a small integer in one band and 1.5 as a double in another, and
+ * V8 boxes (16 B) a double it loads from some of those fields.
+ */
+export interface KitCache {
+  built: boolean;
+  /** The kit the cache was built from, undefined for a champion without one. */
+  kit: KitDef | undefined;
+  championId: string;
+  /** Rewritten in place on a rebuild, so its fields keep one representation. */
+  profile: BotProfile;
+  /** 1 when the base ability of the slot has a reach band. */
+  hasBase: Uint8Array;
+  baseMin: Float64Array;
+  baseMax: Float64Array;
+  /** The width of the shot of the base ability, see `clearanceOf`. */
+  baseClearance: Float64Array;
+  /**
+   * 1 when the slot is an EX slot of the kit (listed in `kit.ex`, has a variant, is not F) and
+   * the variant has a reach band.
+   */
+  hasEx: Uint8Array;
+  exMin: Float64Array;
+  exMax: Float64Array;
+  exClearance: Float64Array;
+}
+
+export function createKitCache(): KitCache {
+  return {
+    built: false,
+    kit: undefined,
+    championId: '',
+    profile: { rangeMin: 0.5, rangeMax: 0.5 },
+    hasBase: new Uint8Array(SLOTS.length),
+    baseMin: new Float64Array(SLOTS.length),
+    baseMax: new Float64Array(SLOTS.length),
+    baseClearance: new Float64Array(SLOTS.length),
+    hasEx: new Uint8Array(SLOTS.length),
+    exMin: new Float64Array(SLOTS.length),
+    exMax: new Float64Array(SLOTS.length),
+    exClearance: new Float64Array(SLOTS.length),
+  };
+}
+
+/** Rebuilds the cache when `kit` or `championId` differs from the one it was built for. */
+export function refreshKitCache(cache: KitCache, kit: KitDef | undefined, championId: string): void {
+  if (cache.built && cache.kit === kit && cache.championId === championId) return;
+  cache.built = true;
+  cache.kit = kit;
+  cache.championId = championId;
+  const profile = profileFor(championId, kit);
+  cache.profile.rangeMin = profile.rangeMin;
+  cache.profile.rangeMax = profile.rangeMax;
+  for (let i = 0; i < SLOTS.length; i++) {
+    cache.hasBase[i] = 0;
+    cache.hasEx[i] = 0;
+    if (kit === undefined) continue;
+    const slot = SLOTS[i] as Slot;
+    const spec = kit.slots[slot];
+    const base = abilityReach(spec);
+    if (base !== null) {
+      cache.hasBase[i] = 1;
+      cache.baseMin[i] = base.min;
+      cache.baseMax[i] = base.max;
+    }
+    cache.baseClearance[i] = clearanceOf(spec);
+    const variant = spec.ex;
+    if (variant !== undefined && slot !== 'F' && kit.ex.includes(slot)) {
+      const band = abilityReach(variant);
+      if (band !== null) {
+        cache.hasEx[i] = 1;
+        cache.exMin[i] = band.min;
+        cache.exMax[i] = band.max;
+      }
+      cache.exClearance[i] = clearanceOf(variant);
+    }
+  }
 }
 
 function hasStatus(me: ChampionState, type: StatusType): boolean {
@@ -38,23 +129,12 @@ function hasDash(ability: AbilitySpec): boolean {
 }
 
 /**
- * The ability the slot would cast on this think: the EX variant when the slot is listed in
- * `kit.ex`, the champion has the energy and the variant has a reach band, else the base ability.
- * F never has one.
+ * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
+ * `kit.ex`, has a variant with a reach band (the cache holds one only then), and the champion has
+ * the energy. F never does.
  */
-function ability(kit: KitDef, me: ChampionState, slot: Slot): { spec: AbilitySpec; ex: boolean } {
-  const base = kit.slots[slot];
-  const variant = base.ex;
-  if (
-    variant !== undefined &&
-    slot !== 'F' &&
-    kit.ex.includes(slot) &&
-    me.energy >= EX_ENERGY_COST &&
-    abilityReach(variant) !== null
-  ) {
-    return { spec: variant, ex: true };
-  }
-  return { spec: base, ex: false };
+function exFor(cache: KitCache, index: number, me: ChampionState): boolean {
+  return cache.hasEx[index] === 1 && me.energy >= EX_ENERGY_COST;
 }
 
 /**
@@ -74,53 +154,65 @@ export function clearanceOf(spec: AbilitySpec): number {
  * the slot would cast, with a clear shot of that ability's width, this think included. Anything
  * else puts the count back to 0. It ignores cooldown, energy, status and windup, so a slot that
  * comes off cooldown while the target stays in reach is pressed on the first tick the sim would
- * cast it.
+ * cast it. Allocates nothing: the bands come from the cache and the shot uses `scratch`.
  */
 export function updateRuns(
   runs: number[],
   state: GameState,
-  kit: KitDef,
+  cache: KitCache,
   me: ChampionState,
   target: ChampionState,
+  scratch: SightScratch,
+  dist: Measure,
 ): void {
-  const d = Math.hypot(me.x - target.x, me.y - target.y);
+  distanceInto(dist, me, target);
+  const d = dist.metres;
   for (let i = 0; i < SLOTS.length; i++) {
-    const spec = ability(kit, me, SLOTS[i] as Slot).spec;
-    const band = abilityReach(spec);
-    runs[i] =
-      band !== null && inReach(band, d) && clearShot(state, me, target, clearanceOf(spec))
-        ? (runs[i] as number) + 1
-        : 0;
+    const ex = exFor(cache, i, me);
+    let inBand = false;
+    if (ex) {
+      // `inReach` of the EX band, written out over the typed arrays.
+      inBand = (cache.exMin[i] as number) <= d && d <= (cache.exMax[i] as number) - RANGE_MARGIN;
+      scratch.clearance = cache.exClearance[i] as number;
+    } else if (cache.hasBase[i] === 1) {
+      inBand = (cache.baseMin[i] as number) <= d && d <= (cache.baseMax[i] as number) - RANGE_MARGIN;
+      scratch.clearance = cache.baseClearance[i] as number;
+    }
+    runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
   }
 }
 
 /**
- * The slot to press, or null. The first of F, R, E, Q, SPACE, M2, M1 (the sim's own order) whose
- * run is over `castDelay` and that passes the sim's gates: no windup in progress unless it fires
- * on this tick (windupLeft 1), the cooldown at most 1 (it counts down first), the energy for the
- * cost (100 for F, 25 for an EX variant), no stun or silence, and no root for a dash. Run
- * `updateRuns` first.
+ * Writes the slot to press into `choice` and returns true, or returns false. The first of F, R, E,
+ * Q, SPACE, M2, M1 (the sim's own order) whose run is over `castDelay` and that passes the sim's
+ * gates: no windup in progress unless it fires on this tick (windupLeft 1), the cooldown at most 1
+ * (it counts down first), the energy for the cost (100 for F, 25 for an EX variant), no stun or
+ * silence, and no root for a dash. Run `updateRuns` first.
  */
 export function chooseCast(
+  choice: CastChoice,
   runs: readonly number[],
   castDelay: number,
   kit: KitDef,
+  cache: KitCache,
   me: ChampionState,
-): CastChoice | null {
-  if (me.cast !== null && me.cast.windupLeft !== 1) return null;
-  if (hasStatus(me, 'stun') || hasStatus(me, 'silence')) return null;
+): boolean {
+  if (me.cast !== null && me.cast.windupLeft !== 1) return false;
+  if (hasStatus(me, 'stun') || hasStatus(me, 'silence')) return false;
   const rooted = hasStatus(me, 'root');
   for (let i = SLOTS.length - 1; i >= 0; i--) {
     if ((runs[i] as number) <= castDelay) continue;
     if ((me.cooldowns[i] as number) > 1) continue;
     const slot = SLOTS[i] as Slot;
-    const { spec, ex } = ability(kit, me, slot);
+    const ex = exFor(cache, i, me);
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if (me.energy < cost) continue;
-    if (rooted && hasDash(spec)) continue;
-    return { slot, ex };
+    if (rooted && hasDash(abilityFor(kit, slot, ex))) continue;
+    choice.slot = slot;
+    choice.ex = ex;
+    return true;
   }
-  return null;
+  return false;
 }
 
 /** The `buttons` of a choice: its slot bit, and SHIFT for an EX variant. */
@@ -132,13 +224,4 @@ export function buttonsOf(choice: CastChoice): number {
 export function abilityFor(kit: KitDef, slot: Slot, ex: boolean): AbilitySpec {
   const base = kit.slots[slot];
   return ex && base.ex !== undefined ? base.ex : base;
-}
-
-/** The speed of the first top-level projectile of an ability, or undefined when it has none. */
-export function projectileSpeed(spec: AbilitySpec): number | undefined {
-  for (let i = 0; i < spec.effects.length; i++) {
-    const effect = spec.effects[i];
-    if (effect !== undefined && effect.type === 'projectile') return effect.speed;
-  }
-  return undefined;
 }

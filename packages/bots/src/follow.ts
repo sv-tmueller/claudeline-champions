@@ -1,8 +1,9 @@
 import { segmentClear } from './geometry';
 import { cellCenter, cellIndexAt } from './grid';
 import type { NavGrid, Vec2 } from './grid';
+import { hypot2 } from './hypot';
 import { findPath } from './path';
-import { steerToward } from './steer';
+import { steerTowardInto } from './steer';
 import type { MoveCommand } from './steer';
 
 /** Ticks after which the follower plans again even when nothing changed. */
@@ -72,7 +73,7 @@ function splitPath(grid: NavGrid, path: readonly Vec2[]): Vec2[] {
     const a = path[i - 1];
     const b = path[i];
     if (a === undefined || b === undefined) continue;
-    const count = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / grid.cellSize));
+    const count = Math.max(1, Math.ceil(hypot2(b.x - a.x, b.y - a.y) / grid.cellSize));
     for (let k = 1; k <= count; k++) {
       points.push({ x: a.x + ((b.x - a.x) * k) / count, y: a.y + ((b.y - a.y) * k) / count });
     }
@@ -105,12 +106,13 @@ function plan(grid: NavGrid, follower: PathFollower, position: Vec2, goal: Vec2)
   follower.points = [exitPoint, ...splitPath(grid, route)];
 }
 
-function advance(follower: PathFollower, position: Vec2): void {
+/** Skips the points already reached; `scratch` takes the steering test of each. */
+function advance(follower: PathFollower, position: Vec2, scratch: MoveCommand): void {
   while (follower.index < follower.points.length) {
     const point = follower.points[follower.index];
     if (point === undefined) return;
-    const move = steerToward(position, point);
-    if (move.moveX !== 0 || move.moveY !== 0) return;
+    steerTowardInto(scratch, position, point);
+    if (scratch.moveX !== 0 || scratch.moveY !== 0) return;
     follower.index++;
   }
 }
@@ -119,7 +121,7 @@ function needsPlan(grid: NavGrid, follower: PathFollower, position: Vec2, goal: 
   if (follower.goal === null) return true;
   if (follower.age >= REPLAN_INTERVAL) return true;
   if (follower.age < REPLAN_MIN_AGE) return false;
-  if (Math.hypot(goal.x - follower.goal.x, goal.y - follower.goal.y) > grid.cellSize) return true;
+  if (hypot2(goal.x - follower.goal.x, goal.y - follower.goal.y) > grid.cellSize) return true;
   const next = follower.points[follower.index];
   return next !== undefined && !segmentClear(grid, position, next);
 }
@@ -134,12 +136,33 @@ export function followPath(
   position: Vec2,
   goal: Vec2,
 ): MoveCommand {
+  const out: MoveCommand = { moveX: 0, moveY: 0 };
+  followPathInto(out, grid, follower, position, goal);
+  return out;
+}
+
+/**
+ * `followPath` written into `out`, which also serves as the scratch of the steering tests. The
+ * steady state (no plan) allocates nothing: a plan, with its search and its split path, does.
+ */
+export function followPathInto(
+  out: MoveCommand,
+  grid: NavGrid,
+  follower: PathFollower,
+  position: Vec2,
+  goal: Vec2,
+): void {
   if (follower.goal !== null) follower.age++;
-  advance(follower, position);
+  advance(follower, position, out);
   if (needsPlan(grid, follower, position, goal)) {
     plan(grid, follower, position, goal);
-    advance(follower, position);
+    advance(follower, position, out);
   }
   const point = follower.points[follower.index];
-  return point === undefined ? { moveX: 0, moveY: 0 } : steerToward(position, point);
+  if (point === undefined) {
+    out.moveX = 0;
+    out.moveY = 0;
+  } else {
+    steerTowardInto(out, position, point);
+  }
 }

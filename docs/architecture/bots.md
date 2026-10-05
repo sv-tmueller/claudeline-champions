@@ -10,13 +10,19 @@ Bots run inside the same process as the sim (browser locally, server online).
 They read the full state; fairness comes from difficulty tiers, not hidden
 information.
 
+- `think` returns the bot's own `PlayerInput` record and the bot's next `think`
+  overwrites every field of it (the dead and idle paths too). A caller that keeps
+  an input past the next think copies it; `step` already does, since it reads the
+  record and keeps no reference to it. Two bots never share a record.
+
 - Call `think` once per tick, before `step`; it never mutates the state or
   touches `state.rng`. A champion with a kit in `state.kits` presses at most one
   slot per think, plus SHIFT for an EX variant (see Casting). A champion without
   a kit never presses: `buttons` is 0. Casting needs the kits passed to
   `createMatch`.
 - `inspect()` is read-only and returns a fresh copy of the intent and target the
-  bot is acting on. It exists so tests and dev tools can observe decisions.
+  bot is acting on. It exists so tests and dev tools can observe decisions. It
+  allocates by design and is not on the frame path.
 - `createBot` throws `Error('Invalid bot: ...')` for a `playerId` that is not a
   non-negative integer, a `difficulty` that is not an own key of the tier table,
   or a `seed` that is not an integer. `think` throws when the state has no
@@ -186,7 +192,10 @@ error (up to 12 degrees on easy) moves off the centre-to-centre segment.
 
 `packages/bots/src/casting.ts` (not `cast.ts`: the sim has one) and
 `packages/bots/src/reach.ts`. The bot finds its kit in `state.kits` by champion id
-on every think and keeps no reference to it.
+on every think and derives from it, once, what it needs (see Allocation): the reach
+band and the shot width of each slot's base ability and EX variant, and the profile.
+It keeps that cache for as long as the kit found is the same object and the champion
+id is the same, and rebuilds it otherwise.
 
 Reach band of an ability, from kit data (`abilityReach`), with `CR` the champion
 radius 0.5 and `offset` starting at 0 along the top-level effects:
@@ -242,6 +251,48 @@ Never pressed: an ability with no band (self and ally abilities: Hargrim Q, R an
 base SPACE, Quillon SPACE and R in the test kits), and any slot of a champion
 without a kit. Openers and escapes are not built.
 
+## Allocation
+
+A think allocates nothing in the steady state: the bot runs in the frame path of the
+browser, and `packages/bots/test/allocation.test.ts` measures it (see Testing). What
+makes that true, and what stays outside it:
+
+- Every record a think reads or writes is made once, in `createBot`, and rewritten
+  field by field: the decision and the acted decision, the delay ring, the move
+  command, the scores, the cast choice, the returned input, the scratch points of the
+  shot test and the kit cache. Loops on the think path are indexed. Fields that hold
+  doubles start as doubles (0.5), so no field changes representation and boxes.
+- A double passed to a call that V8 does not inline, or returned from one, is boxed
+  (16 B), and so is a double loaded from a field that holds a small integer in one
+  object and a double in another. So the hot helpers take objects and write a field of
+  one (`distanceInto`, `scoreIntentsInto`, `clearShotWith`, `nearestSightCellIn`,
+  `steerTowardInto`, `followPathInto`), the numbers a scan reads come from typed
+  arrays or arrays of doubles (the kit cache, `NavGrid.shapes`, the obstacle table of
+  the shot test), and the aim is written out over locals. The object-and-field form
+  gives the same numbers as the pure functions it replaces (`scoreIntents`,
+  `leadPoint`, `rotateByHalfTangent`, `roundAim`, `clearShot`, `nearestSightCell`,
+  `steerToward`, `followPath`), which stay as the reference the tests compare it with.
+- `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32 B per
+  call, so a bot that measures a dozen distances allocated 400 B for them. A test
+  compares it, bit for bit, with `Math.hypot`.
+- `lineOfSight` is the sim's `hasLineOfSight` over a Float64Array of the obstacles,
+  because the sim's allocates about 128 B per call (each sweep returns a double). A
+  test compares the two on random segments. The table is rebuilt when the arena is
+  another object.
+- `segmentClear` reads the obstacles from `NavGrid.shapes` (a flat array of numbers,
+  kept next to `obstacles` in the grid, which stays plain JSON) and takes every
+  distance from one `hypot2` call site.
+- The scratch of the shot test and the scan is per bot, so two bots never share it.
+  A direct call of `clearShot` or `nearestSightCell` without a scratch allocates one.
+
+Outside the steady state, by design: a plan (A star, `splitPath`, the fallback search),
+a fresh path follower after a goal or intent change, the grid and the tables built for a
+new arena, the kit cache built for a new kit, `inspect()`, and the aim error draw, whose
+`aimU` is a closure variable written once every 15 thinks. The decision records are
+what a think would have allocated once: one small object per think stays under the
+bound of the test, so only review and the unit tests guard the returned input (it is the
+bot's own record) and the decision record.
+
 ## Aim
 
 Lead moving targets using their current velocity; add a tier-dependent angular
@@ -290,16 +341,19 @@ seeded from `seed`), and `think` is a pure function of the state plus the bot's
 private state. A bot keeps no module-level state, iterates arrays in index
 order, never reads the wall clock or `Math.random`, never reads or writes
 `state.rng`, never mutates the state, adds no random draw for casting (the aim
-draw stays the only use of the bot's rng), finds the kit on every think instead
-of keeping it, and stores copies of numbers and ids
-rather than references into the state. The one exception is `gridArena`, the
-`state.arena` reference the bot keeps for an identity check: while the arena
-object is the same, the navigation grid and the path follower stay; a new arena
-object (for example from `cloneState` each tick) rebuilds the grid and resets
-the follower, so such a caller pays a rebuild every tick. The tier table and
-each tier are frozen and readonly. Decisions use only `+ - * /`,
-comparisons, `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`, `hypot`,
-`imul` and the sim's public exports. Bots do not use the sim's `dmath`. Lint
+draw stays the only use of the bot's rng), and stores copies of numbers and ids
+rather than references into the state. The exceptions are three references the bot
+keeps for identity checks, each rebuilt when the object it was built from is another
+one: `state.arena` (the navigation grid and the path follower stay while it is the
+same object; a new arena object, for example from `cloneState` each tick, rebuilds
+the grid and resets the follower, so such a caller pays a rebuild every tick), the
+same arena for the obstacle table of the shot test (see Allocation), and the kit
+object found in `state.kits` together with the champion id (the kit cache). The
+caches are per bot and a kit or an arena mutated in place is not supported.
+The tier table and each tier are frozen and readonly. Decisions use only
+`+ - * /`, comparisons, `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`, `imul`,
+the sim's public exports and `hypot2` of `packages/bots/src/hypot.ts`, which gives the
+bits `Math.hypot` gives (see Allocation). Bots do not use the sim's `dmath`. Lint
 bans `Date`, `performance`, `Math.random`, `Date.now` and `performance.now` in
 bots source (the sim's transcendental-math ban is not copied: bots output is not
 promised bit-identical across platforms); review enforces the rest.
@@ -336,6 +390,23 @@ and a shifted line hits the pillar gets no press and is not chosen as a sight
 cell. The determinism test runs the same match twice, and two matches
 stepped in turn, and compares input streams and final checksums in memory. See
 [testing](testing.md).
+
+A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation section. It
+builds six frozen scenes on arena 1 with the shipped Hargrim and Quillon kits (a press, an
+engage stand, a path follow past the age of the segment test, a kite with no clear shot, a
+kite step and a retreat), warms each bot up with 20000 thinks and reads
+`process.memoryUsage().heapUsed` around one `think`, 600 samples per round. The figure of a
+round is the median delta minus the median delta of an empty pair of reads, and the lowest of
+three rounds of every scene must be under a literal bound, 128 B per think. Main reads 4 to 56 KB
+per think, the branch 0 B, and the bound sits between the two. The test also reads the sim's
+baseline step against the floor of the sim's own check, which proves the counter moves, and it
+checks that `think` leaves the checksum alone and that every scene stayed in its intent. It gates
+on the native runner and not on the Linux container (batch #53 decision 12). Differential tests
+keep the allocation-free forms honest: `hypot2` and `distanceInto` against `Math.hypot`,
+`lineOfSight` against the sim's `hasLineOfSight`, and `segmentClear` against a copy of the
+implementation before the rewrite and against the sampled clearance oracle. The test helpers
+copy every input a bot returns, and a guard counts one distinct record per bot per tick, since a
+stream of aliases would compare a few objects with themselves.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the

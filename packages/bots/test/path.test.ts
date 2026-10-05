@@ -41,6 +41,7 @@ function handGrid(cols: number, rows: number, blockedCells: [number, number][]):
     height: rows,
     blocked,
     obstacles: [],
+    shapes: [],
   };
 }
 

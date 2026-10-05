@@ -638,3 +638,58 @@ describe('aim speed', () => {
     expect(input).toMatchObject(expectedAim(me, target, NOMINAL_PROJECTILE_SPEED));
   });
 });
+
+describe('the kit cache', () => {
+  // Quillon with an M1 that is the only slot with a band: 21 m/s for 40 ticks reaches 14 m and
+  // for 20 ticks 7 m.
+  const m1Kit = (lifetimeTicks: number): KitDef =>
+    quietKit('quillon', { M1: boltSlot(21, lifetimeTicks, { cooldownTicks: 30 }) });
+
+  /** Quillon (id 1) 9 m from champion 2, its only enemy, in a match with this kit. */
+  function nineMetres(kit: KitDef): GameState {
+    const state = createMatch(QUILLON, open, 1, [kit]);
+    kill(state, 0, 3);
+    put(state, 1, -3, 0);
+    put(state, 2, 6, 0);
+    return state;
+  }
+
+  it('reads the band of the kit of the match the bot is in, not the first one it saw', () => {
+    const bot = createBot(1, 'hard', 1);
+    expect(firstPress(bot, nineMetres(m1Kit(40)), 60), 'the long M1 reaches 9 m').not.toBeNull();
+    const short = nineMetres(m1Kit(20));
+    for (let i = 0; i < 60; i++) expect(bot.think(short).buttons, `short, think ${i}`).toBe(0);
+    expect(firstPress(bot, nineMetres(m1Kit(40)), 60), 'the long M1 again').not.toBeNull();
+  });
+
+  it('reads the profile of the champion the bot is in, when neither match has a kit', () => {
+    const asQuillon = createMatch(QUILLON, open, 1);
+    kill(asQuillon, 0, 3);
+    put(asQuillon, 1, -3, 0);
+    put(asQuillon, 2, 0, 0);
+    const bot = createBot(1, 'hard', 1);
+    for (let i = 0; i < TIERS.hard.delay + 1; i++) bot.think(asQuillon);
+    // Quillon is 3 m from its enemy: closer than rangeMin 6, so it kites.
+    expect(bot.inspect().intent).toBe('kite');
+
+    const asHargrim = createMatch(
+      {
+        teamSize: 2,
+        players: [
+          { championId: 'dummy', team: 'A' },
+          { championId: 'hargrim', team: 'A' },
+          { championId: 'dummy', team: 'B' },
+          { championId: 'dummy', team: 'B' },
+        ],
+      },
+      open,
+      1,
+    );
+    kill(asHargrim, 0, 3);
+    put(asHargrim, 1, -3, 0);
+    put(asHargrim, 2, 0, 0);
+    for (let i = 0; i < TIERS.hard.delay + 1; i++) bot.think(asHargrim);
+    // Hargrim never kites: it stands 3 m from its enemy.
+    expect(bot.inspect().intent).toBe('engage');
+  });
+});

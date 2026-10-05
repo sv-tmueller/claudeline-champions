@@ -107,17 +107,17 @@ describe('think output', () => {
     expect(bot.inspect()).toEqual({ intent: 'idle', targetId: -1 });
   });
 
-  it('returns a fresh valid input every tick', () => {
+  it('returns a valid input every tick, always the bot own record', () => {
     const state = setup();
     kill(state, 1, 3);
     const bots = new Map([[0, createBot(0, 'hard', 3)]]);
     const bot = bots.get(0);
     if (!bot) throw new Error('no bot');
-    const seen = new Set<PlayerInput>();
+    let own: PlayerInput | undefined;
     for (let i = 0; i < 300; i++) {
       const input = bot.think(state);
-      expect(seen.has(input)).toBe(false);
-      seen.add(input);
+      own ??= input;
+      expect(input).toBe(own);
       expect(Object.is(input.moveX, 0) || input.moveX === 1 || input.moveX === -1).toBe(true);
       expect(Object.is(input.moveY, 0) || input.moveY === 1 || input.moveY === -1).toBe(true);
       expect(Object.is(input.moveX, -0)).toBe(false);
@@ -849,5 +849,65 @@ describe('finisher', () => {
       during: { intent: 'kite', targetId: 2 },
       after: { intent: 'retreat', targetId: 2 },
     });
+  });
+});
+
+describe('the returned input', () => {
+  /** Champion 0 of the 2v2 against champion 2, 6 m east on open ground. */
+  function duel(): GameState {
+    const state = setup();
+    kill(state, 1, 3);
+    put(state, 0, -3, 0);
+    put(state, 2, 3, 0);
+    return state;
+  }
+
+  it('is the bot own record: the next think overwrites it, whatever the path', () => {
+    const state = duel();
+    const bot = createBot(0, 'hard', 1);
+    expect(bot.think(state)).toBe(bot.think(state));
+    // The dead path.
+    ch(state, 0).alive = false;
+    expect(bot.think(state)).toBe(bot.think(state));
+    ch(state, 0).alive = true;
+    // The idle path: no enemy is alive.
+    kill(state, 2);
+    expect(bot.think(state)).toBe(bot.think(state));
+  });
+
+  it('is a record per bot', () => {
+    const state = setup();
+    expect(createBot(0, 'hard', 1).think(state)).not.toBe(createBot(0, 'hard', 1).think(state));
+  });
+
+  it('is written in every field again on each think', () => {
+    const state = duel();
+    const bot = createBot(0, 'hard', 1);
+    const input = bot.think(state);
+    const expected = { ...input };
+    // A caller that writes garbage into the record does not corrupt the next think.
+    (input as { moveX: number }).moveX = 1;
+    input.moveY = -1;
+    input.aimX = 123456;
+    input.aimY = -98765;
+    input.buttons = 77;
+    expect(bot.think(state)).toEqual(expected);
+    ch(state, 0).alive = false;
+    ch(state, 0).aimX = 321;
+    ch(state, 0).aimY = -654;
+    input.aimX = 5;
+    input.buttons = 9;
+    expect(bot.think(state)).toEqual({ moveX: 0, moveY: 0, aimX: 321, aimY: -654, buttons: 0 });
+  });
+
+  it('is not what inspect returns: inspect is a fresh copy every time', () => {
+    const state = duel();
+    const bot = createBot(0, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    const a = bot.inspect();
+    expect(bot.inspect()).not.toBe(a);
+    expect(bot.inspect()).toEqual(a);
+    (a as { intent: string }).intent = 'idle';
+    expect(bot.inspect().intent).toBe('engage');
   });
 });

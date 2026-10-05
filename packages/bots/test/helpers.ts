@@ -1,4 +1,6 @@
 import arena01Json from '../../../data/arenas/arena01.json';
+import hargrimJson from '../../../data/kits/hargrim.json';
+import quillonJson from '../../../data/kits/quillon.json';
 import {
   Button,
   CHAMPION_RADIUS,
@@ -27,6 +29,14 @@ import { findPath } from '../src/path';
 import { profileFor } from '../src/profile';
 
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
+
+/**
+ * The shipped Hargrim and Quillon kits from `data/kits`, for `createMatch`, which validates them.
+ * The JSON is a plain object tree, so the cast is the one the sim's roster test makes.
+ */
+export function jsonKits(): KitDef[] {
+  return [hargrimJson, quillonJson].map((kit) => structuredClone(kit) as unknown as KitDef);
+}
 
 function validAxis(v: number): boolean {
   return (v === 1 || v === -1 || v === 0) && !Object.is(v, -0);
