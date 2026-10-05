@@ -98,7 +98,8 @@ export function updateRuns(
  * The slot to press, or null. The first of F, R, E, Q, SPACE, M2, M1 (the sim's own order) whose
  * run is over `castDelay` and that passes the sim's gates: no windup in progress unless it fires
  * on this tick (windupLeft 1), the cooldown at most 1 (it counts down first), the energy for the
- * cost (100 for F, 25 for an EX variant), no stun or silence, and no root for a dash. Run `updateRuns` first.
+ * cost (100 for F, 25 for an EX variant), no stun or silence, and no root for a dash. Run
+ * `updateRuns` first.
  */
 export function chooseCast(
   runs: readonly number[],

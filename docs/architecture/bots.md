@@ -152,7 +152,11 @@ has only the centre segment. It is a pure function of the state and draws no
 random number. Why: a position on the edge of an obstacle's shadow has a line of
 sight, but every bolt with the smallest aim error hits the obstacle. Without the
 test both Quillons of the kit headless run stood on the edge of the pillar's
-shadow and never landed a bolt again.
+shadow and never landed a bolt again. Three lines are a stand-in for the swept
+circle of the sim, and a shot can still clip in two cases: an obstacle narrower
+than `c` that lies between two of the three lines (a post of radius under `c` / 2,
+or a thin wall parallel to the shot), and a flight line that the lead or the aim
+error (up to 12 degrees on easy) moves off the centre-to-centre segment.
 
 - A cast uses `c` = the radius of the first top-level projectile of the ability it
   would press, or the champion radius 0.5 m when the ability has none.
