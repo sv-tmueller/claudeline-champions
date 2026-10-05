@@ -76,8 +76,8 @@ champion has a small bot profile with a preferred range. The kit does not ship
 it: the bots derive the range from the kit data (see Profiles), and openers and
 escapes are not built. The one finisher is the rule under Finisher below.
 
-Built so far: engage, kite, retreat, plus idle, and casting (see Casting). Idle
-means no enemy is alive: the bot stands and keeps its aim.
+Built so far: engage, kite, retreat, plus idle, casting (see Casting) and the advance of a
+retreating bot (see Deadlock). Idle means no enemy is alive: the bot stands and keeps its aim.
 
 Target: the bot keeps its current target while it is alive, unless another
 alive enemy is more than 1 m nearer. Otherwise the target is the nearest alive
@@ -87,10 +87,10 @@ id.
 With `d` the distance to the target, `h` health over maximum health, and
 `[rangeMin, rangeMax]` from the profile, scores are clamped to 0 to 1:
 
-| Intent  | Score                                                | Movement                                                                                                                                   |
-| ------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                                     |
-| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                                                       |
+| Intent  | Score                                                | Movement                                                                                                                                                                                |
+| ------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                                                                                  |
+| kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                                                                                                    |
 | retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there, unless a finisher qualifies, see Finisher, or the deadlock rule advances, see Deadlock |
 
 Hysteresis: the bot switches only when the best other intent scores more than
@@ -412,23 +412,33 @@ and no `NaN` may appear. The headless test runs a 2v2 match of four bots on
 arena 1 for 3600 ticks with a mix of tiers, checks the sim invariants and the
 input rules every tick, and checks that `think` leaves the state's checksum
 unchanged. A second headless run puts a mirror 2v2 (Hargrim and Quillon on both
-teams, bots-local kits in `packages/bots/test/kits.ts`) through the same checks,
-with a press oracle: every press is checked on the state the bot thought on
-against a literal band table, the acted target, line of sight and a clear shot of
-the ability's width, the cooldown, the energy, stun, silence, root with a dash and
-the windup, and afterwards the sim must have started that cast, or a death, a
-stun, a silence or a root explains why not. The run must end with a death from a
-cast, every champion must start a cast, and one cast must be an EX. A
-shadow-edge test on arena 1 pins that a position where the centre line is clear
-and a shifted line hits the pillar gets no press and is not chosen as a sight
-cell. The determinism test runs the same match twice, and two matches
-stepped in turn, and compares input streams and final checksums in memory. See
-[testing](testing.md).
+teams) through the same checks, once on the bots-local test kits in
+`packages/bots/test/kits.ts` and once on the shipped kits `data/kits/hargrim.json` and
+`quillon.json`, with a press oracle: every press is checked on the state the bot thought
+on against a literal band and clearance table of the kit set (written from the kit files,
+not from src, and worked out again from the files by a test, since the run presses only
+some slots), the acted target, line of sight and a clear shot of the ability's width, the
+cooldown, the energy, stun, silence, root with a dash and the windup, and afterwards the sim
+must have started that cast, or a death, a stun, a silence or a root explains why not. The
+run must end with a death from a cast, every champion must start a cast, and one cast must
+be an EX. The seeds are 101 to 104, the match seed 7 and the tiers easy, normal, hard,
+normal; they are pinned, and a miss after a change to the bots, the sim or the Node
+version is governed by batch #53 decision 8.3. The ultimate has its own pinned run: the 2v2
+ends its fights by tick 700 with the energy bar at 75 at most, and 9000 matches of it on the
+shipped kits gave no F cast, so a 3v3 of Hargrim and two Quillons a side, seeds 101 to 106 at
+the hard tier, runs through the same checks and must start an F (decision 8 of #63 allows a
+separate set for this alone; it needed another size of match). The energy reserve is what
+lets it fire: without it the run starts none. A shadow-edge test on arena 1 pins that a
+position where the centre line is clear and a shifted line hits the pillar gets no press and
+is not chosen as a sight cell. The determinism test runs the same match twice, and two
+matches stepped in turn, on the test kits and on the shipped kits (the second one
+interleaved with a match on the test kits), and compares input streams and final checksums
+in memory. See [testing](testing.md).
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation section. It
-builds six frozen scenes on arena 1 with the shipped Hargrim and Quillon kits (a press, an
+builds nine frozen scenes on arena 1 with the shipped Hargrim and Quillon kits (a press, an
 engage stand, a path follow past the age of the segment test, a kite with no clear shot, a
-kite step and a retreat), warms each bot up with 20000 thinks and reads
+kite step, a retreat, and the deadlock rule's advance, flee and latched stand), warms each bot up with 20000 thinks and reads
 `process.memoryUsage().heapUsed` around one `think`, 600 samples per round. The figure of a
 round is the median delta minus the median delta of an empty pair of reads, and the lowest of
 three rounds of every scene must be under a literal bound, 128 B per think. Main reads 4 to 56 KB
