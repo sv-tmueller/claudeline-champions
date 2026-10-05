@@ -1,0 +1,165 @@
+{
+  "id": "hargrim",
+  "maxHealth": 160,
+  "moveSpeed": 5.5,
+  "support": false,
+  "ex": ["M2", "SPACE"],
+  "slots": {
+    "M1": {
+      "cooldownTicks": 36,
+      "windupTicks": 9,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "meleeArc",
+          "radius": 2.5,
+          "cosHalfAngle": 0.6427876097,
+          "effects": [{ "type": "damage", "amount": 12 }]
+        }
+      ]
+    },
+    "M2": {
+      "cooldownTicks": 360,
+      "windupTicks": 24,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "ahead", "distance": 2.5 },
+          "radius": 2,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 18 },
+            { "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 90 } }
+          ]
+        }
+      ],
+      "ex": {
+        "windupTicks": 24,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "area",
+            "placement": { "type": "ahead", "distance": 2.5 },
+            "radius": 2.75,
+            "durationTicks": 1,
+            "intervalTicks": 1,
+            "targets": "enemies",
+            "effects": [
+              { "type": "damage", "amount": 26 },
+              { "type": "applyStatus", "status": { "type": "slow", "percent": 50, "ticks": 120 } }
+            ]
+          }
+        ]
+      }
+    },
+    "SPACE": {
+      "cooldownTicks": 420,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "dash", "distance": 5, "ticks": 15, "then": [] },
+        { "type": "applyStatus", "status": { "type": "haste", "percent": 20, "ticks": 90 } }
+      ],
+      "ex": {
+        "windupTicks": 0,
+        "movement": "free",
+        "effects": [
+          {
+            "type": "dash",
+            "distance": 7,
+            "ticks": 15,
+            "then": [
+              {
+                "type": "area",
+                "placement": { "type": "self" },
+                "radius": 1.5,
+                "durationTicks": 1,
+                "intervalTicks": 1,
+                "targets": "enemies",
+                "effects": [
+                  { "type": "damage", "amount": 12 },
+                  { "type": "applyStatus", "status": { "type": "stun", "ticks": 30 } }
+                ]
+              }
+            ]
+          },
+          { "type": "applyStatus", "status": { "type": "haste", "percent": 30, "ticks": 120 } }
+        ]
+      }
+    },
+    "Q": {
+      "cooldownTicks": 840,
+      "windupTicks": 12,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 4,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "allies",
+          "effects": [{ "type": "applyStatus", "status": { "type": "haste", "percent": 30, "ticks": 120 } }]
+        }
+      ]
+    },
+    "E": {
+      "cooldownTicks": 540,
+      "windupTicks": 18,
+      "movement": "locked",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 20,
+          "radius": 0.4,
+          "lifetimeTicks": 27,
+          "pierce": false,
+          "effects": [
+            { "type": "damage", "amount": 14 },
+            { "type": "knockback", "distance": 4, "ticks": 12, "direction": "toward" },
+            { "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 60 } }
+          ]
+        }
+      ]
+    },
+    "R": {
+      "cooldownTicks": 720,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "shield", "absorb": 40, "ticks": 240 },
+        { "type": "applyStatus", "status": { "type": "haste", "percent": 20, "ticks": 90 } }
+      ]
+    },
+    "F": {
+      "cooldownTicks": 600,
+      "windupTicks": 30,
+      "movement": "locked",
+      "effects": [
+        {
+          "type": "dash",
+          "distance": 6,
+          "ticks": 18,
+          "then": [
+            {
+              "type": "area",
+              "placement": { "type": "self" },
+              "radius": 3.5,
+              "durationTicks": 1,
+              "intervalTicks": 1,
+              "targets": "enemies",
+              "effects": [
+                { "type": "damage", "amount": 40 },
+                { "type": "applyStatus", "status": { "type": "stun", "ticks": 60 } },
+                { "type": "knockback", "distance": 3, "ticks": 10, "direction": "away" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
