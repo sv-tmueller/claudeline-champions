@@ -4,8 +4,8 @@
 // Quillon kits of `data/kits` through `validateKit`, for a 2v2 of Hargrim and Quillon on each team,
 // and it imports nothing from the other test files but `helpers.ts` and `round-watch.ts`.
 //
-// The match test runs 3600 ticks with random inputs. The inputs come from a mulberry32 of this file,
-// seeded with SEED, so the state's own random stream is not drawn on. Each champion holds its move,
+// The match test runs 3600 ticks with random inputs. The inputs come from `nextRandom` (mulberry32)
+// on a holder of this file seeded with SEED, so the state's own random stream is not drawn on. Each champion holds its move,
 // aim and buttons and redraws all three with p = 0.15 per tick. An aim goes to a live enemy with
 // p = 0.7 and to a random point of the arena otherwise. Each of the seven ability buttons is held
 // with p = 0.3. The match seed is SEED too.
@@ -29,6 +29,8 @@ import {
   CHAMPION_RADIUS,
   MAX_ARENA_METERS,
   RING_SOURCE_ID,
+  ROUND_TICKS,
+  WARMUP_TICKS,
   checksum,
   createMatch,
   hasLineOfSight,
@@ -37,6 +39,7 @@ import {
 } from '../src/index';
 import type { ArenaDef, GameState, MatchConfig, PlayerInput, SimEvent } from '../src/index';
 import { validateKit } from '../src/kit';
+import { nextRandom } from '../src/rng';
 import { arena01, contactKinds } from './helpers';
 import { RoundWatcher, checkEveryStep } from './round-watch';
 
@@ -45,7 +48,7 @@ const TICKS = 3600;
 const REDRAW = 0.15;
 const AIM_AT_ENEMY = 0.7;
 const HOLD_BUTTON = 0.3;
-const SUDDEN_DEATH_AT = 5580;
+const SUDDEN_DEATH_AT = WARMUP_TICKS + ROUND_TICKS;
 const STANDOFF_CAP = 9000;
 
 const arena02: ArenaDef = parseArenaDef(arena02Json);
@@ -141,11 +144,11 @@ describe('the arena02 ring', () => {
   });
 
   it('flags a ring that breaks one rule at a time', () => {
-    const wall = { type: 'circle', x: 0, y: 0, r: 1, height: 2, blocksProjectiles: true } as const;
+    const pillar = { type: 'circle', x: 0, y: 0, r: 1, height: 2, blocksProjectiles: true } as const;
     const cases: [string, ArenaDef, string][] = [
       ['an end circle that does not fit the floor', withRing({ endRadius: 9.6 }), 'wider than the floor'],
       ['a start radius inside the spawns', withRing({ startRadius: 11 }), 'from the centre'],
-      ['an obstacle in the open centre', { ...arena02, obstacles: [...arena02.obstacles, wall] }, 'inside the end radius'],
+      ['an obstacle in the open centre', { ...arena02, obstacles: [...arena02.obstacles, pillar] }, 'inside the end radius'],
       ['a ring that does not shrink', withRing({ endRadius: 18 }), '0 < end < start'],
       ['a ring that does no damage', withRing({ damagePerSecond: 0 }), 'damagePerSecond'],
     ];
@@ -160,25 +163,14 @@ describe('the arena02 ring', () => {
   });
 });
 
-/** mulberry32: the usual 32-bit generator, so the inputs do not draw on the state's random stream. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** A player per champion that holds its input and redraws it with p = REDRAW each tick. */
 class RandomPlayers {
   private readonly random: () => number;
   private readonly held: PlayerInput[];
 
   constructor(seed: number, count: number) {
-    this.random = mulberry32(seed);
+    const holder = { rng: seed };
+    this.random = () => nextRandom(holder);
     this.held = Array.from({ length: count }, () => ({ moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0 }));
   }
 
