@@ -13,7 +13,7 @@ import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, config2v2 } from './helpers';
+import { arena01, clearShotOracle, config2v2 } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const STEP = 5.5 / 60;
@@ -470,8 +470,12 @@ describe('kite corner and line of sight', () => {
     expect(hasLineOfSight(state, me, target)).toBe(false);
     expect(dist(me, target)).toBe(7);
     const { rangeMin, rangeMax } = profileFor('quillon');
+    // A stand needs a clear shot of a champion's width, so the walk ends at a cell that has one:
+    // a bare line of sight can still be the edge of the pillar's shadow.
     const seen = () =>
-      hasLineOfSight(state, me, target) && dist(me, target) >= rangeMin && dist(me, target) <= rangeMax;
+      clearShotOracle(state, me, target, 0.5) &&
+      dist(me, target) >= rangeMin &&
+      dist(me, target) <= rangeMax;
     let ticks = 0;
     while (!seen() && ticks < 240) {
       const input = bot.think(state);
@@ -483,10 +487,39 @@ describe('kite corner and line of sight', () => {
     for (let i = 0; i < 30; i++) {
       const input = bot.think(state);
       expect(input.buttons).toBe(0);
+      // A stand: no walking at all, not a step that happens to keep line of sight.
+      expect({ moveX: input.moveX, moveY: input.moveY }, `hold ${i}`).toEqual({ moveX: 0, moveY: 0 });
       stepOne(state, 1, input);
       expect(hasLineOfSight(state, me, target), `hold ${i}`).toBe(true);
     }
     expect(me.vx === 0 && me.vy === 0).toBe(true);
+  });
+
+  it('walks on in the engage band without a clear shot, and stands with one', () => {
+    // Lumeth (id 2) engages at 8 m: inside its band [6, 10], and the pillar of arena01 has a
+    // radius of 1.5, so a level line at height h has a line of sight above 1.5 and a clear shot
+    // of 0.5 m above 2.
+    const { rangeMax } = profileFor('lumeth');
+    const engage = (h: number) => {
+      const state = setup(arena01);
+      kill(state, 1, 3);
+      const me = put(state, 2, -4, h);
+      const target = put(state, 0, 4, h);
+      expect(dist(me, target)).toBeLessThanOrEqual(rangeMax);
+      const bot = createBot(2, 'hard', 1);
+      const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+      expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 0 });
+      return { state, me, target, input };
+    };
+
+    const edge = engage(1.6);
+    expect(hasLineOfSight(edge.state, edge.me, edge.target)).toBe(true);
+    expect(clearShotOracle(edge.state, edge.me, edge.target, 0.5)).toBe(false);
+    expect(edge.input.moveX !== 0 || edge.input.moveY !== 0).toBe(true);
+
+    const clear = engage(2.1);
+    expect(clearShotOracle(clear.state, clear.me, clear.target, 0.5)).toBe(true);
+    expect({ moveX: clear.input.moveX, moveY: clear.input.moveY }).toEqual({ moveX: 0, moveY: 0 });
   });
 
   it('follows the path to the target when no cell within 8 has line of sight', () => {
@@ -518,7 +551,7 @@ describe('kite corner and line of sight', () => {
     expect(input.buttons).toBe(0);
   });
 
-  it('starts a fresh plan when it is cornered again after kite steps', () => {
+  it('starts a fresh plan when it is cornered again after a stand in the band', () => {
     const state = setup(arena01);
     kill(state, 0, 3);
     const me = put(state, 1, 14.4, 9.4);
@@ -685,5 +718,104 @@ describe('aim error', () => {
       const input = bot.think(state);
       expect([input.aimX, input.aimY]).toEqual([777, -333]);
     }
+  });
+});
+
+describe('finisher', () => {
+  // Quillon (id 1, band [6, 13]) at 20 percent health, 8 m from Lumeth (id 2) on open ground.
+  function duelAt(enemyHealth: number, distance = 8, arena: ArenaDef = open, h = 0) {
+    const state = setup(arena);
+    kill(state, 0, 3);
+    const me = put(state, 1, -4, h);
+    const enemy = put(state, 2, -4 + distance, h);
+    me.health = 0.2 * me.maxHealth;
+    enemy.health = enemyHealth * enemy.maxHealth;
+    return { state, me, enemy };
+  }
+  const intentAfterDelay = (state: GameState) => {
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    return bot.inspect();
+  };
+
+  it('engages an enemy in reach at 15 percent instead of retreating at 20 percent', () => {
+    expect(intentAfterDelay(duelAt(0.15).state)).toEqual({ intent: 'engage', targetId: 2 });
+  });
+
+  it('retreats from an enemy at 25 percent', () => {
+    expect(intentAfterDelay(duelAt(0.25).state)).toEqual({ intent: 'retreat', targetId: 2 });
+  });
+
+  it('engages an enemy at exactly the bot health fraction', () => {
+    expect(intentAfterDelay(duelAt(0.2).state).intent).toBe('engage');
+  });
+
+  it('retreats when the weak enemy is beyond rangeMax', () => {
+    const { rangeMax } = profileFor('quillon');
+    expect(rangeMax).toBe(13);
+    expect(intentAfterDelay(duelAt(0.15, 13.5).state).intent).toBe('retreat');
+    expect(intentAfterDelay(duelAt(0.15, 13).state).intent).toBe('engage');
+  });
+
+  it('retreats when the weak enemy has no clear shot, on the edge of the pillar shadow', () => {
+    const edge = duelAt(0.15, 8, arena01, 1.6);
+    expect(hasLineOfSight(edge.state, edge.me, edge.enemy)).toBe(true);
+    expect(clearShotOracle(edge.state, edge.me, edge.enemy, 0.5)).toBe(false);
+    expect(intentAfterDelay(edge.state).intent).toBe('retreat');
+    const clear = duelAt(0.15, 8, arena01, 2.1);
+    expect(clearShotOracle(clear.state, clear.me, clear.enemy, 0.5)).toBe(true);
+    expect(intentAfterDelay(clear.state).intent).toBe('engage');
+  });
+
+  it('targets the finisher, not the nearer enemy that is healthy', () => {
+    const { state } = duelAt(0.1, 10);
+    ch(state, 3).alive = true;
+    put(state, 3, 2, 0);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'engage', targetId: 2 });
+    // Without the finisher the nearer enemy is the target, and the bot retreats.
+    ch(state, 2).health = ch(state, 2).maxHealth;
+    expect(intentAfterDelay(state)).toEqual({ intent: 'retreat', targetId: 3 });
+  });
+
+  it('targets the nearer of two qualifying enemies, in both id orders', () => {
+    // Nearer than 4 m the kite score tops the retreat score at 20 percent, and the finisher is never reached.
+    const near = 5;
+    const far = 10;
+    for (const [nearId, farId] of [
+      [2, 3],
+      [3, 2],
+    ] as const) {
+      const { state, me } = duelAt(0.15);
+      ch(state, 3).alive = true;
+      ch(state, 3).health = 0.1 * ch(state, 3).maxHealth;
+      put(state, nearId, me.x + near, 0);
+      put(state, farId, me.x + far, 0);
+      expect(intentAfterDelay(state)).toEqual({ intent: 'kite', targetId: nearId });
+    }
+  });
+
+  it('takes the lower id when two qualifying enemies are at the same distance', () => {
+    const { state, me } = duelAt(0.15);
+    ch(state, 3).alive = true;
+    ch(state, 3).health = 0.15 * ch(state, 3).maxHealth;
+    put(state, 2, me.x, 5);
+    put(state, 3, me.x, -5);
+    expect(intentAfterDelay(state).targetId).toBe(2);
+    put(state, 2, me.x, -5);
+    put(state, 3, me.x, 5);
+    expect(intentAfterDelay(state).targetId).toBe(2);
+  });
+
+  it('does not take a dead enemy as the finisher, and retreats from the live one', () => {
+    const { state } = duelAt(0.1, 6);
+    ch(state, 2).alive = false;
+    ch(state, 3).alive = true;
+    ch(state, 3).health = 0.5 * ch(state, 3).maxHealth;
+    put(state, 3, 4, 0);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'retreat', targetId: 3 });
+  });
+
+  it('kites a finisher that is closer than rangeMin', () => {
+    expect(intentAfterDelay(duelAt(0.15, 2).state)).toEqual({ intent: 'kite', targetId: 2 });
   });
 });

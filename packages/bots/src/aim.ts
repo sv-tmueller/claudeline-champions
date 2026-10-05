@@ -1,6 +1,9 @@
 import type { Vec2 } from './grid';
 
-/** Metres per second. Kits will own the real speeds; the lead uses one nominal value for now. */
+/**
+ * Metres per second. The lead of an ability with a projectile uses that projectile's own speed
+ * from the kit; this value stands for a champion without a kit and for an ability with none.
+ */
 export const NOMINAL_PROJECTILE_SPEED = 20;
 
 /**

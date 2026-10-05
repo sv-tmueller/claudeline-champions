@@ -32,6 +32,11 @@ describe('stalls in a headless 2v2 match of bots', () => {
 
     // A bot that dithers on the spot never has a zero-move input: it has to leave the corner too.
     expect(farthest, 'distance Lumeth got from the corner').toBeGreaterThan(5);
+    // It also ends away from the corner, not back in it.
+    expect(
+      Math.hypot(lumeth.x - 14.4, lumeth.y - 9.4),
+      'final distance of Lumeth from the corner',
+    ).toBeGreaterThan(5);
     const worst = tracker.worst();
     expect(
       worst.length,
