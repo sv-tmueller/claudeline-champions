@@ -22,8 +22,9 @@ const SUDDEN_DEATH_TICKS = 1800;
 const RING_START_M = 18;
 const RING_END_M = 3;
 // The match: a headless run of the same match through the client's own setup and driver
-// ended at tick 2998 (match-setup.test.ts); a match of five rounds with a sudden death
-// each would be about 12 000 ticks, at most 125 frames. Passing it fails the test.
+// ended at tick 2998 (match-setup.test.ts). The budget is 12 000 ticks: the measured
+// 2998, two more rounds of about 1000 each and one round to sudden death of about
+// 7000. Passing it fails the test.
 const MATCH_BUDGET_TICKS = 12_000;
 // The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 12 000 ticks
 // are at most 125 frames. Without the scale the match takes thousands of frames, and
@@ -288,6 +289,9 @@ test('warns of the ring in the sandbox: a countdown, the falling radius, and the
     expect(now.ring.outside, 'still outside when the picture was taken').toBe('true');
     const withoutEdge = (await countPixels(page, await pictureWithoutEdge(page), [RED])).matches[0] ?? NaN;
     const withEdge = (await countPixels(page, outsidePicture, [RED])).matches[0] ?? NaN;
+    // The floor is far under the edge: the 1.5u spread band alone is about
+    // 2 x (1280 + 720) x 19 = 76 000 px at 1280x720 (u is 12.8 px), and the picture
+    // measured about 96 000 red pixels more than the one without it.
     expect(withEdge - withoutEdge, 'the red edge shows').toBeGreaterThan(5000);
     console.log(
       `ring: outside at tick ${hooks.tick}, radius ${hooks.ring.radius}, ${withEdge - withoutEdge} red edge pixels, ${frames} frames, ${Date.now() - startedAt} ms`,
