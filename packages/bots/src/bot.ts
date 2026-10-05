@@ -1,4 +1,4 @@
-import { SLOTS, hasLineOfSight } from '@claudeline/sim';
+import { SLOTS } from '@claudeline/sim';
 import type { ChampionState, GameState, KitDef, PlayerInput } from '@claudeline/sim';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, roundAim, rotateByHalfTangent } from './aim';
 import { abilityFor, buttonsOf, chooseCast, findKit, projectileSpeed, updateRuns } from './casting';
@@ -14,7 +14,7 @@ import type { Intent, ScoredIntent } from './intent';
 import { profileFor } from './profile';
 import type { BotProfile } from './profile';
 import { createRng } from './rng';
-import { nearestSightCell } from './sight';
+import { SIGHT_CLEARANCE, clearShot, nearestSightCell } from './sight';
 import { steerToward } from './steer';
 import type { MoveCommand } from './steer';
 
@@ -192,7 +192,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     const g = navGrid(state);
     switch (acted.intent) {
       case 'engage':
-        if (d <= profile.rangeMax && hasLineOfSight(state, me, target)) return { moveX: 0, moveY: 0 };
+        if (d <= profile.rangeMax && clearShot(state, me, target, SIGHT_CLEARANCE)) {
+          return { moveX: 0, moveY: 0 };
+        }
         return follow('target', g, me, target);
       case 'kite': {
         if (d < profile.rangeMin) {
@@ -209,7 +211,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
           escaping = leave.moveX !== 0 || leave.moveY !== 0;
           return leave;
         }
-        if (hasLineOfSight(state, me, target)) return { moveX: 0, moveY: 0 };
+        if (clearShot(state, me, target, SIGHT_CLEARANCE)) return { moveX: 0, moveY: 0 };
         const cell = nearestSightCell(g, state, me, target, profile.rangeMin, profile.rangeMax);
         return cell >= 0
           ? follow('sight', g, me, cellCenter(g, cell))
@@ -299,7 +301,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       }
       let choice: CastChoice | null = null;
       if (kit !== undefined) {
-        updateRuns(runs, kit, me, target, hasLineOfSight(state, me, target));
+        updateRuns(runs, state, kit, me, target);
         choice = chooseCast(runs, tier.castDelay, kit, me);
       } else {
         runs.fill(0);

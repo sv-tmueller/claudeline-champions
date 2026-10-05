@@ -3,6 +3,7 @@ import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import {
   checkInvariants,
+  clearShotOracle,
   configMirror,
   createRun,
   createStallTracker,
@@ -37,6 +38,25 @@ const BANDS: Record<string, Band> = {
   'quillon:E': { min: 0, max: 18 },
   'quillon:E:ex': { min: 0, max: 18 },
   'quillon:F': { min: 0, max: 20 },
+};
+/**
+ * The width of the shot of each pressed ability, from the kits: the first projectile radius, or the
+ * champion radius 0.5 for an ability with no projectile.
+ */
+const CLEARANCES: Record<string, number> = {
+  'hargrim:M1': 0.5,
+  'hargrim:M2': 0.5,
+  'hargrim:M2:ex': 0.5,
+  'hargrim:SPACE:ex': 0.5,
+  'hargrim:E': 0.4,
+  'hargrim:F': 0.5,
+  'quillon:M1': 0.25,
+  'quillon:M2': 0.4,
+  'quillon:M2:ex': 0.25,
+  'quillon:Q': 0.6,
+  'quillon:E': 0.2,
+  'quillon:E:ex': 0.2,
+  'quillon:F': 0.6,
 };
 /** The pressed abilities that hold a dash, which a root skips. */
 const DASHES = new Set(['hargrim:SPACE:ex', 'hargrim:F']);
@@ -84,6 +104,10 @@ function pressProblems(
     problems.push(`target ${targetId} is not an alive enemy`);
   } else {
     if (!hasLineOfSight(state, c, target)) problems.push('no line of sight');
+    const clearance = CLEARANCES[key];
+    if (clearance !== undefined && !clearShotOracle(state, c, target, clearance)) {
+      problems.push(`no clear shot of width ${clearance}`);
+    }
     if (band !== undefined && !(band.min <= d && d <= band.max - MARGIN)) {
       problems.push(`distance ${d} outside [${band.min}, ${band.max - MARGIN}]`);
     }

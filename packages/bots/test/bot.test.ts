@@ -13,7 +13,7 @@ import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, config2v2 } from './helpers';
+import { arena01, clearShotOracle, config2v2 } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const STEP = 5.5 / 60;
@@ -470,8 +470,12 @@ describe('kite corner and line of sight', () => {
     expect(hasLineOfSight(state, me, target)).toBe(false);
     expect(dist(me, target)).toBe(7);
     const { rangeMin, rangeMax } = profileFor('quillon');
+    // A stand needs a clear shot of a champion's width, so the walk ends at a cell that has one:
+    // a bare line of sight can still be the edge of the pillar's shadow.
     const seen = () =>
-      hasLineOfSight(state, me, target) && dist(me, target) >= rangeMin && dist(me, target) <= rangeMax;
+      clearShotOracle(state, me, target, 0.5) &&
+      dist(me, target) >= rangeMin &&
+      dist(me, target) <= rangeMax;
     let ticks = 0;
     while (!seen() && ticks < 240) {
       const input = bot.think(state);

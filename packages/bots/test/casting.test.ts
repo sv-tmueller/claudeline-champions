@@ -15,7 +15,7 @@ import { AIM_ERROR_HOLD, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import { createRng } from '../src/rng';
-import { arena01 } from './helpers';
+import { arena01, clearShotOracle } from './helpers';
 import { boltAbility, boltSlot, quietAbility, quietKit, quillonKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -115,19 +115,22 @@ describe('cast timing and line of sight', () => {
     // The target steps behind the pillar: 7 m away, in reach of Quillon's bolts, and out of sight.
     put(state, 2, 4, 0);
     expect(hasLineOfSight(state, me, target)).toBe(false);
+    // The first slot in the order that is in reach is E, a shot of radius 0.2.
     const seen: boolean[] = [];
     let pressed = -1;
     for (let tick = 0; tick < 240 && pressed < 0; tick++) {
-      seen.push(hasLineOfSight(state, me, target));
+      seen.push(clearShotOracle(state, me, target, 0.2));
       const input = bot.think(state);
-      if (!seen[tick]) expect(input.buttons, `tick ${tick} has no line of sight`).toBe(0);
+      if (!hasLineOfSight(state, me, target)) {
+        expect(input.buttons, `tick ${tick} has no line of sight`).toBe(0);
+      }
       if (input.buttons !== 0) pressed = tick;
       stepOne(state, 1, input);
     }
     expect(pressed, 'the bot never pressed').toBeGreaterThan(0);
     const firstSeen = seen.indexOf(true);
     expect(firstSeen).toBeGreaterThanOrEqual(0);
-    // The run needs line of sight on every think from the first one to the press.
+    // The run needs a clear shot on every think from the first one to the press.
     expect(seen.slice(firstSeen, pressed + 1).every((s) => s)).toBe(true);
     expect(pressed).toBe(firstSeen + tier.castDelay);
   });
@@ -165,6 +168,55 @@ describe('cast timing and line of sight', () => {
     }
     const t0 = TIERS.hard.delay + TIERS.hard.castDelay;
     expect(started.slice(0, 3)).toEqual([t0, t0 + 30, t0 + 60]);
+  });
+});
+
+describe('clear shot', () => {
+  // The pillar of arena01 is a circle of radius 1.5 at the origin. On a level line at height h
+  // the centre line clears it when h > 1.5, and a shot of radius r when h - r > 1.5.
+  function shadowDuel(h: number): GameState {
+    const state = createMatch(QUILLON, arena01, 1, [quillonKit()]);
+    kill(state, 0, 3);
+    put(state, 1, -4, h);
+    put(state, 2, 4, h);
+    return state;
+  }
+  const THINKS = TIERS.hard.delay + TIERS.hard.castDelay + ENOUGH;
+
+  it('does not press on a shadow edge where the centre line is clear and a shifted line hits the pillar', () => {
+    const state = shadowDuel(1.6);
+    const me = ch(state, 1);
+    expect(hasLineOfSight(state, me, ch(state, 2))).toBe(true);
+    // Every shot of the kit is at least 0.2 m wide, and 1.6 - 0.2 is inside the pillar.
+    expect(clearShotOracle(state, me, ch(state, 2), 0.2)).toBe(false);
+    expect(firstPress(createBot(1, 'hard', 1), state, THINKS)).toBeNull();
+  });
+
+  it('presses once the shot is wide-clear: the same duel 0.4 m higher', () => {
+    const state = shadowDuel(2);
+    const press = firstPress(createBot(1, 'hard', 1), state, THINKS);
+    expect(press?.input.buttons).toBe(Button.E);
+  });
+
+  it('tests each ability with its own projectile radius', () => {
+    // At 1.8 the 0.2 and 0.25 shots (E and M1) clear the pillar, the 0.4 and 0.6 shots do not.
+    const state = shadowDuel(1.8);
+    const me = ch(state, 1);
+    expect(clearShotOracle(state, me, ch(state, 2), 0.2)).toBe(true);
+    expect(clearShotOracle(state, me, ch(state, 2), 0.25)).toBe(true);
+    expect(clearShotOracle(state, me, ch(state, 2), 0.4)).toBe(false);
+    expect(firstPress(createBot(1, 'hard', 1), state, THINKS)?.input.buttons).toBe(Button.E);
+
+    // With E cooling down, Q (0.6) and M2 (0.4) are skipped and M1 (0.25) is pressed.
+    const next = shadowDuel(1.8);
+    ch(next, 1).cooldowns[4] = 600;
+    expect(firstPress(createBot(1, 'hard', 1), next, THINKS)?.input.buttons).toBe(Button.M1);
+
+    // With E and M1 cooling down, nothing with a clear shot is left.
+    const none = shadowDuel(1.8);
+    ch(none, 1).cooldowns[4] = 600;
+    ch(none, 1).cooldowns[0] = 600;
+    expect(firstPress(createBot(1, 'hard', 1), none, THINKS)).toBeNull();
   });
 });
 

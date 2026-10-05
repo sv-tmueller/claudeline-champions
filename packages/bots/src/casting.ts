@@ -1,6 +1,7 @@
-import { Button, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } from '@claudeline/sim';
+import { Button, CHAMPION_RADIUS, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } from '@claudeline/sim';
 import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
 import { abilityReach, inReach } from './reach';
+import { clearShot } from './sight';
 
 // Casting: which slot a bot presses on a think. The gates copy steps 3b to 3d of the sim's `step`
 // (cooldowns count down, then a windup fires at 1, then a new cast may start), read on the state
@@ -57,22 +58,39 @@ function ability(kit: KitDef, me: ChampionState, slot: Slot): { spec: AbilitySpe
 }
 
 /**
- * Counts, per slot, the consecutive thinks on which the target was in line of sight and inside the
- * band of the ability the slot would cast, this think included. Anything else puts the count back
- * to 0. It ignores cooldown, energy, status and windup, so a slot that comes off cooldown while
- * the target stays in reach is pressed on the first tick the sim would cast it.
+ * The width of the shot of an ability: the radius of its first top-level projectile, or the
+ * champion radius when it has none.
+ */
+export function clearanceOf(spec: AbilitySpec): number {
+  for (let i = 0; i < spec.effects.length; i++) {
+    const effect = spec.effects[i];
+    if (effect !== undefined && effect.type === 'projectile') return effect.radius;
+  }
+  return CHAMPION_RADIUS;
+}
+
+/**
+ * Counts, per slot, the consecutive thinks on which the target was inside the band of the ability
+ * the slot would cast, with a clear shot of that ability's width, this think included. Anything
+ * else puts the count back to 0. It ignores cooldown, energy, status and windup, so a slot that
+ * comes off cooldown while the target stays in reach is pressed on the first tick the sim would
+ * cast it.
  */
 export function updateRuns(
   runs: number[],
+  state: GameState,
   kit: KitDef,
   me: ChampionState,
-  target: ChampionState | undefined,
-  sight: boolean,
+  target: ChampionState,
 ): void {
-  const d = target === undefined ? Infinity : Math.hypot(me.x - target.x, me.y - target.y);
+  const d = Math.hypot(me.x - target.x, me.y - target.y);
   for (let i = 0; i < SLOTS.length; i++) {
-    const band = target !== undefined && sight ? abilityReach(ability(kit, me, SLOTS[i] as Slot).spec) : null;
-    runs[i] = band !== null && inReach(band, d) ? (runs[i] as number) + 1 : 0;
+    const spec = ability(kit, me, SLOTS[i] as Slot).spec;
+    const band = abilityReach(spec);
+    runs[i] =
+      band !== null && inReach(band, d) && clearShot(state, me, target, clearanceOf(spec))
+        ? (runs[i] as number) + 1
+        : 0;
   }
 }
 

@@ -276,11 +276,35 @@ export function holding(
   if (target === undefined || !target.alive || target.team === c.team) return false;
   const d = Math.hypot(c.x - target.x, c.y - target.y);
   const { rangeMin, rangeMax } = profileFor(c.championId, kitOf(state, c));
-  if (acted.intent === 'engage') return d <= rangeMax && hasLineOfSight(state, c, target);
-  if (acted.intent === 'kite') {
-    return d >= rangeMin && d <= rangeMax && hasLineOfSight(state, c, target);
-  }
+  // A stand needs a clear shot of the width of a champion, not only a line of sight.
+  const clear = () => clearShotOracle(state, c, target, CHAMPION_RADIUS);
+  if (acted.intent === 'engage') return d <= rangeMax && clear();
+  if (acted.intent === 'kite') return d >= rangeMin && d <= rangeMax && clear();
   return false;
+}
+
+/**
+ * An independent oracle for a clear shot of width `clearance`: the sim's line of sight along the
+ * centre segment and along two segments shifted sideways by `clearance`, written out from the
+ * definition. It deliberately does not import src/sight.
+ */
+export function clearShotOracle(
+  state: GameState,
+  from: Point,
+  to: Point,
+  clearance: number,
+): boolean {
+  if (!hasLineOfSight(state, from, to)) return false;
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  if (length === 0) return true;
+  const px = (-(to.y - from.y) / length) * clearance;
+  const py = ((to.x - from.x) / length) * clearance;
+  for (const sign of [1, -1]) {
+    const a = { x: from.x + sign * px, y: from.y + sign * py };
+    const b = { x: to.x + sign * px, y: to.y + sign * py };
+    if (!hasLineOfSight(state, a, b)) return false;
+  }
+  return true;
 }
 
 /** A champion's own cell when free, else its nearest free cell, as a point; null when none. */
