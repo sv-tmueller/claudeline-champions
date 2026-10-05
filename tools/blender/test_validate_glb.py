@@ -18,7 +18,6 @@ import validate_glb
 REPO = Path(__file__).resolve().parents[2]
 ARENA_IDS = ("arena01", "arena02")
 ARENAS_DIR = REPO / "assets" / "models" / "arenas"
-ARENA_JSON = REPO / "data" / "arenas" / "arena01.json"
 ARENA_GLB = ARENAS_DIR / "arena01.glb"
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
@@ -216,13 +215,21 @@ class ArenaNodeTests(ValidatorCase):
         self.assertRejected(self.arena_glb(pack_glb(doc)), "duplicate")
 
     def test_rejects_obstacle_translation_that_disagrees_with_json(self):
+        # Obstacle_7 has y = 7 in arena01 and y = -7.5 in arena02, so the z flip changes both.
+        def flip_z(translation):
+            translation[2] = -translation[2]  # sim y maps to z = -y
+
+        def shift_x(translation):
+            translation[0] += 1  # the JSON x moved by a metre
+
         for arena_id in ARENA_IDS:
-            with self.subTest(arena=arena_id):
-                doc = arena_doc(load_arena(arena_id))
-                for node in doc["nodes"]:
-                    if node["name"] == "Obstacle_7":
-                        node["translation"][0] += 1  # the JSON x moved by a metre
-                self.assertRejected(self.arena_glb(pack_glb(doc), arena_id), "does not match")
+            for label, change in (("z flipped", flip_z), ("x shifted", shift_x)):
+                with self.subTest(arena=arena_id, change=label):
+                    doc = arena_doc(load_arena(arena_id))
+                    for node in doc["nodes"]:
+                        if node["name"] == "Obstacle_7":
+                            change(node["translation"])
+                    self.assertRejected(self.arena_glb(pack_glb(doc), arena_id), "does not match")
 
     def test_rejects_malformed_nodes_and_translations(self):
         def with_node(extra):
