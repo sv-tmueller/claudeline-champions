@@ -25,7 +25,7 @@ import { parseLaunch } from './launch';
 import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { bindInput, createInputCore } from './input';
 import { capturePoses, createPoses, interpolatePoses } from './interpolate';
-import { createFixedStepClock } from './loop';
+import { createFixedStepClock, STEP_MS } from './loop';
 import { arenaModelUrl, championModelUrl } from './models';
 import { buildResult } from './result-dom';
 import { ResultScreen } from './result-screen';
@@ -277,6 +277,24 @@ function frame(now: number): void {
   draw(clock.alpha);
 }
 
+// The timestamp of the dev-only probe hook below, in the same closure as frame.
+let probeNow = -1;
+
+/**
+ * Runs `count` frames with synthetic timestamps one sim tick apart, without the
+ * animation loop. Only the dev-only hook calls it, and a build drops it. The
+ * heap probe counts this function like the rest of main.ts: V8 inlines the frame
+ * into it, so the frame's bytes land here, and the hook's own cost is about 10 to
+ * 18 B per frame (see testing.md).
+ */
+function frameMany(count: number): void {
+  if (probeNow < 0) probeNow = performance.now();
+  for (let i = 0; i < count; i++) {
+    probeNow += STEP_MS;
+    frame(probeNow);
+  }
+}
+
 // A rejected load is not caught on purpose: it surfaces as a page error.
 async function loadModels(): Promise<void> {
   const loader = new GLTFLoader();
@@ -305,9 +323,14 @@ hud.update(state);
 result.update(state);
 if (import.meta.env.DEV) {
   // Dev builds only: Vite replaces the flag with false in a build and drops the
-  // branch and the chunk, so F4 never ships.
+  // branch and the chunk, so F4 and the probe hook never ship.
   const { bindDebugShot, fireDebugShot } = await import('./debug-shot');
   bindDebugShot(window, renderer.domElement, () => fireDebugShot(state, HUMAN_ID, aimX, aimY));
+  // The heap probe of e2e/combat.spec.ts runs frames through this hook instead of
+  // the animation loop, see frameMany. The hook only forwards a frame count.
+  (window as unknown as { __runProbeFrames: (frames: number) => void }).__runProbeFrames = (frames) => {
+    frameMany(frames);
+  };
 }
 // Draw once so the arena and champions are on the canvas before the hook.
 draw(0);
