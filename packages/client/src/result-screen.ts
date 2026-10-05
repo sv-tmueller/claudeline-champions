@@ -32,7 +32,7 @@ export class ResultScreen {
   private won = -1;
   private localScore = -1;
   private otherScore = -1;
-  // The text of every score up to the rounds to win, shared with the HUD, made once.
+  // The text of every score up to the rounds to win, made once by `scoreTexts`, as the HUD's is.
   private readonly scoreTable: string[];
 
   constructor(

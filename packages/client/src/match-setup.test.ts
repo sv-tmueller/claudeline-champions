@@ -135,9 +135,9 @@ describe('a match of bots from setup to the result', () => {
   });
 
   // The source of the tick budget of e2e/match-end.spec.ts, which plays this match in
-  // a browser at a time scale. A round lasts at most 5400 ticks and 1800 of sudden
-  // death, a warmup 180 and the pause between rounds 180, so the first to 3 needs
-  // at most 5 rounds and one more sudden death.
+  // a browser at a time scale. The budget is a margin over this deterministic match
+  // (tick 2998 on main's bots): two more rounds and one sudden-death round. A bots
+  // change past it fails here first.
   it('ends the match to 3 rounds with a winner on 3 within the budget of the e2e', { timeout: 60_000 }, () => {
     const { state, winner, matchEnded } = playToTheEnd(DEFAULT_ROUNDS_TO_WIN, MATCH_END_BUDGET_TICKS);
     expect(state.match?.phase).toBe('matchEnd');

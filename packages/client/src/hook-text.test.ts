@@ -21,8 +21,7 @@ describe('intText', () => {
     }
   });
 
-  it('returns the same string object for a repeat, which is the table and not a new string', () => {
-    expect(intText(1234)).toBe(intText(1234));
+  it('gives the text at both ends of the table', () => {
     expect(intText(0)).toBe('0');
     expect(intText(INT_TEXT_COUNT - 1)).toBe(String(INT_TEXT_COUNT - 1));
   });

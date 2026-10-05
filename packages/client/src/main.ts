@@ -16,7 +16,7 @@ import { createChampionLooks, lookMode, type ChampionLooks } from './champion-lo
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
 import { readDevLaunch } from './dev-launch';
 import { createAreaViews, createProjectileViews } from './entity-views';
-import { CombatFeedback, flashTexts, routeEvents } from './feedback';
+import { CombatFeedback, flashText, flashTexts, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
 import { cmText, facingKey, facingText, intText, percentText } from './hook-text';
 import { Hud } from './hud';
@@ -222,7 +222,7 @@ function writeCombatHooks(): void {
   const mask = feedback.flashMask(state.tick);
   if (mask !== written.flashMask) {
     written.flashMask = mask;
-    canvas.setAttribute('data-flashing', FLASH_TEXTS[mask] ?? '');
+    canvas.setAttribute('data-flashing', FLASH_TEXTS[mask] ?? flashText(mask));
   }
 }
 

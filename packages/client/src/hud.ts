@@ -181,7 +181,8 @@ export class Hud {
     // health or maximum builds its text.
     const tabled = max === this.tableMaxHealth ? this.healthTexts[key] : undefined;
     this.handles.healthText.textContent = tabled ?? `${key} / ${max}`;
-    this.handles.healthFill.style.transform = (tabled !== undefined ? this.healthFills[key] : undefined) ?? healthFill(key, max);
+    this.handles.healthFill.style.transform =
+      tabled !== undefined ? (this.healthFills[key] as string) : healthFill(key, max);
   }
 
   private updateEnergy(energy: number): void {
