@@ -355,10 +355,10 @@ export function dropUnusedCasts(state: GameState): void {
 }
 
 /**
- * Round reset hook for match flow: every champion's energy and cooldowns go to 0, its windup and
- * dash are dropped and its statuses removed, the cast records are emptied, and the projectiles
- * and areas still alive forget their cast. Emits nothing; match flow wraps it in its own round
- * event. Not in the index.
+ * The ability part of the round reset: every champion's energy and cooldowns go to 0, its windup
+ * and dash are dropped and its statuses removed, the cast records are emptied, and the projectiles
+ * and areas still alive forget their cast. Emits nothing: `startRound` in `flow.ts` calls it and
+ * wraps it in `roundStarted`. Not in the index.
  */
 export function resetAbilityState(state: GameState): void {
   for (const champion of state.champions) {

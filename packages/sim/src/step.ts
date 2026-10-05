@@ -11,6 +11,7 @@ import {
 } from './cast';
 import { resolveChampion } from './collision';
 import { atan2 } from './dmath';
+import { stepLocked, stepRoundEnd } from './flow';
 import { length } from './geometry';
 import { upkeepStatuses } from './health';
 import { stepForcedMotion } from './motion';
@@ -26,6 +27,12 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
   const resolved = state.champions.map((c) => resolveInput(inputs[c.id], c.aimX, c.aimY));
 
   state.events.length = 0;
+
+  // Warmup, the round end pause and the match end run only the aim and the facing.
+  if (state.match !== undefined && state.match.phase !== 'round') {
+    stepLocked(state, state.match, resolved);
+    return;
+  }
 
   for (const champion of state.champions) {
     const input = resolved[champion.id];
@@ -78,7 +85,9 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
   stepAreas(state);
   expireProjectiles(state);
   expireAreas(state);
+  if (state.match !== undefined) stepRoundEnd(state, state.match);
   dropUnusedCasts(state);
+  if (state.match !== undefined) state.match.phaseTicks += 1;
 
   state.tick += 1;
 }
