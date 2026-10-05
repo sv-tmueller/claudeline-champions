@@ -6,6 +6,8 @@ looks, cover density, gaps, how far a player is from cover and whether the end
 circle of the sudden death ring is open floor. Standard library only, no
 Blender.
 
+The test globs `data/arenas/*.json`, so a new arena is checked without an edit
+here. Every arena must break no rule, except the ids in ALLOWED_DEVIATIONS.
 arena01 is grandfathered. It breaks two rules, and it cannot change because
 every sim fixture checksums `state.arena`. The test pins both deviations, so a
 third one, or a repair that goes unnoticed, fails here.
@@ -13,6 +15,8 @@ third one, or a repair that goes unnoticed, fails here.
 import copy
 import json
 import math
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -37,9 +41,18 @@ AREA_GRID = 0.05
 EPS = 1e-9
 
 
-def load_arena(arena_id):
-    with open(ARENAS_DIR / ("%s.json" % arena_id)) as f:
+# The rules an arena may break, by id. arena01 is grandfathered by decision 14 on issue #63. No
+# other arena may break a rule, so a new arena needs no entry here.
+ALLOWED_DEVIATIONS = {"arena01": ["heights", "cover reach"]}
+
+
+def load_arena(arena_id, directory=ARENAS_DIR):
+    with open(Path(directory) / ("%s.json" % arena_id)) as f:
         return json.load(f)
+
+
+def committed_arena_ids(directory):
+    return sorted(path.stem for path in Path(directory).glob("*.json"))
 
 
 # geometry. An obstacle is a circle {x, y, r} or a rect {x, y, w, h}.
@@ -262,6 +275,16 @@ def rule_names(problems):
     return [p.split(":")[0] for p in problems]
 
 
+def unexpected_deviations(directory):
+    """Every arena of the directory whose broken rules differ from its allowed ones, by id."""
+    found = {}
+    for arena_id in committed_arena_ids(directory):
+        broken = rule_names(principle_problems(load_arena(arena_id, directory)))
+        if broken != ALLOWED_DEVIATIONS.get(arena_id, []):
+            found[arena_id] = broken
+    return found
+
+
 def mutated(arena_id, change):
     arena = copy.deepcopy(load_arena(arena_id))
     change(arena)
@@ -269,6 +292,35 @@ def mutated(arena_id, change):
 
 
 class CommittedArenaTests(unittest.TestCase):
+    def test_every_committed_arena_has_only_its_allowed_deviations(self):
+        self.assertEqual(unexpected_deviations(ARENAS_DIR), {})
+
+    def test_the_glob_finds_every_committed_arena(self):
+        ids = committed_arena_ids(ARENAS_DIR)
+        self.assertIn("arena01", ids)
+        self.assertIn("arena02", ids)
+
+    def test_the_glob_catches_a_new_arena_that_breaks_a_principle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for arena_id in ("arena01", "arena02"):
+                shutil.copy(ARENAS_DIR / ("%s.json" % arena_id), tmp)
+            broken = load_arena("arena02")
+            broken["id"] = "arena03"
+            broken["obstacles"][0]["height"] = 1.0
+            with open(Path(tmp) / "arena03.json", "w") as f:
+                json.dump(broken, f)
+            self.assertEqual(unexpected_deviations(tmp), {"arena03": ["heights"]})
+
+    def test_the_glob_catches_a_repaired_grandfathered_arena(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for arena_id in ("arena01", "arena02"):
+                shutil.copy(ARENAS_DIR / ("%s.json" % arena_id), tmp)
+            repaired = load_arena("arena02")
+            repaired["id"] = "arena01"
+            with open(Path(tmp) / "arena01.json", "w") as f:
+                json.dump(repaired, f)
+            self.assertEqual(unexpected_deviations(tmp), {"arena01": []})
+
     def test_arena02_follows_every_principle(self):
         self.assertEqual(principle_problems(load_arena("arena02")), [])
 
@@ -284,7 +336,8 @@ class CommittedArenaTests(unittest.TestCase):
         share = sum(area(o) for o in arena["obstacles"]) / 600
         self.assertAlmostEqual(share, 0.0602, places=3)
         self.assertAlmostEqual(max_cover_distance(arena), 7.49, places=2)
-        self.assertGreaterEqual(walkable_end_circle_area(arena), 28.0)
+        # The 0.05 m grid gives 28.26 m2. The exact end circle is 28.274 m2.
+        self.assertAlmostEqual(walkable_end_circle_area(arena), 28.26, places=2)
 
 
 class PrincipleCheckTests(unittest.TestCase):
