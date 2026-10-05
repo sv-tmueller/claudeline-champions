@@ -14,7 +14,6 @@ information.
   overwrites every field of it (the dead and idle paths too). A caller that keeps
   an input past the next think copies it; `step` already does, since it reads the
   record and keeps no reference to it. Two bots never share a record.
-
 - Call `think` once per tick, before `step`; it never mutates the state or
   touches `state.rng`. A champion with a kit in `state.kits` presses at most one
   slot per think, plus SHIFT for an EX variant (see Casting). A champion without
@@ -303,13 +302,16 @@ makes that true, and what stays outside it:
   one (`distanceInto`, `scoreIntentsInto`, `clearShotWith`, `nearestSightCellIn`,
   `steerTowardInto`, `followPathInto`), the numbers a scan reads come from typed
   arrays or arrays of doubles (the kit cache, `NavGrid.shapes`, the obstacle table of
-  the shot test), and the aim is written out over locals. The object-and-field form
-  gives the same numbers as the pure functions it replaces (`scoreIntents`,
-  `leadPoint`, `rotateByHalfTangent`, `roundAim`, `clearShot`, `nearestSightCell`,
-  `steerToward`, `followPath`), which stay as the reference the tests compare it with.
+  the shot test), and the aim is written out over locals. `scoreIntents`, `clearShot`,
+  `nearestSightCell`, `steerToward` and `followPath` are wrappers over those forms, so
+  there is one implementation of each and nothing to keep in step. The aim is the one
+  place with two: `leadPoint`, `rotateByHalfTangent` and `roundAim` of aim.ts stay as the
+  independent reference, and a seeded test compares `think`'s inlined aim with them.
 - `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32 B per
   call, so a bot that measures a dozen distances allocated 400 B for them. A test
-  compares it, bit for bit, with `Math.hypot`.
+  compares it, bit for bit, with `Math.hypot`. That test pins the `Math.hypot` of current
+  V8 (Node 22). If it fails after a Node upgrade, V8 changed `Math.hypot`: that is a
+  decision to make (follow it or keep these bits), not a bug in the bots.
 - `lineOfSight` is the sim's `hasLineOfSight` over a Float64Array of the obstacles,
   because the sim's allocates about 128 B per call (each sweep returns a double). A
   test compares the two on random segments. The table is rebuilt when the arena is
@@ -409,7 +411,8 @@ match replays exactly from its input stream.
   a fixed 3600 ticks.
 - Local steering around champions and projectiles, dodging and ally logic.
 - Openers and escapes, and abilities that land on the caster or on
-  allies (self and ally abilities).
+  allies (self and ally abilities). Openers and escapes are deferred to batch 8, next to the
+  Lumeth and Skerrow profiles (decision 5 on #63).
 
 ## Testing
 
@@ -444,11 +447,12 @@ in memory. See [testing](testing.md).
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation section. It
 builds nine frozen scenes on arena 1 with the shipped Hargrim and Quillon kits (a press, an
 engage stand, a path follow past the age of the segment test, a kite with no clear shot, a
-kite step, a retreat, and the deadlock rule's advance, flee and latched stand), warms each bot up with 20000 thinks and reads
-`process.memoryUsage().heapUsed` around one `think`, 600 samples per round. The figure of a
-round is the median delta minus the median delta of an empty pair of reads, and the lowest of
-three rounds of every scene must be under a literal bound, 128 B per think. Main reads 4 to 56 KB
-per think, the branch 0 B, and the bound sits between the two. The test also reads the sim's
+kite step, a retreat, and the deadlock rule's advance, flee and latched stand), warms each
+bot up with 20000 thinks and reads `process.memoryUsage().heapUsed` around one `think`, 600
+samples per round. The figure of a round is the median delta minus the median delta of an
+empty pair of reads, and the lowest of three rounds of every scene must be under a literal
+bound, 128 B per think. The think before the rewrite (b09b437) read 4 to 56 KB per think; the
+current think reads 0 B, and the bound sits between the two. The test also reads the sim's
 baseline step against the floor of the sim's own check, which proves the counter moves, and it
 checks that `think` leaves the checksum alone and that every scene stayed in its intent. It gates
 on the native runner and not on the Linux container (batch #53 decision 12). Differential tests
@@ -468,8 +472,8 @@ no enemy in reach and the team not ahead the deadlock rule says advance, so that
 is a stall), or retreat standing in reach of its target with a clear shot (the latched
 stand, which casts). The tracker works the team sums and the reach out with its own
 oracle (`clearShotOracle`), not with the code of the bot. Idle counts as standing, and a
-cornered kiter closer than `rangeMin` counts. Any other tick resets the run. No bot may stall for more
-than 120 ticks, in the headless run and in a corner-start run: the same match
+cornered kiter closer than `rangeMin` counts. Any other tick resets the run. No bot may
+stall for more than 120 ticks, in the headless run and in a corner-start run: the same match
 with one bot in the north-east corner of arena 1 and a melee champion 2.83 m
 away on the diagonal, which the old stand rule left frozen for the whole 3600
 ticks. A bot pushed by another champion keeps a non-zero input and is not
