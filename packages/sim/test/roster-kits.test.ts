@@ -1,4 +1,4 @@
-// The roster kits as data: `data/kits/hargrim.json` and `data/kits/quillon.json`, whose numbers come
+// The roster kits as data: `data/kits/hargrim.json`, `quillon.json` and `skerrow.json`, whose numbers come
 // from docs/design/roster-v1.md (ticks = seconds x 60, one hit = durationTicks 1 / intervalTicks 1).
 //
 // Every number the doc fixes is written out again here as a literal, so a kit file that drifts from
@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
+import skerrowJson from '../../../data/kits/skerrow.json';
 import { Button, SLOTS, createMatch, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -18,10 +19,12 @@ import { champion, findNegativeZero, input, openArena, place } from './helpers';
 const KITS = [
   { stem: 'hargrim', json: hargrimJson },
   { stem: 'quillon', json: quillonJson },
+  { stem: 'skerrow', json: skerrowJson },
 ];
 
 const hargrim = validateKit(hargrimJson);
 const quillon = validateKit(quillonJson);
+const skerrow = validateKit(skerrowJson);
 
 function mirror(id: string) {
   return {
@@ -76,6 +79,7 @@ describe('the kit stats', () => {
     });
     expect(stats(hargrim)).toEqual({ id: 'hargrim', maxHealth: 160, moveSpeed: 5.5, support: false, ex: ['M2', 'SPACE'] });
     expect(stats(quillon)).toEqual({ id: 'quillon', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
+    expect(stats(skerrow)).toEqual({ id: 'skerrow', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['SPACE', 'E'] });
   });
 
   it('gives a path-precise message for a number outside the contract', () => {
@@ -195,6 +199,10 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(quillon)).toEqual([]);
   });
 
+  it('hold for the Skerrow kit', () => {
+    expect(catalogProblems(skerrow)).toEqual([]);
+  });
+
   it('name the path of a number outside them', () => {
     const copy = copyOf(hargrim);
     const dash = copy.slots.F.effects[0];
@@ -218,6 +226,27 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(copy)).toEqual([
       'quillon.slots.M1.effects[0].effects[1].status: dot total 6 is not 8 to 30',
     ]);
+  });
+
+  it('keep the Skerrow arc cosines the 10-decimal literal of cos 45 degrees, and the Reaper arc a full circle', () => {
+    const arc = (effect: AbilityEffect | undefined, where: string) => {
+      if (effect?.type !== 'meleeArc') throw new Error(`${where} is not a meleeArc`);
+      return effect;
+    };
+    const lunge = skerrow.slots.SPACE.ex?.effects[0];
+    if (lunge?.type !== 'dash') throw new Error('Skerrow SPACE EX does not start with a dash');
+    const quarter = [
+      arc(skerrow.slots.M1.effects[0], 'Skerrow M1'),
+      arc(skerrow.slots.E.effects[0], 'Skerrow E'),
+      arc(lunge.then[0], 'Skerrow SPACE EX then'),
+    ];
+    for (const { cosHalfAngle } of quarter) {
+      expect(cosHalfAngle).toBe(0.7071067812);
+      expect(String(cosHalfAngle).split('.')[1]).toHaveLength(10);
+      // Math.cos is an accuracy reference here only: no kit value is computed with it.
+      expect(Math.abs(cosHalfAngle - Math.cos((45 * Math.PI) / 180))).toBeLessThan(1e-10);
+    }
+    expect(arc(skerrow.slots.F.effects[1], 'Skerrow F').cosHalfAngle).toBe(-1);
   });
 
   it('keep the Hargrim M1 cosine the 10-decimal literal of cos 50 degrees', () => {
@@ -268,6 +297,10 @@ describe('the EX variants', () => {
       ['effects[0].radius', 'effects[0].effects[0].amount', 'effects[0].effects[1].status.percent', 'effects[0].effects[1].status.ticks'].sort(),
     );
     expect(exDiff(quillon, 'E')).toEqual(['windupTicks', 'effects[0].pierce', 'effects[0].effects[0].amount'].sort());
+    expect(exDiff(skerrow, 'SPACE')).toEqual(
+      ['effects[0].distance', 'effects[0].then[0]', 'effects[1].status.percent', 'effects[1].status.ticks'].sort(),
+    );
+    expect(exDiff(skerrow, 'E')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.perPulse'].sort());
   });
 });
 
@@ -374,7 +407,7 @@ function press(slot: Slot, options: { ex?: boolean; aim?: Spot; moveY?: -1 | 0 |
   return input(0, options.moveY ?? 0, Math.round(aimX * 100), Math.round(aimY * 100), buttons);
 }
 
-describe('every slot of both kits', () => {
+describe('every slot of the three kits', () => {
   interface Row {
     kit: KitDef;
     slot: Slot;
@@ -404,6 +437,15 @@ describe('every slot of both kits', () => {
     { kit: quillon, slot: 'E', ex: true, cooldown: 480, windup: 18, walk: 0, cost: 25 },
     { kit: quillon, slot: 'R', ex: false, cooldown: 840, windup: 0, cost: 0 },
     { kit: quillon, slot: 'F', ex: false, cooldown: 600, windup: 48, walk: 0, cost: 100 },
+    { kit: skerrow, slot: 'M1', ex: false, cooldown: 24, windup: 6, walk: 5.5, cost: 0 },
+    { kit: skerrow, slot: 'M2', ex: false, cooldown: 180, windup: 6, walk: 5.5, cost: 0 },
+    { kit: skerrow, slot: 'SPACE', ex: false, cooldown: 360, windup: 0, cost: 0 },
+    { kit: skerrow, slot: 'SPACE', ex: true, cooldown: 360, windup: 0, cost: 25 },
+    { kit: skerrow, slot: 'Q', ex: false, cooldown: 720, windup: 12, walk: 5.5, cost: 0 },
+    { kit: skerrow, slot: 'E', ex: false, cooldown: 420, windup: 15, walk: 2.75, cost: 0 },
+    { kit: skerrow, slot: 'E', ex: true, cooldown: 420, windup: 15, walk: 2.75, cost: 25 },
+    { kit: skerrow, slot: 'R', ex: false, cooldown: 960, windup: 0, cost: 0 },
+    { kit: skerrow, slot: 'F', ex: false, cooldown: 600, windup: 18, walk: 0, cost: 100 },
   ];
 
   it.each(rows)('$kit.id $slot ex=$ex casts with its cooldown, windup, cost and walk rule', (row) => {
@@ -736,6 +778,188 @@ describe('Quillon', () => {
     expect(expired?.e.reason).toBe('lifetime');
     expect((expired?.step ?? 0) - 48 + 1).toBe(48);
     expect(expired?.e.x).toBeCloseTo(X0 + 20, 9);
+    rig.clean();
+  });
+});
+
+describe('Skerrow', () => {
+  it('M1 Twin Cut hits the enemy 40 degrees off the line at 1.8 m and not the one 50 degrees off', () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 1.38, 1.16], 3: [X0 + 1.16, 1.38] });
+    rig.run(7, press('M1'));
+    expect(rig.events('meleeArc').map(({ step, e }) => ({ step, radius: e.radius, cos: e.cosHalfAngle, targets: e.targetIds }))).toEqual([
+      { step: 6, radius: 2, cos: 0.7071067812, targets: [2] },
+    ]);
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 9, 121]]);
+    expect(rig.health(3)).toBe(130);
+    expect(rig.applied()).toEqual([]);
+    rig.clean();
+  });
+
+  it('M2 Throwing Knife flies 10 m in 25 sweeps', () => {
+    const rig = new Rig(skerrow);
+    rig.run(6 + 25, press('M2'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(6);
+    expect(spawned?.e.radius).toBe(0.2);
+    expect(spawned?.e.vx).toBe(24);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 6 + 1).toBe(25);
+    expect(expired?.e.x).toBeCloseTo(X0 + 10, 9);
+    rig.clean();
+  });
+
+  it('M2 Throwing Knife does 12 damage and slows 20 percent for 60 ticks', () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 8, 0] });
+    rig.run(6 + 25, press('M2'));
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 12, 118]]);
+    expect(rig.applied()).toEqual([[2, 'slow', 60]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 20 }]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('SPACE Lunge dashes 6 m in 12 ticks with haste on self and fires nothing at the end', () => {
+    const rig = new Rig(skerrow);
+    rig.step(press('SPACE'));
+    expect(rig.applied()).toEqual([[0, 'haste', 90]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 20 }]);
+    rig.run(11);
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 6, 12]]);
+    const ended = rig.events('dashEnded');
+    expect(ended.map(({ step, e }) => [step, e.reason])).toEqual([[11, 'complete']]);
+    expect(ended[0]?.e.x).toBeCloseTo(X0 + 6, 9);
+    expect(rig.events('meleeArc')).toEqual([]);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.clean();
+  });
+
+  it('SPACE EX Lunge dashes 8 m, then cuts the enemy inside the arc at the end for 14', () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 9.5, 0.6], 3: [X0 + 8, 1.8] }, 25);
+    rig.step(press('SPACE', { ex: true }));
+    expect(rig.applied()).toEqual([[0, 'haste', 120]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 30 }]);
+    rig.run(11);
+    expect(rig.events('dashStarted').map(({ e }) => [e.distance, e.ticks])).toEqual([[8, 12]]);
+    expect(rig.events('dashEnded').map(({ step, e }) => [step, e.reason])).toEqual([[11, 'complete']]);
+    const [arc] = rig.events('meleeArc');
+    expect(arc?.step).toBe(11);
+    expect(arc?.e.x).toBeCloseTo(X0 + 8, 9);
+    expect(arc?.e.radius).toBe(2);
+    expect(arc?.e.cosHalfAngle).toBe(0.7071067812);
+    expect(arc?.e.targetIds).toEqual([2]);
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 14, 116]]);
+    expect(rig.health(3)).toBe(130);
+    rig.clean();
+  });
+
+  it('Q Quiet Dart flies 11 m in 33 sweeps', () => {
+    const rig = new Rig(skerrow);
+    rig.run(12 + 33, press('Q'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(12);
+    expect(spawned?.e.radius).toBe(0.3);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 12 + 1).toBe(33);
+    expect(expired?.e.x).toBeCloseTo(X0 + 11, 9);
+    rig.clean();
+  });
+
+  it('Q Quiet Dart does 8 damage and silences for 90 ticks', () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 8, 0] });
+    rig.run(12 + 33, press('Q'));
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 8, 122]]);
+    expect(rig.applied()).toEqual([[2, 'silence', 90]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'silence' }]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E Rend does 20 damage, then four pulses of 4 over 120 ticks', () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 2, 0] });
+    rig.run(15 + 125, press('E'));
+    expect(rig.events('meleeArc').map(({ step, e }) => [step, e.radius, e.cosHalfAngle, e.targetIds])).toEqual([[15, 2.5, 0.7071067812, [2]]]);
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([
+      [2, 20, 110],
+      [2, 4, 106],
+      [2, 4, 102],
+      [2, 4, 98],
+      [2, 4, 94],
+    ]);
+    expect(rig.applied()).toEqual([[2, 'dot', 120]]);
+    expect(rig.statuses(2)).toEqual([]);
+    rig.clean();
+  });
+
+  it('E EX Rend does 28 damage, then four pulses of 6', () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 2, 0] }, 25);
+    rig.run(15 + 125, press('E', { ex: true }));
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([
+      [2, 28, 102],
+      [2, 6, 96],
+      [2, 6, 90],
+      [2, 6, 84],
+      [2, 6, 78],
+    ]);
+    expect(rig.applied()).toEqual([[2, 'dot', 120]]);
+    rig.clean();
+  });
+
+  it('R Vanish Step goes as far as the aim up to 5 m and makes the caster invulnerable for 30 ticks', () => {
+    for (const [aim, to] of [[[X0 + 3, 0], X0 + 3], [AHEAD, X0 + 5]] as [Spot, number][]) {
+      const rig = new Rig(skerrow);
+      rig.step(press('R', { aim }));
+      const [teleport] = rig.events('teleport');
+      expect(teleport?.e.blocked).toBe(false);
+      expect(teleport?.e.fromX).toBe(X0);
+      expect(teleport?.e.toX).toBeCloseTo(to, 9);
+      expect(champion(rig.state, 0).x).toBeCloseTo(to, 9);
+      expect(rig.applied()).toEqual([[0, 'invulnerable', 30]]);
+      rig.clean();
+    }
+  });
+
+  it("F Reaper's Dance swings where the teleport lands: 40 damage, stun 30, then silence 120, at 2 m ahead and 1.5 m behind", () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 9, 0], 3: [X0 + 5.5, 0] }, 100);
+    rig.run(18 + 1, press('F', { aim: [X0 + 7, 0] }));
+    const [teleport] = rig.events('teleport');
+    expect(teleport?.step).toBe(18);
+    expect(teleport?.e.toX).toBeCloseTo(X0 + 7, 9);
+    const [arc] = rig.events('meleeArc');
+    expect(arc?.step).toBe(18);
+    expect(arc?.e.x).toBeCloseTo(X0 + 7, 9);
+    expect(arc?.e.radius).toBe(2.5);
+    expect(arc?.e.cosHalfAngle).toBe(-1);
+    expect(arc?.e.targetIds).toEqual([2, 3]);
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 40, 90], [3, 40, 90]]);
+    expect(rig.applied()).toEqual([
+      [2, 'stun', 30],
+      [2, 'silence', 120],
+      [3, 'stun', 30],
+      [3, 'silence', 120],
+    ]);
+    expect(rig.statuses(2)).toEqual([{ type: 'stun' }, { type: 'silence' }]);
+    rig.clean();
+  });
+
+  it("F Reaper's Dance misses an enemy 3.5 m from where it lands and one near where it started", () => {
+    const rig = new Rig(skerrow, { 2: [X0 + 10.5, 0], 3: [X0 + 1.5, 0] }, 100);
+    rig.run(18 + 1, press('F', { aim: [X0 + 7, 0] }));
+    expect(rig.events('meleeArc').map(({ e }) => e.targetIds)).toEqual([[]]);
+    expect(rig.health(2)).toBe(130);
+    expect(rig.health(3)).toBe(130);
+    expect(rig.applied()).toEqual([]);
+    rig.clean();
+  });
+
+  it("F Reaper's Dance teleports at most 8 m, however far the aim is", () => {
+    const rig = new Rig(skerrow, {}, 100);
+    rig.run(18 + 1, press('F', { aim: [X0 + 12, 0] }));
+    const [teleport] = rig.events('teleport');
+    expect(teleport?.e.blocked).toBe(false);
+    expect(teleport?.e.toX).toBeCloseTo(X0 + 8, 9);
     rig.clean();
   });
 });
