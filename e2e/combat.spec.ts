@@ -13,6 +13,10 @@ interface Hooks {
   flashing: string[];
   bars: string[];
   debugShots: number;
+  /** The match phase, the sim's own string. */
+  phase: string;
+  /** `data-ready` of the M1 icon. */
+  m1Ready: string | null;
   /** The visible kill-feed lines, "killer > victim", oldest first. */
   killFeed: string[];
 }
@@ -37,13 +41,25 @@ const RING_SLACK_TICKS = 4;
 // The functions whose allocations the heap probe counts: every combat render
 // module, the pose and overlay helpers that run each frame, the loop clock, the
 // input sampler, the HUD writer with its views and the kill feed, the champion
-// names, and every function in main.ts (stepSim, sampleAim, draw and the hook
-// writers). The HUD builder, hud-dom.ts, runs once at startup and is not counted.
+// names, the result screen's writer, the client's bot-driving glue
+// (bot-driver.ts) and every function in main.ts (stepSim, sampleAim, draw and
+// the hook writers). The HUD builder, hud-dom.ts, the result panel's builder,
+// result-dom.ts, and the setup modules run once at startup and are not counted.
+// The bots package is not counted either: it allocates on every think, by its
+// API (a fresh PlayerInput, a decision record per think), which the bots
+// package's milestone addresses. Its files get the prefix bots/ in `summarise`,
+// as the sim's get sim/, so a bots file such as bot.ts never matches a client
+// entry. Bytes of an inlined callee land on its caller, so bots bytes inlined
+// into the glue would still show in bot-driver.ts.
 // V8 inlines main.ts's frame into three's animation callback, so the bytes of
 // frame's own body are attributed to onAnimationFrame: that one three function
 // counts too, and nothing else in three does.
 const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:|^three\.module[^:]*:onAnimationFrame$/;
+// The sweep files of the sim. Their garbage is huge today (about 790 KB per
+// window, in projectile.ts and geometry.ts) and #49 removes most of it, so the
+// sanity floor below leaves them out and no merge order moves it.
+const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // Measured in a warm steady state: 0 bytes in every counted function but
 // onAnimationFrame, which shows 0 to 48 B per window in the clean mode (three's
 // own callback and the inlined frame, cause not isolated) and about 1100 B in the
@@ -54,7 +70,8 @@ const COMBAT_CODE =
 // The limit stays just above the clean figure so the small ones are caught. See
 // the pull request.
 const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
-// Anything counted at all proves the profiler saw the sim's own garbage.
+// The profiler must see the sim's and the bots' own garbage outside the sweep
+// files: the cast and melee code, the match flow and the bots' thinking.
 const PROFILER_SANITY_BYTES = 100_000;
 
 async function readHooks(page: Page): Promise<Hooks> {
@@ -73,6 +90,8 @@ async function readHooks(page: Page): Promise<Hooks> {
       flashing: list(d['flashing']),
       bars: list(d['bars']),
       debugShots: Number(d['debugShots']),
+      phase: d['phase'] ?? '',
+      m1Ready: document.querySelector('[data-slot="M1"]')?.getAttribute('data-ready') ?? null,
       killFeed: [...document.querySelectorAll('[data-line][data-visible="true"]')].map(
         (line) =>
           `${line.querySelector('[data-part="killer"]')?.textContent} > ${line.querySelector('[data-part="victim"]')?.textContent}`,
@@ -115,6 +134,8 @@ interface ProfileNode {
 
 interface Allocations {
   total: number;
+  /** Bytes outside the sweep files of the sim, for the sanity floor. */
+  outsideSweep: number;
   combat: number;
   /** Bytes in three's onAnimationFrame, where the inlined frame function lands. */
   onAnimationFrame: number;
@@ -125,14 +146,16 @@ interface Allocations {
 }
 
 function summarise(root: ProfileNode): Allocations {
-  const result: Allocations = { total: 0, combat: 0, onAnimationFrame: 0, fakeRequestAnimationFrame: 0, combatByFunction: {} };
+  const result: Allocations = { total: 0, outsideSweep: 0, combat: 0, onAnimationFrame: 0, fakeRequestAnimationFrame: 0, combatByFunction: {} };
   const pending = [root];
   for (let node = pending.pop(); node; node = pending.pop()) {
     result.total += node.selfSize;
-    // The sim has an input.ts of its own (resolveInput), so its files get a prefix
-    // and never match a client module of the same name.
-    const prefix = node.callFrame.url.includes('/packages/sim/') ? 'sim/' : '';
-    const key = `${prefix}${node.callFrame.url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
+    // The sim has an input.ts of its own (resolveInput) and the bots a bot.ts, so
+    // their files get a prefix and never match a client module of the same name.
+    const url = node.callFrame.url;
+    const prefix = url.includes('/packages/sim/') ? 'sim/' : url.includes('/packages/bots/') ? 'bots/' : '';
+    const key = `${prefix}${url.split('/').slice(-1)[0]}:${node.callFrame.functionName}`;
+    if (!SWEEP_FILES.test(key)) result.outsideSweep += node.selfSize;
     if (key === ':requestAnimationFrame') result.fakeRequestAnimationFrame += node.selfSize;
     if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
       result.combat += node.selfSize;
@@ -162,12 +185,17 @@ const SETTLE_WINDOWS = 1;
 const MEASURED_WINDOWS = 3;
 // A sixteenth of the pixels of the 1280x720 viewport that the screenshots need.
 const PROBE_VIEWPORT = { width: 320, height: 180 };
+// The viewport of the screenshots, which is also the default of playwright.config.ts.
+const SCREENSHOT_VIEWPORT = { width: 1280, height: 720 };
+// The warmup is 180 ticks, WARMUP_TICKS in the sim.
+const WARMUP_BUDGET_TICKS = 200;
 // The CI job timed out at the default 30 s on 2026-10-02 (run 36967340392).
 // On the runner (2 cores, SwiftShader) steps 1 to 7 take about 45 s, because a
 // frame renders in 105 to 210 ms at 1280x720 and each tick-exact frame also
 // pays a hook read of 32 to 75 ms. Step 8 took about 30 s at 320x180 with 8
 // warm-up volleys, where a frame is 17 to 24 ms, and about 18 s with 4. That is
-// about 63 s in all, so 240 s is a margin of more than 3x.
+// about 63 s in all, plus the warmup wait of step 1 (180 ticks at 320x180, about
+// 5 s), so 240 s is a margin of more than 3x.
 const TEST_TIMEOUT_MS = 240_000;
 
 /** Runs one window of frames, 480 ms of fake time, in one call. */
@@ -226,13 +254,20 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
   const { problems, failed } = watchProblems(page);
 
   try {
-    // 1. A paused clock, so every frame below is one the test ran.
+    // 1. A paused clock, so every frame below is one the test ran. The dev-only
+    // sandbox is the probe scene: the roster of this test with match flow and the
+    // two kits, where only champion 3 is a bot and has no kit, so nothing hurts the
+    // others. The warmup locks the champions for 180 ticks, which run at the small
+    // viewport, since a frame there costs a sixteenth of the pixels.
     await page.clock.install({ time: 0 });
-    await page.goto('/');
+    await page.goto('/?scene=sandbox');
     await orFail(page.waitForSelector('canvas[data-arena][data-tick]'), failed);
     await page.clock.pauseAt(PAUSE_AT_MS);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.enable');
+    await page.setViewportSize(PROBE_VIEWPORT);
+    await runUntil(page, 'the round phase', WARMUP_BUDGET_TICKS, (h) => h.phase === 'round');
+    await page.setViewportSize(SCREENSHOT_VIEWPORT);
 
     // 2. The baseline picture has no flash and no ring.
     const baseline = await countPixels(page, await page.screenshot(), [WHITE, RING]);
@@ -300,6 +335,12 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     // never looks at pixels, so the canvas shrinks first. The resize is
     // outside every measured window.
     await page.setViewportSize(PROBE_VIEWPORT);
+    // M1 is held from the first volley to the end of the measured windows. It is
+    // Hargrim's arc: a 36-tick cooldown, a reach of 3 m and nothing in reach, so it
+    // casts again and again and the windows cover startCast, the windup, castFired,
+    // the arc and the HUD's windup and cooldown reads. No projectile or area spawns
+    // in them.
+    await page.mouse.down();
     for (let volley = 0; volley < WARM_UP_VOLLEYS; volley++) {
       await fireVolley(page);
       for (let window = 0; window < WINDOWS_PER_FLIGHT; window++) await runWindow(page);
@@ -307,25 +348,36 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     await fireVolley(page);
     for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
     let worst: Allocations | undefined;
-    let sawGarbage = 0;
+    let lowestOutsideSweep = Infinity;
     const figures: string[] = [];
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       const allocations = await allocationsOverAWindow(page, cdp);
-      sawGarbage = Math.max(sawGarbage, allocations.total);
+      lowestOutsideSweep = Math.min(lowestOutsideSweep, allocations.outsideSweep);
       if (!worst || allocations.combat > worst.combat) worst = allocations;
-      figures.push(`${allocations.total}/${allocations.onAnimationFrame}/${allocations.fakeRequestAnimationFrame}`);
+      figures.push(
+        `${allocations.total}/${allocations.onAnimationFrame}/${allocations.fakeRequestAnimationFrame}/${allocations.outsideSweep}`,
+      );
     }
     // One line per attempt, so every log shows which mode the run was in.
     console.log(
-      `heap probe attempt ${test.info().retry}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame: ${figures.join(' ')}`,
+      `heap probe attempt ${test.info().retry}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files: ${figures.join(' ')}`,
     );
+    await page.mouse.up();
     hooks = await readHooks(page);
     // The death line is long gone: the kill feed expires after 300 ticks.
     expect(hooks.tick - deathTick).toBeGreaterThanOrEqual(300);
     expect(hooks.killFeed).toEqual([]);
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
-    expect(sawGarbage, 'the profiler saw no allocations at all').toBeGreaterThan(PROFILER_SANITY_BYTES);
+    // Nothing else happened to the match: still the same round, one death, the
+    // bot untouched and no flash, so the arc and the shots hurt nobody, and M1
+    // was cast (its icon is on cooldown), so the windows covered the casting.
+    expect(hooks.phase).toBe('round');
+    expect(hooks.deaths).toBe(1);
+    expect(hooks.bars[3], 'the bot was hit').toBe('100');
+    expect(hooks.flashing).toEqual([]);
+    expect(hooks.m1Ready, 'M1 never went on cooldown, so no cast ran').toBe('false');
+    expect(lowestOutsideSweep, 'the profiler saw too few allocations outside the sweep files').toBeGreaterThan(PROFILER_SANITY_BYTES);
     expect(
       worst?.combat,
       `combat code allocated ${JSON.stringify(worst?.combatByFunction)}`,
