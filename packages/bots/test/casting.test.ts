@@ -201,9 +201,11 @@ describe('windups', () => {
         const types = state.events
           .filter((e) => e.type === 'castFired' || e.type === 'castStarted')
           .map((e) => [e.type, 'slot' in e ? e.slot : null]);
+        // M1 is instant, so it fires in the step that starts it, after the Q fire.
         expect(types).toEqual([
           ['castFired', 'Q'],
           ['castStarted', 'M1'],
+          ['castFired', 'M1'],
         ]);
         expect(waited).toBe(9);
         return;

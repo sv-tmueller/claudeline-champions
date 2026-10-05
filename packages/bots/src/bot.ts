@@ -1,6 +1,8 @@
-import { hasLineOfSight } from '@claudeline/sim';
-import type { ChampionState, GameState, PlayerInput } from '@claudeline/sim';
+import { SLOTS, hasLineOfSight } from '@claudeline/sim';
+import type { ChampionState, GameState, KitDef, PlayerInput } from '@claudeline/sim';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, roundAim, rotateByHalfTangent } from './aim';
+import { abilityFor, buttonsOf, chooseCast, findKit, projectileSpeed, updateRuns } from './casting';
+import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
 import { createFollower, followPath } from './follow';
@@ -10,6 +12,7 @@ import type { NavGrid, Vec2 } from './grid';
 import { chooseIntent, scoreIntents } from './intent';
 import type { Intent, ScoredIntent } from './intent';
 import { profileFor } from './profile';
+import type { BotProfile } from './profile';
 import { createRng } from './rng';
 import { nearestSightCell } from './sight';
 import { steerToward } from './steer';
@@ -141,6 +144,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   let gridArena: GameState['arena'] | undefined;
   let aimU = 0;
   let aimAge = 0;
+  // Per slot (in SLOTS order), the consecutive thinks the acted target was in sight and in reach
+  // of the ability the slot would cast. Allocated once; see casting.ts.
+  const runs: number[] = SLOTS.map(() => 0);
 
   function navGrid(state: GameState): NavGrid {
     if (grid === undefined || gridArena !== state.arena) {
@@ -151,7 +157,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     return grid;
   }
 
-  function decide(state: GameState, me: ChampionState): void {
+  function decide(state: GameState, me: ChampionState, profile: BotProfile): void {
     const targetId = chooseTarget(state, me, decided.targetId);
     const target = state.champions[targetId];
     if (targetId < 0 || target === undefined) {
@@ -162,7 +168,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     const scores = scoreIntents(
       distanceBetween(me, target),
       me.health / me.maxHealth,
-      profileFor(me.championId).rangeMin,
+      profile.rangeMin,
     );
     decided = { intent: chooseIntent(current, scores), targetId };
   }
@@ -174,10 +180,14 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     return followPath(g, follower, me, goal);
   }
 
-  function move(state: GameState, me: ChampionState, acted: Decision): MoveCommand {
+  function move(
+    state: GameState,
+    me: ChampionState,
+    acted: Decision,
+    profile: BotProfile,
+  ): MoveCommand {
     const target = enemyAlive(state, me, acted.targetId);
     if (acted.intent === 'idle' || target === undefined) return { moveX: 0, moveY: 0 };
-    const profile = profileFor(me.championId);
     const d = distanceBetween(me, target);
     const g = navGrid(state);
     switch (acted.intent) {
@@ -212,16 +222,38 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     }
   }
 
-  function aim(me: ChampionState, target: ChampionState): { aimX: number; aimY: number } {
+  function aim(
+    me: ChampionState,
+    target: ChampionState,
+    speed: number,
+  ): { aimX: number; aimY: number } {
     if (aimAge === 0) aimU = (2 * rng.next() - 1) * tier.maxU;
     aimAge = (aimAge + 1) % AIM_ERROR_HOLD;
-    const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, NOMINAL_PROJECTILE_SPEED);
+    const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, speed);
     const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, aimU);
     const aimX = roundAim(me.x + turned.x);
     const aimY = roundAim(me.y + turned.y);
     return Number.isFinite(aimX) && Number.isFinite(aimY)
       ? { aimX, aimY }
       : { aimX: me.aimX, aimY: me.aimY };
+  }
+
+  /**
+   * The speed the aim leads with: the first projectile of the ability winding up, or else of the
+   * one pressed on this think, or else the nominal speed.
+   */
+  function aimSpeed(kit: KitDef | undefined, me: ChampionState, choice: CastChoice | null): number {
+    if (kit !== undefined) {
+      const spec =
+        me.cast !== null
+          ? abilityFor(kit, me.cast.slot, me.cast.ex)
+          : choice !== null
+            ? abilityFor(kit, choice.slot, choice.ex)
+            : undefined;
+      const speed = spec === undefined ? undefined : projectileSpeed(spec);
+      if (speed !== undefined) return speed;
+    }
+    return NOMINAL_PROJECTILE_SPEED;
   }
 
   return {
@@ -232,9 +264,14 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       escaping = false;
       const me = state.champions[playerId];
       if (me === undefined) return fail(`no champion ${playerId} in the state`);
-      if (!me.alive) return { moveX: 0, moveY: 0, aimX: me.aimX, aimY: me.aimY, buttons: 0 };
+      if (!me.alive) {
+        runs.fill(0);
+        return { moveX: 0, moveY: 0, aimX: me.aimX, aimY: me.aimY, buttons: 0 };
+      }
 
-      decide(state, me);
+      const kit = findKit(state, me.championId);
+      const profile = profileFor(me.championId, kit);
+      decide(state, me, profile);
 
       const delayed = ring[ringIndex];
       ring[ringIndex] = { intent: decided.intent, targetId: decided.targetId };
@@ -246,14 +283,35 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       if (acted.intent !== lastActed.intent || acted.targetId !== lastActed.targetId) {
         follower = createFollower();
       }
+      if (acted.targetId !== lastActed.targetId) runs.fill(0);
       lastActed = acted;
 
-      const command = move(state, me, acted);
-      const { aimX, aimY } =
-        acted.intent === 'idle' || target === undefined
-          ? { aimX: me.aimX, aimY: me.aimY }
-          : aim(me, target);
-      return { moveX: command.moveX, moveY: command.moveY, aimX, aimY, buttons: 0 };
+      const command = move(state, me, acted, profile);
+      if (acted.intent === 'idle' || target === undefined) {
+        runs.fill(0);
+        return {
+          moveX: command.moveX,
+          moveY: command.moveY,
+          aimX: me.aimX,
+          aimY: me.aimY,
+          buttons: 0,
+        };
+      }
+      let choice: CastChoice | null = null;
+      if (kit !== undefined) {
+        updateRuns(runs, kit, me, target, hasLineOfSight(state, me, target));
+        choice = chooseCast(runs, tier.castDelay, kit, me);
+      } else {
+        runs.fill(0);
+      }
+      const { aimX, aimY } = aim(me, target, aimSpeed(kit, me, choice));
+      return {
+        moveX: command.moveX,
+        moveY: command.moveY,
+        aimX,
+        aimY,
+        buttons: choice === null ? 0 : buttonsOf(choice),
+      };
     },
 
     inspect(): { intent: Intent; targetId: number } {

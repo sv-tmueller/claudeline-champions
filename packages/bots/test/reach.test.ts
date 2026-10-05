@@ -78,6 +78,12 @@ describe('abilityReach', () => {
     });
   });
 
+  it('adds the teleport range to a dash that follows it', () => {
+    expect(
+      abilityReach(ability({ type: 'teleport', range: 3, fixed: true }, dash(6, area({ type: 'self' }, 3.5)))),
+    ).toEqual({ min: 0, max: 13 });
+  });
+
   it('gives a lone teleport no reach', () => {
     expect(abilityReach(ability({ type: 'teleport', range: 4, fixed: false }))).toBeNull();
   });
