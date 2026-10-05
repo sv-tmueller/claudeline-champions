@@ -124,28 +124,29 @@ sim steps first and the views read its state afterwards.
   and the faded dead grey.
 - `debug-shot.ts`: the dev-only F4 shot above.
 - `bot-driver.ts`, `match-setup.ts` and `launch.ts`: see Launch and match.
-- Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's
-  position in centimetres), `data-f0` (its facing in radians, three decimals),
+- Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's position
+  in centimetres), `data-f0` (its facing in radians, three decimals),
   `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
   `data-rings`, `data-bar0` to `data-bar3` (a champion's fill percent, "x" for a
   hidden bar), `data-overlay`, `data-debugShots`, `data-phase` (the sim's phase
   string: warmup, round, roundEnd or matchEnd), `data-round` and the readiness
   flags `data-rendered` and `data-arena`. The e2e specs read them and pace
-  themselves by `data-tick`. A hook is written only when its value changes, with
-  `setAttribute` and text from the tables of `hook-text.ts` (integers, signed
-  centimetres, facing in milliradians, percents) and `flashTexts` in
-  `feedback.ts`, all made once at startup, so a change write builds no string.
-  A table falls back to the formatter past its range. A position is two hooks and
-  a bar is one hook per champion because a combined "x,y" or "a,b,c,d" text
-  cannot come from a table.
+  themselves by `data-tick`. A per-tick hook is written only when its value
+  changes, with `setAttribute` and text from the tables of `hook-text.ts`
+  (integers, signed centimetres, facing in milliradians, percents) and
+  `flashTexts` in `feedback.ts`, all made once at startup, so a change write
+  builds no string. A table falls back to the formatter past its range. A position
+  is two hooks and a bar is one hook per champion because a combined "x,y" or
+  "a,b,c,d" text cannot come from a table.
 
 The frame path allocates nothing in steady state: views are pooled, text comes
 from tables and is written only on a change, and the numbers a frame carries live
 in object fields. The combat spec measures it with a heap probe, see
 [testing](testing.md). A match of bots is never in a steady state: hook and HUD
 values change in every window. The change writes come from tables and so build
-no string, but the sandbox, where a casting champion in a stationary scene
-changes almost nothing, stays the scene of the probe that needs no bot.
+no string, but the probe still runs in the sandbox, where a casting champion in a
+stationary scene changes almost nothing. A probe scene on the live match, which
+would count those table writes with real changes, is issue #77 (batch 8).
 The HUD writes its state with `setAttribute` and not `dataset`: in the
 probe a `dataset` write allocated about 100 B per window whenever a slot
 changed, and `setAttribute` allocated none.
@@ -242,26 +243,27 @@ nothing. The texts come from tables made in the constructor: the health text and
 fill per whole health up to the local champion's maximum, the energy fill per
 whole energy, and the score per pair up to the rounds to win (`scoreTexts` in
 `hud-views.ts`, shared with the result screen). A value past a table builds its
-text, so nothing is wrong outside the range, only slower. The kill feed counts its pushes and expiries, and the HUD skips its
-line loop while that count has not moved. The e2e specs read the states from
-data attributes: `data-ready`, `data-windup` and `data-blocked` on a slot,
-`data-ready` on an energy mark, `data-visible` on a kill-feed line,
-`data-team` on its names and `data-sudden` on the timer.
+text, so nothing is wrong outside the range, only slower. The kill feed counts
+its pushes and expiries, and the HUD skips its line loop while that count has
+not moved. The e2e specs read the states from data attributes: `data-ready`,
+`data-windup` and `data-blocked` on a slot, `data-ready` on an energy mark,
+`data-visible` on a kill-feed line, `data-team` on its names and `data-sudden`
+on the timer.
 
-`hud.css` sizes everything from one viewport unit, `--hud-u`
-(`min(1vw, 1.78vh)`), so the HUD scales with the window, and sets
-`pointer-events: none` on everything, so a right click reaches the canvas.
-`result.css` follows the same rules with `--result-u` and `#result`, and one
-difference: the visible panel takes pointer events. The
-colours are hex custom properties on `#hud`. Panels are neutral black with
-alpha and every foreground element sits on one, with one exception: the ring
-warning's red edge, an inset shadow in `var(--hud-enemy)` along the viewport that
-shows while the local champion is outside the ring (rules.md section 8 asks for
-an edge, which cannot sit on a panel). The warning's text is on a panel. Text is off-white, below 250 in
-every channel. Allies and enemies use the health-bar colours. No colour is blue,
-purple or magenta, none falls in the pixel boxes the e2e specs count (white,
-the yellow ring, the magenta overlay) and none is within 80 of a champion body
-colour. `hud-palette.test.ts` checks all of this over both style sheets.
+`hud.css` sizes everything from one viewport unit, `--hud-u` (`min(1vw,
+1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
+everything, so a right click reaches the canvas. `result.css` follows the same
+rules with `--result-u` and `#result`, and one difference: the visible panel
+takes pointer events. The colours are hex custom properties on `#hud`. Panels
+are neutral black with alpha and every foreground element sits on one, with one
+exception: the ring warning's red edge, an inset shadow in `var(--hud-enemy)`
+along the viewport that shows while the local champion is outside the ring
+(rules.md section 8 asks for an edge, which cannot sit on a panel). The
+warning's text is on a panel. Text is off-white, below 250 in every channel.
+Allies and enemies use the health-bar colours. No colour is blue, purple or
+magenta, none falls in the pixel boxes the e2e specs count (white, the yellow
+ring, the magenta overlay) and none is within 80 of a champion body colour.
+`hud-palette.test.ts` checks all of this over both style sheets.
 
 A debug overlay draws collision circles, obstacles, projectiles and line of
 sight. It draws as lines in the 3D scene, not in the HTML HUD, so its shapes
