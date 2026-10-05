@@ -52,7 +52,7 @@ const CLEARANCES: Record<string, number> = {
   'hargrim:F': 0.5,
   'quillon:M1': 0.25,
   'quillon:M2': 0.4,
-  'quillon:M2:ex': 0.25,
+  'quillon:M2:ex': 0.6,
   'quillon:Q': 0.6,
   'quillon:E': 0.2,
   'quillon:E:ex': 0.2,

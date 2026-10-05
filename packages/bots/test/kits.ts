@@ -4,7 +4,8 @@
 // Hargrim and Quillon follow docs/design/roster-v1.md with ticks = seconds x 60, except that the
 // speeds and lifetimes are chosen so that every reach is an exact decimal. Where they differ from
 // the roster: Quillon M1 is 21 m/s (roster 22), M2 is 15 m/s (roster 14) and E is 24 m/s (roster
-// 25). Every cosine is a decimal literal.
+// 25). The radii are the roster's, EX variants included: Quillon M2 is 0.4 m and its EX 0.6 m, E
+// is 0.2 m and its EX 0.2 m. Every cosine is a decimal literal.
 import type { AbilityEffect, AbilitySpec, Effect, KitDef, Slot, SlotSpec, ThenEffect } from '@claudeline/sim';
 
 const SLOW = (percent: number, ticks: number): Effect => ({
@@ -54,7 +55,13 @@ export function boltSlot(
 export function boltAbility(
   speed: number,
   lifetimeTicks: number,
-  options: { windupTicks?: number; movement?: AbilitySpec['movement']; pierce?: boolean; damage?: number } = {},
+  options: {
+    windupTicks?: number;
+    movement?: AbilitySpec['movement'];
+    pierce?: boolean;
+    radius?: number;
+    damage?: number;
+  } = {},
 ): AbilitySpec {
   const { windupTicks, movement, effects } = boltSlot(speed, lifetimeTicks, options);
   return { windupTicks, movement, effects };
@@ -240,7 +247,7 @@ export function quillonKit(): KitDef {
         movement: 'slowed',
         radius: 0.4,
         damage: 14,
-        ex: boltAbility(15, 48, { windupTicks: 18, movement: 'slowed', damage: 20 }),
+        ex: boltAbility(15, 48, { windupTicks: 18, movement: 'slowed', radius: 0.6, damage: 20 }),
       }),
       // No band: a teleport of 4 m up to the aim.
       SPACE: {
@@ -258,7 +265,7 @@ export function quillonKit(): KitDef {
         movement: 'locked',
         radius: 0.2,
         damage: 28,
-        ex: boltAbility(24, 45, { windupTicks: 18, movement: 'locked', pierce: true, damage: 30 }),
+        ex: boltAbility(24, 45, { windupTicks: 18, movement: 'locked', pierce: true, radius: 0.2, damage: 30 }),
       }),
       // No band: a shield on self.
       R: {

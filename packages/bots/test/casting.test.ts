@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Button, createMatch, hasLineOfSight, step } from '@claudeline/sim';
 import type {
+  AbilitySpec,
   ArenaDef,
   ChampionState,
   GameState,
@@ -249,6 +250,35 @@ describe('clear shot', () => {
     const clear = shadowDuel(2.1, kit());
     expect(clearShotOracle(clear, ch(clear, 1), ch(clear, 2), 0.5)).toBe(true);
     expect(firstPress(createBot(1, 'hard', 1), clear, THINKS)?.input.buttons).toBe(Button.M1);
+  });
+
+  it("tests an EX press with the EX variant's own radius, not the base slot's", () => {
+    // At h 1.8 a shot of 0.25 m clears the pillar and one of 0.6 m does not.
+    const kit = (base: number, ex: number) =>
+      quietKit('quillon', {
+        M2: boltSlot(20, 30, { radius: base, ex: boltAbility(20, 30, { radius: ex }) }),
+      });
+    const pressWith = (base: number, ex: number, energy: number) => {
+      const state = shadowDuel(1.8, kit(base, ex));
+      ch(state, 1).energy = energy;
+      return firstPress(createBot(1, 'hard', 1), state, THINKS)?.input.buttons ?? null;
+    };
+    // A narrow base and a wide EX: with 25 energy the EX is the ability, and it has no clear shot.
+    expect(pressWith(0.25, 0.6, 24)).toBe(Button.M2);
+    expect(pressWith(0.25, 0.6, 25)).toBeNull();
+    // A wide base and a narrow EX: with 25 energy the EX is the ability, and it has a clear shot.
+    expect(pressWith(0.6, 0.25, 24)).toBeNull();
+    expect(pressWith(0.6, 0.25, 25)).toBe(Button.M2 | Button.SHIFT);
+  });
+
+  it('gives the Quillon EX bolts the radii of the roster: 0.6 m for M2 and 0.2 m for E', () => {
+    const { M2, E } = quillonKit().slots;
+    const radius = (spec: AbilitySpec | undefined) => {
+      const effect = spec?.effects[0];
+      return effect !== undefined && effect.type === 'projectile' ? effect.radius : null;
+    };
+    expect([radius(M2), radius(M2.ex)]).toEqual([0.4, 0.6]);
+    expect([radius(E), radius(E.ex)]).toEqual([0.2, 0.2]);
   });
 });
 
