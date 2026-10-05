@@ -70,4 +70,35 @@ describe('fixed-step clock', () => {
       expect(clock.alpha).toBeLessThan(1);
     }
   });
+
+  describe('with a time scale', () => {
+    it('steps 6000 times per 60 frames at scale 100', () => {
+      const clock = createFixedStepClock(100);
+      clock.advance(0);
+      let total = 0;
+      for (let i = 1; i <= 60; i++) total += clock.advance((i * 1000) / 60);
+      // The cap is MAX_STEPS_PER_FRAME times the scale, so no frame drops steps here.
+      expect(total).toBe(6000);
+    });
+
+    it('scales the cap, and a stall at scale 10 gives 50 steps and drops the backlog', () => {
+      const clock = createFixedStepClock(10);
+      clock.advance(0);
+      expect(clock.advance(1000)).toBe(50);
+      expect(clock.alpha).toBe(0);
+      expect(clock.advance(1000 + STEP_MS)).toBe(10);
+    });
+
+    it('is the plain clock at scale 1', () => {
+      const plain = createFixedStepClock();
+      const scaled = createFixedStepClock(1);
+      plain.advance(0);
+      scaled.advance(0);
+      for (let i = 1; i <= 90; i++) {
+        const now = (i * 1000) / 45;
+        expect(scaled.advance(now)).toBe(plain.advance(now));
+        expect(scaled.alpha).toBe(plain.alpha);
+      }
+    });
+  });
 });

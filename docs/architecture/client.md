@@ -9,6 +9,12 @@ Fixed-step accumulator. The sim steps at 60 Hz, rendering runs at the display
 rate and interpolates positions between the last two ticks. Rendering never
 steps the sim.
 
+`createFixedStepClock(scale)` takes an integer time scale, 1 by default, which
+multiplies the elapsed time and the step cap (5 steps per frame, times the
+scale). Only the dev-only launch sets it, from `?timescale=<n>` (1 to 200, see
+Launch and match), so the e2e specs can play a whole match in a few dozen
+frames. A production page always runs at scale 1.
+
 ## Input
 
 Keyboard and mouse map to a `PlayerInput` each tick. Mouse aim is a ray from
@@ -23,10 +29,12 @@ shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
-`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now' packages/client/dist`,
+`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now|timescale' packages/client/dist`,
 which must print nothing. The same guard hides the dev-only probe hook,
 `window.__runProbeFrames`, which `combat.spec.ts` uses to run its heap-probe
-windows (see [testing](testing.md)).
+windows (see [testing](testing.md)), and the time scale of `dev-launch.ts`
+(`timescale` is the string that survives minification: the function names do
+not).
 
 ## Launch and match
 
@@ -40,7 +48,15 @@ later platform layer can pass its own arguments instead.
   reads as normal.
 - `?scene=sandbox`: the dev-only scene of the heap probe and the walk spec,
   honoured only when `import.meta.env.DEV` is true. A production build has one
-  scene.
+  scene. The sandbox roster and its read of the address are still in the
+  production bundle, as unreachable code: `parseLaunch` takes the dev flag as an
+  argument instead of the build dropping the branch. The sandbox keeps its
+  place in `match-setup.ts` for now and moving it behind `import.meta.env.DEV`
+  stays open (the dist grep finds the string `sandbox` for that reason).
+- `?timescale=<n>`: dev-only, read by `dev-launch.ts` (`readDevLaunch`), which
+  `main.ts` calls only as `import.meta.env.DEV ? readDevLaunch(location.search) :
+  undefined`, so a build drops the module. An integer from 1 to 200 is the time
+  scale of the loop clock; anything else reads as 1.
 
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`, so a later kit file joins the match and the champion select

@@ -14,6 +14,7 @@ import { createBotDriver } from './bot-driver';
 import { CAMERA_VERTICAL_FOV_DEG, fitCamera, groundAimCm, pointerToNdc } from './camera';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
+import { readDevLaunch } from './dev-launch';
 import { createAreaViews, createProjectileViews } from './entity-views';
 import { CombatFeedback, flashText, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
@@ -121,7 +122,10 @@ window.addEventListener('keydown', (event) => {
 
 const input = createInputCore();
 bindInput(window, renderer.domElement, input);
-const clock = createFixedStepClock();
+// Dev builds only: Vite replaces the flag with false in a build, and the module
+// goes with it, so a production page has no time scale.
+const devLaunch = import.meta.env.DEV ? readDevLaunch(location.search) : undefined;
+const clock = createFixedStepClock(devLaunch?.timeScale ?? 1);
 
 // The pose before the latest tick, the one being drawn, and the inputs array
 // the sim reads. Champion 0 is the human, the bots write their own entries
