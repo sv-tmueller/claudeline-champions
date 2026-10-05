@@ -113,11 +113,12 @@ export function spawnProjectile(
 /** The moving circle of the sweep in progress. `sweep` owns it and fills every field. */
 const seg: Segment = { x: 0.5, y: 0.5, dx: 0.5, dy: 0.5, r: 0.5 };
 /** The circle `sweep` tests the segment against, and the only writer of it. */
-const ring: Circle = { cx: 0.5, cy: 0.5, cr: 0.5 };
+const target: Circle = { cx: 0.5, cy: 0.5, cr: 0.5 };
 /**
  * The champions one sweep touches, in ascending (t, id) order, written in place: the first
  * `contactCount` entries are live. `sweep` fills them before the first hit and reads them in
- * the hit pass, and nothing a hit calls sweeps. They are double arrays from the start.
+ * the hit pass, and nothing a hit calls sweeps. `contactT` holds doubles and `contactId` holds
+ * small integers, so each array keeps its element kind from the start.
  */
 const contactT: number[] = [0.5, 0.5, 0.5, 0.5];
 const contactId: number[] = [0, 0, 0, 0];
@@ -172,8 +173,10 @@ function expireAt(
 
 /**
  * Returns true when the projectile is gone after this tick's sweep. A tick that hits and ends
- * nothing allocates nothing: no object, array or closure, and no double passed or returned
- * through a call V8 may not inline (see `Segment`).
+ * nothing allocates nothing in the code: no object, array or closure, and no double passed or
+ * returned through a call V8 may not inline (see `Segment`; a miss returns the literal
+ * `Infinity`). The allocation test still reads about 430 B per step for eight projectiles
+ * before V8's final compiler tier.
  */
 function sweep(state: GameState, p: ProjectileState): boolean {
   seg.x = p.x;
@@ -190,10 +193,10 @@ function sweep(state: GameState, p: ProjectileState): boolean {
     if (!o.blocksProjectiles) continue;
     let t: number;
     if (o.type === 'circle') {
-      ring.cx = o.x;
-      ring.cy = o.y;
-      ring.cr = o.r + p.radius;
-      t = sweepCircleAt(seg, ring);
+      target.cx = o.x;
+      target.cy = o.y;
+      target.cr = o.r + p.radius;
+      t = sweepCircleAt(seg, target);
     } else {
       t = sweepRectAt(seg, o);
     }
@@ -220,10 +223,10 @@ function sweep(state: GameState, p: ProjectileState): boolean {
   for (let i = 0; i < champions.length; i++) {
     const c = champions[i] as ChampionState;
     if (!c.alive || c.team === p.team || p.hitIds.includes(c.id)) continue;
-    ring.cx = c.x;
-    ring.cy = c.y;
-    ring.cr = reach;
-    const t = sweepCircleAt(seg, ring);
+    target.cx = c.x;
+    target.cy = c.y;
+    target.cr = reach;
+    const t = sweepCircleAt(seg, target);
     if (!(t <= 1 && t <= blockerT)) continue;
     // Insert after every contact that is earlier, or equal in t with a lower id.
     let k = contactCount;

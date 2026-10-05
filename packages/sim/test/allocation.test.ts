@@ -16,8 +16,9 @@ import { arena01, config2v2 } from './helpers';
 /**
  * The most heap one step may allocate for eight projectiles that sweep every obstacle and
  * champion and hit nothing. The sweep used to build arrays and tuples per obstacle and read
- * about 27 KB per step on this scene; it now reads about 1 KB, and 0 once V8's last compiler
- * tier has settled. The limit sits between the two.
+ * about 27 KB per step on this scene; it now reads about 0.4 KB, before V8's last compiler
+ * tier has settled. The limit sits between the two. It cannot catch one small object per sweep
+ * (about 1.4 KB per step, under the limit), so only review and the arrow counts guard that.
  */
 const SWEEP_ALLOCATION_LIMIT_BYTES_PER_STEP = 4096;
 

@@ -166,6 +166,8 @@ export function sweepRectAt(s: Segment, rect: RectObstacle): number {
   best = Math.min(best, sweepCircleAt(s, corner));
   corner.cy = maxY;
   best = Math.min(best, sweepCircleAt(s, corner));
+  // A miss returns the literal, not the Math.min result, so no computed double crosses this call.
+  if (best === Infinity) return Infinity;
   return best;
 }
 
