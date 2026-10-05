@@ -67,8 +67,8 @@ local steering to avoid champions and projectiles.
 Utility scoring over candidate intents: engage, kite, dodge a predicted
 projectile, retreat, peel for an ally, hold position, use the ultimate. Each
 champion has a small bot profile with a preferred range. The kit does not ship
-it: the bots derive the range from the kit data (see Profiles), and openers,
-escapes and finishers are not built.
+it: the bots derive the range from the kit data (see Profiles), and openers and
+escapes are not built. The one finisher is the rule under Finisher below.
 
 Built so far: engage, kite, retreat, plus idle, and casting (see Casting). Idle
 means no enemy is alive: the bot stands and keeps its aim.
@@ -92,6 +92,18 @@ the current one plus 0.1. Ties go to retreat, then kite, then engage. This
 makes kite start at `d < rangeMin` and end at `d > 1.2 rangeMin`, and retreat
 start at `h < 0.3` and end at `h > 0.36`. After idle the next decision starts
 again from engage.
+
+Finisher: a bot that would choose retreat, or is retreating, does not retreat
+while an alive enemy is within `rangeMax` of the profile, has a clear shot of
+0.5 m (see Clear shot) and has a health fraction at or below the bot's own
+(`health / maxHealth`, equal counts). The nearest such enemy, the lower id on a
+tie, becomes the target, and the scores are taken against it with retreat at 0,
+so the bot engages or kites it by the rules above and casts at it. Why: at low
+health every champion of the kit headless run retreated to its spawn and the
+match froze with no kill; a bot that can win the trade should take it. The rule
+is a pure function of the state and draws no random number, and it runs inside
+`decide`, so the reaction delay applies to it like to any decision. When no
+enemy qualifies, retreat is as above.
 
 A stand needs a clear shot of a champion's width, not only a line of sight: see
 Clear shot. Wherever this document says a stand needs line of sight, it means
@@ -220,7 +232,7 @@ stays in reach is pressed on the first tick the sim would cast it.
 
 Never pressed: an ability with no band (self and ally abilities: Hargrim Q, R and
 base SPACE, Quillon SPACE and R in the test kits), and any slot of a champion
-without a kit. Openers, escapes and finishers are not built.
+without a kit. Openers and escapes are not built.
 
 ## Aim
 
@@ -292,7 +304,7 @@ match replays exactly from its input stream.
 - A full match must finish: it waits for match flow, so the headless test runs
   a fixed 3600 ticks.
 - Local steering around champions and projectiles, dodging and ally logic.
-- Openers, escapes and finishers, and abilities that land on the caster or on
+- Openers and escapes, and abilities that land on the caster or on
   allies (self and ally abilities).
 - An energy reserve for the ultimate.
 
