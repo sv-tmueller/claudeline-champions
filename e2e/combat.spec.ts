@@ -65,9 +65,11 @@ const COMBAT_CODE =
   /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:/;
 // Three's own animation callback. It is logged and never counted.
 const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
-// The sweep files of the sim. Their garbage is huge today (about 790 KB per
-// window, in projectile.ts and geometry.ts) and #49 removes most of it, so the
-// sanity floor below leaves them out and no merge order moves it.
+// The sweep files of the sim. Their garbage was huge (about 790 KB per window, in
+// projectile.ts and geometry.ts) until #62 removed most of it: now 5.7 to 18 KB
+// per window (total minus outside the sweep files, 9 windows of a local run on
+// 66f4828). The sanity floor below leaves them out, so it does not depend on
+// them.
 const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // Measured in a warm steady state: every counted function reads 0 B but the
 // hook's frameMany, which reads 276 to 540 B per window (9 to 18 B per frame, one
@@ -85,10 +87,10 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // 1120 B). See testing.md.
 const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // The profiler must see garbage outside the sweep files in every window: the
-// sim's collision, step and sight code, the fake clock's timers and three's
-// render. About 344 KB per window was the lowest figure measured on the sandbox
-// with the bots casting (344 to 360 KB over 15 windows), so the floor is about a
-// quarter of it.
+// sim's collision, step and sight code and three's render. About 265 KB per
+// window was the lowest figure measured with the hook on a head that contains
+// #62 (264,652 B, 9 windows of a local run on 66f4828), so the floor is about
+// a third of it.
 const PROFILER_SANITY_BYTES = 80_000;
 
 async function readHooks(page: Page): Promise<Hooks> {
@@ -268,10 +270,13 @@ async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allo
 // means a window ran frames through the clock). The log line keeps its four
 // figures, total, onAnimationFrame, fake requestAnimationFrame and outside the
 // sweep files, and adds the counted combat bytes of the window as a fifth.
-// Two retries stay a net for now. A regression of more than 640 B fails every
-// clean attempt; only a marginal one near the limit can pass on a retry. A
-// regression of the sizes measured (1048 B and up) fails all three attempts. The
-// global retries stay 0 in playwright.config.ts.
+// Two retries stay because 1 runner attempt in 6 on 791b232 (job 111860976393)
+// failed the probe with a first-window spike of 3636 B in main.ts:writeCombatHooks
+// (4020 B counted, cause not isolated), and its retry passed. A flaky combat.spec
+// whose failed attempt shows this spike is that case; any other failure is real.
+// A retry also lets a marginal regression near the limit pass; a regression of
+// the sizes measured (1048 B and up) fails all three attempts. The global
+// retries stay 0 in playwright.config.ts.
 test.describe.configure({ retries: 2 });
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
