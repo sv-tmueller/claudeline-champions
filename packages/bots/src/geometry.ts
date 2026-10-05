@@ -41,10 +41,10 @@ export function pointBlocked(grid: NavGrid, p: Vec2): boolean {
 }
 
 /** Numbers per obstacle in `NavGrid.shapes`: kind, x, y, r or w, h, limit. */
-export const SHAPE_STRIDE = 6;
+const SHAPE_STRIDE = 6;
 /** The kind of a circle in `NavGrid.shapes`; a rectangle is `SHAPE_RECT`. */
-export const SHAPE_CIRCLE = 0;
-export const SHAPE_RECT = 1;
+const SHAPE_CIRCLE = 0;
+const SHAPE_RECT = 1;
 
 /**
  * The obstacles of an arena as numbers for `segmentClear`: per obstacle its kind, x, y, r (a

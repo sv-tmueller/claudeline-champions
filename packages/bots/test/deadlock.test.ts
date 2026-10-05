@@ -10,9 +10,10 @@ import { hargrimKit, quillonKit } from './kits';
 
 // The low-health deadlock: every champion of a match retreats to its spawn and stands there, and
 // nobody is ever in reach of anybody. A retreating bot advances when no enemy is in its reach and
-// its team is not ahead (the sum of health fractions of its alive champions is at most the enemy's),
-// and a bot that is advancing stays so until it stops retreating, its target changes or its team
-// gets ahead. These are the unit pins of that rule; the match-sized pin is in headless-kits.test.ts.
+// its team is not ahead (the sum of health fractions of its alive champions is at most the
+// enemy's), and a bot that is advancing stays so until it stops retreating, its target changes or
+// its team gets ahead. These are the unit pins of that rule; the match-sized pin is in headless-
+// kits.test.ts.
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const DELAY = TIERS.hard.delay;
@@ -58,9 +59,10 @@ function think(bot: Bot, state: GameState, n = 1): PlayerInput {
 const SETTLE = DELAY + 10;
 
 /**
- * Quillon (id 1, kitless, so the table profile: stands 6 to 13 m from its target) at the centre of
- * the cell of its spawn (-12, -2) on open ground at 20 percent health, with one enemy alive, Lumeth (id 2), at full
- * health 24 m away. The other two champions are dead, so the sums are 0.2 against 1.
+  * Quillon (id 1, kitless, so the table profile: stands 6 to 13 m from its target) at the centre of
+  * the cell of its spawn (-12, -2) on open ground at 20 percent health, with one enemy alive,
+  * Lumeth (id 2), at full health 24 m away. The other two champions are dead, so the sums are 0.2
+  * against 1.
  */
 function lone(enemyAt: [number, number] = [12, 2]): { state: GameState; bot: Bot } {
   const state = createMatch(config2v2(), open, 1);
@@ -133,7 +135,8 @@ describe('the advance of a retreating bot', () => {
 
   it('flees to its spawn instead when an enemy is in reach with a clear shot', () => {
     // The bot stands 8 m from Lumeth, inside its 13 m, with nothing between them. Lumeth is at full
-    // health, so it is no finisher, and the team is behind, so only the reach keeps it from advancing.
+    // health, so it is no finisher, and the team is behind, so only the reach keeps it from
+    // advancing.
     const { state, bot } = lone([4, -2]);
     put(state, 1, -4, -2);
     const input = think(bot, state, SETTLE);
@@ -144,8 +147,8 @@ describe('the advance of a retreating bot', () => {
   it('advances past an enemy in range that has no clear shot, behind a pillar', () => {
     // arena01's pillar (radius 1.5 at the origin) is between the bot and Lumeth: 10 m apart on a
     // line through it, which is in range but has no line of sight. Nothing is in reach, so the bot
-    // walks around the pillar to a cell that sees Lumeth, away from its spawn, and stands there with
-    // a clear shot, where a bot that retreats walks to its spawn and stays.
+    // walks around the pillar to a cell that sees Lumeth, away from its spawn, and stands there
+    // with a clear shot, where a bot that retreats walks to its spawn and stays.
     const state = createMatch(config2v2(), arena01, 1);
     for (const dead of [0, 3]) ch(state, dead).alive = false;
     put(state, 1, -5, 0);
@@ -177,8 +180,8 @@ describe('the latch of the advance', () => {
 
   it('keeps standing in reach once the advance has begun, where a bot that is not latched flees', () => {
     const { state, bot } = latched();
-    // The enemy is 8 m away with a clear shot: a bot that begins here flees (see above); this one began
-    // before and stands, so it can cast.
+    // The enemy is 8 m away with a clear shot: a bot that begins here flees (see above); this one
+    // began before and stands, so it can cast.
     const input = think(bot, state, SETTLE);
     expect(bot.inspect()).toEqual({ intent: 'retreat', targetId: 2 });
     expect([input.moveX, input.moveY]).toEqual([0, 0]);
@@ -238,8 +241,8 @@ describe.each([
   { name: 'the test kits', kits: () => [hargrimKit(), quillonKit()] },
   { name: 'the shipped kits', kits: jsonKits },
 ])('the match that froze at low health, with $name', ({ kits }) => {
-  // The final state of the kit headless run of #58 (a mirror 2v2 of Hargrim and Quillon, seeds 101 to
-  // 104, easy, normal, hard, normal): health 3 of 160, 27 of 120, 26 of 160 and 13 of 120, every
+  // The final state of the kit headless run of #58 (a mirror 2v2 of Hargrim and Quillon, seeds 101
+  // to 104, easy, normal, hard, normal): health 3 of 160, 27 of 120, 26 of 160 and 13 of 120, every
   // champion under 36 percent, every champion retreating to its spawn and standing there, no kill.
   // Team A has 0.244 of health summed against 0.271 of team B, so team A is behind and advances,
   // and team B, ahead, stays until something changes.
@@ -247,7 +250,8 @@ describe.each([
   const TIER_NAMES = ['easy', 'normal', 'hard', 'normal'] as const;
 
   it('has the team that is behind leave its spawn and a death follow within 3600 ticks', () => {
-    const run = createRun([101, 102, 103, 104], TIER_NAMES, 7, { config: configMirror(), kits: kits() });
+    const config = configMirror();
+    const run = createRun([101, 102, 103, 104], TIER_NAMES, 7, { config, kits: kits() });
     const { state } = run;
     state.champions.forEach((c, id) => {
       c.health = HEALTH[id] as number;
@@ -259,7 +263,8 @@ describe.each([
       run.advance();
       state.champions.forEach((c, id) => {
         const spawn = spawns[id];
-        if (spawn !== undefined && left[id] === -1 && Math.hypot(c.x - spawn.x, c.y - spawn.y) > 1) {
+        if (spawn === undefined || left[id] !== -1) return;
+        if (Math.hypot(c.x - spawn.x, c.y - spawn.y) > 1) {
           left[id] = state.tick;
         }
       });

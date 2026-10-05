@@ -75,7 +75,8 @@ const HARGRIM_CLEARANCES: Record<string, number> = {
 
 const KIT_SETS: KitSet[] = [
   {
-    // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal reaches.
+    // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal
+    // reaches.
     name: 'the test kits',
     kits: () => [hargrimKit(), quillonKit()],
     bands: {
@@ -189,10 +190,13 @@ function pressProblems(
   return { problems, key, gates };
 }
 
-/** Whether the sim may have refused this press in the step, for a reason other than the bot's gates. */
+/**
+ * Whether the sim may have refused this press in the step, for a reason other than the bot's gates.
+ */
 function explained(events: readonly SimEvent[], press: Press): boolean {
   for (const e of events) {
-    if (e.type === 'castStarted' && e.championId === press.id && e.slot === press.slot && e.ex === press.ex) {
+    const sameCast = e.type === 'castStarted' && e.championId === press.id && e.slot === press.slot;
+    if (sameCast && e.ex === press.ex) {
       return true;
     }
     // A champion before this one in the step turn order can kill it, stun it or silence it, or
@@ -219,9 +223,10 @@ interface Played {
 }
 
 /**
- * Plays `TICKS` ticks of a match of bots and checks every tick: the bots leave the state alone, every
- * input is valid, every press passes the oracle of `set` on the state the bot thought on and the sim
- * starts it (or something explains why not), the invariants hold, and the stall tracker is fed.
+  * Plays `TICKS` ticks of a match of bots and checks every tick: the bots leave the state alone,
+  * every input is valid, every press passes the oracle of `set` on the state the bot thought on and
+  * the sim starts it (or something explains why not), the invariants hold, and the stall tracker is
+  * fed.
  */
 function play(set: KitSet, run: MatchRun): Played {
   const { state, bots } = run;
@@ -314,10 +319,12 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
   // The 2v2 above ends its fights by tick 700 with the energy bar at 75 at most (the energy of a
   // champion comes from damage, and four champions die quickly), so the ultimate never fires in it:
   // 9000 matches of that mirror on the shipped kits (seeds 4 to 12003 in groups of four, three tier
-  // sets, each stopped when one champion was left) gave no F cast. A 3v3 (Hargrim and two Quillons a side) lasts longer and its bar reaches 100. These
-  // seeds and tiers are pinned for this criterion alone; the death run above keeps its seeds.
+  // sets, each stopped when one champion was left) gave no F cast. A 3v3 (Hargrim and two Quillons
+  // a side) lasts longer and its bar reaches 100. These seeds and tiers are pinned for this
+  // criterion alone; the death run above keeps its seeds.
   it('a 3v3 of six bots on two kits starts an ultimate within 3600 ticks', () => {
-    const run = createRun(ULTIMATE_SEEDS, ULTIMATE_TIERS, 7, { config: config3v3(), kits: set.kits() });
+    const config = config3v3();
+    const run = createRun(ULTIMATE_SEEDS, ULTIMATE_TIERS, 7, { config, kits: set.kits() });
     const played = play(set, run);
     expect(
       played.ultimates.some((n) => n > 0),
@@ -376,7 +383,8 @@ describe('the band and clearance tables of the shipped kits', () => {
     if (dash === undefined || dash.type !== 'dash') throw new Error('no dash');
     const burst = dash.then[0];
     if (burst === undefined || burst.type !== 'area') throw new Error('no burst');
-    expect(set.bands['hargrim:SPACE:ex']).toEqual({ min: 0, max: dash.distance + burst.radius + 0.5 });
+    const burstReach = dash.distance + burst.radius + 0.5;
+    expect(set.bands['hargrim:SPACE:ex']).toEqual({ min: 0, max: burstReach });
     const hook = projectile(slotOf('hargrim', 'E'));
     expect(set.bands['hargrim:E']).toEqual({ min: 0, max: (hook.speed * hook.lifetimeTicks) / 60 });
     expect(set.clearances['hargrim:E']).toBe(hook.radius);

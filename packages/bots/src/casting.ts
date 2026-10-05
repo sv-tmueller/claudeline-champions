@@ -80,7 +80,11 @@ export function createKitCache(): KitCache {
 }
 
 /** Rebuilds the cache when `kit` or `championId` differs from the one it was built for. */
-export function refreshKitCache(cache: KitCache, kit: KitDef | undefined, championId: string): void {
+export function refreshKitCache(
+  cache: KitCache,
+  kit: KitDef | undefined,
+  championId: string,
+): void {
   if (cache.built && cache.kit === kit && cache.championId === championId) return;
   cache.built = true;
   cache.kit = kit;
@@ -135,7 +139,7 @@ const F_INDEX = SLOTS.indexOf('F');
  * The energy from which the EX variants are held while F is ready: what F costs less what one EX
  * press spends, so the bar can reach the cost of F instead of falling back by an EX cast first.
  */
-export const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
+const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
 
 /**
  * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
@@ -192,7 +196,8 @@ export function updateRuns(
       inBand = (cache.exMin[i] as number) <= d && d <= (cache.exMax[i] as number) - RANGE_MARGIN;
       scratch.clearance = cache.exClearance[i] as number;
     } else if (cache.hasBase[i] === 1) {
-      inBand = (cache.baseMin[i] as number) <= d && d <= (cache.baseMax[i] as number) - RANGE_MARGIN;
+      const max = (cache.baseMax[i] as number) - RANGE_MARGIN;
+      inBand = (cache.baseMin[i] as number) <= d && d <= max;
       scratch.clearance = cache.baseClearance[i] as number;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;

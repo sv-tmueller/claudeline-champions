@@ -393,10 +393,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       case 'retreat': {
         // The deadlock rule: a retreating bot advances on its target when no enemy is in its reach
         // and its team is not ahead. Without it every champion of a match at low health walks to
-        // its spawn and stands there for good. The advance is latched: once begun it goes on, and it
-        // stands in reach to cast, until the intent leaves retreat, the target changes or the team
-        // gets ahead. Without the latch a bot at the edge of its reach steps back out of it, so its
-        // cast run starts over on every other think and nothing lands.
+        // its spawn and stands there for good. The advance is latched: once begun it goes on, and
+        // it stands in reach to cast, until the intent leaves retreat, the target changes or the
+        // team gets ahead. Without the latch a bot at the edge of its reach steps back out of it,
+        // so its cast run starts over on every other think and nothing lands.
         const ahead = teamAhead(state, me);
         if (advancing && (acted.targetId !== advanceTargetId || ahead)) advancing = false;
         if (!advancing && !ahead && !enemyInReach(state, me, profile, sight, dist)) {

@@ -166,7 +166,8 @@ export function lineOfSight(
  * edge of a shadow has a line of sight but no clear shot, and a bolt aimed from it with the
  * smallest error hits the obstacle. A zero-length shot has only the centre segment. The shifted
  * segments are written into `scratch`, which only a direct call (a test) leaves to the default
- * and so allocates; `scratch.from` must not be `from`.
+ * and so allocates. `from` and `to` must not be `scratch.a` or `scratch.b`, which the shifted
+ * segments overwrite; `scratch.from` is not written, so it may be `from`.
  */
 export function clearShot(
   state: GameState,
