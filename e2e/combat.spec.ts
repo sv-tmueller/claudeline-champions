@@ -61,18 +61,23 @@ const COMBAT_CODE =
 // sanity floor below leaves them out and no merge order moves it.
 const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // Measured in a warm steady state: 0 bytes in every counted function but
-// onAnimationFrame, which shows 0 to 48 B per window in the clean mode (three's
+// onAnimationFrame, which shows 0 to 72 B per window in the clean mode (three's
 // own callback and the inlined frame, cause not isolated) and about 1100 B in the
-// bad mode (see the retries below). Each of these fails the limit: a template string
-// written to a hook every frame (about 800 B), a closure made per call in
-// routeEvents (about 1500 B), an escaping array in frame (about 1300 B), and an
-// object literal per projectile per frame in draw that escapes (about 11 KB).
+// bad mode (see the retries below). Each of these fails the limit, with the
+// figures of the pull request: an escaping array in frame (about 1300 B), a
+// template string written to a hook every frame (about 2500 B), a closure made per
+// call in routeEvents (about 1500 to 1900 B), an escaping object in draw (about
+// 10.7 KB), a fresh literal from toPlayerInput (about 1350 B), a template string
+// per Hud.update call (about 1300 B), an escaping array per BotDriver.think call
+// (about 970 B) and a template string per ResultScreen.update call (about 800 B).
 // The limit stays just above the clean figure so the small ones are caught. See
-// the pull request.
+// testing.md.
 const COMBAT_ALLOCATION_LIMIT_BYTES = 256;
-// The profiler must see the sim's and the bots' own garbage outside the sweep
-// files: the cast and melee code, the match flow and the bots' thinking.
-const PROFILER_SANITY_BYTES = 100_000;
+// The profiler must see garbage outside the sweep files in every window: the
+// sim's collision, step and sight code, the fake clock's timers and three's
+// render. About 320 KB per window was the lowest figure measured on the sandbox
+// (317 to 333 KB over 25 windows), so the floor is about a quarter of it.
+const PROFILER_SANITY_BYTES = 80_000;
 
 async function readHooks(page: Page): Promise<Hooks> {
   return page.evaluate(() => {
