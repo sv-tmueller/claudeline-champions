@@ -495,6 +495,33 @@ describe('kite corner and line of sight', () => {
     expect(me.vx === 0 && me.vy === 0).toBe(true);
   });
 
+  it('walks on in the engage band without a clear shot, and stands with one', () => {
+    // Lumeth (id 2) engages at 8 m: inside its band [6, 10], and the pillar of arena01 has a
+    // radius of 1.5, so a level line at height h has a line of sight above 1.5 and a clear shot
+    // of 0.5 m above 2.
+    const { rangeMax } = profileFor('lumeth');
+    const engage = (h: number) => {
+      const state = setup(arena01);
+      kill(state, 1, 3);
+      const me = put(state, 2, -4, h);
+      const target = put(state, 0, 4, h);
+      expect(dist(me, target)).toBeLessThanOrEqual(rangeMax);
+      const bot = createBot(2, 'hard', 1);
+      const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+      expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 0 });
+      return { state, me, target, input };
+    };
+
+    const edge = engage(1.6);
+    expect(hasLineOfSight(edge.state, edge.me, edge.target)).toBe(true);
+    expect(clearShotOracle(edge.state, edge.me, edge.target, 0.5)).toBe(false);
+    expect(edge.input.moveX !== 0 || edge.input.moveY !== 0).toBe(true);
+
+    const clear = engage(2.1);
+    expect(clearShotOracle(clear.state, clear.me, clear.target, 0.5)).toBe(true);
+    expect({ moveX: clear.input.moveX, moveY: clear.input.moveY }).toEqual({ moveX: 0, moveY: 0 });
+  });
+
   it('follows the path to the target when no cell within 8 has line of sight', () => {
     const walled: ArenaDef = {
       ...open,
