@@ -161,6 +161,12 @@ describe('TIERS', () => {
     });
   }
 
+  it('pins the cast delay: easy 15, normal 8, hard 3', () => {
+    expect(TIERS.easy.castDelay).toBe(15);
+    expect(TIERS.normal.castDelay).toBe(8);
+    expect(TIERS.hard.castDelay).toBe(3);
+  });
+
   it('is frozen, the table and every tier, so no bot or test can change a tier', () => {
     expect(Object.isFrozen(TIERS)).toBe(true);
     for (const [tier] of expected) expect(Object.isFrozen(TIERS[tier]), tier).toBe(true);
