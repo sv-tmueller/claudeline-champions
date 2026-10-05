@@ -1,10 +1,10 @@
 # Arena design principles
 
-Status: v1 principles, pre-implementation
+Status: v1 principles, checked by `tools/blender/test_arena_principles.py`. Two arenas: arena01 (grandfathered, see section 8) and arena02
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.1, 4.7, 8.1 and 10
 Companion document: [game rules and controls](rules.md)
 
-This document sets the rules every arena must follow. It contains no specific arena layout. Layouts live in the arena definition files, which follow the data format in section 8.1 of the spec.
+This document sets the rules every arena must follow. It contains no coordinates. Layouts live in the arena definition files, which follow the data format in section 8.1 of the spec. Section 8 lists the arenas.
 
 `[spec]` marks a value copied from the design spec. `[tuned]` marks a value chosen here, which a balance pass may move.
 
@@ -81,3 +81,16 @@ Every obstacle also has a `height` and a `blocksProjectiles` flag.
 - The ring values are stored in the arena definition under `ring`. v1 arenas use the values above `[spec]`.
 - The circle inside `endRadius` must be playable. It holds at least 20 m2 of walkable floor and every part of it is reachable `[tuned]`. The full circle is about 28 m2.
 - Keep obstacles inside the end circle small, so the last fight stays a fight and nobody can hide from the ring and every enemy at once `[tuned]`.
+
+## 8. The arenas
+
+| id | name | intent |
+|----|------|--------|
+| `arena01` | Arena 1 | A fight around a central pillar. The pillar sits inside the end circle, and the lanes beside it are open, so a round opens with a long-range duel. |
+| `arena02` | Arena 2 | The reverse. The centre is open floor, so the whole end circle is walkable and sudden death is fought in the open. Two walls in front of the spawns cut every sightline between them, so a round opens with movement, not a duel. Pillars and posts give flank and lane cover. Low walls fence the centre for movement only. |
+
+Layouts are in `data/arenas/<id>.json`, and both use the ring values of section 7.
+
+`arena01` breaks two rules of this document, and it is grandfathered. Six of its blocking obstacles are 1.5 m high, where section 5 asks for at least 1.8 m. Its corners are 10.7 m from the nearest blocking obstacle, where section 6 asks for at most 8 m. It cannot change, because every sim fixture checksums `state.arena`, so a new height or a new obstacle would move every checksum. No other arena may break a rule.
+
+`tools/blender/test_arena_principles.py` checks sections 3 to 7 against every committed arena. It expects no problem for `arena02` and pins exactly these two for `arena01`, so a third deviation, or a repair of one of these, fails the test.

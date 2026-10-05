@@ -13,6 +13,7 @@ Run these from the repo root. Each must exit 0.
 
 ```
 tools/blender/run.sh tools/blender/gen_arena.py -- --arena data/arenas/arena01.json --out assets/models/arenas/arena01.glb
+tools/blender/run.sh tools/blender/gen_arena.py -- --arena data/arenas/arena02.json --out assets/models/arenas/arena02.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion placeholder --out assets/models/champions/placeholder.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion hargrim --out assets/models/champions/hargrim.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion quillon --out assets/models/champions/quillon.glb
@@ -30,13 +31,14 @@ newer and no packages, so they can run in CI.
 | File | Purpose |
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
-| `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json` |
+| `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
 | `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs |
 | `blender_common.py` | Scene clearing, materials and export, shared by the generators |
-| `test_export_determinism.py` | Regenerates each model four times and compares it to the committed glb. Needs Blender, skips without it. One test, without Blender, checks that every committed champion glb has a case |
+| `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
+| `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
 | `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, feet, facing, height, footprint, budgets and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names and the arena JSON. Standard library only |
-| `test_validate_glb.py` | Unit tests for the validator. The tests that read the committed models need `assets/models` to exist |
+| `test_validate_glb.py` | Unit tests for the validator, over both arenas where they read the committed models. Those tests need `assets/models` to exist |
 
 ## Runner
 
@@ -73,9 +75,9 @@ not vertical.
 - `Floor` covers exactly `size.width` by `size.height`, 0.2 m thick, with its
   top at z = 0.
 - The walls are 0.5 m thick and 1.0 m high. They sit outside the playable
-  area, with their inner faces on x = +-15 and y = +-10 for arena 1.
+  area, with their inner faces on x = +-15 and y = +-10 for both arenas.
 - `Wall_N` is at +y and `Wall_E` is at +x. `Wall_N` and `Wall_S` are longer by
-  two wall thicknesses (31 m for arena 1) so the corners close.
+  two wall thicknesses (31 m for both arenas) so the corners close.
 - Node names are exactly `Floor`, `Wall_N`, `Wall_S`, `Wall_E`, `Wall_W` and
   `Obstacle_0` to `Obstacle_<n-1>`, matching the obstacle order in the JSON.
 - Four flat materials: floor, wall, blocking obstacle (brown) and
