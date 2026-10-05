@@ -54,13 +54,13 @@ port 5173, which Playwright starts itself.
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
   idle human to its result screen (`result.png`), within 12 000 ticks and 150
-  frames (a headless run through the client's setup and driver ends at tick 2998 on
-  main's bots), and follows the Quillon link. The other plays the sandbox to the
-  red edge: the ring warning hidden until 600 ticks before the ring, the countdown,
-  the radius text equal to the sim's within 0.1 m and falling, and the red edge
-  (`ring.png`, counted as red pixels against a picture without the edge). Both
-  assert budgets and tick relations from the rules, and the frame budget makes a
-  page without the scale fail at once, however fast the machine is.
+  frames (a headless run through the client's setup and driver ends at tick 2998
+  on main's bots), and follows the Quillon link. The other plays the sandbox to
+  the red edge: the ring warning hidden until 600 ticks before the ring, the
+  countdown, the radius text equal to the sim's within 0.1 m and falling, and the
+  red edge (`ring.png`, counted as red pixels against a picture without the edge).
+  Both assert budgets and tick relations from the rules, and the frame budget
+  makes a page without the scale fail at once, however fast the machine is.
 
 - Run them with `CI=1`. Without it Playwright reuses whatever listens on 5173,
   which can be a sibling session's dev server serving other code. With `CI=1`
@@ -138,8 +138,9 @@ a plain heap delta is not needed.
   call)) and carries the bytes of whatever V8 inlines into it. The runner showed
   one other window: 1 attempt in 6 on 791b232 (job 111860976393) read a
   first-window spike of 3636 B in `main.ts:writeCombatHooks` (4020 B counted,
-  cause not isolated), which the retry covers. The limit is about 100 B above the largest clean
-  window of 35 attempts and below every mutation below (1048 B and up). It was
+  cause not isolated), which the retry covers. The limit is about 100 B above the
+  largest clean window of 35 attempts and below every mutation below (1048 B and
+  up). It was
   read on a copy of the spec with the limit at 1 B and no retries; to read the
   per-function figures, run that copy and read the "combat code allocated" line
   of the failure message. Excluding `frameMany` from the pattern is not an option:
@@ -168,7 +169,9 @@ a plain heap delta is not needed.
   through the fake clock); a nonzero one means one did.
 - The HUD writes state with `setAttribute`, not `dataset`. With `dataset`, the
   casting windows read 96 to 128 B in `hud.ts:updateSlots` in 5 of 5 attempts at
-  limit 1, and `setAttribute` read 0 B.
+  limit 1 when it was first measured, and 3 of 10 attempts on a rerun (128, 80 and
+  32 B in the worst window, 0 B in the other 7). `setAttribute` read 0 B in every
+  attempt of every clean run.
 - The history, which is why the windows use a hook: with the windows on the fake
   clock, `onAnimationFrame` had two modes. Playwright's fake clock hands out ids
   of 1e12 and up, so each `requestAnimationFrame` call boxes about three heap
@@ -176,10 +179,10 @@ a plain heap delta is not needed.
   the fake clock's own function holds them (about 1075 B per window); in the bad
   mode (about 1100 B per window) Maglev inlines it into `onAnimationFrame`. The
   runner entered the bad mode in every attempt once the sandbox had kits, match
-  flow and a driven bot (run 37335049730, batch #53 decisions 5 and 13), so retries could
-  not cover it. Turning Maglev's inlining off removed the mode but made the
-  counted functions allocate 6.6 to 7 KB per window (boxed doubles at the call
-  boundaries that no longer inline), so the flag was dropped. Loop fields as
+  flow and a driven bot (run 37335049730, batch #53 decisions 5 and 13), so
+  retries could not cover it. Turning Maglev's inlining off removed the mode but
+  made the counted functions allocate 6.6 to 7 KB per window (boxed doubles at the
+  call boundaries that no longer inline), so the flag was dropped. Loop fields as
   doubles from creation, `draw` reading the clock itself, a timestamp as an
   integer and a hook that passes no timestamp changed nothing in the mode or in
   the hook's 9 to 18 B per frame.

@@ -61,10 +61,11 @@ later platform layer can pass its own arguments instead.
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`, so a later kit file joins the match and the champion select
 without a client change. `createMatch` validates them, and a bad kit file shows
-up as a page error. The pure modules (`launch`, `match-setup`, `bot-driver`,
-`models`, `roster`) take the kit list as an argument, so the unit tests load the
-two files statically instead: `tsconfig.tools.json` has `types: ["node"]` and
-rejects `import.meta.glob`.
+up as a page error. Of the pure modules, only `launch` and `match-setup` take
+the kit list as an argument (`result-dom` takes its ids; `bot-driver`, `models`
+and `roster` take neither), so the unit tests load the two files statically
+instead: `tsconfig.tools.json` has `types: ["node"]` and rejects
+`import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
 sim's constant, 3):
