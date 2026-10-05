@@ -224,11 +224,15 @@ a kit file is greyed (`data-available="false"`) until its file exists. There is
 no pre-match screen. Only the visible panel takes pointer events; the HUD takes
 none.
 
-No e2e plays a match to the end: a full match of bots is thousands of ticks, and
-a tick is one 17 to 24 ms frame at the probe viewport on the runner. The
-evidence is a headless integration test through the client's own setup and
-driver (`match-setup.test.ts`, one round to win), the result screen's unit tests
-and the e2e check that the hidden panel and its select exist.
+`e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
+`/?timescale=100` (see Launch and match), with the human idle: a 16 ms frame runs
+96 ticks, so the match of about 3300 ticks is some 35 frames at 5 frames a read,
+where without the scale it would be thousands of frames. It reads the panel hidden
+until `data-phase` is `matchEnd`, then the title, the score (equal to the HUD's),
+the select, takes `result.png` and follows the Quillon link. The headless
+integration test (`match-setup.test.ts`, one round to win and three) gives the
+tick budget, and the result screen's unit tests the Victory and Defeat cases that
+the idle human cannot reach.
 
 `Hud.update` runs once per stepping frame, after all of that frame's sim steps.
 It compares integers and booleans held in cache fields with the new values and

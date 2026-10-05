@@ -50,6 +50,17 @@ port 5173, which Playwright starts itself.
   (`match.png`): input, a projectile and a hit within tick budgets, the timer and
   the hidden result panel. It asserts budgets only, never an exact tick, since bot
   output differs between platforms.
+- `match-end.spec.ts`: two tests on the dev-only time scale `?timescale=100`
+  (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
+  ticks each, read every 5 frames at 320x180. One plays the default match with an
+  idle human to its result screen (`result.png`), within 12 000 ticks and 150
+  frames (a headless run through the client's setup and driver ends at tick 2998 on
+  main's bots), and follows the Quillon link. The other plays the sandbox to the
+  red edge: the ring warning hidden until 600 ticks before the ring, the countdown,
+  the radius text equal to the sim's within 0.1 m and falling, and the red edge
+  (`ring.png`, counted as red pixels against a picture without the edge). Both
+  assert budgets and tick relations from the rules, and the frame budget makes a
+  page without the scale fail at once, however fast the machine is.
 
 - Run them with `CI=1`. Without it Playwright reuses whatever listens on 5173,
   which can be a sibling session's dev server serving other code. With `CI=1`
