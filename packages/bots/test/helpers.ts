@@ -1,4 +1,6 @@
 import arena01Json from '../../../data/arenas/arena01.json';
+import hargrimJson from '../../../data/kits/hargrim.json';
+import quillonJson from '../../../data/kits/quillon.json';
 import {
   Button,
   CHAMPION_RADIUS,
@@ -27,6 +29,14 @@ import { findPath } from '../src/path';
 import { profileFor } from '../src/profile';
 
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
+
+/**
+ * The shipped Hargrim and Quillon kits from `data/kits`, for `createMatch`, which validates them.
+ * The JSON is a plain object tree, so the cast is the one the sim's roster test makes.
+ */
+export function jsonKits(): KitDef[] {
+  return [hargrimJson, quillonJson].map((kit) => structuredClone(kit) as unknown as KitDef);
+}
 
 function validAxis(v: number): boolean {
   return (v === 1 || v === -1 || v === 0) && !Object.is(v, -0);
@@ -204,6 +214,19 @@ export interface MatchRun {
 export interface RunOptions {
   config?: MatchConfig;
   kits?: readonly KitDef[];
+  /** Replaces `createBot`, for a test that drives the run with its own bots. */
+  makeBot?: (id: number, tier: Difficulty, seed: number) => Bot;
+}
+
+/** A copy of an input: a bot owns its returned record and overwrites it on its next think. */
+export function copyInput(input: PlayerInput): PlayerInput {
+  return {
+    moveX: input.moveX,
+    moveY: input.moveY,
+    aimX: input.aimX,
+    aimY: input.aimY,
+    buttons: input.buttons,
+  };
 }
 
 export function createRun(
@@ -217,7 +240,7 @@ export function createRun(
     const seed = botSeeds[c.id];
     const tier = tiers[c.id];
     if (seed === undefined || tier === undefined) throw new Error(`no seed or tier for ${c.id}`);
-    return createBot(c.id, tier, seed);
+    return (options.makeBot ?? createBot)(c.id, tier, seed);
   });
   const inputs: PlayerInput[][] = [];
   return {
@@ -225,7 +248,7 @@ export function createRun(
     bots,
     inputs,
     advance(): PlayerInput[] {
-      const tickInputs = bots.map((bot) => bot.think(state));
+      const tickInputs = bots.map((bot) => copyInput(bot.think(state)));
       step(state, tickInputs);
       inputs.push(tickInputs);
       return tickInputs;
