@@ -8,6 +8,7 @@ import type {
   MatchConfig,
   PlayerInput,
   Slot,
+  SlotSpec,
   StatusInstance,
 } from '@claudeline/sim';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
@@ -174,8 +175,8 @@ describe('cast timing and line of sight', () => {
 describe('clear shot', () => {
   // The pillar of arena01 is a circle of radius 1.5 at the origin. On a level line at height h
   // the centre line clears it when h > 1.5, and a shot of radius r when h - r > 1.5.
-  function shadowDuel(h: number): GameState {
-    const state = createMatch(QUILLON, arena01, 1, [quillonKit()]);
+  function shadowDuel(h: number, kit: KitDef = quillonKit()): GameState {
+    const state = createMatch(QUILLON, arena01, 1, [kit]);
     kill(state, 0, 3);
     put(state, 1, -4, h);
     put(state, 2, 4, h);
@@ -217,6 +218,37 @@ describe('clear shot', () => {
     ch(none, 1).cooldowns[4] = 600;
     ch(none, 1).cooldowns[0] = 600;
     expect(firstPress(createBot(1, 'hard', 1), none, THINKS)).toBeNull();
+  });
+
+  it('gives an ability with no projectile a clearance of 0.5 m, not 0.25 or 1', () => {
+    // M1 is a ground burst 8 m ahead, 1 m wide: a band that reaches across the pillar, no bolt.
+    const burst: SlotSpec = {
+      cooldownTicks: 60,
+      windupTicks: 0,
+      movement: 'free',
+      effects: [
+        {
+          type: 'area',
+          placement: { type: 'aim', range: 8 },
+          radius: 1,
+          durationTicks: 1,
+          intervalTicks: 1,
+          targets: 'enemies',
+          effects: [{ type: 'damage', amount: 1 }],
+        },
+      ],
+    };
+    const kit = () => quietKit('quillon', { M1: burst });
+    // At 1.8 a shot of 0.25 m would clear the pillar (1.55 > 1.5) and one of 0.5 m does not (1.3).
+    const edge = shadowDuel(1.8, kit());
+    expect(clearShotOracle(edge, ch(edge, 1), ch(edge, 2), 0.25)).toBe(true);
+    expect(clearShotOracle(edge, ch(edge, 1), ch(edge, 2), 0.5)).toBe(false);
+    expect(firstPress(createBot(1, 'hard', 1), edge, THINKS)).toBeNull();
+
+    // At 2.1 the 0.5 m shot clears it (1.6 > 1.5), and a clearance of 1 m (1.1) would not.
+    const clear = shadowDuel(2.1, kit());
+    expect(clearShotOracle(clear, ch(clear, 1), ch(clear, 2), 0.5)).toBe(true);
+    expect(firstPress(createBot(1, 'hard', 1), clear, THINKS)?.input.buttons).toBe(Button.M1);
   });
 });
 
@@ -348,6 +380,55 @@ describe('cast gates', () => {
     ch(state, 2).alive = true;
     ch(state, 0).alive = false;
     for (let i = 0; i < 40; i++) expect(bot.think(state).buttons, `dead think ${i}`).toBe(0);
+  });
+});
+
+describe('cast run resets', () => {
+  const m1Kit = () => quietKit('tester', { M1: boltSlot(20, 30) });
+  const hard = TIERS.hard;
+
+  it('starts the run again when the acted target changes, though both are in reach', () => {
+    const state = duel(m1Kit());
+    const me = ch(state, 0);
+    // M1 is on cooldown, so nothing is pressed while the run builds on enemy 2, 8 m away.
+    me.cooldowns[0] = 600;
+    put(state, 2, 5, 0);
+    const bot = createBot(0, 'hard', 1);
+    for (let i = 0; i < 30; i++) expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+    expect(bot.inspect().targetId).toBe(2);
+
+    // Enemy 3 comes back 3 m nearer than enemy 2, and both are inside the band of M1 (9 m).
+    ch(state, 3).alive = true;
+    put(state, 3, -3, 5);
+    let switched = -1;
+    for (let i = 0; i < 30 && switched < 0; i++) {
+      expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+      if (bot.inspect().targetId === 3) switched = i;
+    }
+    expect(switched, 'the bot never switched to enemy 3').toBeGreaterThanOrEqual(0);
+
+    // The cooldown ends. The switch think counted as the first of the run on enemy 3, so the
+    // press is castDelay - 1 thinks later, not on the first think.
+    me.cooldowns[0] = 0;
+    const press = firstPress(bot, state, 20);
+    expect(press?.index).toBe(hard.castDelay - 1);
+    expect(press?.input.buttons).toBe(Button.M1);
+  });
+
+  it('starts the run again after a dead think', () => {
+    const state = duel(m1Kit());
+    const me = ch(state, 0);
+    me.cooldowns[0] = 600;
+    const bot = createBot(0, 'hard', 1);
+    for (let i = 0; i < 30; i++) expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+
+    me.alive = false;
+    expect(bot.think(state).buttons).toBe(0);
+    me.alive = true;
+    me.cooldowns[0] = 0;
+    const press = firstPress(bot, state, 20);
+    expect(press?.index).toBe(hard.castDelay);
+    expect(press?.input.buttons).toBe(Button.M1);
   });
 });
 
