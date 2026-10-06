@@ -40,8 +40,10 @@ const RESERVED = new Set([
   'MetaRight',
 ]);
 
-export function isReserved(code: string): boolean {
-  return RESERVED.has(code);
+// The empty code is what `event.code` reads for a key the browser cannot identify: an action
+// bound to it could never be pressed again.
+function isReserved(code: string): boolean {
+  return code === '' || RESERVED.has(code);
 }
 
 export type RebindResult =

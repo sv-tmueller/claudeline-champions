@@ -50,6 +50,7 @@ describe('rebind', () => {
   });
 
   it.each([
+    '',
     'Escape',
     'Tab',
     'F3',
@@ -62,7 +63,7 @@ describe('rebind', () => {
     'AltRight',
     'MetaLeft',
     'MetaRight',
-  ])('rejects %s as reserved', (code) => {
+  ])('rejects %j as reserved', (code) => {
     expect(rebind(DEFAULT_BINDINGS, 'Q', code)).toEqual({ ok: false, reason: 'reserved' });
   });
 

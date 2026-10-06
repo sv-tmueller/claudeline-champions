@@ -19,7 +19,7 @@ export interface Launch {
 }
 
 /** The arena the page plays when the address names none that exists. */
-export const DEFAULT_ARENA = 'arena01';
+const DEFAULT_ARENA = 'arena01';
 
 /**
  * Reads the query string. `kitIds` are the ids with a loaded kit, `arenaIds`

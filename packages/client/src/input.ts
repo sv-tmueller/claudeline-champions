@@ -36,7 +36,7 @@ export interface InputCore {
   setBindings(bindings: Bindings): void;
   /** Returns whether the caller should call preventDefault. */
   keyDown(code: string, mods: KeyMods): boolean;
-  /** Always clears the code. Returns whether to call preventDefault. */
+  /** Clears the action the code is bound to, with or without a modifier. Returns whether to call preventDefault. */
   keyUp(code: string, mods: KeyMods): boolean;
   mouseDown(button: number): void;
   mouseUp(button: number): void;

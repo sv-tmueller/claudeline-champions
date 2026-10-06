@@ -56,8 +56,8 @@ describe('readSettings', () => {
     expect(readSettings(text(1, { ...CUSTOM, up: 'KeyL' }))).toEqual(DEFAULTS);
   });
 
-  it.each(['Escape', 'Tab', 'F3', 'F4', 'ShiftLeft', 'ControlLeft', 'AltRight', 'MetaLeft'])(
-    'reads the defaults when an action holds the reserved %s',
+  it.each(['', 'Escape', 'Tab', 'F3', 'F4', 'ShiftLeft', 'ControlLeft', 'AltRight', 'MetaLeft'])(
+    'reads the defaults when an action holds the reserved %j',
     (code) => {
       expect(readSettings(text(1, { ...CUSTOM, F: code }))).toEqual(DEFAULTS);
     },
@@ -77,7 +77,7 @@ describe('readSettings', () => {
     expect(readSettings(outer)).toEqual(DEFAULTS);
   });
 
-  it('keeps the settings and the defaults apart', () => {
+  it('reads the defaults as the shared DEFAULT_BINDINGS set', () => {
     expect(readSettings(null).bindings).toBe(DEFAULT_BINDINGS);
   });
 });

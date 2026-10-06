@@ -58,11 +58,12 @@ port 5173, which Playwright starts itself.
   ticks each, read every 5 frames at 320x180. One plays the default match with an
   idle human to its result screen (`result.png`), once per arena
   (`/?arena=arena02&timescale=100` for arena02), within a budget of ticks and
-  frames per arena: 12 000 and 150 on arena01, 13 000 and 161 on arena02 (a
-  headless run through the client's setup and driver gives each arena's tick, in
-  `match-setup.test.ts`; the arena02 budget is that tick plus two rounds of about
-  1000 and one round to sudden death of about 7000, rounded up to 1000, with
-  frames = ceil(ticks / 96) + 25), and follows the Quillon link of the result panel, which keeps the arena.
+  frames per arena: 15 000 and 182 on arena01 (it ends at tick 5184 on the bots
+  of #86), 13 000 and 161 on arena02. A headless run through the client's setup
+  and driver gives each arena's tick, in `match-setup.test.ts`. The budget is that
+  tick plus two rounds of about 1000 and one round to sudden death of about 7000,
+  rounded up to 1000, and the frames are ceil(ticks / 96) + 25. The test follows
+  the Quillon link of the result panel, which keeps the arena.
   The other plays the sandbox to the red edge: the ring warning hidden until 600
   ticks before the ring, the countdown, the radius text equal to the sim's within
   0.1 m and falling, and the red edge (`ring.png`, counted as red pixels against a

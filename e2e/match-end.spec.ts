@@ -45,9 +45,9 @@ const RED: ColourRange = { min: [140, 30, 30], max: [255, 100, 100] };
 const TEST_TIMEOUT_MS = 60_000;
 // The match test runs once per arena. `query` leads the address and ends in `&` when it is not
 // empty. The budgets of arena01 are the two constants above. arena02 has its own headless run
-// (match-setup.test.ts, tick 3474 on the bots of #86) and its budget is built the same way: the
-// measured tick, two more rounds of about 1000 each and one round to sudden death of about 7000,
-// 12 474 rounded up to 13 000 ticks, and frames = ceil(13 000 / 96) + 25 = 161.
+// (match-setup.test.ts, ARENA02_END_TICK) and its budget is built the same way: that tick plus
+// two more rounds of about 1000 each and one round to sudden death of about 7000, rounded up to
+// 1000 (13 000 ticks), and frames = ceil(13 000 / 96) + 25 = 161.
 const ARENAS = [
   { id: 'arena01', query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
   { id: 'arena02', query: 'arena=arena02&', budgetTicks: 13_000, budgetFrames: 161 },

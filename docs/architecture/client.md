@@ -28,9 +28,9 @@ Keys match on `event.code`, and the nine movement and slot actions can be reboun
 `bindings.ts` (pure) holds `Action` (up, left, down, right, SPACE, Q, E, R, F),
 `DEFAULT_BINDINGS` (the table of rules.md section 6), `rebind` (refuses a code
 another action holds, `duplicate`, and a reserved code, `reserved`: Escape, Tab,
-F3, F4, both Shift keys, Control, Alt and Meta) and `keyLabel`. The mouse buttons
-and Shift stay fixed: Shift modifies any slot and is two physical keys for one
-bit. `InputCore` has a `bindings` getter and `setBindings`, and translates the
+F3, F4, both Shift keys, Control, Alt, Meta and the empty code of a key the
+browser cannot identify) and `keyLabel`. The mouse buttons and Shift stay fixed:
+Shift modifies any slot and is two physical keys for one bit. `InputCore` has a `bindings` getter and `setBindings`, and translates the
 physical code of an event into the default code of its action before it joins
 `held`, so `toPlayerInput` and its tables are the same whatever the bindings. A
 key held across a rebinding is cleared by the `releaseAll` the menu runs on close.
@@ -282,16 +282,17 @@ on the timer.
 1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
 everything, so a right click reaches the canvas. `result.css` follows the same
 rules with `--result-u` and `#result`, and one difference: the visible panel
-takes pointer events. So does `menu.css`, with `--menu-u` and `#menu`. The colours are hex custom properties on `#hud`. Panels
-are neutral black with alpha and every foreground element sits on one, with one
-exception: the ring warning's red edge, an inset shadow in `var(--hud-enemy)`
-along the viewport that shows while the local champion is outside the ring
-(rules.md section 8 asks for an edge, which cannot sit on a panel). The
-warning's text is on a panel. Text is off-white, below 250 in every channel.
-Allies and enemies use the health-bar colours. No colour is blue, purple or
-magenta, none falls in the pixel boxes the e2e specs count (white, the yellow
-ring, the magenta overlay) and none is within 80 of a champion body colour.
-`hud-palette.test.ts` checks all of this over the three style sheets.
+takes pointer events. So does `menu.css`, with `--menu-u` and `#menu`. The
+colours are hex custom properties on `#hud`. Panels are neutral black with alpha
+and every foreground element sits on one, with one exception: the ring warning's
+red edge, an inset shadow in `var(--hud-enemy)` along the viewport that shows
+while the local champion is outside the ring (rules.md section 8 asks for an
+edge, which cannot sit on a panel). The warning's text is on a panel. Text is
+off-white, below 250 in every channel. Allies and enemies use the health-bar
+colours. No colour is blue, purple or magenta, none falls in the pixel boxes the
+e2e specs count (white, the yellow ring, the magenta overlay) and none is within
+80 of a champion body colour. `hud-palette.test.ts` checks all of this over the
+three style sheets.
 
 A debug overlay draws collision circles, obstacles, projectiles and line of
 sight. It draws as lines in the 3D scene, not in the HTML HUD, so its shapes
