@@ -59,10 +59,11 @@ port 5173, which Playwright starts itself.
   `/?arena=arena02`; `match-3v3.png` and `match-3v3-arena02.png` for the same
   addresses with `teamsize=3`): input, one bar hook per champion (four, or six
   in a 3v3), a projectile and a hit within tick budgets, the timer and the
-  hidden result panel. It asserts budgets only, never an exact tick, since bot
-  output differs between platforms. The 3v3 rows log the headless ticks next
+  hidden result panel. It asserts budgets only, never an exact tick, because
+  every bots change moves the ticks: the 3v3 rows log the headless ticks next
   to the ones they read (projectile 267 and 275, hit 301 and 307, the same on
-  9612bff and on 57dd52f: the dash hold of #98 moves none of them).
+  9612bff and on 57dd52f: the dash hold of #98 moves none of them) and assert
+  the budgets of the 2v2 rows.
 - `match-end.spec.ts`: tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
