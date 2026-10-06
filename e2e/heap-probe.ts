@@ -44,20 +44,27 @@ const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // 66f4828). The sanity floor below leaves them out, so it does not depend on
 // them.
 const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
-// The sandbox's limit, 640 B, on the median of five measured windows. In a warm
+// The sandbox's limit, 600 B, on the median of five measured windows. In a warm
 // steady state every counted function reads 0 B but the hook's frameMany, which reads
 // 300 to 588 B per window (9 to 18 B per frame, one boxed number per frame, whatever
 // its argument: it stayed with the timestamp as an argument, as an integer, in a field
 // of the loop clock and with no argument at all) and counts the bytes of the callees
-// inlined into it. On 1670d1b (the pointer aim of #87 and the draw of #89 fixed) the
-// median of five was at most 456 B over 15 local attempts at limit 1 B (5 batches of 3
-// repeats, none blind: see testing.md), and at most 504 B over the 24 runner attempts
-// of the isolation of #77 (run 37434090996, before those fixes); the limit is 136 B above
-// the largest figure, local or runner, and 252 B under the smallest mutation (892 B).
+// inlined into it. The largest clean median of five is 504 B, from the 24 runner
+// attempts of the isolation of #77 (run 37434090996, before the fixes of #87 and #89).
+// The figures with the fixes in: at most 456 B over 15 local attempts at limit 1 B on
+// 1670d1b (5 batches of 3 repeats, none blind: see testing.md), at most 480 B over the
+// tester's 3 local attempts on 3def3bc (360, 480 and 480 B), and at most 456 B over the
+// 6 runner attempts on 3def3bc (384, 360, 432, 432, 456 and 408 B, run 37456539110).
+// The limit is 96 B above 504 B (about 100 B, to a round 600 B) and 292 B under the
+// smallest mutation (892 B). It was 640 B, 136 B above the largest figure, which is
+// outside the margins the rule has accepted (96 to 120 B).
+// Rechecked against 600 B: the eight per-call mutations below all failed 3 of 3 on the
+// sandbox (medians 940 to 3132 B).
 // The worst window is not a stable figure: window 0 holds the first frame's acquire of
 // the volley's 8 views and reads 744 to 1032 B counted in the 15 local attempts (636 to
-// 1068 B over the 59 earlier ones, 24 runner and 35 local), and a one-off spike lands in
-// one window of some attempts (1224 to 2140 B).
+// 1068 B over the 59 earlier ones, 24 runner and 35 local; 792 to 1092 B in the 6 runner
+// attempts on 3def3bc), and a one-off spike lands in one window of some attempts (1224 to
+// 2140 B).
 // Each of these fails the limit alone, as the median of the windows per attempt over 3
 // attempts, on 1670d1b plus the line of testing.md: an escaping array in frame (1600 to
 // 1728 B), a template string written to data-p0x on every writeHooks call (2844 to
@@ -69,7 +76,7 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // position and facing (336 to 408 B) and the canvas rect asked from the DOM on every
 // sampleAim call (336 to 504 B) are the live scene's (see LIVE_ALLOCATION_LIMIT_BYTES):
 // the sandbox's pointer never moves, so here they pass. See testing.md.
-export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
+export const COMBAT_ALLOCATION_LIMIT_BYTES = 600;
 // The live match's limit: 780 B, its own literal, on the median of five measured
 // windows. The measured windows hold the first projectiles and hits of round 3, whose
 // event paths (the view acquire, routeEvents, the impact rings) cost 24 to 330 B in a
@@ -96,7 +103,7 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // (which fails on both scenes). One mutation is gated by the sandbox and not by this
 // limit: the template per ResultScreen.update call (836 to 860 B here over 3 attempts,
 // all red, but only 56 B over the limit, and 704 B and 752 B passed under 780 B in
-// the earlier 12, so it is not a live gate; 892 to 944 B against 640 B on the
+// the earlier 12, so it is not a live gate; 892 to 944 B against 600 B on the
 // sandbox). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
 // The profiler must see garbage outside the sweep files in every window: the

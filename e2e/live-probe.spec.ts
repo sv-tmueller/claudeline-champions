@@ -84,11 +84,14 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 3500 frames on 8d80073 (the warm-up to tick 2879, the lead, the
-// five windows and the run-on to the first death). It took 1.0 to 1.1 min on the runner
-// (jobs 112201476995 and 112203346352 on 7b80afd), about 18 ms a frame, so 180 s is a
-// margin of 2.7x. The warm-up budget above (9100 frames, about 165 s at that rate) is
-// reached only when the spec is already failing, and then the timeout may fire first.
+// A live attempt is about 3500 frames (the warm-up to tick 2879, the lead, the five
+// windows and the run-on to the first death, tick 3539 on 1670d1b). It took 6 to 16 s
+// locally (3 attempts in parallel), and the six runner jobs on 3def3bc (run
+// 37456539110) took 2.7 to 4.2 min for the whole Playwright job of 19 tests, so one
+// live attempt is well inside 180 s. The earlier shape took 1.0 to 1.1 min on the
+// runner, about 18 ms a frame (jobs 112201476995 and 112203346352 on 7b80afd), and the
+// warm-up budget above (9100 frames, about 165 s at that rate) is reached only when
+// the spec is already failing, and then the timeout may fire first.
 const TEST_TIMEOUT_MS = 180_000;
 
 async function readHooks(page: Page): Promise<Hooks> {
