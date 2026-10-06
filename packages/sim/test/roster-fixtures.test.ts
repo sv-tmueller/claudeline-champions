@@ -1,5 +1,5 @@
-// Scripted roster fixtures: one per kit, `scripted-roster-hargrim-arena01-2v2.json` and
-// `scripted-roster-quillon-arena01-2v2.json`.
+// Scripted roster fixtures: one per kit, `scripted-roster-hargrim-arena01-2v2.json`,
+// `scripted-roster-quillon-arena01-2v2.json` and `scripted-roster-skerrow-arena01-2v2.json`.
 //
 // Each fixture runs 2400 ticks on arena01 with the kit of `data/kits/<id>.json` for all four
 // champions (a mirror: two on team A, two on team B), so one kit meets itself in every exchange.
@@ -18,13 +18,36 @@
 // after another until a run satisfied every item of the coverage test below with no oracle problem.
 // The search script is not committed; the script it produced is the data. It used mulberry32 seeded
 // with the attempt number (1, 2, 3 and so on) and ran the mirror config of the fixture for 2400
-// ticks, drawing a new window of 5 + floor(rnd * 14) ticks per champion whenever its last one ran
-// out, with the same draw order, probabilities and `setEnergy` energies as that header. Match seed
-// 5555 for Hargrim and 5556 for Quillon. The player was written again from that header, since the
-// original search script is not committed either. Attempt 1 was the first to cover everything for
-// Hargrim and attempt 23 the first for Quillon (attempts 1 to 22 each missed an item of the
-// coverage test, and none had an oracle problem); each one's output is that fixture's segments and
-// actions exactly.
+// ticks. Match seed 5555 for Hargrim, 5556 for Quillon and 5558 for Skerrow. Attempt 1 was the first
+// to cover everything for Hargrim, attempt 23 the first for Quillon and attempt 6 the first for
+// Skerrow (attempts 1 to 22 and 1 to 5 each missed an item of the coverage test, and none had an
+// oracle problem); each one's output is that fixture's segments and actions exactly.
+//
+// The player. The abilities header leaves draw-level detail open, so this is the order the
+// committed Hargrim and Quillon fixtures fix. The player was written again from that header (the
+// original script is not committed either), and it reproduces Hargrim attempt 1 and Quillon attempt
+// 23 byte for byte, segments and actions, which is what makes this record exact. At the start of a
+// tick, for each champion in id order (a dead one too) whose window ran out, from the state before
+// that tick's step, it draws in this order: (1) the length, 5 + floor(rnd * 14) ticks; (2) a flag,
+// where below 0.3 the target is a random living enemy and otherwise the nearest one (a tie goes to
+// the lower id); (3) the random enemy index, floor(rnd * living enemies), drawn in every window and
+// used only when the flag was below 0.3; (4) the random ally index, floor(rnd * living allies other
+// than the champion), drawn in every window and used only by an ally aim; (5) the aim kind, where
+// below 0.6 aims at the target, below 0.8 at the ally, below 0.92 at a uniform point (two more
+// draws, x = -14 + 28 * rnd and then y = -9 + 18 * rnd, in meters) and otherwise at the champion
+// itself; a kind with nobody to aim at (no living enemy, no living ally) falls through to the next
+// one that applies, so an ally kind with no living ally becomes the uniform point; the aim is then
+// rounded to whole centimeters as Math.round(meters * 100), which takes no draw; (6) the walk: one
+// draw, where below 0.45 walks along the axes toward the aim point (away from it when within 3.5 m,
+// per axis only when more than 0.5 m off, with no more draws), below 0.70 takes a uniform axis in
+// each of x and y (two more draws, floor(rnd * 3) - 1, x first) and otherwise stands, with no more
+// draws; (7) seven button draws for M1, M2, SPACE, Q, E, R, F against 0.5, 0.3, 0.2, 0.3, 0.3,
+// 0.15, 0.3, then one for SHIFT against 0.3; (8) one draw for a `setEnergy` action against 0.2,
+// and when it is taken the champion, floor(rnd * 4), and then the energy, [0, 24, 25, 98, 99, 100,
+// 60][floor(rnd * 7)], both at the current tick. Flipping any one of these choices (the order of
+// the uniform point, centimeter rounding, allies including the champion, the energy order, the
+// ally threshold, a walk that always draws its axes) changes the winning Skerrow segments within
+// the first 90 ticks.
 //
 // The checksums were then generated as for the other fixtures: set every checksum to 0, run
 // `npx vitest run --project sim packages/sim/test/roster-fixtures.test.ts`, copy the actual values
@@ -38,8 +61,10 @@
 import { describe, expect, it } from 'vitest';
 import hargrimFixtureJson from './fixtures/scripted-roster-hargrim-arena01-2v2.json';
 import quillonFixtureJson from './fixtures/scripted-roster-quillon-arena01-2v2.json';
+import skerrowFixtureJson from './fixtures/scripted-roster-skerrow-arena01-2v2.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
+import skerrowJson from '../../../data/kits/skerrow.json';
 import { checksum, cloneState, createMatch, step } from '../src/index';
 import type { GameState, MatchConfig, PlayerInput } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -166,6 +191,12 @@ const EXPECTED: Record<string, Expected> = {
     thens: [],
     statuses: ['slow', 'haste', 'root', 'shield'],
   },
+  skerrow: {
+    fired: ['M1/false', 'M2/false', 'SPACE/false', 'SPACE/true', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
+    gains: ['M1/false', 'M2/false', 'SPACE/true', 'Q/false', 'E/false', 'E/true', 'F/false'],
+    thens: ['SPACE/true'],
+    statuses: ['slow', 'haste', 'silence', 'dot', 'invulnerable', 'stun'],
+  },
 };
 
 /** Collects what the coverage test needs from the events of every step. */
@@ -241,7 +272,11 @@ interface Subject {
 const SUBJECTS: Subject[] = [
   { name: 'hargrim', kit: validateKit(hargrimJson), fixture: decodeFixture(hargrimFixtureJson, 'hargrim') },
   { name: 'quillon', kit: validateKit(quillonJson), fixture: decodeFixture(quillonFixtureJson, 'quillon') },
+  { name: 'skerrow', kit: validateKit(skerrowJson), fixture: decodeFixture(skerrowFixtureJson, 'skerrow') },
 ];
+
+/** The match seed of each fixture, so no two kits share a stream. */
+const SEEDS: Record<string, number> = { hargrim: 5555, quillon: 5556, skerrow: 5558 };
 
 interface Observer {
   /** Before the actions of the tick the state is about to run. */
@@ -283,7 +318,7 @@ describe.each(SUBJECTS)('scripted $name fixture', ({ name, kit, fixture }) => {
 
   it('uses the kit of its data file and its own match seed', () => {
     expect(start().kits).toStrictEqual([kit]);
-    expect(fixture.seed).toBe(name === 'hargrim' ? 5555 : 5556);
+    expect(fixture.seed).toBe(SEEDS[name]);
     expect(fixture.ticks).toBe(2400);
   });
 

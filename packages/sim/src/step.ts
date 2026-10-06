@@ -11,7 +11,7 @@ import {
 } from './cast';
 import { resolveChampion } from './collision';
 import { atan2 } from './dmath';
-import { stepLocked, stepRoundEnd } from './flow';
+import { stepLocked, stepSuddenDeathAndDecision } from './flow';
 import { length } from './geometry';
 import { upkeepStatuses } from './health';
 import { stepForcedMotion } from './motion';
@@ -85,7 +85,7 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
   stepAreas(state);
   expireProjectiles(state);
   expireAreas(state);
-  if (state.match !== undefined) stepRoundEnd(state, state.match);
+  if (state.match !== undefined) stepSuddenDeathAndDecision(state, state.match);
   dropUnusedCasts(state);
   if (state.match !== undefined) state.match.phaseTicks += 1;
 
