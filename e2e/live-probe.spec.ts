@@ -1,6 +1,7 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import {
   LIVE_ALLOCATION_LIMIT_BYTES,
+  LIVE_BOTS_LIMIT_BYTES,
   PROBE_VIEWPORT,
   PROFILER_SANITY_BYTES,
   allocationsOverAWindow,
@@ -16,10 +17,11 @@ import { orFail, watchProblems } from './support';
 // human on every tick, projectiles, hits and bars as the bots fight). The first
 // scene, combat.spec.ts, is a steady state. This one counts the table-driven
 // change writes with real changes, and the bots' fight through the glue. The
-// bots package itself is logged as the sixth figure of the probe line and never
-// counted (see heap-probe.ts). Every frame runs through the client's dev-only
-// hook, starting in the warmup phase; the fake clock is paused before the page
-// loads and never runs a frame, so the ticks are the hook's alone.
+// bots package itself is logged as the sixth figure of the probe line and bounded
+// apart from the counted code, on the median of the five windows (see heap-probe.ts).
+// Every frame runs through the client's dev-only hook, starting in the warmup phase;
+// the fake clock is paused before the page loads and never runs a frame, so the ticks
+// are the hook's alone.
 //
 // The scene is measured late, in the first round that begins after
 // WARM_UP_TICKS, with no profiler before it. A live match does not give the
@@ -288,6 +290,13 @@ test('the live match: the writes of a changing match allocate under the limit', 
       measured.asserted.combat,
       `combat code allocated ${JSON.stringify(measured.asserted.combatByFunction)}`,
     ).toBeLessThan(LIVE_ALLOCATION_LIMIT_BYTES);
+    // The bots' bytes, apart from the counted code: the median of the five windows' own figures,
+    // not the bots figure of the window that is the median by counted bytes (see LIVE_BOTS_LIMIT_BYTES).
+    const botsMedian = windows.map((w) => w.bots).sort((a, b) => a - b)[(MEASURED_WINDOWS - 1) / 2] as number;
+    expect(
+      botsMedian,
+      `bots allocated ${JSON.stringify(windows.find((w) => w.bots === botsMedian)?.botsByFunction)}`,
+    ).toBeLessThanOrEqual(LIVE_BOTS_LIMIT_BYTES);
 
     // Windows run on to the first death of the round, so every log shows how far the
     // last measured window is from it, and the margin is asserted.
