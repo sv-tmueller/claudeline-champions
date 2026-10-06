@@ -289,11 +289,12 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
 - The asserted figure is the median of the five measured windows, in both
   scenes, and a window's figure is its counted bytes (see the retries bullet
   above for why). Window 0 of the sandbox holds the first-frame acquire of the
-  volley's eight views and reads 636 to 1068 B counted in every attempt (74
-  attempts: the 24 runner lines of the isolation, 35 local and the 15 of
-  1670d1b; the acquire is 336 to 660 B of it), which the median ignores; the
-  live scene's windows hold the round's first projectiles, the first hit and the
-  rings: the event paths (`entity-views.ts:acquire`, `feedback.ts:routeEvents`,
+  volley's eight views and reads 636 to 1092 B counted in every attempt (80
+  attempts: the 24 runner lines of the isolation, 35 local, the 15 of 1670d1b
+  and the 6 runner attempts of 3def3bc, which reached 1092; the acquire is 336
+  to 660 B of it), which the median ignores; the live scene's windows hold the
+  round's first projectiles, the first hit and the rings: the event paths
+  (`entity-views.ts:acquire`, `feedback.ts:routeEvents`,
   `impact-rings.ts:spawn`) cost 24 to 330 B in a window, with one-off spikes of
   1.3 to 5 KB in `hud.ts`, `impact-rings.ts`, `main.ts` and `champion-look.ts`,
   each in one window.
@@ -329,14 +330,16 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   `draw` excluded: jobs 112201476995, 112203346352 and 112205063119) were 588,
   540 and 660 B, at 1.0 to 1.1 min per live attempt; the six runner attempts on
   3def3bc read 660, 552, 636, 516, 576 and 528 B, with `sampleAim`, `camera.ts`
-  and `draw` at 0 B in every window and 2.7 to 4.2 min for the whole Playwright
-  job of 19 tests. The live limit is 96 B above the largest clean local median
-  (684 B), 120 B above the largest of those runner medians (660 B) and 228 B
-  under the smallest live-gated mutation, the per-change `data-p0x` write (1008
-  to 1176 B). A runner live median above 780 B reopens the limit under the limit
-  rule (about 100 B above the largest clean median, below the smallest
-  live-gated mutation; if none fits, stop and report). The figures of the PR's
-  runner proof are in its body.
+  and `draw` at 0 B in every window, 41 s to 1.1 min per live attempt (1.1 min,
+  50.8 s, 40.9 s, 51.3 s, 1.1 min and 47.4 s, about 2.7x margin against the 180
+  s timeout) and 2.7 to 4.2 min for the whole Playwright run of 19 tests. The
+  live limit is 96 B above the largest clean local median (684 B), 120 B above
+  the largest of those runner medians (660 B) and 228 B under the smallest
+  live-gated mutation, the per-change `data-p0x` write (1008 to 1176 B). A
+  runner live median above 780 B reopens the limit under the limit rule (about
+  100 B above the largest clean median, below the smallest live-gated mutation;
+  if none fits, stop and report). The figures of the PR's runner proof are in
+  its body.
 - `main.ts:sampleAim`, `camera.ts` and `entity-views.ts:draw` read 0 B. On
   1670d1b the three read 0 B in all 75 windows of the 15 live attempts (the
   pointer present and moving), and `draw` and the camera module in all 75

@@ -110,8 +110,8 @@ const WARM_UP_VOLLEYS = 4;
 // Five windows measured right after the volley, with no settle window: 150 ticks, all
 // of them before the first shot ends (162). The asserted figure is the median of the
 // five (decision 12 of batch #63, from the isolation of #77, see testing.md): window 0
-// holds the first frame's acquire of the volley's eight views and reads 636 to 1068 B
-// counted (74 attempts, runner and local, see COMBAT_ALLOCATION_LIMIT_BYTES), and a
+// holds the first frame's acquire of the volley's eight views and reads 636 to 1092 B
+// counted (80 attempts, runner and local, see COMBAT_ALLOCATION_LIMIT_BYTES), and a
 // one-off spike in another function can land in any window, so the worst window is not
 // a stable figure and the median is.
 const MEASURED_WINDOWS = 5;
