@@ -135,8 +135,10 @@ and the same input stream, `checksum` after N ticks is identical on every run.
   alive flag.
 - Projectile: id, owner, team (copied from the owner at spawn), position,
   velocity, radius, remaining lifetime ticks, pierce flag, the champions it has
-  already hit (`hitIds`, in hit order), an inline `effects` list and `castId`
-  (the cast that fired it, or `null` for a dev tool spawn).
+  already hit (`hitIds`, in hit order), an inline `effects` list, an optional
+  `allyEffects` list (the key is missing, not `undefined`, when the projectile
+  has none) and `castId` (the cast that fired it, or `null` for a dev tool
+  spawn).
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
   the next application, an inline `effects` list and `castId` as for a
@@ -163,7 +165,11 @@ strength field of that type), `shield { absorb, ticks }`, `knockback
 { distance, ticks, direction: 'away' | 'toward' }` and `energyGain { amount }`
 (an integer from 1 to 100; only `landHit` reads it). A hit applies its effects
 in list order to each champion it lands on, with the owner as the source and
-the slot of the cast that made it, or no slot for a dev tool spawn. `away`
+the slot of the cast that made it, or no slot for a dev tool spawn. A
+projectile with `allyEffects` applies that list to a champion of the owner's team
+(never the owner) and `effects` to a champion of the other team; both lists hold
+the `Effect` union, and a `damage` in `allyEffects` is allowed and earns no
+energy. `away`
 points from the hit origin (the projectile contact point, the area centre, the
 arc origin) to the target, `toward` from the target to the owner's current
 position, and a zero vector means no push.
@@ -264,15 +270,25 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   sweep ends it at that time, with reason `obstacle` or `boundary`. Obstacles
   with `blocksProjectiles: false` are ignored. The boundary is hit once the
   centre reaches `W/2 - radius` (and the same for y), outward only.
-- Champions: a projectile can touch alive champions of the other team that are
-  not in its `hitIds`, using the reach `0.5 + radius`. It never hits its owner
-  or an ally. A champion it already overlaps at spawn is hit at t = 0. Dead
-  champions are passed through.
+- Champions: a projectile can touch alive champions that are not in its
+  `hitIds`, using the reach `0.5 + radius`. It never hits its owner. A champion
+  of the other team is a candidate unless the projectile is ally-only (it has
+  `allyEffects` and an empty `effects`); a champion of the owner's team is a
+  candidate only when the projectile has `allyEffects`. A projectile without
+  `allyEffects` therefore never hits an ally, and an empty `effects` without
+  `allyEffects` (a dev spawn) still stops at the first enemy. A champion it
+  already overlaps at spawn is hit at t = 0, ally or enemy. A cast projectile
+  starts at the caster's centre, so it touches an ally pressed against the caster
+  at t = 0 only with a radius of 0.5 m or more. Dead champions are passed
+  through. The hit applies `allyEffects` to an ally and `effects` to
+  an enemy, and `projectileHit` names the champion hit, which may be an ally.
 - Order: contacts at or before the blocker time are taken by time, then by
-  champion id. A non-piercing projectile ends at the first one (reason `hit`);
-  a piercing one hits each once and goes on until a blocker or its lifetime
-  ends it. A champion killed by an earlier projectile in the same tick is
-  skipped by the later ones.
+  champion id. A non-piercing projectile ends at the first one of either team
+  (reason `hit`); a piercing one hits each once, allies too, and goes on until a
+  blocker or its lifetime ends it. A full-health ally still stops a non-piercing
+  bolt: there is a `projectileHit` and no `heal` event. An ally-only projectile
+  passes the enemies in its way without an event. A champion killed by an
+  earlier projectile in the same tick is skipped by the later ones.
 - Against a wall: a contact at t = 0 blocks only a projectile that moves into
   the obstacle, so a champion pressed against a wall can still fire away from
   it. Into the wall it ends at once.
@@ -370,7 +386,8 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
   turn subnormal below about 1.5e-154; a component of exactly 1e-150 is
   accepted), a speed or radius at or below 0, a lifetime, duration or interval
   that is not a positive integer, a projectile `pierce` that is not a boolean,
-  `effects` that is not an array, an effect of an unknown type or with a bad
+  `effects` that is not an array, a projectile `allyEffects` that is given but
+  is not a non-empty array, an effect (in either list) of an unknown type or with a bad
   field (an amount at or below 0, a status spec that `applyStatus` would
   reject, a shield with an absorb not above 0 and at most 1e6 or ticks outside 1
   to 36000, a knockback with a distance not above 0 and at most 1e6, ticks
@@ -688,7 +705,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 
 | Effect | Fields | What it does |
 | --- | --- | --- |
-| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects` | spawns a projectile from the caster along the fire direction |
+| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner), `effects` on the other team |
 | `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects` | spawns an area; `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
 | `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
@@ -697,6 +714,12 @@ All times are integer ticks. `AbilityEffect` is one of:
 
 `effects` inside a projectile, area or arc are hit effects (the `Effect` union,
 including `energyGain`) that land on each champion the entity touches.
+`allyEffects` is a projectile-only key: an area, meleeArc, dash, teleport or
+top-level hit effect that carries it fails validation, and so does one inside a
+dash `then`. A hit effect inside an `effects` or `allyEffects` list is copied
+field by field, so a stray key there is dropped. When present, `allyEffects`
+must not be empty; a projectile that has it may have an empty `effects`, which
+makes it ally-only, and one without it must keep `effects` non-empty.
 
 `createMatch(config, arena, seed, kits = [])` validates every kit it is given
 (an invalid one throws `Invalid kit: <path>: <problem>`), rejects a duplicate id
@@ -715,7 +738,8 @@ area radius, placement distance and range, arc radius, teleport range, shield
 absorb, heal amount, `maxHealth` and `moveSpeed` above 0 and at most 1e6; dash
 distance 0.000001 to 1000; `cosHalfAngle` from -1 to 1; `energyGain` an integer
 from 1 to 100; hit effects and status specs as the toolkit accepts them. It also
-checks the structure: every slot present, non-empty effect lists, a known
+checks the structure: every slot present, non-empty effect lists (a projectile
+with `allyEffects` may have an empty `effects`, but never two empty lists), a known
 movement rule, exactly two distinct EX slots (never F) that match the slots
 carrying an `ex`. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
 not checked here; roster tests do that. The bounds keep `step` from throwing, not

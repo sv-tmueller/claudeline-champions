@@ -157,6 +157,11 @@ describe('spawnProjectile', () => {
     ['a status effect with a bad spec', { effects: [{ type: 'applyStatus' as const, status: { type: 'slow' as const, percent: 0, ticks: 5 } }] }],
     ['a shield effect with no absorb', { effects: [{ type: 'shield' as const, absorb: 0, ticks: 60 }] }],
     ['a knockback effect with a bad direction', { effects: [{ type: 'knockback', distance: 2, ticks: 8, direction: 'up' } as never] }],
+    ['allyEffects that is not an array', { allyEffects: 'heal' as never }],
+    ['allyEffects that is null', { allyEffects: null as never }],
+    ['an empty allyEffects', { allyEffects: [] }],
+    ['an allyEffects effect of an unknown type', { allyEffects: [{ type: 'burn', amount: 3 } as never] }],
+    ['an allyEffects effect with a zero amount', { allyEffects: [{ type: 'heal' as const, amount: 0 }] }],
   ])('throws on %s and changes nothing', (_name, over) => {
     const state = open();
     expect(() => spawnProjectile(state, spec(over))).toThrow('Invalid projectile');
@@ -554,5 +559,245 @@ describe('projectile hit effects', () => {
       { type: 'slow', sourceId: 0, slot: null, percent: 30 },
       { type: 'shield', sourceId: 0, slot: null, absorb: 10 },
     ]);
+  });
+});
+
+describe('a projectile with allyEffects', () => {
+  const heal = { type: 'heal' as const, amount: 10 };
+  const bolt = (over: Partial<ProjectileSpec> = {}) =>
+    spec({ allyEffects: [heal], ...over });
+
+  /** Owner 0 at -5; the callers put the ally (1) and the enemies (2, 3) on the line. */
+  function line(): GameState {
+    const state = open();
+    place(state, 0, -5, 0);
+    return state;
+  }
+
+  it('heals an ally and leaves the enemy behind it alone (T1)', () => {
+    const state = line();
+    place(state, 1, -2, 0);
+    place(state, 2, 3, 0);
+    champion(state, 1).health = 100;
+    spawnProjectile(state, bolt());
+    state.events.length = 0;
+    const events = runOut(state);
+    expect(events.map((e) => e.type)).toEqual(['projectileHit', 'heal', 'projectileExpired']);
+    expect(events[0]).toMatchObject({ type: 'projectileHit', targetId: 1 });
+    expect(events[1]).toEqual({ type: 'heal', targetId: 1, sourceId: 0, amount: 10, health: 110 });
+    expect(events[2]).toMatchObject({ type: 'projectileExpired', reason: 'hit' });
+    expect(champion(state, 1).health).toBe(110);
+    expect(champion(state, 2).health).toBe(120);
+  });
+
+  it('damages an enemy with effects when no ally is on the line (T2)', () => {
+    const state = line();
+    place(state, 2, 3, 0);
+    spawnProjectile(state, bolt());
+    const events = runOut(state);
+    expect(ofType(events, 'heal')).toEqual([]);
+    expect(ofType(events, 'damage')).toHaveLength(1);
+    expect(champion(state, 2).health).toBe(110);
+  });
+
+  it('never hits its owner, even when it spawns on the owner (T3)', () => {
+    const state = line();
+    place(state, 1, -2, 0);
+    champion(state, 0).health = 100;
+    champion(state, 1).health = 100;
+    spawnProjectile(state, bolt());
+    const events = runOut(state);
+    expect(ofType(events, 'projectileHit').map((h) => h.targetId)).toEqual([1]);
+    expect(champion(state, 0).health).toBe(100);
+    expect(champion(state, 1).health).toBe(110);
+  });
+
+  it('stops at the first champion of either team without pierce (T4)', () => {
+    const allyFirst = line();
+    place(allyFirst, 1, -2, 0);
+    place(allyFirst, 2, 3, 0);
+    spawnProjectile(allyFirst, bolt());
+    allyFirst.events.length = 0;
+    const a = runOut(allyFirst);
+    expect(a.map((e) => e.type)).toEqual(['projectileHit', 'projectileExpired']);
+    expect(ofType(a, 'projectileHit').map((h) => h.targetId)).toEqual([1]);
+    expect(ofType(a, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+    expect(champion(allyFirst, 1).health).toBe(120);
+    expect(champion(allyFirst, 2).health).toBe(120);
+
+    const enemyFirst = line();
+    place(enemyFirst, 2, -2, 0);
+    place(enemyFirst, 1, 3, 0);
+    champion(enemyFirst, 1).health = 100;
+    spawnProjectile(enemyFirst, bolt());
+    const b = runOut(enemyFirst);
+    expect(ofType(b, 'projectileHit').map((h) => h.targetId)).toEqual([2]);
+    expect(champion(enemyFirst, 2).health).toBe(110);
+    expect(champion(enemyFirst, 1).health).toBe(100);
+  });
+
+  it('stops at the first champion of either team when both are inside one sweep (T4c)', () => {
+    // 120 m/s is 2 m per tick. The two champions stand 1.2 m apart, so the collision push-out leaves
+    // them in place (a gap under 1.0 m would move the second one), and from x = -5 the contacts at
+    // -4.5 and -3.3 (t = 0.25 and 0.85) are both in the first sweep.
+    const allyFirst = line();
+    place(allyFirst, 1, -3.8, 0);
+    place(allyFirst, 2, -2.6, 0);
+    spawnProjectile(allyFirst, bolt({ speed: 120 }));
+    step(allyFirst, []);
+    expect(allyFirst.projectiles).toHaveLength(0);
+    expect(allyFirst.events.map((e) => e.type)).toEqual(['projectileHit', 'projectileExpired']);
+    expect(ofType(allyFirst.events, 'projectileHit').map((h) => h.targetId)).toEqual([1]);
+    expect(ofType(allyFirst.events, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+    expect(champion(allyFirst, 2).health).toBe(120);
+
+    const enemyFirst = line();
+    place(enemyFirst, 2, -3.8, 0);
+    place(enemyFirst, 1, -2.6, 0);
+    champion(enemyFirst, 1).health = 100;
+    spawnProjectile(enemyFirst, bolt({ speed: 120 }));
+    step(enemyFirst, []);
+    expect(enemyFirst.projectiles).toHaveLength(0);
+    expect(ofType(enemyFirst.events, 'projectileHit').map((h) => h.targetId)).toEqual([2]);
+    expect(ofType(enemyFirst.events, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+    expect(champion(enemyFirst, 2).health).toBe(110);
+    expect(champion(enemyFirst, 1).health).toBe(100);
+  });
+
+  it('touches an ally and an enemy once each with pierce, in contact order (T5)', () => {
+    const allyThenEnemy = line();
+    place(allyThenEnemy, 1, -2, 0);
+    place(allyThenEnemy, 2, 3, 0);
+    champion(allyThenEnemy, 1).health = 100;
+    spawnProjectile(allyThenEnemy, bolt({ pierce: true }));
+    allyThenEnemy.events.length = 0;
+    const a: SimEvent[] = [];
+    for (let i = 0; i < 30; i++) {
+      step(allyThenEnemy, []);
+      a.push(...allyThenEnemy.events);
+    }
+    expect(allyThenEnemy.projectiles[0]?.hitIds).toEqual([1, 2]);
+    a.push(...runOut(allyThenEnemy));
+    expect(ofType(a, 'projectileHit').map((h) => h.targetId)).toEqual([1, 2]);
+    expect(ofType(a, 'heal')).toHaveLength(1);
+    expect(ofType(a, 'damage')).toHaveLength(1);
+    expect(ofType(a, 'projectileExpired').map((e) => e.reason)).toEqual(['boundary']);
+    expect(champion(allyThenEnemy, 1).health).toBe(110);
+    expect(champion(allyThenEnemy, 2).health).toBe(110);
+
+    const enemyThenAlly = line();
+    place(enemyThenAlly, 2, -2, 0);
+    place(enemyThenAlly, 1, 3, 0);
+    champion(enemyThenAlly, 1).health = 100;
+    spawnProjectile(enemyThenAlly, bolt({ pierce: true }));
+    enemyThenAlly.events.length = 0;
+    const events: SimEvent[] = [];
+    for (let i = 0; i < 30; i++) {
+      step(enemyThenAlly, []);
+      events.push(...enemyThenAlly.events);
+    }
+    expect(enemyThenAlly.projectiles[0]?.hitIds).toEqual([2, 1]);
+    events.push(...runOut(enemyThenAlly));
+    expect(ofType(events, 'projectileHit').map((h) => h.targetId)).toEqual([2, 1]);
+    expect(ofType(events, 'heal')).toHaveLength(1);
+    expect(ofType(events, 'damage')).toHaveLength(1);
+    expect(ofType(events, 'projectileExpired').map((e) => e.reason)).toEqual(['boundary']);
+    expect(champion(enemyThenAlly, 1).health).toBe(110);
+    expect(champion(enemyThenAlly, 2).health).toBe(110);
+  });
+
+  it('heals an ally only once while a piercing bolt flies on past it (T5)', () => {
+    const state = line();
+    place(state, 1, -2, 0);
+    champion(state, 1).health = 50;
+    spawnProjectile(state, bolt({ pierce: true }));
+    const events = runOut(state);
+    expect(ofType(events, 'heal')).toHaveLength(1);
+    expect(champion(state, 1).health).toBe(60);
+  });
+
+  it('passes enemies without a trace when effects is empty, and heals the ally (T6)', () => {
+    const state = line();
+    place(state, 2, -2, 0);
+    place(state, 1, 3, 0);
+    champion(state, 1).health = 100;
+    spawnProjectile(state, bolt({ effects: [] }));
+    state.events.length = 0;
+    const events = runOut(state);
+    expect(events.map((e) => e.type)).toEqual(['projectileHit', 'heal', 'projectileExpired']);
+    expect(ofType(events, 'projectileHit').map((h) => h.targetId)).toEqual([1]);
+    expect(champion(state, 2).health).toBe(120);
+    expect(champion(state, 1).health).toBe(110);
+  });
+
+  it('reaches the boundary through enemies when effects is empty and no ally is there (T6)', () => {
+    const state = line();
+    place(state, 2, -2, 0);
+    place(state, 3, 3, 0);
+    spawnProjectile(state, bolt({ effects: [] }));
+    state.events.length = 0;
+    const events = runOut(state);
+    expect(events.map((e) => e.type)).toEqual(['projectileExpired']);
+    expect(ofType(events, 'projectileExpired').map((e) => e.reason)).toEqual(['boundary']);
+    expect(champion(state, 2).health).toBe(120);
+    expect(champion(state, 3).health).toBe(120);
+  });
+
+  it('still stops at the first enemy with an empty effects list and no allyEffects (T7)', () => {
+    const state = line();
+    place(state, 1, -2, 0);
+    place(state, 2, 3, 0);
+    place(state, 3, 6, 0);
+    spawnProjectile(state, spec({ effects: [] }));
+    state.events.length = 0;
+    const events = runOut(state);
+    expect(events.map((e) => e.type)).toEqual(['projectileHit', 'projectileExpired']);
+    expect(ofType(events, 'projectileHit').map((h) => h.targetId)).toEqual([2]);
+    expect(ofType(events, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+  });
+
+  it('leaves the key out when absent and stores a copy when given (T8)', () => {
+    const plain = open();
+    spawnProjectile(plain, spec());
+    const p = plain.projectiles[0];
+    expect(p).toStrictEqual({
+      id: 4,
+      ownerId: 0,
+      team: 'A',
+      x: -5,
+      y: 0,
+      vx: 25,
+      vy: 0,
+      radius: 0.2,
+      remainingTicks: 120,
+      pierce: false,
+      hitIds: [],
+      effects: [{ type: 'damage', amount: 10 }],
+      castId: null,
+    });
+    expect(p && 'allyEffects' in p).toBe(false);
+
+    const state = open();
+    const effect = { type: 'heal' as const, amount: 10 };
+    const allyEffects = [effect];
+    spawnProjectile(state, spec({ allyEffects }));
+    effect.amount = 99;
+    allyEffects.push({ type: 'heal', amount: 1 });
+    const q = state.projectiles[0];
+    expect(q?.allyEffects).toStrictEqual([{ type: 'heal', amount: 10 }]);
+    expect(q?.allyEffects).not.toBe(allyEffects);
+  });
+});
+
+describe('spawnProjectile allyEffects checks', () => {
+  it.each([
+    ['not an array', 'heal', 'allyEffects must be a non-empty array'],
+    ['null', null, 'allyEffects must be a non-empty array'],
+    ['empty', [], 'allyEffects must be a non-empty array'],
+    ['a bad effect', [{ type: 'heal', amount: 0 }], 'allyEffects: effect amount 0 is not a number above 0'],
+  ])('names allyEffects when it is %s (T9)', (_name, allyEffects, message) => {
+    expect(() => spawnProjectile(open(), spec({ allyEffects: allyEffects as never }))).toThrow(
+      `Invalid projectile: ${message}`,
+    );
   });
 });

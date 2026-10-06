@@ -338,3 +338,86 @@ describe('createMatch with kits', () => {
     );
   });
 });
+
+/** Gives an effect the projectile-only key, which the types leave out. */
+function carry(e: object): void {
+  (e as { allyEffects?: unknown }).allyEffects = [{ type: 'heal', amount: 1 }];
+}
+
+describe('validateKit and a projectile with allyEffects', () => {
+  const healBolt: AbilityEffect = {
+    type: 'projectile',
+    speed: 20,
+    radius: 0.5,
+    lifetimeTicks: 40,
+    pierce: false,
+    effects: [{ type: 'damage', amount: 10 }],
+    allyEffects: [
+      { type: 'heal', amount: 12 },
+      { type: 'applyStatus', status: { type: 'haste', percent: 20, ticks: 30 } },
+    ],
+  };
+  const allyOnly: AbilityEffect = { ...healBolt, effects: [] };
+
+  it('accepts a two-list bolt and an ally-only bolt, copies both and omits the key elsewhere (K1)', () => {
+    const kit = kitWith('lumeth-ish', { M1: quiet({ effects: [healBolt] }), M2: quiet({ effects: [allyOnly] }) });
+    const copy = validateKit(kit);
+    expect(copy).toStrictEqual(kit);
+    const [shot] = copy.slots.M1.effects;
+    const [orig] = kit.slots.M1.effects;
+    if (shot?.type !== 'projectile' || orig?.type !== 'projectile') throw new Error('not a projectile');
+    expect(shot.allyEffects).not.toBe(orig.allyEffects);
+    expect(shot.allyEffects?.[0]).not.toBe(orig.allyEffects?.[0]);
+    expect(copy.slots.M2.effects[0]).toMatchObject({ type: 'projectile', effects: [] });
+
+    const plain = validateKit(testStriker());
+    expect('allyEffects' in bolt(plain)).toBe(false);
+    expect(validateKit(plain)).toStrictEqual(testStriker());
+  });
+
+  it.each([
+    ['an area', (k: KitDef) => carry(slam(k)), 'slots.M2.effects[0]'],
+    ['a meleeArc', (k: KitDef) => carry(arc(k)), 'slots.M1.effects[0]'],
+    ['a dash', (k: KitDef) => carry(dash(k)), 'slots.SPACE.effects[0]'],
+    ['a teleport', (k: KitDef) => carry(blink(k)), 'slots.R.effects[0]'],
+    [
+      'a top-level heal',
+      (k: KitDef) => void (k.slots.M1.effects = [{ type: 'heal', amount: 1, allyEffects: [{ type: 'heal', amount: 1 }] } as never]),
+      'slots.M1.effects[0]',
+    ],
+    [
+      'an effect inside then',
+      (k: KitDef) => void (dash(k).then = [{ type: 'heal', amount: 1, allyEffects: [{ type: 'heal', amount: 1 }] } as never]),
+      'slots.SPACE.effects[0].then[0]',
+    ],
+  ])('rejects allyEffects on %s (K2)', (_name, mutate, path) => {
+    expect(() => validateKit(broken(mutate as Mutate))).toThrow(
+      `Invalid kit: test-striker.${path}.allyEffects: only a projectile carries allyEffects`,
+    );
+  });
+
+  it('rejects an empty allyEffects, two empty lists and a bad effect, with the path (K3)', () => {
+    const at = 'Invalid kit: k.slots.M1.effects[0]';
+    expect(() => validateKit(kitWith('k', { M1: quiet({ effects: [{ ...healBolt, allyEffects: [] }] }) }))).toThrow(
+      `${at}.allyEffects: must not be empty`,
+    );
+    expect(() =>
+      validateKit(kitWith('k', { M1: quiet({ effects: [{ ...healBolt, effects: [], allyEffects: [] }] }) })),
+    ).toThrow(`${at}.allyEffects: must not be empty`);
+    expect(() =>
+      validateKit(
+        kitWith('k', { M1: quiet({ effects: [{ ...healBolt, allyEffects: [{ type: 'heal', amount: 0 }] }] }) }),
+      ),
+    ).toThrow(`${at}.allyEffects: effect amount 0 is not a number above 0`);
+  });
+
+  it('still needs a non-empty effects without allyEffects and an array with it (K3)', () => {
+    const bare: AbilityEffect = { type: 'projectile', speed: 20, radius: 0.5, lifetimeTicks: 40, pierce: false, effects: [] };
+    expect(() => validateKit(kitWith('k', { M1: quiet({ effects: [bare] }) }))).toThrow(
+      'Invalid kit: k.slots.M1.effects[0].effects: must not be empty',
+    );
+    expect(() =>
+      validateKit(kitWith('k', { M1: quiet({ effects: [{ ...healBolt, effects: 'damage' as never }] }) })),
+    ).toThrow('Invalid kit: k.slots.M1.effects[0].effects: effects must be an array');
+  });
+});
