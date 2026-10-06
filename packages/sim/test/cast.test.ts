@@ -897,3 +897,31 @@ describe('resetAbilityState', () => {
     expect(state.areas).toEqual([]);
   });
 });
+
+describe('a cast projectile with allyEffects', () => {
+  const allyBolt: AbilityEffect = {
+    type: 'projectile',
+    speed: 20,
+    radius: 0.3,
+    lifetimeTicks: 60,
+    pierce: false,
+    effects: [{ type: 'damage', amount: 5 }],
+    allyEffects: [{ type: 'heal', amount: 10 }],
+  };
+
+  it('heals the ally on the line, pays the support energy and leaves the enemy alone (C1)', () => {
+    const state = setup([kitWith('k0', { M1: quiet({ effects: [allyBolt] }) }, { support: true })]);
+    place(state, 1, -2, 0);
+    champion(state, 1).health = 100;
+    const log = run(state, 40, (tick) => (tick === 0 ? [input(0, 0, 1000, 0, M1)] : []));
+    expect(of(log, 'heal').map((l) => l.event)).toEqual([
+      { type: 'heal', targetId: 1, sourceId: 0, amount: 10, health: 110 },
+    ]);
+    expect(of(log, 'energyGained').map((l) => l.event)).toMatchObject([
+      { championId: 0, targetId: 1, amount: 5, energy: 5 },
+    ]);
+    expect(of(log, 'projectileHit').map((l) => l.event.targetId)).toEqual([1]);
+    expect(champion(state, 0).energy).toBe(5);
+    expect(champion(state, 2).health).toBe(120);
+  });
+});

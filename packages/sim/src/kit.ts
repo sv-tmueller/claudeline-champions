@@ -33,7 +33,13 @@ export type AbilityEffect =
       radius: number;
       lifetimeTicks: number;
       pierce: boolean;
+      /** Lands on the other team; may be empty when `allyEffects` is given. */
       effects: Effect[];
+      /**
+       * Lands on the owner's team, never the owner. When present it is not empty, and an empty
+       * `effects` makes the projectile pass enemies. The key is left out when there is none.
+       */
+      allyEffects?: Effect[];
     }
   | {
       type: 'area';
@@ -152,17 +158,31 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
   const effect = readObject(value, path);
   const at = (key: string) => `${path}.${key}`;
   const type: unknown = effect['type'];
+  if (type !== 'projectile' && effect['allyEffects'] !== undefined) {
+    return fail(at('allyEffects'), 'only a projectile carries allyEffects');
+  }
   switch (type) {
     case 'projectile': {
       const pierce = readBoolean(effect['pierce'], at('pierce'));
-      return {
+      const speed = readMagnitude(effect['speed'], at('speed'));
+      const radius = readMagnitude(effect['radius'], at('radius'));
+      const lifetimeTicks = readTicks(effect['lifetimeTicks'], at('lifetimeTicks'));
+      const ally = effect['allyEffects'];
+      // With an ally list, `effects` may be empty; the ally list itself never is.
+      const effects =
+        ally === undefined
+          ? readHitEffects(effect['effects'], at('effects'))
+          : copyEffects(effect['effects'] as Effect[], (problem) => fail(at('effects'), problem));
+      const projectile: Extract<AbilityEffect, { type: 'projectile' }> = {
         type,
-        speed: readMagnitude(effect['speed'], at('speed')),
-        radius: readMagnitude(effect['radius'], at('radius')),
-        lifetimeTicks: readTicks(effect['lifetimeTicks'], at('lifetimeTicks')),
+        speed,
+        radius,
+        lifetimeTicks,
         pierce,
-        effects: readHitEffects(effect['effects'], at('effects')),
+        effects,
       };
+      if (ally !== undefined) projectile.allyEffects = readHitEffects(ally, at('allyEffects'));
+      return projectile;
     }
     case 'area': {
       const place = readObject(effect['placement'], at('placement'));
