@@ -34,6 +34,8 @@ interface Hooks {
   x: number;
   y: number;
   healthText: string;
+  /** How many `data-bar` hooks the canvas has: one per champion. */
+  bars: number;
   menuVisible: string | null;
   menuView: string | null;
 }
@@ -51,6 +53,7 @@ async function readHooks(page: Page): Promise<Hooks> {
       x: Number(d['p0x']),
       y: Number(d['p0y']),
       healthText: document.querySelector('[data-hud="health-bar"] [data-part="health-text"]')?.textContent ?? '',
+      bars: [0, 1, 2, 3, 4, 5, 6, 7].filter((id) => d[`bar${id}`] !== undefined).length,
       menuVisible: panel?.getAttribute('data-visible') ?? null,
       menuView: panel?.getAttribute('data-view') ?? null,
     };
@@ -194,12 +197,23 @@ test('goes back to the select from the menu and relaunches on another arena', as
         entry.getAttribute('data-current'),
         entry.getAttribute('href'),
       ]),
+      teams: [...document.querySelectorAll<HTMLElement>('[data-menu="panel"] [data-team-size]')].map((entry) => [
+        entry.getAttribute('data-team-size'),
+        entry.getAttribute('data-current'),
+        entry.getAttribute('href'),
+        entry.textContent,
+      ]),
     }));
     expect(links.champions.map(([id]) => id)).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow']);
-    expect(links.champions.find(([id]) => id === 'quillon')?.[1]).toBe('?champion=quillon&difficulty=normal&arena=arena01');
+    expect(links.champions.find(([id]) => id === 'quillon')?.[1]).toBe('?champion=quillon&difficulty=normal&arena=arena01&teamsize=2');
     expect(links.arenas).toEqual([
-      ['arena01', 'true', '?champion=hargrim&difficulty=normal&arena=arena01'],
-      ['arena02', 'false', '?champion=hargrim&difficulty=normal&arena=arena02'],
+      ['arena01', 'true', '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2'],
+      ['arena02', 'false', '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=2'],
+    ]);
+    // The team row: 2v2 is being played, and each link writes the whole setup with its own size.
+    expect(links.teams).toEqual([
+      ['2', 'true', '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', '2v2'],
+      ['3', 'false', '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3', '3v3'],
     ]);
     // The match is still paused behind it.
     const paused = await readHooks(page);
@@ -213,6 +227,47 @@ test('goes back to the select from the menu and relaunches on another arena', as
     expect(await isMarked(page)).toBe(false);
     await orFail(page.waitForSelector('canvas[data-arena="arena02"]'), failed);
     expect((await readHooks(page)).menuVisible).toBe('false');
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('relaunches as a 3v3 from the menu select, and a restart keeps the team size', async ({ page }) => {
+  test.setTimeout(TEST_TIMEOUT_MS);
+  const { problems, failed } = watchProblems(page);
+  try {
+    await open(page, '/', failed);
+    expect((await readHooks(page)).bars, 'a 2v2 has four bars').toBe(4);
+    await mark(page);
+    await openMenu(page);
+    await page.locator('[data-menu="panel"] [data-action="select"]').click();
+    await expectMenu(page, true, 'select');
+    await page.locator('[data-menu="panel"] [data-team-size="3"]').click();
+    await waitForReload(page, failed);
+    expect(await isMarked(page), 'a new page').toBe(false);
+    await orFail(page.waitForSelector('canvas[data-bar5]'), failed);
+    let after = await readHooks(page);
+    expect(after.bars, 'a 3v3 has six bars').toBe(6);
+    expect(after.menuVisible, 'the menu is closed again').toBe('false');
+    expect(new URL(page.url()).search).toBe('?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3');
+
+    // The menu of the 3v3 offers it as the current size, and Restart keeps it.
+    await mark(page);
+    await openMenu(page);
+    await page.locator('[data-menu="panel"] [data-action="select"]').click();
+    await expectMenu(page, true, 'select');
+    expect(
+      await page.locator('[data-menu="panel"] [data-team-size="3"]').getAttribute('data-current'),
+      '3v3 is current',
+    ).toBe('true');
+    await page.locator('[data-menu="panel"] [data-action="back"]').first().click();
+    await page.locator('[data-action="restart"]').click();
+    await waitForReload(page, failed);
+    expect(await isMarked(page), 'a new page').toBe(false);
+    await orFail(page.waitForSelector('canvas[data-bar5]'), failed);
+    after = await readHooks(page);
+    expect(after.bars, 'still a 3v3 after Restart').toBe(6);
+    expect(after.phase).toBe('warmup');
   } finally {
     expect(problems).toEqual([]);
   }

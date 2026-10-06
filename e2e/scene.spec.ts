@@ -32,6 +32,7 @@ interface HudRead {
     visible: string | null;
     entries: { champion: string | null; available: string | null; href: string | null; text: string }[];
     arenas: { id: string | null; current: string | null; href: string | null; text: string }[];
+    teams: { size: string | null; current: string | null; available: string | null; href: string | null; text: string }[];
   };
 }
 
@@ -72,6 +73,13 @@ async function readHud(page: Page): Promise<HudRead> {
         arenas: [...document.querySelectorAll<HTMLElement>('[data-result="panel"] [data-arena-id]')].map((entry) => ({
           id: entry.getAttribute('data-arena-id'),
           current: entry.getAttribute('data-current'),
+          href: entry.getAttribute('href'),
+          text: entry.textContent ?? '',
+        })),
+        teams: [...document.querySelectorAll<HTMLElement>('[data-result="panel"] [data-team-size]')].map((entry) => ({
+          size: entry.getAttribute('data-team-size'),
+          current: entry.getAttribute('data-current'),
+          available: entry.getAttribute('data-available'),
           href: entry.getAttribute('href'),
           text: entry.textContent ?? '',
         })),
@@ -128,17 +136,22 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     // The result panel exists and stays hidden until the match ends. Its select
     // lists the roster in order: the champions with a kit link to a relaunch on the
     // arena being played, the others are greyed and have no link. The arena row
-    // lists both arenas in id order, each linking with the current champion.
+    // lists both arenas in id order, each linking with the current champion. Every
+    // link writes the team size, 2 included, and the team row has 2v2 as the current.
     expect(hud.result.visible).toBe('false');
     expect(hud.result.entries).toEqual([
-      { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01', text: 'Hargrim' },
-      { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal&arena=arena01', text: 'Quillon' },
-      { champion: 'lumeth', available: 'true', href: '?champion=lumeth&difficulty=normal&arena=arena01', text: 'Lumeth' },
-      { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal&arena=arena01', text: 'Skerrow' },
+      { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: 'Hargrim' },
+      { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal&arena=arena01&teamsize=2', text: 'Quillon' },
+      { champion: 'lumeth', available: 'true', href: '?champion=lumeth&difficulty=normal&arena=arena01&teamsize=2', text: 'Lumeth' },
+      { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal&arena=arena01&teamsize=2', text: 'Skerrow' },
     ]);
     expect(hud.result.arenas).toEqual([
-      { id: 'arena01', current: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01', text: 'Arena 1' },
-      { id: 'arena02', current: 'false', href: '?champion=hargrim&difficulty=normal&arena=arena02', text: 'Arena 2' },
+      { id: 'arena01', current: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: 'Arena 1' },
+      { id: 'arena02', current: 'false', href: '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=2', text: 'Arena 2' },
+    ]);
+    expect(hud.result.teams).toEqual([
+      { size: '2', current: 'true', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: '2v2' },
+      { size: '3', current: 'false', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3', text: '3v3' },
     ]);
     expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
 
@@ -193,16 +206,55 @@ test('starts on arena02 from the launch address', async ({ page }, testInfo) => 
     // The select carries the arena: the champion links stay on it, and arena02 is the current one.
     const hud = await readHud(page);
     expect(hud.result.entries.map((entry) => entry.href)).toEqual([
-      '?champion=hargrim&difficulty=normal&arena=arena02',
-      '?champion=quillon&difficulty=normal&arena=arena02',
-      '?champion=lumeth&difficulty=normal&arena=arena02',
-      '?champion=skerrow&difficulty=normal&arena=arena02',
+      '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=2',
+      '?champion=quillon&difficulty=normal&arena=arena02&teamsize=2',
+      '?champion=lumeth&difficulty=normal&arena=arena02&teamsize=2',
+      '?champion=skerrow&difficulty=normal&arena=arena02&teamsize=2',
     ]);
     expect(hud.result.arenas.map((entry) => [entry.id, entry.current])).toEqual([
       ['arena01', 'false'],
       ['arena02', 'true'],
     ]);
     await page.screenshot({ path: testInfo.outputPath('scene-arena02.png') });
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('starts a 3v3 from the launch address', async ({ page }) => {
+  const { problems, failed } = watchProblems(page);
+  try {
+    await page.goto('/?teamsize=3');
+    // Every bar is written once, so data-bar5 is there after the first frame.
+    await orFail(page.waitForSelector('canvas[data-arena="arena01"][data-bar5]'), failed);
+    const canvas = page.locator('canvas');
+    // Six champions, so six bars at full health and no seventh. Bars are written when
+    // their percent changes, and nobody has been hurt in the warmup.
+    for (let id = 0; id < 6; id++) expect(await canvas.getAttribute(`data-bar${id}`), `bar ${id}`).toBe('100');
+    expect(await canvas.getAttribute('data-bar6')).toBeNull();
+    // The human stands on the first team A spawn, (-12, 2).
+    expect(Number(await canvas.getAttribute('data-p0x'))).toBe(-1200);
+    expect(Number(await canvas.getAttribute('data-p0y'))).toBe(200);
+    // The select keeps the size: 3v3 is the current one, and every link carries it.
+    const hud = await readHud(page);
+    expect(hud.result.teams.map((entry) => [entry.size, entry.current])).toEqual([
+      ['2', 'false'],
+      ['3', 'true'],
+    ]);
+    expect(hud.result.entries.map((entry) => entry.href)).toEqual([
+      '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3',
+      '?champion=quillon&difficulty=normal&arena=arena01&teamsize=3',
+      '?champion=lumeth&difficulty=normal&arena=arena01&teamsize=3',
+      '?champion=skerrow&difficulty=normal&arena=arena01&teamsize=3',
+    ]);
+    expect(hud.result.arenas.map((entry) => entry.href)).toEqual([
+      '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3',
+      '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=3',
+    ]);
+    expect(hud.result.teams.map((entry) => entry.href)).toEqual([
+      '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2',
+      '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3',
+    ]);
   } finally {
     expect(problems).toEqual([]);
   }
