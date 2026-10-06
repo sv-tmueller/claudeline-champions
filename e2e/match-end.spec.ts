@@ -21,10 +21,11 @@ const COUNTDOWN_TICKS = 600;
 const SUDDEN_DEATH_TICKS = 1800;
 const RING_START_M = 18;
 const RING_END_M = 3;
-// The match: a headless run of the same match through the client's own setup and driver
-// ended at tick 2998 (match-setup.test.ts). The budget is 12 000 ticks: the measured
-// 2998, two more rounds of about 1000 each and one round to sudden death of about
-// 7000. Passing it fails the test.
+// The match: this test's own run ended at tick 3264 on f7e10f0 (read in frames of 96
+// ticks, with an idle human). Bot output moves with the bots package, so re-measure it
+// when the bots change. The budget is 12 000 ticks: the measured 3264, two more rounds
+// of about 1000 each and one round to sudden death of about 7000. Passing it fails the
+// test.
 const MATCH_BUDGET_TICKS = 12_000;
 // The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 12 000 ticks
 // are at most 125 frames. Without the scale the match takes thousands of frames, and
