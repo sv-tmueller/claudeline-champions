@@ -1,6 +1,6 @@
 import type { TeamId } from '@claudeline/sim';
 import { MeshBasicMaterial, SphereGeometry, type Mesh } from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AREA_Y,
   PROJECTILE_ALLY_COLOUR,
@@ -189,5 +189,53 @@ describe('entity views', () => {
     const mesh = visible(views)[0]!;
     expect(mesh.material).toBe(ally);
     expect(mesh.position.y).toBe(2);
+  });
+});
+
+// The frame path must allocate nothing: a call to Vector3.set with three raw
+// doubles boxes them wherever the engine does not inline it (testing.md, the
+// heap probe), so draw writes the position fields of the mesh directly.
+describe('entity views draw without a position.set call', () => {
+  const pools = [
+    ['projectiles', () => createProjectileViews('A'), PROJECTILE_Y],
+    ['areas', () => createAreaViews('A'), AREA_Y],
+  ] as const;
+  const alphas = [0, 0.1, 0.25, 0.5, 0.999, 1];
+
+  it.each(pools)('positions every %s mesh at prev + (cur - prev) * alpha, y negated, with no set call', (_name, make, height) => {
+    const views = make();
+    // Fractional values that do not interpolate exactly, and a zero y for the -0 case.
+    const shots = [entity(1, 0.1, 0.7), entity(2, -3.3, 0), entity(3, 12.125, -4.6)];
+    views.capture(shots);
+    const moved = [entity(1, 0.4, 1.3), entity(2, -2.1, 0.15), entity(3, 11.5, -4.0)];
+    views.sync(moved);
+    const shown = visible(views);
+    expect(shown).toHaveLength(3);
+    const sets = shown.map((mesh) => vi.spyOn(mesh.position, 'set'));
+    for (const alpha of alphas) {
+      views.draw(alpha);
+      shown.forEach((mesh, i) => {
+        const from = shots[i]!;
+        const to = moved[i]!;
+        expect(mesh.position.x, `x of mesh ${i} at alpha ${alpha}`).toBe(from.x + (to.x - from.x) * alpha);
+        expect(mesh.position.y, `y of mesh ${i} at alpha ${alpha}`).toBe(height);
+        expect(mesh.position.z, `z of mesh ${i} at alpha ${alpha}`).toBe(-(from.y + (to.y - from.y) * alpha));
+      });
+    }
+    sets.forEach((spy, i) => expect(spy, `position.set on mesh ${i}`).not.toHaveBeenCalled());
+  });
+
+  it.each(pools)('keeps the unused %s slots hidden through draw', (_name, make) => {
+    const views = make();
+    const list = [entity(1, 1, 1), entity(2, 2, 2)];
+    views.capture(list);
+    views.sync(list);
+    views.draw(0.5);
+    expect(visible(views)).toHaveLength(2);
+    expect(meshes(views).filter((mesh) => !mesh.visible)).toHaveLength(14);
+    views.sync([list[0]!]);
+    views.draw(0.5);
+    expect(visible(views)).toHaveLength(1);
+    expect(views.count).toBe(1);
   });
 });

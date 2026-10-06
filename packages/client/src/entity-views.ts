@@ -6,6 +6,7 @@ import {
   MeshBasicMaterial,
   SphereGeometry,
   type BufferGeometry,
+  type Vector3,
 } from 'three';
 
 /** Centre height of a projectile sphere above the ground. */
@@ -36,6 +37,8 @@ interface Slot {
   x: number;
   y: number;
   readonly mesh: Mesh;
+  /** The mesh's own position vector, written field by field in `draw`. */
+  readonly position: Vector3;
 }
 
 export interface EntityViewOptions {
@@ -101,7 +104,13 @@ export class EntityViews {
     }
   }
 
-  /** Moves each live mesh between its previous and current position. */
+  /**
+   * Moves each live mesh between its previous and current position. The fields
+   * of the mesh's position are written directly: a `position.set(x, y, z)` call
+   * passes three raw doubles, which V8 boxes into heap numbers wherever the
+   * optimizing tier does not inline it (a cold branch with few live views), and
+   * the live heap probe read 228 to 912 B per window of that (issue #89).
+   */
   draw(alpha: number): void {
     const slots = this.slots;
     const y = this.options.y;
@@ -110,7 +119,10 @@ export class EntityViews {
       if (!slot.active) continue;
       const x = slot.prevX + (slot.x - slot.prevX) * alpha;
       const simY = slot.prevY + (slot.y - slot.prevY) * alpha;
-      slot.mesh.position.set(x, y, -simY);
+      const position = slot.position;
+      position.x = x;
+      position.y = y;
+      position.z = -simY;
     }
   }
 
@@ -178,6 +190,7 @@ export class EntityViews {
         x: 0,
         y: 0,
         mesh,
+        position: mesh.position,
       });
     }
   }
