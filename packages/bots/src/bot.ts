@@ -444,9 +444,15 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     const sin = (2 * u) / k;
     const lx = leadX - me.x;
     const ly = leadY - me.y;
-    // roundAim: whole centimetres, and the `+ 0` turns -0 into 0.
-    const aimX = Math.round((me.x + (lx * cos - ly * sin)) * 100) + 0;
-    const aimY = Math.round((me.y + (lx * sin + ly * cos)) * 100) + 0;
+    // roundAim: whole centimetres, with -0 turned into 0 by `+ 0.5 - 0.5` where roundAim has `+ 0`:
+    // the same value for every aim in the arena (a whole number below 2^52 survives the two
+    // additions, and -0 + 0.5 is 0.5). A `+ 0` after Math.round has int32 feedback (every earlier
+    // value was a whole number in a Smi), and the first aim point in [-0.5, 0) cm made Maglev
+    // deoptimize `aim` there ("not int32"); it then ran in the interpreter, 65 KB a window in the
+    // live scene, until it was optimized again. A double constant gives the sum number feedback
+    // from its first run, so -0 is no new case.
+    const aimX = Math.round((me.x + (lx * cos - ly * sin)) * 100) + 0.5 - 0.5;
+    const aimY = Math.round((me.y + (lx * sin + ly * cos)) * 100) + 0.5 - 0.5;
     if (aimX - aimX === 0 && aimY - aimY === 0) {
       input.aimX = aimX;
       input.aimY = aimY;
