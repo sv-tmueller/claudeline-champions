@@ -21,16 +21,18 @@ const COUNTDOWN_TICKS = 600;
 const SUDDEN_DEATH_TICKS = 1800;
 const RING_START_M = 18;
 const RING_END_M = 3;
-// The match: a headless run of the same match through the client's own setup and driver
-// ended at tick 2998 (match-setup.test.ts). The budget is 12 000 ticks: the measured
-// 2998, two more rounds of about 1000 each and one round to sudden death of about
-// 7000. Passing it fails the test.
-const MATCH_BUDGET_TICKS = 12_000;
-// The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 12 000 ticks
-// are at most 125 frames. Without the scale the match takes thousands of frames, and
-// this fails the test at once, where the 60 s timeout alone would only fail it on a slow
-// machine (a frame costs 2 ms here and 17 to 24 ms at this viewport on the CI runner).
-const MATCH_BUDGET_FRAMES = 150;
+// The match: this test's own run ended at tick 5184 on 8d80073 (read in frames of 96
+// ticks, with an idle human; 5117 in the headless run of match-setup.test.ts). Bot
+// output moves with the bots package, so re-measure it when the bots change. The budget
+// is 15 000 ticks: the measured 5184 plus two more rounds of about 1000 each and one
+// round to sudden death of about 7000 is about 14 000. Passing it fails the test.
+const MATCH_BUDGET_TICKS = 15_000;
+// The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 15 000 ticks
+// are at most 157 frames, and the budget is that plus 25. Without the scale the match
+// takes thousands of frames, and this fails the test at once, where the 60 s timeout
+// alone would only fail it on a slow machine (a frame costs 2 ms here and 17 to 24 ms
+// at this viewport on the CI runner).
+const MATCH_BUDGET_FRAMES = Math.ceil(MATCH_BUDGET_TICKS / 96) + 25;
 // The ring test needs 5581 ticks to the ring and 700 more to reach the human, 6300 in all.
 const RING_BUDGET_TICKS = 8000;
 const RING_BUDGET_FRAMES = 100;

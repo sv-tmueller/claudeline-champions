@@ -42,18 +42,19 @@ first.
   energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81);
   aim leading and three tiers. A think allocates nothing in the steady state
   (`packages/bots/test/allocation.test.ts`). No Lumeth rules yet.
-- `client`: one 2v2 with three bots, an ally and two enemies, on either arena
-  (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
-  champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
-  arena. The HUD has the ring warning and the kill feed, and the result screen
-  has the champion and arena select. Escape opens a menu that pauses the match
-  (Resume, Restart, the select again, and a keys view that rebinds the nine
-  movement and slot keys). The `Platform` interface has its two settings
-  methods, asynchronous, and the browser platform keeps the bindings in
-  `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and the
-  `__runProbeFrames` hook. The heap probe measures the sandbox scene. Not
-  built: a pre-match screen, audio, the scoreboard, the other three `Platform`
-  methods (`identity`, `unlockAchievement`, `openUrl`).
+- `client`: one 2v2 with three bots, an ally and two enemies, on either
+  arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
+  any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
+  the arena. The HUD has the ring warning and the kill feed, and the result
+  screen has the champion and arena select. Escape opens a menu that pauses
+  the match (Resume, Restart, the select again, and a keys view that rebinds
+  the nine movement and slot keys). The `Platform` interface has its two
+  settings methods, asynchronous, and the browser platform keeps the
+  bindings in `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
+  the `__runProbeFrames` hook. The heap probe measures two scenes, the
+  sandbox and the live match. Not built: a pre-match screen, audio, the
+  scoreboard, the other three `Platform` methods (`identity`,
+  `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon and Skerrow kits; placeholder models for the four roster ids. The
   Lumeth kit is #70.
@@ -88,10 +89,13 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [batch #53 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996621415).
   Recorded in [ADR-003](decisions/ADR-003-typed-ability-modules.md) and
   [Simulation](simulation.md#kit-contract-and-registration).
-- The heap probe runs through the dev-only counted frame hook with a 640 B
-  limit per window, on the sandbox scene:
+- The heap probe runs through the dev-only counted frame hook on two scenes,
+  asserting the median of five windows: 640 B for the sandbox and 780 B for the
+  live match:
   [batch #53 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
-  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236).
+  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236),
+  [batch #80 decision 10](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6011944911),
+  [batch #80 decision 19](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012668313).
   Recorded in [Testing](testing.md#the-heap-probe).
 - arena01's two deviations are grandfathered:
   [batch #63 decision 14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).
