@@ -59,7 +59,7 @@ lists are candidates, sliced batch by batch at dispatch time.
 - Blender rigs and animation clips.
 - Animation state machine in the client, hit feedback.
 - Menus and keybinding, settings persistence through the platform interface.
-- A second arena, 3v3, roster to six.
+- A second arena (arena02 is playable from the arena select, [batch #80](https://github.com/sv-tmueller/claudeline-champions/issues/80)), 3v3, roster to six.
 - A balance pass with a recorded bot-versus-bot win-rate report.
 
 ### 6. Online

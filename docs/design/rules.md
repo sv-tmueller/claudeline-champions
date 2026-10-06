@@ -250,9 +250,9 @@ Default controls `[spec]`:
 | Tab | Scoreboard |
 | Escape | Menu |
 
-- Rebinding arrives in milestone 5 `[spec]`. Until then the keys above are fixed.
+- Rebinding arrives in milestone 5 `[spec]`. The nine keys of the movement and the slots can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R and F `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
 - Tab shows the scoreboard while it is held `[tuned]`. The scoreboard lists every champion with its team, its champion, alive or dead, kills and deaths.
-- In local matches the menu pauses the sim `[tuned]`. Pausing online is decided in milestone 6.
+- In local matches the menu pauses the sim `[tuned]`. It opens in every phase and has three actions: Resume (Escape again does the same), Restart the match with the same champion, difficulty and arena, and back to the champion and arena select `[tuned]`. Pausing online is decided in milestone 6.
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
 - The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.

@@ -58,8 +58,9 @@ The commands and file list are in `tools/blender/README.md`.
   an arena definition or a case is missing. The walls sit at x = +-15 and
   y = +-10 in both. `arena02` needed no generator change: `gen_arena.py` is
   driven by the JSON.
-- The client loads only `arena01` until the arena select (batch 8). `arena02.glb`
-  ships in the build and nothing loads it yet.
+- The client loads every arena under `data/arenas` by id: `?arena=<id>` picks
+  the model (`arena02.glb` for `arena02`), `arena01` is the default and the
+  sandbox's arena, and the arena select links to each.
 - `test_arena_principles.py` checks every arena definition against the
   [arena principles](../design/arenas.md). `arena01` is grandfathered for two
   deviations, and the test pins them.
