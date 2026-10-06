@@ -110,9 +110,10 @@ const WARM_UP_VOLLEYS = 4;
 // Five windows measured right after the volley, with no settle window: 150 ticks, all
 // of them before the first shot ends (162). The asserted figure is the median of the
 // five (decision 12 of batch #63, from the isolation of #77, see testing.md): window 0
-// holds the first frame's acquire of the volley's eight views (336 to 660 B on the
-// runner), and a one-off spike in another function can land in any window, so the
-// worst window is not a stable figure and the median is.
+// holds the first frame's acquire of the volley's eight views and reads 636 to 1068 B
+// counted (59 attempts, runner and local, see COMBAT_ALLOCATION_LIMIT_BYTES), and a
+// one-off spike in another function can land in any window, so the worst window is not
+// a stable figure and the median is.
 const MEASURED_WINDOWS = 5;
 // The viewport of the screenshots, which is also the default of playwright.config.ts.
 const SCREENSHOT_VIEWPORT = { width: 1280, height: 720 };
@@ -140,8 +141,8 @@ async function fireVolley(page: Page): Promise<void> {
 
 // No retries: the asserted figure is the median of five windows, which a one-off JIT
 // spike in one window does not move (the spikes of the isolation, 5 attempts of 24 on
-// the runner, were each in one window), and a regression of the sizes measured (1148 B
-// and up) raises every window. The global retries stay 0 in playwright.config.ts.
+// the runner, were each in one window), and a regression of the sizes measured (784 B
+// and up, see COMBAT_ALLOCATION_LIMIT_BYTES) raises every window. The global retries stay 0 in playwright.config.ts.
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
   test.setTimeout(TEST_TIMEOUT_MS);
@@ -242,7 +243,7 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     await fireVolley(page);
     // The median of the windows is the asserted figure, and the line of the attempt
     // and the functions of every window with counted bytes are in the log.
-    const measured = await measureWindows(page, cdp, 'sandbox', test.info().retry, MEASURED_WINDOWS, 'median');
+    const measured = await measureWindows(page, cdp, 'sandbox', test.info().repeatEachIndex, MEASURED_WINDOWS);
     await page.mouse.up();
     hooks = await readHooks(page);
     // The death line is long gone: the kill feed expires after 300 ticks.

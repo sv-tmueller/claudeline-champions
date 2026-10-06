@@ -1,6 +1,7 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import {
   LIVE_ALLOCATION_LIMIT_BYTES,
+  LIVE_EXCLUDED,
   PROBE_VIEWPORT,
   PROFILER_SANITY_BYTES,
   allocationsOverAWindow,
@@ -49,18 +50,18 @@ interface Hooks {
 // the page loads, as match-end.spec.ts does: no frame of the page runs a tick on
 // its own, so the first read is tick 0.
 const PAUSE_AT_MS = 60_000;
-// The one function of the counted code that this scene does not count. On the runner
-// `entity-views.ts:draw` allocated 228 to 912 B in every window (1.1 to 1.5 KB in the
-// window of the first hit) in 19 of 24 attempts and 0 B in the other 5: a mode of the
-// engine's tiers on a path with few active views, which this scene reaches late. The
-// bytes are logged apart. The sandbox, whose 8 shots keep `draw` hot, counts it, and
-// the mutation of `draw` fails there (see testing.md).
-const LIVE_EXCLUDED = /^entity-views\.ts:draw$/;
+// This scene does not count `entity-views.ts:draw` (LIVE_EXCLUDED in heap-probe.ts, with
+// the figures). The carve-out ends when the client defect
+// https://github.com/sv-tmueller/claudeline-champions/issues/89 is fixed: that fix
+// removes LIVE_EXCLUDED, and the `draw` mutation then fails here too.
 // The warm-up: plain windows, no profiler, until this tick, then on to the start
 // of the next round. About 2300 ticks locally, with rounds 1 and 2 played.
 const WARM_UP_TICKS = 2100;
-// The warm-up fails past this tick: the match ended or a round never began.
-const WARM_UP_BUDGET_TICKS = 6000;
+// The warm-up fails past this tick: the match ended or a round never began. It is
+// WARM_UP_TICKS plus the longest round that match-end.spec.ts budgets, a round that
+// runs to sudden death, about 7000 ticks: a round in progress at WARM_UP_TICKS can end
+// that late, and the next one begins then.
+const WARM_UP_BUDGET_TICKS = 9100;
 // The windows measured, from the first window of the round. The median of the five is
 // the asserted figure, as in the sandbox (see testing.md). The first death of a round
 // came about 240 ticks after its start on f7e10f0, 120 ticks after the last window.
@@ -74,7 +75,10 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// The warm-up is about 2300 frames, 17 to 24 ms each on the runner, so 45 to 60 s.
+// A live attempt is about 2500 frames (the warm-up, the five windows and the run-on) and
+// took 23 to 27 s on the runner (6 attempts of job 112172123856), about 10 ms a frame, so
+// 180 s is a margin of more than 6x, and it covers the warm-up budget above (9100
+// frames, about 90 s at that rate).
 const TEST_TIMEOUT_MS = 180_000;
 
 async function readHooks(page: Page): Promise<Hooks> {
@@ -188,7 +192,7 @@ test('the live match: the writes of a changing match allocate under the limit', 
       );
       reads.push(hooks);
     }
-    const measured = conclude('live', test.info().retry, windows, 'median');
+    const measured = conclude('live', test.info().repeatEachIndex, windows);
 
     // The same round, still in its round phase, with nobody dead since it began, so
     // the windows covered a live fight and not a round end or a new round.

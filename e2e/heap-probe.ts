@@ -50,10 +50,12 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // its argument: it stayed with the timestamp as an argument, as an integer, in a field
 // of the loop clock and with no argument at all) and counts the bytes of the callees
 // inlined into it. The median of five was at most 528 B over 35 local attempts at
-// limit 1 B and at most 504 B over the 24 runner attempts of the isolation of #77 (run
-// 37434090996); the limit is about 100 B above the largest. The worst window is not a
-// stable figure: window 0 holds the 8 views of the volley (684 to 1068 B in every
-// attempt) and a one-off spike lands in one window of some attempts (1224 to 2140 B).
+// limit 1 B (all 35 read, none blind: see testing.md) and at most 504 B over the 24
+// runner attempts of the isolation of #77 (run 37434090996); the limit is about 100 B
+// above the largest. The worst window is not a stable figure: window 0 holds the first
+// frame's acquire of the volley's 8 views and reads 636 to 1068 B counted in every
+// attempt (59 attempts: 24 runner, 35 local; the acquire is 336 to 660 B of it), and a
+// one-off spike lands in one window of some attempts (1224 to 2140 B).
 // Each of these fails the limit alone, as the median of the windows per attempt over 3
 // attempts, on 458f458 plus the line of testing.md: an escaping array in frame (1600 to
 // 1648 B), a template string written to data-p0x on every writeHooks call (3052 to
@@ -66,10 +68,10 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // they read 336 to 432 B and pass. See testing.md.
 export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // The live match's limit: 640 B as well, with its own figures. The median of five
-// measured windows was at most 504 B over 35 local attempts at limit 1 B and at most
-// 540 B over the 24 runner attempts of the isolation (run 37434090996), counting
-// every function of the pattern but `entity-views.ts:draw` (LIVE_EXCLUDED in
-// live-probe.spec.ts). The limit is about 100 B above the largest clean median and
+// measured windows was at most 504 B over 35 local attempts at limit 1 B (all 35 read,
+// none blind) and at most 540 B over the 24 runner attempts of the isolation (run
+// 37434090996), counting every function of the pattern but `entity-views.ts:draw`
+// (LIVE_EXCLUDED below). The limit is about 100 B above the largest clean median and
 // below the median of every live mutation but one (3 attempts each, same lines as
 // the sandbox's): 1600 to 1736 B for the array in frame, 2608 to 2676 B for the
 // p0x template, 1892 to 1924 B for the closure in routeEvents, 1960 to 2180 B for
@@ -81,6 +83,17 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // excluded function and reads 432 to 456 B here, so the sandbox, which counts draw,
 // is its gate (3052 to 3180 B). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 640;
+// The one function of the counted code that the live scene does not count. On the
+// runner `entity-views.ts:draw` allocated 228 to 912 B in every window (1.1 to 1.5 KB
+// in the window of the first hit) in 19 of 24 attempts and 0 B in the other 5: a mode
+// of the engine's tiers on a path with few active views, which the live scene reaches
+// late. The bytes are logged apart, as `excluded`. The sandbox, whose 8 shots keep
+// `draw` hot, counts it, and the mutation of `draw` fails there (see testing.md).
+// This is a carve-out: the client defect is
+// https://github.com/sv-tmueller/claudeline-champions/issues/89, and its fix removes
+// LIVE_EXCLUDED. Anchored, so `main.ts:draw` and `impact-rings.ts:draw`, which are
+// spike sites, stay counted.
+export const LIVE_EXCLUDED = /^entity-views\.ts:draw$/;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains
@@ -169,16 +182,13 @@ export function summarise(root: ProfileNode, exclude?: RegExp): Allocations {
 }
 
 /**
- * The window whose figure a spec asserts: the worst by counted bytes, or the
- * median of an odd count, so that one spiked window does not decide the attempt
- * (decision 12 of batch #63, if the spike isolation of #77 lands on it). The
- * first of equal windows wins.
+ * The window whose figure a spec asserts: the median of an odd count by counted
+ * bytes, so that one spiked window does not decide the attempt (decision 12 of
+ * batch #63, as the spike isolation of #77 decided it; see testing.md).
  */
-export function pickAsserted(windows: readonly Allocations[], rule: 'worst' | 'median'): Allocations {
+export function pickAsserted(windows: readonly Allocations[]): Allocations {
   const sorted = [...windows].sort((a, b) => a.combat - b.combat);
-  const last = sorted[sorted.length - 1];
-  if (!last) throw new Error('no windows to pick from');
-  if (rule === 'worst') return last;
+  if (sorted.length === 0) throw new Error('no windows to pick from');
   if (sorted.length % 2 === 0) throw new Error(`the median needs an odd count of windows, got ${sorted.length}`);
   return sorted[(sorted.length - 1) / 2] as Allocations;
 }
@@ -186,9 +196,9 @@ export function pickAsserted(windows: readonly Allocations[], rule: 'worst' | 'm
 /** One line per attempt, so every log shows the figures of all its measured windows. */
 export function probeLine(scene: string, attempt: number, windows: readonly Allocations[]): string {
   const figures = windows.map(
-    (w) => `${w.total}/${w.onAnimationFrame}/${w.fakeRequestAnimationFrame}/${w.outsideSweep}/${w.combat}/${w.bots}`,
+    (w) => `${w.total}/${w.onAnimationFrame}/${w.fakeRequestAnimationFrame}/${w.outsideSweep}/${w.combat}/${w.bots}/${w.excluded}`,
   );
-  return `heap probe ${scene} attempt ${attempt}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots: ${figures.join(' ')}`;
+  return `heap probe ${scene} attempt ${attempt}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots/excluded: ${figures.join(' ')}`;
 }
 
 /** A CDP session with the heap profiler enabled, for the page. Open it after the clock is paused. */
@@ -230,7 +240,7 @@ export async function allocationsOverAWindow(page: Page, cdp: CDPSession, exclud
 
 export interface Measured {
   windows: Allocations[];
-  /** The window whose counted bytes the spec asserts, by the rule it passed. */
+  /** The window whose counted bytes the spec asserts: the median. */
   asserted: Allocations;
   lowestOutsideSweep: number;
 }
@@ -249,11 +259,11 @@ export async function measureWindows(
   scene: string,
   attempt: number,
   count: number,
-  rule: 'worst' | 'median',
+  exclude?: RegExp,
 ): Promise<Measured> {
   const windows: Allocations[] = [];
-  for (let i = 0; i < count; i++) windows.push(await allocationsOverAWindow(page, cdp));
-  return conclude(scene, attempt, windows, rule);
+  for (let i = 0; i < count; i++) windows.push(await allocationsOverAWindow(page, cdp, exclude));
+  return conclude(scene, attempt, windows);
 }
 
 /** Logs the probe line and the per-function figures of measured windows and picks the asserted one. */
@@ -261,7 +271,6 @@ export function conclude(
   scene: string,
   attempt: number,
   windows: readonly Allocations[],
-  rule: 'worst' | 'median',
 ): Measured {
   console.log(probeLine(scene, attempt, windows));
   windows.forEach((w, index) => {
@@ -273,7 +282,7 @@ export function conclude(
   });
   return {
     windows: [...windows],
-    asserted: pickAsserted(windows, rule),
+    asserted: pickAsserted(windows),
     lowestOutsideSweep: Math.min(...windows.map((w) => w.outsideSweep)),
   };
 }
@@ -293,4 +302,5 @@ export function conclude(
 // means a window ran frames through the clock). The log line keeps its four
 // older figures, total, onAnimationFrame, fake requestAnimationFrame and outside
 // the sweep files, and adds the counted combat bytes of the window as a fifth and
-// the bots bytes as a sixth.
+// the bots bytes as a sixth and the excluded bytes (the live scene's `draw`, 0 for the
+// sandbox) as a seventh.
