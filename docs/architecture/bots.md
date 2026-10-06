@@ -446,11 +446,11 @@ waypoints of `findPath`, the points of `splitPath`, the follower's goal) and
 nothing else, a fresh path follower after a goal or intent change, the grid
 and the tables built for a new arena, the search scratch made for a larger
 one, the kit cache built for a new kit, and `inspect()`. The aim error is a
-field of a record (`aimError`), not a closure variable: V8's Maglev tier boxes
-every number written to one. The decision records are what a think would have
-allocated once: one small object per think stays under the bound of the test,
-so only review and the unit tests guard the returned input (it is the bot's
-own record) and the decision record.
+field of a record (`aimError`), not a closure variable: V8's Maglev tier boxed
+every number written to one, in the engines measured. The decision records are
+what a think would have allocated once: one small object per think stays under
+the bound of the test, so only review and the unit tests guard the returned
+input (it is the bot's own record) and the decision record.
 
 ### In the browser
 
@@ -471,16 +471,18 @@ neither is tier timing:
 - The Maglev tier. In a traced run `aim`, `updateRuns`, `computeCues`,
   `clearShotWith`, `steerTowardInto` and `hypot2` were in Maglev, V8's middle
   tier, at tick 3029 and none of them was deoptimized or compiled again inside
-  the windows. Maglev does not inline a call with a double argument or result,
-  and calls `Number.isFinite` with its argument boxed: one 16 B box per call.
-  That was `bot.ts:aim` at 1.2 KB a window (a `Number.isFinite` per think, and
-  the `aimU` store), the distance of `steerTowardInto` with the finite test of
-  `cellIndexAt` at about 5 KB together, and `clearShotWith` with `needsPlan`
-  at about 1.5 KB. The finite tests are `x - x === 0` now, the distances go
-  through `distanceInto`, and `segmentClear` has `hypot2` written out. The
-  same scenes run Maglev-only (Node 26, `--no-turbofan`) read 18 B a think in
-  `aim` and up to 54 KB in a scene that plans; after the change every scene
-  that does not plan reads 2 B there, the rng draw.
+  the windows. In the engines measured (the Chromium of Playwright 1.63, and
+  V8 14.6 on Node 26) Maglev does not inline a call with a double argument or
+  result, and calls `Number.isFinite` with its argument boxed: one 16 B box
+  per call. No committed test checks that again. That was `bot.ts:aim` at 1.2
+  KB a window (a `Number.isFinite` per think, and the `aimU` store), the
+  distance of `steerTowardInto` with the finite test of `cellIndexAt` at about
+  5 KB together, and `clearShotWith` with `needsPlan` at about 1.5 KB. The
+  finite tests are `x - x === 0` now, the distances go through `distanceInto`,
+  and `segmentClear` has `hypot2` written out. The same scenes run Maglev-only
+  (Node 26, `--no-turbofan`) read 18 B a think in `aim` and up to 54 KB in a
+  scene that plans; after the change every scene that does not plan reads 2 B
+  there, the rng draw.
 
 Not the cause: an unoptimized `aim` (Ignition, `--no-turbofan --no-maglev`)
 boxes about 755 B a think, 68 KB a window, and the live one read 13 B; a deopt
@@ -490,12 +492,19 @@ trace does show are three's `needsUpdate` and code a GC clears (`embedded weak
 objects cleared`), which the plans' garbage fed.
 
 After, 15 local attempts: a median window of 3.5 to 4.0 KB, the five windows
-6.0, 10.8, 2.5, 3.7 and 1.5 KB, with `aim`, `updateRuns`, `computeCues`,
+6.1, 10.8, 2.6, 3.7 and 1.6 KB, with `aim`, `updateRuns`, `computeCues`,
 `sight.ts`, `steer.ts`, `hypot.ts` and `cellIndexAt` at 0 B. What is left is
 the path of a plan (`splitPath`, `findPath`, `cellCenter`, `plan`: 0.9 to 6.9
 KB a window), the rng draw (`rng.next` runs in the interpreter, one call in 15
 thinks: 0.5 to 0.7 KB) and the kite step in the first two windows (cold code,
 2 to 3 KB).
+
+The first windows of a round are not in that figure and are not bounded. With
+the profiler on from tick 0 locally, the first window of round 1 read 2.5 MB
+of bots bytes before and 0.72 MB after (cold code: the first plans and shot
+tests run in the interpreter), of round 2 1.5 MB before and 40 KB after, of
+round 3 1.1 MB before and 0.11 MB after, and the fifth window of a round 0.2
+MB before and under 0.15 MB after (round 3: 8 KB).
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
