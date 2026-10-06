@@ -61,7 +61,8 @@ port 5173, which Playwright starts itself.
   in a 3v3), a projectile and a hit within tick budgets, the timer and the
   hidden result panel. It asserts budgets only, never an exact tick, since bot
   output differs between platforms. The 3v3 rows log the headless ticks next
-  to the ones they read (projectile 267 and 275, hit 301 and 307, on 9612bff).
+  to the ones they read (projectile 267 and 275, hit 301 and 307, the same on
+  9612bff and on 57dd52f: the dash hold of #98 moves none of them).
 - `match-end.spec.ts`: tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
@@ -69,10 +70,11 @@ port 5173, which Playwright starts itself.
   (`/?arena=arena02&timescale=100` for arena02) and team size (`teamsize=3`
   for the 3v3 rows), within a budget of ticks and frames per row: 15 000 and
   182 on arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5184 in the e2e and
-  5117 in a headless run, on 8d80073), 13 000 and 161 on arena02, and 21 000
-  and 244 on the 3v3 of arena01 (it ends at tick 10 631 headless and 10 944 in
-  the e2e, a Victory 3 : 1) and 18 000 and 213 on the 3v3 of arena02 (tick 7119
-  headless and 7584 in the e2e, a Defeat 2 : 3). A headless run through the
+  5053 in a headless run, on 57dd52f), 14 000 and 171 on arena02 (tick 4198
+  headless and 4224 in the e2e, a Defeat 0 : 3), and 23 000 and 265 on the 3v3
+  of arena01 (it ends at tick 12 431 headless and 12 864 in the e2e, a Defeat
+  2 : 3) and 18 000 and 213 on the 3v3 of arena02 (tick 7125 headless and 7584
+  in the e2e, a Defeat 2 : 3). A headless run through the
   client's setup and driver gives each row's tick, in
   `match-setup.test.ts`. The budget is that tick plus two rounds of about 1000
   and one round to sudden death of about 7000, rounded up to 1000, and the
@@ -167,17 +169,18 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   the pointer aim with real changes. The clock is paused before the page loads
   and never runs a frame, so the first read is tick 0 and every tick is the
   hook's. The warm-up is plain windows with no profiler from tick 0 to the first
-  round that begins after tick 2100 (round 3, begun by tick 2879 on 1670d1b on
-  every run so far: the bots are deterministic), then 5 plain windows of the
-  round (the lead, 150 ticks), then the next 5 windows are measured, ticks 3029
-  to 3179. The lead is derived from three 17-window runs of round 3 with the
-  pointer on 1670d1b, all three identical: the first projectile spawns in window
-  5 (ticks 3029 to 3059), the first hit lands in window 6, and then 1 to 4
-  projectiles are live and 1 to 3 hits land per window to the end of the run
-  (tick 3389), with the first death of the round read at tick 3539. The pointer
-  moves the human's own aim from round 1 on, and only the first death moved (it
-  was read at 3509 without a pointer, on 8d80073), so the margin after the last
-  measured window is 360 ticks (the floor is 60). The human walks W and D in the
+  round that begins after tick 2100 (round 3, begun by tick 2609 on 57dd52f on
+  every run so far: the bots are deterministic), then 4 plain windows of the
+  round (the lead, 120 ticks), then the next 5 windows are measured, ticks 2729
+  to 2879. The lead is derived from three 17-window runs of round 3 with the
+  pointer on 57dd52f, all three identical: the first projectile spawns in window
+  4 (ticks 2729 to 2759), the first hits land in window 6 (five at once), and
+  then 1 to 2 hits land per window and 0 to 3 projectiles are live at the reads
+  to the end of the run (tick 3119), with the first death of the round read at
+  tick 3419. Before the dash hold of #98 the round began by tick 2879, the first
+  projectile spawned in window 5 (lead 5, windows 3029 to 3179) and the first
+  death was read at 3539. The margin after the last measured window is 540
+  ticks (the floor is 60). The human walks W and D in the
   first window, then A and D in turn at y of about 3.9 m, west of the block at x
   = -8, with M1 held; Hargrim's M1 windup is `slowed`, so the walk goes on under
   the cast.

@@ -21,11 +21,12 @@ const COUNTDOWN_TICKS = 600;
 const SUDDEN_DEATH_TICKS = 1800;
 const RING_START_M = 18;
 const RING_END_M = 3;
-// The match: this test's own run ended at tick 5184 on 8d80073 (read in frames of 96
-// ticks, with an idle human; 5117 in the headless run of match-setup.test.ts). Bot
-// output moves with the bots package, so re-measure it when the bots change. The budget
-// is 15 000 ticks: the measured 5184 plus two more rounds of about 1000 each and one
-// round to sudden death of about 7000 is about 14 000. Passing it fails the test.
+// The match: this test's own run ended at tick 5184 on 57dd52f (read in frames of 96
+// ticks, with an idle human; 5053 in the headless run of match-setup.test.ts, 5117 on
+// 8d80073 and 5184 read then too). Bot output moves with the bots package, so re-measure
+// it when the bots change. The budget is 15 000 ticks: the measured 5184 plus two more
+// rounds of about 1000 each and one round to sudden death of about 7000 is about 14 000.
+// Passing it fails the test.
 const MATCH_BUDGET_TICKS = 15_000;
 // The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 15 000 ticks
 // are at most 157 frames, and the budget is that plus 25. Without the scale the match
@@ -49,13 +50,15 @@ const TEST_TIMEOUT_MS = 60_000;
 // is not empty. The budgets of arena01 are the two constants above. arena02 has its own headless run
 // (match-setup.test.ts, ARENA02_END_TICK) and its budget is built the same way: that tick plus
 // two more rounds of about 1000 each and one round to sudden death of about 7000, rounded up to
-// 1000 (13 000 ticks), and frames = ceil(13 000 / 96) + 25 = 161.
+// 1000: 4198 + 2000 + 7000 = 13 198, so 14 000 ticks, and frames = ceil(14 000 / 96) + 25 = 171
+// (13 000 and 161 with the 3474 of #86).
 // The 3v3 rows have their own headless runs (match-setup.test.ts, ARENA01_3V3_END_TICK and
 // ARENA02_3V3_END_TICK) and the same formula with a longer round, since the longest non-sudden 3v3
 // round measured is 1557 ticks, rounded to 1600: end tick + 2 * 1600 + 7000, rounded up to 1000.
-//   arena01: 10 631 + 3200 + 7000 = 20 831, so 21 000 ticks; frames = ceil(21 000 / 96) + 25 = 244.
-//   arena02:  7 119 + 3200 + 7000 = 17 319, so 18 000 ticks; frames = ceil(18 000 / 96) + 25 = 213.
-// The headless runs end in a Victory 3 : 1 on arena01 (round 4, one sudden-death round) and a Defeat
+//   arena01: 12 431 + 3200 + 7000 = 22 631, so 23 000 ticks; frames = ceil(23 000 / 96) + 25 = 265.
+//   arena02:  7 125 + 3200 + 7000 = 17 325, so 18 000 ticks; frames = ceil(18 000 / 96) + 25 = 213.
+// (The figures of #86 and #96 were 10 631 with 21 000 and 244 on arena01, and 7 119 on arena02.)
+// The headless runs end in a Defeat 2 : 3 on arena01 (round 5, one sudden-death round) and a Defeat
 // 2 : 3 on arena02 (round 5). The rows read the result off the page and log it next to those
 // figures. The exact outcome is not pinned: the 2v2 rows derive it from the score the same way, and
 // every bots change moves it. The headless match-setup tests log the end tick and fail once a match
@@ -64,9 +67,9 @@ const TEST_TIMEOUT_MS = 60_000;
 // about ten times more, so about 7 s), under the 60 s default.
 const ROWS = [
   { id: 'arena01', size: 2, query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
-  { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 13_000, budgetFrames: 161 },
-  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 21_000, budgetFrames: 244, expected: 'Victory 3 : 1 at about tick 10 631' },
-  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 18_000, budgetFrames: 213, expected: 'Defeat 2 : 3 at about tick 7119' },
+  { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 14_000, budgetFrames: 171 },
+  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 23_000, budgetFrames: 265, expected: 'Defeat 2 : 3 at about tick 12 431' },
+  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 18_000, budgetFrames: 213, expected: 'Defeat 2 : 3 at about tick 7125' },
 ] as const;
 
 interface Hooks {

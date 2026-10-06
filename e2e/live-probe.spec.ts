@@ -53,7 +53,7 @@ interface Hooks {
 // its own, so the first read is tick 0.
 const PAUSE_AT_MS = 60_000;
 // The warm-up: plain windows, no profiler, until this tick, then on to the start
-// of the next round: round 3, begun by tick 2879 on 8d80073, with rounds 1 and 2 played.
+// of the next round: round 3, begun by tick 2609 on 57dd52f, with rounds 1 and 2 played.
 const WARM_UP_TICKS = 2100;
 // The warm-up fails past this tick: the match ended or a round never began. It is
 // WARM_UP_TICKS plus the longest round that match-end.spec.ts budgets, a round that
@@ -62,20 +62,21 @@ const WARM_UP_TICKS = 2100;
 const WARM_UP_BUDGET_TICKS = 9100;
 // Plain windows of the round before the measured ones, so that the measured windows
 // hold the round's first projectiles and hits, the event paths this scene exists to
-// cover. Measured on 1670d1b with the moving pointer of POINTERS (3 runs of 17
-// windows of round 3, begun by tick 2879; the aim changes the human's own M1 and
-// its facing from round 1 on, so the round-3 figures of the no-pointer runs of
-// 8d80073 were re-derived): the first projectile spawns in window 5 (ticks 3029 to
-// 3059, 150 ticks into the windows of the round), the first hit lands in window 6,
-// then 1 to 4 projectiles are live and 1 to 3 hits land per window to the end of
-// the run (tick 3389). The first death of the round is read at tick 3539 (3509
-// without the pointer). The lead is a count of windows, not a tick, because windows
-// are the unit the spec runs in; a bots change moves the first projectile, and the
-// assertion that the measured windows hold one fails then, so re-measure.
-const EVENT_LEAD_WINDOWS = 5;
-// The windows measured, after the lead: windows 5 to 9 of round 3, ticks 3029 to 3179.
+// cover. Measured on 57dd52f, whose bots hold the dash on an escape think, with the
+// moving pointer of POINTERS (3 runs of 17 windows of round 3, begun by tick 2609, the
+// same in all three: the dash hold shortened rounds 1 and 2, which began round 3 by
+// tick 2879 before it; the aim changes the human's own M1 and its facing from round 1
+// on): the first projectile spawns in window 4 (ticks 2729 to 2759, 120 ticks into the
+// windows of the round), the first hits land in window 6 (five at once), then 1 to 2
+// hits land per window and 0 to 3 projectiles are live at the reads to the end of the
+// 17 windows (tick 3119). The first death of the round is read at tick 3419 (3539
+// before the hold). The lead is a count of windows, not a tick, because windows are the
+// unit the spec runs in; a bots change moves the first projectile, and the assertion
+// that the measured windows hold one fails then, so re-measure.
+const EVENT_LEAD_WINDOWS = 4;
+// The windows measured, after the lead: windows 4 to 8 of round 3, ticks 2729 to 2879.
 // The median of the five is the asserted figure, as in the sandbox (see testing.md).
-// The last of them ends 360 ticks before the first death of the round.
+// The last of them ends 540 ticks before the first death of the round.
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
@@ -86,8 +87,8 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 3500 frames (the warm-up to tick 2879, the lead, the five
-// windows and the run-on to the first death, tick 3539 on 1670d1b). It took 6 to 16 s
+// A live attempt is about 3400 frames (the warm-up to tick 2609, the lead, the five
+// windows and the run-on to the first death, tick 3419 on 57dd52f). It took 6 to 16 s
 // locally (3 attempts in parallel). On the runner the live test took 41 s to 1.1 min
 // per attempt (1.1 min, 50.8 s, 40.9 s, 51.3 s, 1.1 min and 47.4 s on 3def3bc, run
 // 37456539110; the whole Playwright run of 19 tests took 2.7 to 4.2 min), about 18 ms a
