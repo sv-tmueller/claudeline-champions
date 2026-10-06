@@ -11,7 +11,14 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { arenaById } from './arenas';
 import { createBotDriver } from './bot-driver';
-import { CAMERA_VERTICAL_FOV_DEG, fitCamera, groundAimCm, pointerToNdc } from './camera';
+import {
+  CAMERA_VERTICAL_FOV_DEG,
+  createCanvasRect,
+  fitCamera,
+  groundAimFromPointer,
+  refreshCanvasRect,
+  type GroundAim,
+} from './camera';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
 import { readDevLaunch } from './dev-launch';
@@ -111,6 +118,12 @@ const result = new ResultScreen(buildResult(resultRoot, kitIds, arenas, launch),
 const menuDom = buildMenu(menuRoot, kitIds, arenas, launch);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
+// The canvas rect and the ground point of the last pointer sample. The rect is
+// copied once per resize, since a frame must not ask for a new DOMRect, and the
+// hit is written in place, never returned. Both are declared before resize(),
+// which already runs below. The hit starts as integers (Smis) and stays integer.
+const canvasRect = createCanvasRect();
+const aimHit: GroundAim = { x: 0, y: 0 };
 
 function render(): void {
   renderer.render(scene, camera);
@@ -119,6 +132,8 @@ function render(): void {
 function resize(): void {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // The canvas fills #app, so only a resize moves its rect.
+  refreshCanvasRect(canvasRect, renderer.domElement);
   fitCamera(camera, window.innerWidth, window.innerHeight, arena);
   render();
 }
@@ -170,11 +185,9 @@ let aimY = human.aimY;
 function sampleAim(): void {
   const pointer = input.pointer;
   if (!pointer) return;
-  const ndc = pointerToNdc(pointer.clientX, pointer.clientY, renderer.domElement.getBoundingClientRect());
-  const hit = groundAimCm(camera, ndc.x, ndc.y);
-  if (!hit) return;
-  aimX = hit.x;
-  aimY = hit.y;
+  if (!groundAimFromPointer(camera, pointer, canvasRect, aimHit)) return;
+  aimX = aimHit.x;
+  aimY = aimHit.y;
 }
 
 // The hooks are written with setAttribute and text from tables made at startup

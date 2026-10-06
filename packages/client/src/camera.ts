@@ -82,21 +82,38 @@ export function fitCamera(
   camera.updateMatrixWorld();
 }
 
-export interface Ndc {
+/** The canvas's client rect, copied once per resize into fields, so a frame reads numbers and makes no DOMRect. */
+export interface CanvasRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** A canvas rect with no size yet: every field is NaN until `refreshCanvasRect` fills it. */
+export function createCanvasRect(): CanvasRect {
+  return { left: NaN, top: NaN, width: NaN, height: NaN };
+}
+
+/** Where `groundAimFromPointer` writes a hit, integer sim centimeters. */
+export interface GroundAim {
   x: number;
   y: number;
 }
 
-/** Client (CSS pixel) coordinates to normalized device coordinates; NDC y points up. */
-export function pointerToNdc(
-  clientX: number,
-  clientY: number,
-  rect: { left: number; top: number; width: number; height: number },
-): Ndc {
-  return {
-    x: 2 * ((clientX - rect.left) / rect.width) - 1,
-    y: 1 - 2 * ((clientY - rect.top) / rect.height),
-  };
+/**
+ * Copies the element's current client rect into `out`. The canvas fills its
+ * container, so only a resize moves it: `main.ts` calls this from its resize
+ * handler, after `setSize`, and a layout change without a resize event would
+ * leave the copy stale. `getBoundingClientRect` makes a new DOMRect on every
+ * call, which is why a frame must not call it.
+ */
+export function refreshCanvasRect(out: CanvasRect, element: { getBoundingClientRect(): CanvasRect }): void {
+  const rect = element.getBoundingClientRect();
+  out.left = rect.left;
+  out.top = rect.top;
+  out.width = rect.width;
+  out.height = rect.height;
 }
 
 const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
@@ -105,12 +122,31 @@ const rayOrigin = new Vector2();
 const hit = new Vector3();
 
 /**
- * The ground point under an NDC position as integer sim centimeters, or null
- * when the ray misses the plane (cursor above the horizon).
+ * Casts the pointer's ray (client CSS pixels, through the cached canvas rect)
+ * onto the ground and writes the ground point under it into `out` as integer sim
+ * centimeters. Returns false, and leaves `out` alone, when the ray misses the
+ * plane (cursor above the horizon). NDC y points up.
+ *
+ * It runs every frame while a pointer exists, so no raw double crosses a call
+ * and nothing is returned or built: the NDC are locals with the same
+ * expressions, in the same order, as the two functions this replaced, so the aim
+ * is bit for bit the old one (camera.test.ts keeps them as the oracle). The
+ * ray's own origin is a module-level Vector2 whose fields are written in place.
  */
-export function groundAimCm(camera: PerspectiveCamera, ndcX: number, ndcY: number): { x: number; y: number } | null {
-  raycaster.setFromCamera(rayOrigin.set(ndcX, ndcY), camera);
-  if (!raycaster.ray.intersectPlane(groundPlane, hit)) return null;
+export function groundAimFromPointer(
+  camera: PerspectiveCamera,
+  pointer: { clientX: number; clientY: number },
+  rect: CanvasRect,
+  out: GroundAim,
+): boolean {
+  const ndcX = 2 * ((pointer.clientX - rect.left) / rect.width) - 1;
+  const ndcY = 1 - 2 * ((pointer.clientY - rect.top) / rect.height);
+  rayOrigin.x = ndcX;
+  rayOrigin.y = ndcY;
+  raycaster.setFromCamera(rayOrigin, camera);
+  if (!raycaster.ray.intersectPlane(groundPlane, hit)) return false;
   // Three (x, 0, z) is sim (x, -z). `+ 0` turns -0 into 0, as the sim does for aim.
-  return { x: Math.round(hit.x * 100) + 0, y: Math.round(-hit.z * 100) + 0 };
+  out.x = Math.round(hit.x * 100) + 0;
+  out.y = Math.round(-hit.z * 100) + 0;
+  return true;
 }
