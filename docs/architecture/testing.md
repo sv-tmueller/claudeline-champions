@@ -55,7 +55,10 @@ port 5173, which Playwright starts itself.
 - `match-end.spec.ts`: two tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
-  idle human to its result screen (`result.png`), within 15 000 ticks and 182 frames (`ceil(15000 / 96) + 25`; the match ends at tick 5184 in the e2e and 5117 in a headless run through the client's setup and driver, on 8d80073), and follows the Quillon link. The other plays the sandbox to
+  idle human to its result screen (`result.png`), within 15 000 ticks and 182
+  frames (`ceil(15000 / 96) + 25`; the match ends at tick 5184 in the e2e and
+  5117 in a headless run through the client's setup and driver, on 8d80073), and
+  follows the Quillon link. The other plays the sandbox to
   the red edge: the ring warning hidden until 600 ticks before the ring, the
   countdown, the radius text equal to the sim's within 0.1 m and falling, and the
   red edge (`ring.png`, counted as red pixels against a picture without the edge).

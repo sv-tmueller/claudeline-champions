@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   LIVE_EXCLUDED,
+  allocationsOverAWindow,
   conclude,
   measureWindows,
   pickAsserted,
@@ -189,5 +190,21 @@ describe('measureWindows', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('allocationsOverAWindow', () => {
+  it('forwards the exclusion to the summary, so the live path counts the draw bytes apart', async () => {
+    const draw = node('http://127.0.0.1:5173/packages/client/src/entity-views.ts', 'draw', 700);
+    const frameMany = node('http://127.0.0.1:5173/packages/client/src/main.ts', 'frameMany', 360);
+    const page = { evaluate: async () => undefined };
+    const cdp = {
+      send: async (method: string) =>
+        method === 'HeapProfiler.stopSampling' ? { profile: { head: node('', '(root)', 0, [draw, frameMany]) } } : {},
+    };
+    const live = await allocationsOverAWindow(page as never, cdp as never, LIVE_EXCLUDED);
+    expect([live.combat, live.excluded]).toEqual([360, 700]);
+    const sandbox = await allocationsOverAWindow(page as never, cdp as never);
+    expect([sandbox.combat, sandbox.excluded]).toEqual([1060, 0]);
   });
 });
