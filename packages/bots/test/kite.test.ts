@@ -59,7 +59,7 @@ describe('kiteStepInto', () => {
     expect(KITE_STEP).toBe(1);
   });
 
-  it('writes the first free point of the five into the scratch point, and none when cornered', () => {
+  it('returns false when cornered, with the last point tried in the scratch point', () => {
     const out: MoveCommand = { moveX: 0, moveY: 0 };
     const scratch = createKiteScratch();
     const corner = { x: 14.4, y: 9.4 };

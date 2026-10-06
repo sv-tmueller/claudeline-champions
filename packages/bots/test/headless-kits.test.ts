@@ -235,7 +235,7 @@ function pressProblems(
   const target = state.champions[targetId];
   const problems: string[] = [];
   const escape = pressed.ex ? undefined : ESCAPES[key];
-  let landing: OracleLanding | null = null
+  let landing: OracleLanding | null = null;
   const d = target === undefined ? NaN : Math.hypot(c.x - target.x, c.y - target.y);
   const cooldown = c.cooldowns[SLOTS.indexOf(pressed.slot)] ?? Infinity;
   const gates =
@@ -325,7 +325,7 @@ interface Played {
   ultimates: number[];
   /** A champion that had a cast fire killed an enemy. */
   killed: boolean;
-  /** The teleports of the run, and how many the sim reported blocked. */
+  /** The escape teleports of the run (pressed with a landing), and how many were blocked. */
   teleports: number;
   blockedTeleports: number;
   /** The tick on which a team had no champion alive, or -1. */
@@ -391,6 +391,10 @@ function play(set: KitSet, run: MatchRun): Played {
       if (press.landing === null) continue;
       const event = state.events.find((e) => e.type === 'teleport' && e.championId === press.id);
       if (event === undefined || event.type !== 'teleport') continue;
+      // Only the escape teleports count: Reaper's Dance teleports after an 18 tick windup and may
+      // be blocked legitimately, so it is not part of this pin.
+      teleports++;
+      if (event.blocked) blockedTeleports++;
       // The sim puts the champion where the oracle found the first landing.
       expect([event.toX, event.toY], `tick ${tick} champion ${press.id} teleport`).toEqual([
         press.landing.x,
@@ -398,10 +402,6 @@ function play(set: KitSet, run: MatchRun): Played {
       ]);
     }
     for (const e of state.events) {
-      if (e.type === 'teleport') {
-        teleports++;
-        if (e.blocked) blockedTeleports++;
-      }
       if (e.type === 'castStarted') {
         if (e.slot === 'SPACE' && state.champions[e.championId]?.championId === 'skerrow') {
           if (firstLunge < 0) firstLunge = tick;

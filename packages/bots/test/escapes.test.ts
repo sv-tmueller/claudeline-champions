@@ -53,21 +53,24 @@ describe('the escape trigger', () => {
     expect(pressOf(sceneOf('hargrim', 3, { ready: ['R'] }))).toBeNull();
   });
 
-  it('presses Skip while kiting inside rangeMin, and not at 6.5 m where the kite goes on', () => {
+  it('presses Skip while kiting inside rangeMin, and not at 6.0 or 6.5 m where the kite goes on', () => {
     expect(pressOf(sceneOf('quillon', 5.9, { ready: ['SPACE'] }))).toBe('SPACE');
 
     // The bot settles into the kite at 5.9 m with Skip cooling down, and the target then steps to
-    // 6.5 m, outside rangeMin but inside the hysteresis band: it still kites and presses nothing.
-    const state = sceneOf('quillon', 5.9, { ready: [] });
-    const me = state.champions[0] as ChampionState;
-    const bot = createBot(0, 'hard', 1);
-    for (let i = 0; i < TIERS.hard.delay + 5; i++) bot.think(state);
-    expect(bot.inspect().intent).toBe('kite');
-    me.cooldowns[SLOTS.indexOf('SPACE')] = 0;
-    (state.champions[2] as ChampionState).x = me.x + 6.5;
-    for (let i = 0; i < THINKS; i++) {
-      expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+    // exactly rangeMin (6.0 m, where `d < rangeMin` is false) or to 6.5 m, inside the hysteresis
+    // band: it still kites and presses nothing.
+    for (const d of [6, 6.5]) {
+      const state = sceneOf('quillon', 5.9, { ready: [] });
+      const me = state.champions[0] as ChampionState;
+      const bot = createBot(0, 'hard', 1);
+      for (let i = 0; i < TIERS.hard.delay + 5; i++) bot.think(state);
       expect(bot.inspect().intent).toBe('kite');
+      me.cooldowns[SLOTS.indexOf('SPACE')] = 0;
+      (state.champions[2] as ChampionState).x = me.x + d;
+      for (let i = 0; i < THINKS; i++) {
+        expect(bot.think(state).buttons, `${d} m, think ${i}`).toBe(0);
+        expect(bot.inspect().intent).toBe('kite');
+      }
     }
   });
 
