@@ -278,10 +278,10 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   `allyEffects` therefore never hits an ally, and an empty `effects` without
   `allyEffects` (a dev spawn) still stops at the first enemy. A champion it
   already overlaps at spawn is hit at t = 0, ally or enemy. A cast projectile
-  starts at the caster's centre, so it touches an ally pressed against the caster
-  at t = 0 only with a radius of 0.5 m or more. Dead champions are passed
-  through. The hit applies `allyEffects` to an ally and `effects` to
-  an enemy, and `projectileHit` names the champion hit, which may be an ally.
+  starts at the caster's centre, so it touches an ally pressed against the
+  caster at t = 0 only with a radius of 0.5 m or more. Dead champions are passed
+  through. The hit applies `allyEffects` to an ally and `effects` to an enemy,
+  and `projectileHit` names the champion hit, which may be an ally.
 - Order: contacts at or before the blocker time are taken by time, then by
   champion id. A non-piercing projectile ends at the first one of either team
   (reason `hit`); a piercing one hits each once, allies too, and goes on until a
@@ -387,12 +387,12 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
   accepted), a speed or radius at or below 0, a lifetime, duration or interval
   that is not a positive integer, a projectile `pierce` that is not a boolean,
   `effects` that is not an array, a projectile `allyEffects` that is given but
-  is not a non-empty array, an effect (in either list) of an unknown type or with a bad
-  field (an amount at or below 0, a status spec that `applyStatus` would
-  reject, a shield with an absorb not above 0 and at most 1e6 or ticks outside 1
-  to 36000, a knockback with a distance not above 0 and at most 1e6, ticks
-  outside 1 to 36000 or a direction other than `away` or `toward`). A dead owner
-  may still spawn.
+  is not a non-empty array, an effect (in either list) of an unknown type or
+  with a bad field (an amount at or below 0, a status spec that `applyStatus`
+  would reject, a shield with an absorb not above 0 and at most 1e6 or ticks
+  outside 1 to 36000, a knockback with a distance not above 0 and at most 1e6,
+  ticks outside 1 to 36000 or a direction other than `away` or `toward`). A dead
+  owner may still spawn.
 - `meleeArc` hits every alive enemy of `ownerId` whose body overlaps the circle
   of `radius` around `(x, y)`, `dist <= radius + 0.5` inclusive, and whose
   centre lies inside the arc. The arc is the half-angle stored as its cosine,
