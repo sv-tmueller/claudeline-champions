@@ -252,7 +252,7 @@ Default controls `[spec]`:
 
 - Rebinding arrives in milestone 5 `[spec]`. The nine keys of the movement and the slots can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R and F `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
 - Tab shows the scoreboard while it is held `[tuned]`. The scoreboard lists every champion with its team, its champion, alive or dead, kills and deaths.
-- In local matches the menu pauses the sim `[tuned]`. It opens in every phase and has three actions: Resume (Escape again does the same), Restart the match with the same champion, difficulty and arena, and back to the champion and arena select `[tuned]`. Pausing online is decided in milestone 6.
+- In local matches the menu pauses the sim `[tuned]`. It opens in every phase and has three actions: Resume (Escape again does the same), Restart the match with the same champion, difficulty, arena and team size, and back to the champion, arena and team size select `[tuned]`. Pausing online is decided in milestone 6.
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
 - The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.
@@ -295,5 +295,5 @@ Every champion also carries a world-space health bar above its model. It is gree
 
 - Arena definitions list up to three spawn points per team, and a 2v2 uses the first two `[spec]`.
 - The round and ring timings, energy values, health values and status rules are the same in both modes.
-- The scoreboard and kill feed show more entries in 3v3. The HUD layout is the same.
-- The first playable is 2v2. 3v3 arrives in milestone 5 `[spec]`.
+- The scoreboard shows more entries in 3v3. The kill feed keeps its five lines and the HUD layout is the same `[tuned]`.
+- Local matches offer both sizes in the select (the result panel and the menu) and in the address (`?teamsize=`), and the default is 2v2 `[tuned]`. A 3v3 is the human with two ally bots against three enemy bots, so five bots play. An arena with two spawn points per team plays 2v2, and its 3v3 choice is greyed `[tuned]`.

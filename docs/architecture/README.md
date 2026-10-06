@@ -42,14 +42,14 @@ first.
   energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81);
   aim leading and three tiers. A think allocates nothing in the steady state
   (`packages/bots/test/allocation.test.ts`). No Lumeth rules yet.
-- `client`: one 2v2 with three bots, an ally and two enemies, on either
+- `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
   any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
   the arena. The HUD has the ring warning and the kill feed, and the result
-  screen has the champion and arena select. Escape opens a menu that pauses
-  the match (Resume, Restart, the select again, and a keys view that rebinds
-  the nine movement and slot keys). The `Platform` interface has its two
-  settings methods, asynchronous, and the browser platform keeps the
+  screen has the champion, arena and team size select. Escape opens a menu that
+  pauses the match (Resume, Restart, the select again, and a keys view that
+  rebinds the nine movement and slot keys). The `Platform` interface has its
+  two settings methods, asynchronous, and the browser platform keeps the
   bindings in `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
   the `__runProbeFrames` hook. The heap probe measures two scenes, the
   sandbox and the live match. Not built: a pre-match screen, audio, the
