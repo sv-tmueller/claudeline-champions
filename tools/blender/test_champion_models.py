@@ -1,9 +1,11 @@
 """Contract tests for the committed champion glbs. Standard library only.
 
 They read `assets/models/champions/*.glb` and check what the client relies on
-(one `Champion` node at the scene root, feet at the origin, facing +X, a top
-below the health bar) and that the roster bodies stay easy to tell apart on
-screen. No Blender is needed, so they run in CI.
+(the `Rig` root with the joints and one skinned `Champion` mesh, a bind pose
+equal to the rest pose, rigid weights, feet at the origin, facing +X, a top
+below the health bar at rest and at every key of every clip) and that the
+roster bodies stay easy to tell apart on screen. No Blender is needed, so they
+run in CI.
 """
 import copy
 import json
@@ -29,6 +31,12 @@ MAX_GROUND_RADIUS = 0.50
 MAX_BYTES = 48 * 1024
 MAX_TRIANGLES = 600
 FOOT_TOLERANCE = 1e-4
+MATRIX_TOLERANCE = 1e-5
+WEIGHT_TOLERANCE = 1e-6
+TOP_TOLERANCE = 1e-6
+
+JOINTS = ("Hips", "Spine", "Arm_L", "Arm_R", "Leg_L", "Leg_R")
+NODE_COUNT = 8  # the six joints, Champion and Rig
 
 OVERLAY_B_MINUS_G = 45  # arena.spec counts r-g > 50 and b-g > 50 as overlay
 MIN_DISTANCE = 80
@@ -99,6 +107,83 @@ def triangle_count(doc):
     return total
 
 
+COMPONENT_FORMATS = {5121: ("B", 1), 5123: ("H", 2), 5125: ("I", 4), 5126: ("f", 4)}
+TYPE_WIDTHS = {"SCALAR": 1, "VEC3": 3, "VEC4": 4, "MAT4": 16}
+
+
+def read_accessor(doc, bin_chunk, index):
+    """Return the accessor's elements as a list of tuples, honouring byteStride."""
+    accessor = doc["accessors"][index]
+    code, size = COMPONENT_FORMATS[accessor["componentType"]]
+    width = TYPE_WIDTHS[accessor["type"]]
+    view = doc["bufferViews"][accessor["bufferView"]]
+    stride = view.get("byteStride", size * width)
+    start = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+    fmt = "<%d%s" % (width, code)
+    return [
+        struct.unpack_from(fmt, bytes(bin_chunk), start + i * stride)
+        for i in range(accessor["count"])
+    ]
+
+
+def accessor_offset(doc, index):
+    """The byte offset of the accessor's first element in the BIN chunk."""
+    accessor = doc["accessors"][index]
+    view = doc["bufferViews"][accessor["bufferView"]]
+    return view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+
+
+def identity():
+    return [[1.0 if r == c else 0.0 for c in range(4)] for r in range(4)]
+
+
+def mat_mul(a, b):
+    return [[sum(a[r][k] * b[k][c] for k in range(4)) for c in range(4)] for r in range(4)]
+
+
+def trs_matrix(translation, rotation, scale):
+    """A row-major 4x4 from a glTF translation, quaternion (x, y, z, w) and scale."""
+    x, y, z, w = rotation
+    rot = [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+    ]
+    m = identity()
+    for r in range(3):
+        for c in range(3):
+            m[r][c] = rot[r][c] * scale[c]
+        m[r][3] = translation[r]
+    return m
+
+
+def column_major(flat):
+    return [[flat[c * 4 + r] for c in range(4)] for r in range(4)]
+
+
+def node_trs(node):
+    return (
+        tuple(node.get("translation", (0.0, 0.0, 0.0))),
+        tuple(node.get("rotation", (0.0, 0.0, 0.0, 1.0))),
+        tuple(node.get("scale", (1.0, 1.0, 1.0))),
+    )
+
+
+def world_matrices(doc, pose):
+    """World matrix per node index. `pose` maps a node index to (t, r, s) overrides."""
+    nodes = doc["nodes"]
+    parent = {c: i for i, n in enumerate(nodes) for c in n.get("children", [])}
+    cache = {}
+
+    def world(i):
+        if i not in cache:
+            local = trs_matrix(*pose.get(i, node_trs(nodes[i])))
+            cache[i] = mat_mul(world(parent[i]), local) if i in parent else local
+        return cache[i]
+
+    return [world(i) for i in range(len(nodes))]
+
+
 def material_index_in_range(doc, primitive):
     index = primitive.get("material")
     return isinstance(index, int) and 0 <= index < len(doc.get("materials", []))
@@ -139,22 +224,117 @@ def hex_of(rgb):
 # contract
 
 
-def contract_problems(doc, bin_chunk):
-    """Return a list of problems. An empty list means the contract holds."""
+def layout_problems(doc):
+    """The node layout: `Rig` at the scene root over the joints and `Champion`."""
     problems = []
     nodes = doc.get("nodes", [])
-    if len(nodes) != 1:
-        problems.append("expected exactly one node, found %d" % len(nodes))
-    else:
-        node = nodes[0]
-        if node.get("name") != "Champion" or "mesh" not in node:
-            problems.append("the node must be a mesh named Champion")
+    if len(nodes) != NODE_COUNT:
+        problems.append("expected %d nodes, found %d" % (NODE_COUNT, len(nodes)))
+    by_name = {n.get("name"): n for n in nodes}
+    champion, rig = by_name.get("Champion"), by_name.get("Rig")
+    if champion is None or "mesh" not in champion or "skin" not in champion:
+        problems.append("Champion must have a mesh and a skin")
+    if champion is not None:
         for key in ("translation", "rotation", "scale", "matrix", "children"):
-            if key in node:
+            if key in champion:
                 problems.append("the Champion node must not have %s" % key)
+    if rig is None:
+        problems.append("no node named Rig")
+    else:
+        for key in ("translation", "rotation", "scale", "matrix"):
+            if key in rig:
+                problems.append("the Rig node must not have %s" % key)
+        children = sorted(nodes[c].get("name") for c in rig.get("children", []))
+        if children != ["Champion", "Hips"]:
+            problems.append("the Rig node's children must be Hips and Champion, found %r" % children)
     scenes = doc.get("scenes", [])
-    if doc.get("scene") != 0 or len(scenes) != 1 or scenes[0].get("nodes") != [0]:
-        problems.append("the default scene must list only the Champion node")
+    rig_index = nodes.index(rig) if rig is not None else None
+    if doc.get("scene") != 0 or len(scenes) != 1 or scenes[0].get("nodes") != [rig_index]:
+        problems.append("the default scene must list only Rig")
+    return problems
+
+
+def champion_primitives(doc):
+    index = next(n["mesh"] for n in doc["nodes"] if n.get("name") == "Champion")
+    return doc["meshes"][index]["primitives"]
+
+
+def skinned_vertices(doc, bin_chunk):
+    """Every Champion vertex as (position, joints, weights)."""
+    vertices = []
+    for primitive in champion_primitives(doc):
+        attributes = primitive["attributes"]
+        vertices += zip(
+            read_accessor(doc, bin_chunk, attributes["POSITION"]),
+            read_accessor(doc, bin_chunk, attributes["JOINTS_0"]),
+            read_accessor(doc, bin_chunk, attributes["WEIGHTS_0"]),
+        )
+    return vertices
+
+
+def rig_problems(doc, bin_chunk):
+    """The joints, the bind pose, the weights and the posed top of every clip."""
+    skin = doc["skins"][0]
+    joints = skin["joints"]
+    if sorted(doc["nodes"][j]["name"] for j in joints) != sorted(JOINTS):
+        return ["the skin joints must be %s" % ", ".join(JOINTS)]
+    problems = []
+    inverse = [column_major(m) for m in read_accessor(doc, bin_chunk, skin["inverseBindMatrices"])]
+    rest = world_matrices(doc, {})
+    for joint, ibm in zip(joints, inverse):
+        product = mat_mul(rest[joint], ibm)
+        if any(abs(product[r][c] - identity()[r][c]) > MATRIX_TOLERANCE for r in range(4) for c in range(4)):
+            problems.append("bind pose of %s differs from the rest pose" % doc["nodes"][joint]["name"])
+
+    vertices = skinned_vertices(doc, bin_chunk)
+    for _, indices, weights in vertices:
+        ones = [w for w in weights if abs(w - 1.0) <= WEIGHT_TOLERANCE]
+        zeros = [w for w in weights if abs(w) <= WEIGHT_TOLERANCE]
+        if len(ones) != 1 or len(zeros) != 3 or any(i >= len(joints) for i in indices):
+            problems.append("every vertex must be rigid on one joint at weight 1.0")
+            break
+    if problems:
+        return problems
+
+    for animation in doc["animations"]:
+        values = {}
+        keys = None
+        for channel in animation["channels"]:
+            sampler = animation["samplers"][channel["sampler"]]
+            times = read_accessor(doc, bin_chunk, sampler["input"])
+            if keys is not None and len(times) != keys:
+                return problems + ["clip %s has channels with different key counts" % animation["name"]]
+            keys = len(times)
+            target = channel["target"]
+            values[(target["node"], target["path"])] = read_accessor(doc, bin_chunk, sampler["output"])
+        for key in range(keys or 0):
+            pose = {}
+            for (node, path), outputs in values.items():
+                t, r, s = pose.get(node, node_trs(doc["nodes"][node]))
+                pose[node] = (outputs[key], r, s) if path == "translation" else (t, outputs[key], s)
+            world = world_matrices(doc, pose)
+            skin_matrices = [mat_mul(world[j], ibm) for j, ibm in zip(joints, inverse)]
+            top = max(posed_y(skin_matrices, v) for v in vertices)
+            if top > MAX_TOP + TOP_TOLERANCE:
+                problems.append(
+                    "posed top is %.4f m in %s at key %d, the limit is %.2f m"
+                    % (top, animation["name"], key, MAX_TOP)
+                )
+    return problems
+
+
+def posed_y(skin_matrices, vertex):
+    (x, y, z), indices, weights = vertex
+    return sum(
+        w * (m[1][0] * x + m[1][1] * y + m[1][2] * z + m[1][3])
+        for i, w in zip(indices, weights)
+        for m in (skin_matrices[i],)
+    )
+
+
+def contract_problems(doc, bin_chunk):
+    """Return a list of problems. An empty list means the contract holds."""
+    problems = layout_problems(doc)
     if len(doc.get("meshes", [])) != 1:
         problems.append("expected exactly one mesh")
     names = [m.get("name") for m in doc.get("materials", [])]
@@ -190,6 +370,8 @@ def contract_problems(doc, bin_chunk):
         problems.append("every accent vertex must have x > 0 so the accent marks the front")
     if triangle_count(doc) > MAX_TRIANGLES:
         problems.append("more than %d triangles" % MAX_TRIANGLES)
+    if not problems:
+        problems += rig_problems(doc, bin_chunk)
     return problems
 
 
@@ -210,6 +392,10 @@ def champion_paths():
 
 def load(path):
     return split_glb(Path(path).read_bytes())
+
+
+def node_named(doc, name):
+    return next(n for n in doc["nodes"] if n.get("name") == name)
 
 
 def accent_primitive(doc):
@@ -300,13 +486,62 @@ class ContractCheckTests(unittest.TestCase):
         del primitives(self.doc)[0]["material"]
         self.assertProblem("primitive has no material")
 
-    def test_rejects_a_translation_on_the_node(self):
-        self.doc["nodes"][0]["translation"] = [1, 0, 0]
-        self.assertProblem("must not have translation")
+    def test_rejects_a_translation_on_the_champion_node(self):
+        node_named(self.doc, "Champion")["translation"] = [1, 0, 0]
+        self.assertProblem("Champion node must not have translation")
 
-    def test_rejects_a_second_node(self):
+    def test_rejects_a_rotation_on_the_rig_node(self):
+        node_named(self.doc, "Rig")["rotation"] = [0, 0.7071, 0, 0.7071]
+        self.assertProblem("Rig node must not have rotation")
+
+    def test_rejects_a_child_of_the_champion_node(self):
+        node_named(self.doc, "Champion")["children"] = [0]
+        self.assertProblem("Champion node must not have children")
+
+    def test_rejects_a_champion_node_without_a_skin(self):
+        del node_named(self.doc, "Champion")["skin"]
+        self.assertProblem("Champion must have a mesh and a skin")
+
+    def test_rejects_a_rig_whose_children_are_not_hips_and_champion(self):
+        node_named(self.doc, "Rig")["children"].pop()
+        self.assertProblem("children must be Hips and Champion")
+
+    def test_rejects_a_second_scene_root(self):
+        self.doc["scenes"][0]["nodes"].append(0)
+        self.assertProblem("scene must list only Rig")
+
+    def test_rejects_an_extra_node(self):
         self.doc["nodes"].append({"name": "Extra"})
-        self.assertProblem("exactly one node")
+        self.assertProblem("expected 8 nodes")
+
+    def test_rejects_a_bind_pose_that_differs_from_the_rest_pose(self):
+        ibm = self.doc["skins"][0]["inverseBindMatrices"]
+        # Element 13 is the y translation of the first inverse bind matrix.
+        struct.pack_into("<f", self.bin, accessor_offset(self.doc, ibm) + 4 * 13, 0.5)
+        self.assertProblem("bind pose")
+
+    def test_rejects_a_vertex_that_is_not_rigid_on_one_joint(self):
+        weights = body_primitive(self.doc)["attributes"]["WEIGHTS_0"]
+        struct.pack_into("<4f", self.bin, accessor_offset(self.doc, weights), 0.5, 0.5, 0, 0)
+        self.assertProblem("rigid")
+
+    def test_rejects_a_vertex_on_a_joint_that_does_not_exist(self):
+        joints = body_primitive(self.doc)["attributes"]["JOINTS_0"]
+        struct.pack_into("<4B", self.bin, accessor_offset(self.doc, joints), 9, 0, 0, 0)
+        self.assertProblem("rigid")
+
+    def test_rejects_a_pose_that_lifts_the_top_above_the_limit(self):
+        run = next(a for a in self.doc["animations"] if a["name"] == "Run")
+        hips = next(i for i, n in enumerate(self.doc["nodes"]) if n["name"] == "Hips")
+        channel = next(
+            c for c in run["channels"] if c["target"] == {"node": hips, "path": "translation"}
+        )
+        output = run["samplers"][channel["sampler"]]["output"]
+        offset = accessor_offset(self.doc, output)
+        # Lift the second key of the Hips translation by 1 m (the y component).
+        x, y, z = struct.unpack_from("<3f", self.bin, offset + 12)
+        struct.pack_into("<3f", self.bin, offset + 12, x, y + 1.0, z)
+        self.assertProblem("posed top")
 
     def test_rejects_a_vertex_outside_the_ground_radius(self):
         set_vertex(self.doc, self.bin, body_primitive(self.doc), 0, (0.6, 1.0, 0.0))
