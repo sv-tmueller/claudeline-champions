@@ -5,6 +5,7 @@ import {
   abilityFor,
   buttonsOf,
   chooseCast,
+  createCastCues,
   createKitCache,
   findKit,
   refreshKitCache,
@@ -205,6 +206,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const goalPoint: Vec2 = { x: 0.5, y: 0.5 };
   const kiteScratch = createKiteScratch();
   const kitCache = createKitCache();
+  const cues = createCastCues();
   const dist = createMeasure();
   let follower = createFollower();
   // The kind of goal the follower served on the previous think and on this one. Null after a
@@ -486,7 +488,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       }
       let pressed = false;
       if (kit !== undefined) {
-        updateRuns(runs, state, kitCache, me, target, sight, dist);
+        updateRuns(runs, state, kitCache, me, target, sight, dist, cues);
         pressed = chooseCast(choice, runs, tier.castDelay, kit, kitCache, me);
       } else {
         runs.fill(0);

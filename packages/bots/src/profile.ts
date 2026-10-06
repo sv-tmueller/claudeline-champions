@@ -69,8 +69,24 @@ export interface ChampionRules {
 /** No rule: every slot is pressed on its kit band alone. */
 const NO_RULES: ChampionRules = Object.freeze({ openers: Object.freeze([]) });
 
-/** Keyed by champion id, like `PROFILES`. No champion has a rule yet. */
-const RULES = new Map<string, ChampionRules>();
+/**
+ * Keyed by champion id, like `PROFILES`. The roster's bot sketches (docs/design/roster-v1.md) are
+ * the source of the numbers. Rush is the base dash with the band of `dashBand`; Chain Hook is the
+ * roster's 4 to 7 m, inside the kit band less the margin (0 to 8 m), and only at a target that
+ * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
+ */
+const RULES = new Map<string, ChampionRules>([
+  [
+    'hargrim',
+    {
+      openers: [
+        { slot: 'SPACE', band: 'dash', motion: null },
+        { slot: 'E', band: [4, 7], motion: 'away' },
+      ],
+    },
+  ],
+  ['quillon', { openers: [{ slot: 'Q', band: null, motion: 'closing' }] }],
+]);
 
 /**
  * The openers of a champion. Like `KIT_RULES`, a rule applies only with a kit whose id equals

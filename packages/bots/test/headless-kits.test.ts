@@ -39,9 +39,17 @@ function config3v3(): MatchConfig {
   };
 }
 
+/**
+ * A band of centre distances. A row without `margin` is a kit band, tested with the 1 m range
+ * margin off its top; an opener row (see bots.md, Openers and escapes) is the literal band with
+ * `margin: 0`. `motion` is the condition of an opener: the target walks away from the champion or
+ * toward it, by the sign of (target - champion) . target velocity.
+ */
 interface Band {
   min: number;
   max: number;
+  margin?: number;
+  motion?: 'away' | 'closing';
 }
 
 // The oracle's own band and clearance tables, one per kit set, written out from the kit files
@@ -60,14 +68,16 @@ const HARGRIM_BANDS: Record<string, Band> = {
   'hargrim:M1': { min: 0, max: 3 },
   'hargrim:M2': { min: 0, max: 5 },
   'hargrim:M2:ex': { min: 0, max: 5.75 },
+  'hargrim:SPACE': { min: 4, max: 5, margin: 0 },
   'hargrim:SPACE:ex': { min: 0, max: 9 },
-  'hargrim:E': { min: 0, max: 9 },
+  'hargrim:E': { min: 4, max: 7, margin: 0, motion: 'away' },
   'hargrim:F': { min: 0, max: 10 },
 };
 const HARGRIM_CLEARANCES: Record<string, number> = {
   'hargrim:M1': 0.5,
   'hargrim:M2': 0.5,
   'hargrim:M2:ex': 0.5,
+  'hargrim:SPACE': 0.5,
   'hargrim:SPACE:ex': 0.5,
   'hargrim:E': 0.4,
   'hargrim:F': 0.5,
@@ -84,7 +94,7 @@ const KIT_SETS: KitSet[] = [
       'quillon:M1': { min: 0, max: 14 },
       'quillon:M2': { min: 0, max: 12 },
       'quillon:M2:ex': { min: 0, max: 12 },
-      'quillon:Q': { min: 0, max: 10 },
+      'quillon:Q': { min: 0, max: 10, motion: 'closing' },
       'quillon:E': { min: 0, max: 18 },
       'quillon:E:ex': { min: 0, max: 18 },
       'quillon:F': { min: 0, max: 20 },
@@ -109,7 +119,7 @@ const KIT_SETS: KitSet[] = [
       'quillon:M1': { min: 0, max: (22 * 38) / 60 },
       'quillon:M2': { min: 0, max: (14 * 51) / 60 },
       'quillon:M2:ex': { min: 0, max: (14 * 51) / 60 },
-      'quillon:Q': { min: 0, max: 10 },
+      'quillon:Q': { min: 0, max: 10, motion: 'closing' },
       'quillon:E': { min: 0, max: (25 * 43) / 60 },
       'quillon:E:ex': { min: 0, max: (25 * 43) / 60 },
       'quillon:F': { min: 0, max: 20 },
@@ -127,7 +137,7 @@ const KIT_SETS: KitSet[] = [
   },
 ];
 /** The pressed abilities that hold a dash, which a root skips. */
-const DASHES = new Set(['hargrim:SPACE:ex', 'hargrim:F']);
+const DASHES = new Set(['hargrim:SPACE', 'hargrim:SPACE:ex', 'hargrim:F']);
 const MARGIN = 1;
 const EX_COST = 25;
 const ULTIMATE_COST = 100;
@@ -177,8 +187,12 @@ function pressProblems(
     if (clearance !== undefined && !clearShotOracle(state, c, target, clearance)) {
       problems.push(`no clear shot of width ${clearance}`);
     }
-    if (band !== undefined && !(band.min <= d && d <= band.max - MARGIN)) {
-      problems.push(`distance ${d} outside [${band.min}, ${band.max - MARGIN}]`);
+    if (band !== undefined) {
+      const top = band.max - (band.margin ?? MARGIN);
+      if (!(band.min <= d && d <= top)) problems.push(`distance ${d} outside [${band.min}, ${top}]`);
+      const dot = (target.x - c.x) * target.vx + (target.y - c.y) * target.vy;
+      if (band.motion === 'away' && !(dot > 0)) problems.push(`target not moving away: dot ${dot}`);
+      if (band.motion === 'closing' && !(dot < 0)) problems.push(`target not closing: dot ${dot}`);
     }
   }
   if (cooldown > 1) problems.push(`cooldown ${cooldown} above 1`);
@@ -357,10 +371,11 @@ describe('the band and clearance tables of the shipped kits', () => {
     for (const key of ['M1', 'M2', 'M2:ex', 'Q', 'E', 'E:ex', 'F']) {
       const bolt = projectile(slotOf('quillon', key));
       // The speed is multiplied by the lifetime first: 22 x 38 / 60, not 22 x (38 / 60).
-      expect(set.bands[`quillon:${key}`], key).toEqual({
-        min: 0,
-        max: (bolt.speed * bolt.lifetimeTicks) / 60,
-      });
+      const reach = { min: 0, max: (bolt.speed * bolt.lifetimeTicks) / 60 };
+      // Snare Orb is an opener: the kit band less the margin, and a target walking toward her.
+      expect(set.bands[`quillon:${key}`], key).toEqual(
+        key === 'Q' ? { ...reach, motion: 'closing' } : reach,
+      );
       expect(set.clearances[`quillon:${key}`], key).toBe(bolt.radius);
     }
   });
@@ -386,8 +401,16 @@ describe('the band and clearance tables of the shipped kits', () => {
     const burstReach = dash.distance + burst.radius + 0.5;
     expect(set.bands['hargrim:SPACE:ex']).toEqual({ min: 0, max: burstReach });
     const hook = projectile(slotOf('hargrim', 'E'));
-    expect(set.bands['hargrim:E']).toEqual({ min: 0, max: (hook.speed * hook.lifetimeTicks) / 60 });
+    // Chain Hook is an opener: the roster's literal 4 to 7 m, with no margin, at a target walking
+    // away. It lies inside the kit band less the margin, so it only restricts the press.
+    expect(set.bands['hargrim:E']).toEqual({ min: 4, max: 7, margin: 0, motion: 'away' });
+    expect(7).toBeLessThanOrEqual((hook.speed * hook.lifetimeTicks) / 60 - 1);
     expect(set.clearances['hargrim:E']).toBe(hook.radius);
+    // Rush is the base dash: [D - 1, D] with no margin, a dash that a root skips.
+    const rush = slotOf('hargrim', 'SPACE').effects[0];
+    if (rush === undefined || rush.type !== 'dash') throw new Error('no dash');
+    expect(set.bands['hargrim:SPACE']).toEqual({ min: rush.distance - 1, max: rush.distance, margin: 0 });
+    expect(set.clearances['hargrim:SPACE']).toBe(0.5);
     const ultimate = slotOf('hargrim', 'F').effects[0];
     if (ultimate === undefined || ultimate.type !== 'dash') throw new Error('no dash');
     const slam = ultimate.then[0];

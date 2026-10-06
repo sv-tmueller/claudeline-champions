@@ -67,6 +67,27 @@ export interface KitCache {
   hasOpen: Uint8Array;
   openMin: Float64Array;
   openMax: Float64Array;
+  /**
+   * What the target must be doing for the base ability of the slot: +1 walking away from the bot,
+   * -1 walking toward it, 0 anything. An EX press has no such condition.
+   */
+  motion: Int8Array;
+}
+
+/**
+ * What a think works out once and the run test and the cast choice read, in fields that start as
+ * doubles. A bot owns one.
+ */
+export interface CastCues {
+  /**
+   * (target - bot) . target velocity: positive when the target walks away from the bot, negative
+   * when it walks toward it, 0 when it stands or walks across.
+   */
+  dot: number;
+}
+
+export function createCastCues(): CastCues {
+  return { dot: 0.5 };
 }
 
 export function createKitCache(): KitCache {
@@ -86,6 +107,7 @@ export function createKitCache(): KitCache {
     hasOpen: new Uint8Array(SLOTS.length),
     openMin: new Float64Array(SLOTS.length),
     openMax: new Float64Array(SLOTS.length),
+    motion: new Int8Array(SLOTS.length),
   };
 }
 
@@ -107,6 +129,7 @@ export function refreshKitCache(
     cache.hasBase[i] = 0;
     cache.hasEx[i] = 0;
     cache.hasOpen[i] = 0;
+    cache.motion[i] = 0;
     if (kit === undefined) continue;
     const slot = SLOTS[i] as Slot;
     const spec = kit.slots[slot];
@@ -131,6 +154,7 @@ export function refreshKitCache(
   for (const opener of rules.openers) {
     if (kit === undefined) break;
     const i = SLOTS.indexOf(opener.slot);
+    cache.motion[i] = opener.motion === 'away' ? 1 : opener.motion === 'closing' ? -1 : 0;
     const band = opener.band === 'dash' ? dashBand(kit.slots[opener.slot]) : opener.band;
     if (band === null) continue;
     cache.hasOpen[i] = 1;
@@ -217,9 +241,11 @@ export function updateRuns(
   target: ChampionState,
   scratch: SightScratch,
   dist: Measure,
+  cues: CastCues,
 ): void {
   distanceInto(dist, me, target);
   const d = dist.metres;
+  cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
   for (let i = 0; i < SLOTS.length; i++) {
     const ex = exFor(cache, i, me);
     let inBand = false;
@@ -227,13 +253,18 @@ export function updateRuns(
       // `inReach` of the EX band, written out over the typed arrays.
       inBand = (cache.exMin[i] as number) <= d && d <= (cache.exMax[i] as number) - RANGE_MARGIN;
       scratch.clearance = cache.exClearance[i] as number;
-    } else if (cache.hasOpen[i] === 1) {
-      inBand = (cache.openMin[i] as number) <= d && d <= (cache.openMax[i] as number);
+    } else {
+      if (cache.hasOpen[i] === 1) {
+        inBand = (cache.openMin[i] as number) <= d && d <= (cache.openMax[i] as number);
+      } else if (cache.hasBase[i] === 1) {
+        const max = (cache.baseMax[i] as number) - RANGE_MARGIN;
+        inBand = (cache.baseMin[i] as number) <= d && d <= max;
+      }
       scratch.clearance = cache.baseClearance[i] as number;
-    } else if (cache.hasBase[i] === 1) {
-      const max = (cache.baseMax[i] as number) - RANGE_MARGIN;
-      inBand = (cache.baseMin[i] as number) <= d && d <= max;
-      scratch.clearance = cache.baseClearance[i] as number;
+      // The condition of the slot: a target walking away (+1) or toward the bot (-1).
+      const motion = cache.motion[i] as number;
+      if (motion > 0 && !(cues.dot > 0)) inBand = false;
+      if (motion < 0 && !(cues.dot < 0)) inBand = false;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
   }
