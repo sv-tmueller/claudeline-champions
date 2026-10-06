@@ -39,8 +39,10 @@ first.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot
   test; casting from kit data with range profiles for all four roster ids; the
-  energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81);
-  aim leading and three tiers. A think allocates nothing in the steady state
+  energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81),
+  Skerrow's wait at 6 to 8 m and her Quiet Dart opener, and no dash pressed on
+  an escape think for any kit (#98); aim leading and three tiers. A think
+  allocates nothing in the steady state and a plan search only its path
   (`packages/bots/test/allocation.test.ts`). No Lumeth rules yet.
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
@@ -52,9 +54,9 @@ first.
   two settings methods, asynchronous, and the browser platform keeps the
   bindings in `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
   the `__runProbeFrames` hook. The heap probe measures two scenes, the
-  sandbox and the live match. Not built: a pre-match screen, audio, the
-  scoreboard, the other three `Platform` methods (`identity`,
-  `unlockAchievement`, `openUrl`).
+  sandbox and the live match with a moving pointer, and bounds the bots' bytes
+  in the live match. Not built: a pre-match screen, audio, the scoreboard, the
+  other three `Platform` methods (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
   placeholder, each rigged, with four clips the client does not play yet.
@@ -70,7 +72,8 @@ Topics:
 - [Client](client.md): loop, input, camera, scene, HUD, platform interface.
 - [Bots](bots.md): navigation, decisions, aim, difficulty tiers.
 - [Online](online.md): netcode and ladder principles.
-- [Assets](assets.md): Blender pipeline, node naming, arena definition.
+- [Assets](assets.md): Blender pipeline, node naming, arena definition, the
+  champion rig and clips.
 - [Testing](testing.md): check suite and test types.
 
 Decisions:
@@ -91,10 +94,19 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [Simulation](simulation.md#kit-contract-and-registration).
 - The heap probe runs through the dev-only counted frame hook on two scenes,
   asserting the median of five windows: 600 B for the sandbox and 780 B for the
-  live match:
+  live match, both by the limit rule (about 100 B above the largest clean
+  median, below the smallest mutation the scene gates), and 12 000 B for the
+  bots' bytes in the live match (50 percent above the largest clean median):
   [batch #53 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
-  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236).
-  Recorded in [Testing](testing.md#the-heap-probe).
+  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236),
+  [batch #91 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6014685854),
+  [batch #91 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6014761763),
+  [batch #91 decision 7](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015519796),
+  [batch #91 decision 12](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6019121228),
+  [batch #91 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6020995527),
+  [its addendum](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6021485382).
+  Recorded in [Testing](testing.md#the-heap-probe) and
+  [Bots](bots.md#in-the-browser).
 - arena01's two deviations are grandfathered:
   [batch #63 decision 14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).
   Recorded in [the arena design](../design/arenas.md#8-the-arenas) and pinned
@@ -110,6 +122,18 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   files over IPC without a signature change, and only those two are built:
   [batch #80 decision 15](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012436842).
   Recorded in [Client](client.md#platform-interface).
+- One rig and four clips for every champion model, the placeholder included,
+  checked by the validator against the tables, the floor bounded between keys:
+  [batch #91 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015246696),
+  [batch #91 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015774432),
+  [batch #91 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6019098915).
+  Recorded in [Assets](assets.md#rig) and its [clips](assets.md#clips).
+- The address is the whole setup, the team size included: every select link
+  writes `teamsize`, 2 too, and the arena decides what plays
+  (`playableTeamSize`):
+  [batch #91 decision 5](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015194380).
+  Recorded in [Client](client.md#launch-and-match) and its
+  [select](client.md#result-screen-and-champion-select).
 
 Planning:
 

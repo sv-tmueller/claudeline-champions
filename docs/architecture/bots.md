@@ -410,17 +410,16 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   Hargrim's Rush, EX Rush and ultimate, Skerrow's Lunge and EX Lunge, and
   Lumeth's Glide (a dash with no band, so no rule presses it yet; the hold reads
   the slot's ability and not the rule, so it covers Glide once the Lumeth
-  profile presses it). A dash
-  carries the bot along its aim, toward the target it is leaving: a cornered
-  Skerrow with Vanish Step cooling down used to Lunge into the Hargrim she was
-  fleeing, and Rush did the same. The kit cache holds a flag per slot for each
-  (`baseDash`, `exDash`), and the gate is in `chooseCast`; no escape slot of the
-  current rules starts with a dash (Iron Hide, Skip, Hush Ward and Vanish Step
-  do not), so `chooseEscape` needs none. A dash escape away from the target
-  (Lunge away, Glide with a landing search) is not built. A press the hold
-  withholds leaves the slot unpressed on that think: the walk goes on to the
-  next slot, and a dash with an EX variant that would be cast is not replaced by
-  its base.
+  profile presses it). A dash carries the bot along its aim, toward the target
+  it is leaving: a cornered Skerrow with Vanish Step cooling down used to Lunge
+  into the Hargrim she was fleeing, and Rush did the same. The kit cache holds a
+  flag per slot for each (`baseDash`, `exDash`), and the gate is in
+  `chooseCast`; no escape slot of the current rules starts with a dash (Iron
+  Hide, Skip, Hush Ward and Vanish Step do not), so `chooseEscape` needs none. A
+  dash escape away from the target (Lunge away, Glide with a landing search) is
+  not built. A press the hold withholds leaves the slot unpressed on that think:
+  the walk goes on to the next slot, and a dash with an EX variant that would be
+  cast is not replaced by its base.
 - The aim: `aim()` runs on every think, so the draw cadence of the aim error does not change; an
   escape press with a landing then overwrites `aimX` and `aimY` with the landing's aim, with no
   error and no draw.
@@ -619,9 +618,9 @@ median read 73 KB. The rounding is `+ 0.5 - 0.5` in `aim` now: the same value as
 `+ 0` while |Math.round(x)| is below 2^52 cm (a whole number that size survives
 both additions, and -0 + 0.5 is 0.5; the aim of a champion in any arena is a few
 thousand cm), and a double constant gives the sum number feedback from its first
-run. The windows read 0 B in `aim` again. `escape.ts:landingInto`
-has the same `Math.round(...) + 0` and the same hazard, with a landing point in
-[-0.5, 0) cm, and is not changed: it runs a few times a window, not 90.
+run. The windows read 0 B in `aim` again. `escape.ts:landingInto` has the same
+`Math.round(...) + 0` and the same hazard, with a landing point in [-0.5, 0) cm,
+and is not changed: it runs a few times a window, not 90.
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
