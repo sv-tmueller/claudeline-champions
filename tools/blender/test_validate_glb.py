@@ -16,16 +16,17 @@ from unittest import mock
 import validate_glb
 
 REPO = Path(__file__).resolve().parents[2]
-ARENA_JSON = REPO / "data" / "arenas" / "arena01.json"
-ARENA_GLB = REPO / "assets" / "models" / "arenas" / "arena01.glb"
+ARENA_IDS = ("arena01", "arena02")
+ARENAS_DIR = REPO / "assets" / "models" / "arenas"
+ARENA_GLB = ARENAS_DIR / "arena01.glb"
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
 
-def load_arena():
-    with open(ARENA_JSON) as f:
+def load_arena(arena_id="arena01"):
+    with open(REPO / "data" / "arenas" / ("%s.json" % arena_id)) as f:
         return json.load(f)
 
 
@@ -97,8 +98,8 @@ class ValidatorCase(unittest.TestCase):
         path.write_bytes(data)
         return path
 
-    def arena_glb(self, data):
-        return self.write("arenas", "arena01.glb", data)
+    def arena_glb(self, data, arena_id="arena01"):
+        return self.write("arenas", "%s.glb" % arena_id, data)
 
     def assertRejected(self, path, reason):
         message = validate_glb.validate_file(path)
@@ -108,8 +109,10 @@ class ValidatorCase(unittest.TestCase):
 
 class StructureTests(ValidatorCase):
     def test_synthetic_arena_passes(self):
-        path = self.arena_glb(pack_glb(arena_doc(load_arena())))
-        self.assertIsNone(validate_glb.validate_file(path))
+        for arena_id in ARENA_IDS:
+            with self.subTest(arena=arena_id):
+                path = self.arena_glb(pack_glb(arena_doc(load_arena(arena_id))), arena_id)
+                self.assertIsNone(validate_glb.validate_file(path))
 
     def test_bin_chunk_is_accepted(self):
         path = self.arena_glb(pack_glb(arena_doc(load_arena()), binary=b"\0" * 8))
@@ -212,11 +215,21 @@ class ArenaNodeTests(ValidatorCase):
         self.assertRejected(self.arena_glb(pack_glb(doc)), "duplicate")
 
     def test_rejects_obstacle_translation_that_disagrees_with_json(self):
-        doc = arena_doc(load_arena())
-        for node in doc["nodes"]:
-            if node["name"] == "Obstacle_7":
-                node["translation"] = [0, 0, 7]  # the JSON says y = 7, so z = -7
-        self.assertRejected(self.arena_glb(pack_glb(doc)), "does not match")
+        # Obstacle_7 has y = 7 in arena01 and y = -7.5 in arena02, so the z flip changes both.
+        def flip_z(translation):
+            translation[2] = -translation[2]  # sim y maps to z = -y
+
+        def shift_x(translation):
+            translation[0] += 1  # the JSON x moved by a metre
+
+        for arena_id in ARENA_IDS:
+            for label, change in (("z flipped", flip_z), ("x shifted", shift_x)):
+                with self.subTest(arena=arena_id, change=label):
+                    doc = arena_doc(load_arena(arena_id))
+                    for node in doc["nodes"]:
+                        if node["name"] == "Obstacle_7":
+                            change(node["translation"])
+                    self.assertRejected(self.arena_glb(pack_glb(doc), arena_id), "does not match")
 
     def test_rejects_malformed_nodes_and_translations(self):
         def with_node(extra):
@@ -295,8 +308,10 @@ class ArenaJsonTests(unittest.TestCase):
         self.assertIsNotNone(message, "validator accepted a bad arena")
         self.assertIn(reason, message)
 
-    def test_arena01_passes(self):
-        self.assertIsNone(self.check(lambda a: None))
+    def test_committed_arena_jsons_pass(self):
+        for arena_id in ARENA_IDS:
+            with self.subTest(arena=arena_id):
+                self.assertIsNone(validate_glb.validate_arena_json(load_arena(arena_id), arena_id))
 
     def test_rejects_id_that_differs_from_file_name(self):
         arena = load_arena()
@@ -464,8 +479,13 @@ class NumberTests(unittest.TestCase):
 
 
 class CommittedModelTests(unittest.TestCase):
-    def test_committed_arena_glb_passes(self):
-        self.assertIsNone(validate_glb.validate_file(ARENA_GLB))
+    def test_committed_arena_glbs_are_exactly_the_known_arenas(self):
+        self.assertEqual(tuple(sorted(p.stem for p in ARENAS_DIR.glob("*.glb"))), ARENA_IDS)
+
+    def test_committed_arena_glbs_pass(self):
+        for arena_id in ARENA_IDS:
+            with self.subTest(arena=arena_id):
+                self.assertIsNone(validate_glb.validate_file(ARENAS_DIR / ("%s.glb" % arena_id)))
 
     def test_committed_champion_glbs_pass(self):
         paths = sorted(CHAMPIONS_DIR.glob("*.glb"))

@@ -4,8 +4,9 @@ These tests run the generators in Blender, so they skip when Blender is not
 installed. They exist because `bmesh.ops.create_uvsphere` once gave a
 different vertex order inside its faces on some runs, so one matching run
 proved nothing. Each model is built several times: the placeholder, the four
-roster champions and the arena, four runs each. The last test class needs no
-Blender. It fails when a committed champion glb has no case here.
+roster champions and the two arenas, four runs each. The last two test classes
+need no Blender. They fail when a committed champion or arena glb has no case
+here, or a case has no glb.
 """
 import os
 import subprocess
@@ -21,13 +22,17 @@ RUNS = 4
 CHAMPION_IDS = ("placeholder", "hargrim", "quillon", "lumeth", "skerrow")
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
-CASES = {
-    "arena": (
+ARENA_IDS = ("arena01", "arena02")
+ARENAS_DIR = REPO / "assets" / "models" / "arenas"
+ARENA_DATA_DIR = REPO / "data" / "arenas"
+
+CASES = {}
+for arena_id in ARENA_IDS:
+    CASES[arena_id] = (
         "gen_arena.py",
-        ["--arena", str(REPO / "data" / "arenas" / "arena01.json")],
-        REPO / "assets" / "models" / "arenas" / "arena01.glb",
-    ),
-}
+        ["--arena", str(ARENA_DATA_DIR / ("%s.json" % arena_id))],
+        ARENAS_DIR / ("%s.glb" % arena_id),
+    )
 for champion_id in CHAMPION_IDS:
     CASES[champion_id] = (
         "gen_champion.py",
@@ -77,14 +82,24 @@ class ExportDeterminismTests(unittest.TestCase):
             with self.subTest(champion=champion_id):
                 self.check(champion_id)
 
-    def test_arena_export_matches_committed_file_on_every_run(self):
-        self.check("arena")
+    def test_arena_exports_match_committed_files_on_every_run(self):
+        for arena_id in ARENA_IDS:
+            with self.subTest(arena=arena_id):
+                self.check(arena_id)
 
 
 class ChampionCoverageTests(unittest.TestCase):
     def test_every_committed_champion_glb_has_a_determinism_case(self):
         committed = {path.stem for path in CHAMPIONS_DIR.glob("*.glb")}
         self.assertEqual(committed, set(CHAMPION_IDS))
+
+
+class ArenaCoverageTests(unittest.TestCase):
+    def test_arena_glbs_arena_definitions_and_determinism_cases_are_the_same_set(self):
+        glbs = {path.stem for path in ARENAS_DIR.glob("*.glb")}
+        definitions = {path.stem for path in ARENA_DATA_DIR.glob("*.json")}
+        self.assertEqual(glbs, set(ARENA_IDS))
+        self.assertEqual(definitions, set(ARENA_IDS))
 
 
 if __name__ == "__main__":
