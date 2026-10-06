@@ -98,55 +98,65 @@ async function runUntil(
   }
 }
 
-test('plays the first round of a match against bots', async ({ page }, testInfo) => {
-  test.setTimeout(TEST_TIMEOUT_MS);
-  const { problems, failed } = watchProblems(page);
+// The same round on each arena. The arena02 row proves the bots and the sim play it from the
+// address, not only that the page loads it: its first death is a tick budget like arena01's.
+const ARENAS = [
+  { id: 'arena01', address: '/', picture: 'match.png' },
+  { id: 'arena02', address: '/?arena=arena02', picture: 'match-arena02.png' },
+] as const;
 
-  try {
-    await page.clock.install({ time: 0 });
-    await page.goto('/');
-    await orFail(page.waitForSelector('canvas[data-arena][data-tick]'), failed);
-    await page.clock.pauseAt(PAUSE_AT_MS);
-    await page.setViewportSize(PROBE_VIEWPORT);
+for (const arena of ARENAS) {
+  test(`plays the first round of a match against bots on ${arena.id}`, async ({ page }, testInfo) => {
+    test.setTimeout(TEST_TIMEOUT_MS);
+    const { problems, failed } = watchProblems(page);
 
-    // The warmup, then the round.
-    let hooks = await runUntil(page, 'the round phase', ROUND_BUDGET_TICKS, (h) => h.phase === 'round');
-    expect(hooks.round).toBe('1');
-    expect(hooks.resultVisible).toBe('false');
+    try {
+      await page.clock.install({ time: 0 });
+      await page.goto(arena.address);
+      await orFail(page.waitForSelector(`canvas[data-arena="${arena.id}"][data-tick]`), failed);
+      await page.clock.pauseAt(PAUSE_AT_MS);
+      await page.setViewportSize(PROBE_VIEWPORT);
 
-    // Input reaches the champion: D moves it east.
-    const before = await readHooks(page);
-    await page.keyboard.down('KeyD');
-    await runFrames(page, WALK_FRAMES);
-    await page.keyboard.up('KeyD');
-    await runFrames(page, 2);
-    hooks = await readHooks(page);
-    expect(hooks.x - before.x, 'holding D moved champion 0 east').toBeGreaterThanOrEqual(WALK_FLOOR_CM);
+      // The warmup, then the round.
+      let hooks = await runUntil(page, 'the round phase', ROUND_BUDGET_TICKS, (h) => h.phase === 'round');
+      expect(hooks.round).toBe('1');
+      expect(hooks.resultVisible).toBe('false');
 
-    // The bots fight: a projectile flies within 600 ticks of the round start, and
-    // a hit lands within 1800. These two need the bots to cast (#58).
-    hooks = await runUntil(
-      page,
-      'a projectile',
-      PROJECTILE_BUDGET_TICKS - (hooks.tick - WARMUP_TICKS),
-      (h) => h.projectiles > 0 || h.hits > 0,
-    );
-    hooks = await runUntil(
-      page,
-      'a hit or a bar below 100',
-      HIT_BUDGET_TICKS - (hooks.tick - WARMUP_TICKS),
-      (h) => h.hits > 0 || h.bars.some((bar) => bar !== '100'),
-    );
+      // Input reaches the champion: D moves it east.
+      const before = await readHooks(page);
+      await page.keyboard.down('KeyD');
+      await runFrames(page, WALK_FRAMES);
+      await page.keyboard.up('KeyD');
+      await runFrames(page, 2);
+      hooks = await readHooks(page);
+      expect(hooks.x - before.x, 'holding D moved champion 0 east').toBeGreaterThanOrEqual(WALK_FLOOR_CM);
 
-    // The result panel stays hidden until the match ends.
-    expectTimerFollowsTick(hooks);
-    expect(hooks.resultVisible).toBe('false');
-    expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
+      // The bots fight: a projectile flies within 600 ticks of the round start, and
+      // a hit lands within 1800. These two need the bots to cast (#58).
+      hooks = await runUntil(
+        page,
+        'a projectile',
+        PROJECTILE_BUDGET_TICKS - (hooks.tick - WARMUP_TICKS),
+        (h) => h.projectiles > 0 || h.hits > 0,
+      );
+      hooks = await runUntil(
+        page,
+        'a hit or a bar below 100',
+        HIT_BUDGET_TICKS - (hooks.tick - WARMUP_TICKS),
+        (h) => h.hits > 0 || h.bars.some((bar) => bar !== '100'),
+      );
+      console.log(`first hit on ${arena.id}: tick ${hooks.tick}`);
 
-    await page.setViewportSize(SCREENSHOT_VIEWPORT);
-    await runFrames(page, 2);
-    await page.screenshot({ path: testInfo.outputPath('match.png') });
-  } finally {
-    expect(problems).toEqual([]);
-  }
-});
+      // The result panel stays hidden until the match ends.
+      expectTimerFollowsTick(hooks);
+      expect(hooks.resultVisible).toBe('false');
+      expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
+
+      await page.setViewportSize(SCREENSHOT_VIEWPORT);
+      await runFrames(page, 2);
+      await page.screenshot({ path: testInfo.outputPath(arena.picture) });
+    } finally {
+      expect(problems).toEqual([]);
+    }
+  });
+}

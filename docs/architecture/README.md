@@ -42,13 +42,19 @@ first.
   energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81);
   aim leading and three tiers. A think allocates nothing in the steady state
   (`packages/bots/test/allocation.test.ts`). No Lumeth rules yet.
-- `client`: one 2v2 with three bots, an ally and two enemies, on arena01 only
-  (`main.ts` imports `arena01.json` only). `?champion=` picks any champion
-  with a kit and `?difficulty=` picks the tier. The HUD has the ring warning
-  and the kill feed, and the result screen has the champion select. Dev only:
-  `?scene=sandbox`, `?timescale=` and the `__runProbeFrames` hook. The heap
-  probe measures two scenes, the sandbox and the live match. Not built: a pre-match screen, menus,
-  keybinding, audio, the arena select, the `Platform` interface.
+- `client`: one 2v2 with three bots, an ally and two enemies, on either
+  arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
+  any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
+  the arena. The HUD has the ring warning and the kill feed, and the result
+  screen has the champion and arena select. Escape opens a menu that pauses
+  the match (Resume, Restart, the select again, and a keys view that rebinds
+  the nine movement and slot keys). The `Platform` interface has its two
+  settings methods, asynchronous, and the browser platform keeps the
+  bindings in `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
+  the `__runProbeFrames` hook. The heap probe measures two scenes, the
+  sandbox and the live match. Not built: a pre-match screen, audio, the
+  scoreboard, the other three `Platform` methods (`identity`,
+  `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon and Skerrow kits; placeholder models for the four roster ids. The
   Lumeth kit is #70.
@@ -102,6 +108,10 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [batch #63 decision 19](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6003600257),
   [the harness](https://github.com/sv-tmueller/claudeline-champions/pull/72#issuecomment-6003754462).
   Recorded in [Bots](bots.md#allocation) and its [API](bots.md#api).
+- The `Platform` settings methods are asynchronous, so the Electron port reaches
+  files over IPC without a signature change, and only those two are built:
+  [batch #80 decision 15](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012436842).
+  Recorded in [Client](client.md#platform-interface).
 
 Planning:
 

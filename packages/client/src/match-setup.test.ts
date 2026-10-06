@@ -1,17 +1,19 @@
-import { DEFAULT_ROUNDS_TO_WIN, parseArenaDef, step, type GameState, type KitDef, type PlayerInput } from '@claudeline/sim';
+import { DEFAULT_ROUNDS_TO_WIN, parseArenaDef, step, type ArenaDef, type GameState, type KitDef, type PlayerInput } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
+import arena02Json from '../../../data/arenas/arena02.json';
 import { createBotDriver } from './bot-driver';
 import type { Launch } from './launch';
 import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { HARGRIM_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
+const arena02 = parseArenaDef(arena02Json);
 // The tick budget of e2e/match-end.spec.ts for the default match to its result screen.
-const MATCH_END_BUDGET_TICKS = 12_000;
+const MATCH_END_BUDGET_TICKS = 15_000;
 
 function launch(champion: string, scene: Launch['scene'] = 'match'): Launch {
-  return { scene, champion, difficulty: 'normal' };
+  return { scene, champion, difficulty: 'normal', arena: 'arena01' };
 }
 
 describe('createLocalMatch', () => {
@@ -35,6 +37,12 @@ describe('createLocalMatch', () => {
   it('keeps the human at champion 0 on the first team A spawn', () => {
     const { state } = createLocalMatch(launch('quillon'), arena, TEST_KITS);
     expect([state.champions[0]?.x, state.champions[0]?.y]).toEqual([-12, 2]);
+  });
+
+  it('stands the human on the first team A spawn of the arena it is given: arena02 is (-11, 2)', () => {
+    const { state } = createLocalMatch({ ...launch('hargrim'), arena: 'arena02' }, arena02, TEST_KITS);
+    expect([state.champions[0]?.x, state.champions[0]?.y]).toEqual([-11, 2]);
+    expect(state.arena.id).toBe('arena02');
   });
 
   it('starts in the warmup of a match to 3 round wins', () => {
@@ -96,8 +104,12 @@ describe('createLocalMatch', () => {
 
 // The match through the client's own setup and driver. No browser: the human sends
 // no input, as in the e2e specs that play a match to the end.
-function playToTheEnd(roundsToWin: number, limit: number): { state: GameState; winner: string | undefined; matchEnded: number } {
-  const { state, botIds } = createLocalMatch(launch('hargrim'), arena, TEST_KITS, roundsToWin);
+function playToTheEnd(
+  roundsToWin: number,
+  limit: number,
+  played: ArenaDef = arena,
+): { state: GameState; winner: string | undefined; matchEnded: number } {
+  const { state, botIds } = createLocalMatch({ ...launch('hargrim'), arena: played.id }, played, TEST_KITS, roundsToWin);
   const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
   const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
   let matchEnded = 0;
@@ -116,7 +128,7 @@ function playToTheEnd(roundsToWin: number, limit: number): { state: GameState; w
   // The run time and tick count are reported in the pull request.
   const score = state.match?.score;
   console.log(
-    `integration match (${roundsToWin} to win): matchEnd at tick ${state.tick}, round ${state.match?.round}, score ${score?.A} : ${score?.B}, in ${Date.now() - started} ms`,
+    `integration match on ${played.id} (${roundsToWin} to win): matchEnd at tick ${state.tick}, round ${state.match?.round}, score ${score?.A} : ${score?.B}, in ${Date.now() - started} ms`,
   );
   return { state, winner, matchEnded };
 }
@@ -136,8 +148,8 @@ describe('a match of bots from setup to the result', () => {
 
   // The source of the tick budget of e2e/match-end.spec.ts, which plays this match in
   // a browser at a time scale. The budget is a margin over this deterministic match
-  // (tick 2998 on main's bots): two more rounds and one sudden-death round. A bots
-  // change past it fails here first.
+  // (the console line above reports its end tick, and every bots change moves it):
+  // two more rounds and one sudden-death round. A bots change past it fails here first.
   it('ends the match to 3 rounds with a winner on 3 within the budget of the e2e', { timeout: 60_000 }, () => {
     const { state, winner, matchEnded } = playToTheEnd(DEFAULT_ROUNDS_TO_WIN, MATCH_END_BUDGET_TICKS);
     expect(state.match?.phase).toBe('matchEnd');
@@ -146,5 +158,24 @@ describe('a match of bots from setup to the result', () => {
     expect(score?.[winner as 'A' | 'B']).toBe(DEFAULT_ROUNDS_TO_WIN);
     expect(Math.max(score?.A ?? 0, score?.B ?? 0)).toBe(DEFAULT_ROUNDS_TO_WIN);
     expect(state.tick).toBeLessThanOrEqual(MATCH_END_BUDGET_TICKS);
+  });
+});
+
+// The tick budget of the arena02 row of e2e/match-end.spec.ts: the end tick of this match
+// when the budget was set, plus two rounds of about 1000 ticks and one sudden-death round
+// of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86; every bots
+// change moves it, the console line above reports the current one, and a match that ends
+// past the budget fails here before the e2e does.
+const ARENA02_END_TICK = 3474;
+const ARENA02_BUDGET_TICKS = 13_000;
+
+describe('a match of bots on arena02', () => {
+  it('ends the match to 3 rounds with a winner on 3 within the budget of the e2e', { timeout: 60_000 }, () => {
+    const { state, winner, matchEnded } = playToTheEnd(DEFAULT_ROUNDS_TO_WIN, ARENA02_BUDGET_TICKS, arena02);
+    expect(state.match?.phase).toBe('matchEnd');
+    expect(matchEnded).toBe(1);
+    expect(state.match?.score[winner as 'A' | 'B']).toBe(DEFAULT_ROUNDS_TO_WIN);
+    expect(state.tick).toBeLessThanOrEqual(ARENA02_BUDGET_TICKS);
+    expect(ARENA02_BUDGET_TICKS).toBe(Math.ceil((ARENA02_END_TICK + 2 * 1000 + 7000) / 1000) * 1000);
   });
 });

@@ -10,6 +10,13 @@ const EPSILON_MS = 1e-6;
 export interface FixedStepClock {
   /** Steps to run for a frame at `nowMs`. The first call and a backwards timestamp give 0. */
   advance(nowMs: number): number;
+  /**
+   * Forgets the last timestamp and the banked time, as if the clock had not been
+   * called yet: the next `advance` returns 0 whatever the gap. The menu calls it
+   * on resume, so the time the page was paused is never caught up. The alpha and
+   * the time scale stay.
+   */
+  reset(): void;
   /** Fraction of a step left over after the last `advance`, in [0, 1). */
   readonly alpha: number;
 }
@@ -32,6 +39,10 @@ export function createFixedStepClock(scale = 1): FixedStepClock {
     last: 0,
     accumulator: 0,
     alpha: 0,
+    reset(): void {
+      this.started = false;
+      this.accumulator = 0;
+    },
     advance(nowMs: number): number {
       const previous = this.last;
       const started = this.started;

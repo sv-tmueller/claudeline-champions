@@ -38,7 +38,7 @@ function kitById(kits: readonly KitDef[], id: string): KitDef {
 
 /**
  * The match the page starts. Champion 0 is the pick of the launch on team A,
- * champion 1 is its ally bot (the other of the two kits) and champions 2 and
+ * champion 1 is its ally bot (the other of Hargrim and Quillon) and champions 2 and
  * 3 are the enemy bots, Hargrim and Quillon. The local team is always A. All
  * four need a kit. The scene `sandbox` is the dev-only scene of the heap probe
  * and the walk spec: the old four-champion roster with the two kits and one bot.

@@ -24,6 +24,19 @@ object per input core and returns it, so a frame allocates nothing; a caller
 that keeps inputs (a replay, a bot) must copy them. `step` copies it through
 `resolveInput`.
 
+Keys match on `event.code`, and the nine movement and slot actions can be
+rebound: `bindings.ts` (pure) holds `Action` (up, left, down, right, SPACE, Q,
+E, R, F), `DEFAULT_BINDINGS` (the table of rules.md section 6), `rebind`
+(refuses a code another action holds, `duplicate`, and a reserved code,
+`reserved`: Escape, Tab, F3, F4, both Shift keys, Control, Alt, Meta and the
+empty code of a key the browser cannot identify) and `keyLabel`. The mouse
+buttons and Shift stay fixed: Shift modifies any slot and is two physical keys
+for one bit. `InputCore` has a `bindings` getter and `setBindings`, and
+translates the physical code of an event into the default code of its action
+before it joins `held`, so `toPlayerInput` and its tables are the same whatever
+the bindings. A key held across a rebinding is cleared by the `releaseAll` the
+menu runs on close. Escape opens the menu (see Menu and keybinding).
+
 Two keys are not game input. F3 toggles the debug overlay. F4 fires a debug
 shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
@@ -39,7 +52,7 @@ not).
 
 ## Launch and match
 
-`main.ts` starts one page, one match. `parseLaunch(location.search, kitIds, import.meta.env.DEV)`
+`main.ts` starts one page, one match. `parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV)`
 in `launch.ts` is the only reader of the address, and it takes the string, so a
 later platform layer can pass its own arguments instead.
 
@@ -47,6 +60,10 @@ later platform layer can pass its own arguments instead.
   kit; anything else reads as the first kit in roster order (Hargrim).
 - `?difficulty=easy|normal|hard`: the tier of all three bots. Anything else
   reads as normal.
+- `?arena=<id>`: the arena of the match, an id with a loaded definition (arena01
+  and arena02); anything else reads as arena01, or as the first loaded id when
+  arena01 is missing. The sandbox ignores it and always plays arena01, since the
+  walk spec and the heap probe stand on its coordinates.
 - `?scene=sandbox`: the dev-only scene of the heap probe and the walk spec,
   honoured only when `import.meta.env.DEV` is true. A production build has one
   scene. The sandbox roster and its read of the address are still in the
@@ -62,17 +79,23 @@ later platform layer can pass its own arguments instead.
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`, so a later kit file joins the match and the champion select
 without a client change. `createMatch` validates them, and a bad kit file shows
-up as a page error. Of the pure modules, only `launch` and `match-setup` take
-the kit list as an argument (`result-dom` takes its ids; `bot-driver`, `models`
-and `roster` take neither), so the unit tests load the two files statically
-instead: `tsconfig.tools.json` has `types: ["node"]` and rejects
+up as a page error. The arenas work the same way: every file under
+`data/arenas/` goes through `parseArenaDef` (a bad file is a page error too),
+sorted by id, and `arenaById` in `arenas.ts` hands the chosen one to
+`createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the id, so
+`arena02.glb` loads with no change in `models.ts`. Of the pure modules, `launch`
+takes the kit ids and the arena ids, `match-setup` takes the kit list and the
+arena, and `result-dom` and `menu-dom` take ids and `{ id, name }` pairs (`bot-driver`,
+`models` and `roster` take none of them), so the unit tests load the files
+statically instead: `tsconfig.tools.json` has `types: ["node"]` and rejects
 `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
 sim's constant, 3):
 
 - Champion 0 is the human, the local pick, on team A. It stays champion 0, so
-  the spawn at (-12, 2) and the e2e coordinates hold.
+  the first team A spawn, (-12, 2) on arena01 and (-11, 2) on arena02, and the
+  e2e coordinates hold.
 - Champion 1 is the ally bot, the other of Quillon and Hargrim (Quillon, or
   Hargrim when the pick is Quillon).
 - Champions 2 and 3 are the enemy bots, Hargrim and Quillon, on team B.
@@ -215,7 +238,7 @@ It has seven elements, named by `data-hud` after
   since the sim emits the deaths before `roundEnded`.
 
 Not built yet: the shield segment on the health bar, the silence state of a
-slot, the scoreboard and the menu.
+slot and the scoreboard.
 
 ### Result screen and champion select
 
@@ -224,23 +247,28 @@ by `result-dom.ts`. Its panel is hidden (`data-visible="false"`) until the phase
 is `matchEnd`, and `ResultScreen.update` (`result-screen.ts`), called after
 `hud.update`, then shows Victory or Defeat (the local team against the team that
 reached `roundsToWin`) and the final score, local first, written once. The panel
-holds the select: one entry per roster id in roster order. An id with a loaded
-kit is a link to `?champion=<id>&difficulty=<current>` (`data-available="true"`);
+holds the select, built by `buildSelect` in `result-dom.ts`, which the menu
+builds again for its own select view. The champion row has one entry per roster id
+in roster order. An id with a loaded kit is a link to
+`?champion=<id>&difficulty=<current>&arena=<current>` (`data-available="true"`);
 following it reloads the page, so the kill feed, the views and the bots start
 fresh and the tick never goes back to 0 within a page. A roster champion without
-a kit file is greyed (`data-available="false"`) until its file exists. There is
-no pre-match screen. Only the visible panel takes pointer events; the HUD takes
-none.
+a kit file is greyed (`data-available="false"`) until its file exists. The arena
+row has one link per loaded arena in id order, labelled with `ArenaDef.name`, to
+`?champion=<current>&difficulty=<current>&arena=<id>` (`data-arena-id`), and the
+arena being played carries `data-current="true"`. There is no pre-match screen. Only
+the visible panel takes pointer events; the HUD takes none.
 
 `e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
-`/?timescale=100` (see Launch and match), with the human idle: a 16 ms frame runs
-96 ticks, so the match of about 3300 ticks is some 35 frames at 5 frames a read,
-where without the scale it would be thousands of frames. It reads the panel hidden
-until `data-phase` is `matchEnd`, then the title, the score (equal to the HUD's),
-the select, takes `result.png` and follows the Quillon link. The headless
-integration test (`match-setup.test.ts`, one round to win and three) gives the
-tick budget, and the result screen's unit tests the Victory and Defeat cases that
-the idle human cannot reach.
+`/?timescale=100` (see Launch and match), once per arena (arena02 on
+`/?arena=arena02&timescale=100`), with the human idle: a 16 ms frame runs 96 ticks,
+so a match of 3000 to 5000 ticks is some 30 to 55 frames at 5 frames a read, where
+without the scale it would be thousands of frames. It reads the panel hidden until
+`data-phase` is `matchEnd`, then the title, the score (equal to the HUD's), the
+select, takes `result.png` and follows the Quillon link, which keeps the arena. The
+headless integration tests (`match-setup.test.ts`: one round to win and three on
+arena01, three on arena02) give the tick budget of each arena, and the result
+screen's unit tests the Victory and Defeat cases that the idle human cannot reach.
 
 `Hud.update` runs once per stepping frame, after all of that frame's sim steps.
 It compares integers and booleans held in cache fields with the new values and
@@ -260,26 +288,81 @@ on the timer.
 1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
 everything, so a right click reaches the canvas. `result.css` follows the same
 rules with `--result-u` and `#result`, and one difference: the visible panel
-takes pointer events. The colours are hex custom properties on `#hud`. Panels
-are neutral black with alpha and every foreground element sits on one, with one
-exception: the ring warning's red edge, an inset shadow in `var(--hud-enemy)`
-along the viewport that shows while the local champion is outside the ring
-(rules.md section 8 asks for an edge, which cannot sit on a panel). The
-warning's text is on a panel. Text is off-white, below 250 in every channel.
-Allies and enemies use the health-bar colours. No colour is blue, purple or
-magenta, none falls in the pixel boxes the e2e specs count (white, the yellow
-ring, the magenta overlay) and none is within 80 of a champion body colour.
-`hud-palette.test.ts` checks all of this over both style sheets.
+takes pointer events. So does `menu.css`, with `--menu-u` and `#menu`. The
+colours are hex custom properties on `#hud`. Panels are neutral black with alpha
+and every foreground element sits on one, with one exception: the ring warning's
+red edge, an inset shadow in `var(--hud-enemy)` along the viewport that shows
+while the local champion is outside the ring (rules.md section 8 asks for an
+edge, which cannot sit on a panel). The warning's text is on a panel. Text is
+off-white, below 250 in every channel. Allies and enemies use the health-bar
+colours. No colour is blue, purple or magenta, none falls in the pixel boxes the
+e2e specs count (white, the yellow ring, the magenta overlay) and none is within
+80 of a champion body colour. `hud-palette.test.ts` checks all of this over the
+three style sheets.
 
 A debug overlay draws collision circles, obstacles, projectiles and line of
 sight. It draws as lines in the 3D scene, not in the HTML HUD, so its shapes
 line up with world-space footprints under the perspective camera.
+
+## Menu and keybinding
+
+A third root, `#menu`, next to `#hud` and `#result`, built once at startup by
+`menu-dom.ts` and hidden. Escape toggles it in every phase (rules.md section 6).
+A pure `Menu` (`menu.ts`) holds the state and takes element handles (the tests
+pass fakes, as for the HUD) and three actions from `main.ts`: `setPaused`,
+`restart` and `releaseInput`. `bindMenu` connects the window keydown (Escape, and
+the key of a capture) and a plain DOM click on each button.
+
+- **Pause.** `setPaused(true)` is `renderer.setAnimationLoop(null)`: no frame runs,
+  so the sim, the bot driver and the views all stop, and the canvas keeps its last
+  picture. `setPaused(false)` calls `clock.reset()` (`loop.ts`) and starts the loop
+  again. After a reset the next `advance` returns 0, so the paused time is never
+  caught up (without it the first frame would run the full 5 steps of a stall). The
+  input is released on open and on close. Pausing this way keeps `frame`, `stepSim`,
+  `draw` and the hook writers as they are: nothing in the menu runs per frame, and
+  its DOM is written only on events. The heap probes never open it.
+- **Resume** is Escape again or the button. **Restart** is `location.reload()`: the
+  address is the setup (champion, difficulty, arena and the dev time scale), and the
+  tick still never goes back to 0 within a page. **Back to select** shows the
+  menu's own select view, the champion and arena links of the result panel built by
+  `buildSelect`, with the match still paused; a pick follows a link and reloads.
+- **Views.** The panel carries `data-visible` and `data-view` (`main`, `select` or
+  `keys`), the sections are `data-section`, and the buttons carry `data-action`
+  (`resume`, `restart`, `select`, `keys`, `back`, `reset`). The panel always opens
+  on the main view.
+- **Keys view.** One row per action (`data-binding=<action>`, `data-part="key"`
+  and a `data-rebind` button) built at startup and written only when its text
+  changes. A click on a rebind button waits for the next key (`data-capturing` on
+  the keys section and the row): a key that applies is saved once, Escape cancels
+  the capture and leaves the menu open, and a duplicate or reserved key sets
+  `data-error` and changes and saves nothing. Reset restores the defaults and
+  saves them.
+- **Pointer.** The menu reads no pointer position and calls no
+  `getBoundingClientRect`. The window `mousemove` listener of the input core keeps
+  setting `input.pointer`, so after a menu click `main.ts:sampleAim` allocates
+  exactly as it does for any mouse (issue #87, not fixed here).
+
+The menu pauses in local matches only. Pausing online is milestone 6.
 
 ## Platform interface
 
 Steam readiness: `Platform { identity(), loadSettings(), saveSettings(),
 unlockAchievement(id), openUrl(url) }`. `BrowserPlatform` is the only
 implementation until milestone 8.
+
+Only the two settings methods are built, in `platform.ts`; `identity`,
+`unlockAchievement` and `openUrl` join with their first user. They return
+Promises, so an Electron renderer reaches files over IPC with no change of
+signature. `Settings` is `{ version: 1, bindings }`. `createBrowserPlatform`
+takes an injected `getItem`/`setItem` pair (`main.ts` passes `window.localStorage`
+from inside a try, since reading it can throw) and keeps one JSON text under the
+key `claudeline-champions.settings`. The store is written only on a rebind or a
+reset, and `main.ts` awaits `loadSettings` and applies the bindings before it
+binds the input. `readSettings` reads the defaults, whole, when the stored text is
+unusable, since a per-field merge could create a duplicate: no text, bad JSON, a
+version other than the number 1, a missing action, or a code that is not a string,
+is reserved or is shared. A throwing `getItem` reads the defaults, and a throwing
+`setItem` resolves after a `console.warn`, because a console error fails every e2e.
 
 ## Steam readiness rules
 

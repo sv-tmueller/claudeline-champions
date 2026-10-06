@@ -39,8 +39,10 @@ port 5173, which Playwright starts itself.
 - `arena.spec.ts`: the arena and the F3 overlay render (`arena.png`,
   `arena-overlay.png`), and `data-arena` is set only after the first draw.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round timer
-  against the tick, the hidden result panel and its champion select, and the
-  launch address `?champion=quillon`.
+  against the tick, the hidden result panel with its champion and arena select, and
+  the launch address `?champion=quillon`. A row on `/?arena=arena02`
+  (`scene-arena02.png`) checks `data-arena` and the human's position, (-1100, 200),
+  which proves the sim got arena02 and not only the hook, and the arena links.
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.
@@ -48,22 +50,38 @@ port 5173, which Playwright starts itself.
   and the heap probe below, on the sandbox.
 - `live-probe.spec.ts`: the heap probe's second scene, the default match at time
   scale 1, no picture (see the heap probe below).
-- `match.spec.ts`: the first round of the default match against bots
-  (`match.png`): input, a projectile and a hit within tick budgets, the timer and
-  the hidden result panel. It asserts budgets only, never an exact tick, since bot
-  output differs between platforms.
-- `match-end.spec.ts`: two tests on the dev-only time scale `?timescale=100`
+- `match.spec.ts`: the first round of the default match against bots, once per
+  arena (`match.png`, and `match-arena02.png` for `/?arena=arena02`): input, a
+  projectile and a hit within tick budgets, the timer and the hidden result panel.
+  It asserts budgets only, never an exact tick, since bot output differs between
+  platforms.
+- `match-end.spec.ts`: tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
-  idle human to its result screen (`result.png`), within 15 000 ticks and 182
-  frames (`ceil(15000 / 96) + 25`; the match ends at tick 5184 in the e2e and
-  5117 in a headless run through the client's setup and driver, on 8d80073), and
-  follows the Quillon link. The other plays the sandbox to
-  the red edge: the ring warning hidden until 600 ticks before the ring, the
-  countdown, the radius text equal to the sim's within 0.1 m and falling, and the
-  red edge (`ring.png`, counted as red pixels against a picture without the edge).
-  Both assert budgets and tick relations from the rules, and the frame budget
-  makes a page without the scale fail at once, however fast the machine is.
+  idle human to its result screen (`result.png`), once per arena
+  (`/?arena=arena02&timescale=100` for arena02), within a budget of ticks and
+  frames per arena: 15 000 and 182 on arena01 (`ceil(15000 / 96) + 25`; it ends
+  at tick 5184 in the e2e and 5117 in a headless run, on 8d80073), 13 000 and 161
+  on arena02. A headless run through the client's setup
+  and driver gives each arena's tick, in `match-setup.test.ts`. The budget is that
+  tick plus two rounds of about 1000 and one round to sudden death of about 7000,
+  rounded up to 1000, and the frames are ceil(ticks / 96) + 25. The test follows
+  the Quillon link of the result panel, which keeps the arena.
+  The other plays the sandbox to the red edge: the ring warning hidden until 600
+  ticks before the ring, the countdown, the radius text equal to the sim's within
+  0.1 m and falling, and the red edge (`ring.png`, counted as red pixels against a
+  picture without the edge). These assert budgets and tick relations from the
+  rules, and the frame budget makes a page without the scale fail at once, however
+  fast the machine is.
+- `menu.spec.ts`: the Escape menu on a paused clock in frames of 16 ms
+  (`menu.png`). The pause: 60 frames under the open menu leave the tick as it was,
+  and the 10 frames after Resume run at most 10 ticks (8 with the clock reset of
+  the resume, 13 without it, which catches up the paused 960 ms to the 5 step cap).
+  Restart reloads the page on the same champion and arena, back to select
+  relaunches on arena02, and a rebinding of right to KeyL is refused on a second
+  action as a duplicate, survives `page.reload()`, moves the champion east on KeyL
+  and not on KeyD, and is reset. The menu is clicked at 1280x720 and the frames run
+  at 320x180.
 
 - Run them with `CI=1`. Without it Playwright reuses whatever listens on 5173,
   which can be a sibling session's dev server serving other code. With `CI=1`

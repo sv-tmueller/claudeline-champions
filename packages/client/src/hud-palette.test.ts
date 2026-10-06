@@ -58,6 +58,7 @@ interface Sheet {
 const SHEETS: readonly Sheet[] = [
   { file: 'hud.css', root: '#hud', prefix: '--hud-', unit: '--hud-u' },
   { file: 'result.css', root: '#result', prefix: '--result-', unit: '--result-u' },
+  { file: 'menu.css', root: '#menu', prefix: '--menu-', unit: '--menu-u' },
 ];
 
 function load(sheet: Sheet) {
@@ -238,6 +239,15 @@ describe('ring warning (hud.css)', () => {
 });
 
 describe('pointer events', () => {
+  it('reach the menu panel only while it is visible', () => {
+    const { rules } = load(SHEETS[2] as Sheet);
+    const root = rules.find((rule) => rule.selector === '#menu');
+    expect(root?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('none');
+    const taking = rules.filter((rule) => rule.declarations.some((d) => d.property === 'pointer-events' && d.value !== 'none'));
+    expect(taking.map((rule) => rule.selector)).toEqual(["#menu [data-menu='panel'][data-visible='true']"]);
+    expect(taking[0]?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('auto');
+  });
+
   it('never reach the HUD, so a right click still reaches the canvas', () => {
     const { rules } = load(SHEETS[0] as Sheet);
     const hud = rules.find((rule) => rule.selector === '#hud');

@@ -9,7 +9,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import arena01Json from '../../../data/arenas/arena01.json';
+import { arenaById } from './arenas';
 import { createBotDriver } from './bot-driver';
 import { CAMERA_VERTICAL_FOV_DEG, fitCamera, groundAimCm, pointerToNdc } from './camera';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
@@ -28,16 +28,26 @@ import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { bindInput, createInputCore } from './input';
 import { capturePoses, createPoses, interpolatePoses } from './interpolate';
 import { createFixedStepClock, STEP_MS } from './loop';
+import { Menu } from './menu';
+import { bindMenu, buildMenu } from './menu-dom';
 import { arenaModelUrl, championModelUrl } from './models';
+import { createBrowserPlatform, type SettingsStorage } from './platform';
 import { buildResult } from './result-dom';
 import { ResultScreen } from './result-screen';
 import './style.css';
 import './hud.css';
 import './result.css';
+import './menu.css';
 
 const HUMAN_ID = 0;
 
-const arena = parseArenaDef(arena01Json);
+// Every arena file under data/arenas joins the match and the select the same
+// way. parseArenaDef validates each one, so a bad file is a page error. Sorted
+// by id, so the order does not depend on the file system.
+const arenas = Object.values(import.meta.glob('../../../data/arenas/*.json', { eager: true, import: 'default' }))
+  .map((json) => parseArenaDef(json))
+  .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+const arenaIds = arenas.map((candidate) => candidate.id);
 
 // Every kit file under data/kits joins the match and the select without a client
 // change. A bad kit file shows up as a page error from createMatch, which
@@ -46,7 +56,8 @@ const kits = (Object.values(
   import.meta.glob('../../../data/kits/*.json', { eager: true, import: 'default' }),
 ) as KitDef[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 const kitIds = kits.map((kit) => kit.id);
-const launch = parseLaunch(location.search, kitIds, import.meta.env.DEV);
+const launch = parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV);
+const arena = arenaById(arenas, launch.arena);
 
 const { state, botIds } = createLocalMatch(launch, arena, kits);
 // The bots think here, in the main thread, once per tick before `step`.
@@ -60,6 +71,9 @@ const hudRoot = document.getElementById('hud');
 if (!hudRoot) throw new Error('missing #hud container');
 const resultRoot = document.getElementById('result');
 if (!resultRoot) throw new Error('missing #result container');
+
+const menuRoot = document.getElementById('menu');
+if (!menuRoot) throw new Error('missing #menu container');
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setClearColor(new Color('#1b2230'));
@@ -91,7 +105,10 @@ scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.
 
 // Built before the models load, so the HUD shows while they do.
 const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
-const result = new ResultScreen(buildResult(resultRoot, kitIds, launch.difficulty), human.team, roundsToWin);
+const result = new ResultScreen(buildResult(resultRoot, kitIds, arenas, launch), human.team, roundsToWin);
+
+// Built hidden, like the result panel. The Menu itself is made at the end, once the loop exists.
+const menuDom = buildMenu(menuRoot, kitIds, arenas, launch);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 
@@ -121,7 +138,19 @@ window.addEventListener('keydown', (event) => {
   renderer.domElement.dataset['overlay'] = overlay.visible ? 'on' : 'off';
 });
 
+/** The browser's storage, or undefined where the browser denies it (reading it can throw). */
+function browserStorage(): SettingsStorage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
 const input = createInputCore();
+const platform = createBrowserPlatform(browserStorage());
+// The saved keys apply before the first key is read.
+input.setBindings((await platform.loadSettings()).bindings);
 bindInput(window, renderer.domElement, input);
 // Dev builds only: Vite replaces the flag with false in a build, and the module
 // goes with it, so a production page has no time scale.
@@ -347,4 +376,22 @@ if (import.meta.env.DEV) {
 // Draw once so the arena and champions are on the canvas before the hook.
 draw(0);
 renderer.domElement.dataset['arena'] = arena.id;
+
+// The Escape menu pauses by stopping the animation loop: no frame runs, so the sim,
+// the bots and the views stop with it, and the canvas keeps its last picture. On
+// resume the clock forgets its last timestamp, so the pause is never caught up.
+// Nothing here runs per frame. Restart reloads the page: the address is the setup.
+const menu = new Menu(menuDom.handles, input, platform, {
+  setPaused(on) {
+    if (on) {
+      renderer.setAnimationLoop(null);
+    } else {
+      clock.reset();
+      renderer.setAnimationLoop(frame);
+    }
+  },
+  restart: () => location.reload(),
+  releaseInput: () => input.releaseAll(),
+});
+bindMenu(window, menu, menuDom.buttons);
 renderer.setAnimationLoop(frame);
