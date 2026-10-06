@@ -75,6 +75,31 @@ Decisions:
 - [ADR-004: script-driven Blender assets](decisions/ADR-004-script-driven-blender-assets.md)
 - [ADR-005: original content](decisions/ADR-005-original-content.md)
 
+Batch decisions that shaped the structure (the ADRs stay as written):
+
+- Kits are JSON data:
+  [#32 d4](https://github.com/sv-tmueller/claudeline-champions/issues/32#issuecomment-5945491586),
+  [#53 d1](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5954741436),
+  [#53 d6](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996621415).
+  Recorded in [ADR-003](decisions/ADR-003-typed-ability-modules.md) and
+  [Simulation](simulation.md#kit-contract-and-registration).
+- The heap probe runs through the dev-only counted frame hook, 640 B, on the
+  sandbox scene:
+  [#53 d9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
+  [#53 d18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236).
+  Recorded in [Testing](testing.md#the-heap-probe).
+- arena01's two deviations are grandfathered:
+  [#63 d14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).
+  Recorded in [the arena design](../design/arenas.md#8-the-arenas) and pinned
+  in `tools/blender/test_arena_principles.py`.
+- The bot think allocates nothing, returns the bot's own record, and has a heap
+  check and an identity harness:
+  [#53 d7](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996786969),
+  [#63 d4](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6001535132),
+  [#63 d19](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6003600257),
+  [the harness](https://github.com/sv-tmueller/claudeline-champions/pull/72#issuecomment-6003754462).
+  Recorded in [Bots](bots.md#allocation).
+
 Planning:
 
 - [Roadmap](../roadmap.md): the nine milestones and their candidate packages.
