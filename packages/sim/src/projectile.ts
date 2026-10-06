@@ -240,7 +240,8 @@ function sweep(state: GameState, p: ProjectileState): boolean {
   const reach = CHAMPION_RADIUS + p.radius;
   const champions = state.champions;
   // An ally-effect projectile touches the owner's team (never the owner); an empty `effects`
-  // beside `allyEffects` makes it pass the other team. Without `allyEffects` only the other team is a candidate.
+  // beside `allyEffects` makes it pass the other team. Without `allyEffects` only the other team
+  // is a candidate.
   const allies = p.allyEffects !== undefined;
   const enemies = !allies || p.effects.length > 0;
   for (let i = 0; i < champions.length; i++) {

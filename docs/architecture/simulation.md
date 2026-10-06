@@ -717,8 +717,9 @@ including `energyGain`) that land on each champion the entity touches.
 `allyEffects` is a projectile-only key: an area, meleeArc, dash, teleport or
 top-level hit effect that carries it fails validation, and so does one inside a
 dash `then`. A hit effect inside an `effects` or `allyEffects` list is copied
-field by field, so a stray key there is dropped. When present it must not be empty; a projectile that has it may have an empty `effects`, which makes it
-ally-only, and one without it must keep `effects` non-empty.
+field by field, so a stray key there is dropped. When present, `allyEffects`
+must not be empty; a projectile that has it may have an empty `effects`, which
+makes it ally-only, and one without it must keep `effects` non-empty.
 
 `createMatch(config, arena, seed, kits = [])` validates every kit it is given
 (an invalid one throws `Invalid kit: <path>: <problem>`), rejects a duplicate id
