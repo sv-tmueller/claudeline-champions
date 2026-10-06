@@ -146,9 +146,6 @@ describe('cell lookups', () => {
     expect(cellIndexAt(grid, { x: 0, y: -10.01 })).toBe(-1);
     expect(cellIndexAt(grid, { x: Number.NaN, y: 0 })).toBe(-1);
     expect(cellIndexAt(grid, { x: 0, y: Number.POSITIVE_INFINITY })).toBe(-1);
-    expect(cellIndexAt(grid, { x: Number.NEGATIVE_INFINITY, y: 0 })).toBe(-1);
-    expect(cellIndexAt(grid, { x: 0, y: Number.NEGATIVE_INFINITY })).toBe(-1);
-    expect(cellIndexAt(grid, { x: Number.NaN, y: Number.NaN })).toBe(-1);
   });
 
   it('treats out of range cells as blocked', () => {

@@ -3,10 +3,13 @@ import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
-import { buildNavGrid, cellCenter } from '../src/grid';
+import { createFollower, followPathInto } from '../src/follow';
+import type { PathFollower } from '../src/follow';
+import { pointBlocked } from '../src/geometry';
+import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
 import type { NavGrid, Vec2 } from '../src/grid';
 import type { Intent } from '../src/intent';
-import { findPath } from '../src/path';
+import type { MoveCommand } from '../src/steer';
 import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './helpers';
 
 /*
@@ -71,7 +74,9 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * double argument or result, Number.isFinite included, and a number written to a closure
  * variable each box there (16 B): the live scene read 1.2 KB a window in bot.ts:aim from one such
  * call. That was measured with a scratch config that is not part of this suite, and no committed
- * test checks it again: Node 22, the CI's, has no Maglev by default. See bots.md, Allocation.
+ * test checks it again: Node 22, the CI's, has no Maglev by default, and its V8 12.4 does not
+ * reproduce the figures even with --maglev --no-turbofan (tens of KB a think, before and after
+ * alike). Only Node 26 and the Chromium of Playwright do. See bots.md, Allocation.
  */
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
 
@@ -82,22 +87,32 @@ const THINK_ALLOCATION_LIMIT_BYTES = 128;
 const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
 
 /**
- * The most heap one plan search may allocate, in bytes: the median over a spread of start and goal
- * pairs across arena01 of the `heapUsed` delta around one `findPath`, minus the median of the same
- * delta around nothing. A plan is outside the steady state above (it runs every 30th think at
- * most, and about every 6th while chasing a moving goal), but in a live match it was the bulk of
- * the bots' bytes: the search allocated its tables, an object per open entry and two cell centres
- * per edge test. The search now runs on scratch that outlives the call, and only its output is
- * allocated: the waypoints `findPath` returns. The limit sits between the figure of the search
- * before that change and the figure after it.
+ * The most heap one plan step of the path follower may allocate, in bytes: the median over a
+ * spread of start and goal pairs across arena01 of the `heapUsed` delta around one
+ * `followPathInto` of a fresh follower (so a plan: `findPath`, the string pull, `splitPath`, the
+ * follower's goal and, at an end in a blocked cell, `nearestFreeCell`), minus the median of the
+ * same delta around nothing. Two spreads: clear (both ends in free cells) and fallback (both ends
+ * at legal points inside blocked cells). A plan is outside the steady state above (it runs every
+ * 30th think at most, and about every 6th while chasing a moving goal), but in a live match it was
+ * the bulk of the bots' bytes: the search allocated its tables, an object per open entry and two
+ * cell centres per edge test. The search now runs on scratch that outlives the call, and what a
+ * plan allocates is its output: the waypoints and the points of the split path, about 46 objects
+ * of 56 B for a path across the arena, which is why the limits sit above 3 KB. They sit between
+ * the figure before the change and the figure after it, close to the latter.
  *
- * Per plan, macOS, Node 22, three rounds: 53112 to 53168 B before (bc1d6f1), 400 to 416 B after.
- * The mutations that put a cost back each go over the limit alone: a fresh object kept in a module
- * variable per edge test reads 18112 B, one per open push 11316 B, one per line of walk of the
- * string pull 1948 B, and three fresh typed arrays per search (the tables the old search made)
- * 952 B. It cannot see one typed array per search (584 B) or one small object.
+ * Per plan, macOS, Node 22, three rounds: clear 55980 to 56340 B before (bc1d6f1), 3128 to 3144 B
+ * after; fallback 39288 to 39796 B before, 2280 to 2288 B after. A fresh six-double object kept in
+ * a module variable goes over the limit alone per edge test (clear 44488 B), per open push
+ * (26056 B), per point of `splitPath` (7600 B), per cell of `nearestFreeCell` (fallback 20436 B)
+ * and per segment of `splitPath` (clear 3448 B, fallback 2808 B). It stays under the limit per
+ * call of `plan`, `findPath` and `pullString` (clear 3232 B, fallback 2448 B), and per call of
+ * `nearestFreeCell` it is 56 B over the fallback limit (2616 B) and invisible on the clear spread.
+ * A typed array per search is not seen either. The limits are close to the clean figures because
+ * the output is most of what a plan reads: a fresh object per path or per call is the documented
+ * limit of this check, the way a two-double point is for the think bound.
  */
-const PLAN_ALLOCATION_LIMIT_BYTES = 640;
+const PLAN_ALLOCATION_LIMIT_BYTES = 3300;
+const PLAN_FALLBACK_LIMIT_BYTES = 2560;
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -331,38 +346,78 @@ describe('think allocation', () => {
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
   });
 
-  it('allocates only the path it returns when it plans, across arena01', () => {
+  it("allocates only the path it plans, across arena01: the follower's whole plan step", () => {
     const grid: NavGrid = buildNavGrid(arena01);
     const free: number[] = [];
-    for (let i = 0; i < grid.blocked.length; i++) if (grid.blocked[i] === false) free.push(i);
-    // A fixed spread of pairs, made before the measured calls so the test allocates nothing in them.
-    const from: Vec2[] = [];
-    const to: Vec2[] = [];
-    for (let i = 0; i < WINDOW; i++) {
-      from.push(cellCenter(grid, free[(i * 211 + 7) % free.length] as number));
-      to.push(cellCenter(grid, free[(i * 389 + 101) % free.length] as number));
-    }
-    for (let pass = 0; pass < 3; pass++) for (let i = 0; i < WINDOW; i++) findPath(grid, from[i] as Vec2, to[i] as Vec2);
-    let best = Infinity;
-    const figures: number[] = [];
-    for (let round = 0; round < ROUNDS; round++) {
-      let empty = 0;
-      for (let i = 0; i < WINDOW; i++) {
-        const before = heap();
-        const path = findPath(grid, from[i] as Vec2, to[i] as Vec2);
-        deltas[i] = heap() - before;
-        if (path.length === 0) empty++;
+    // Legal points inside blocked cells (the cell centre is blocked, the point is not): a bot can
+    // stand there, and `nearestFreeCell` searches the cells around it.
+    const inBlocked: Vec2[] = [];
+    for (let i = 0; i < grid.blocked.length; i++) {
+      if (grid.blocked[i] === false) {
+        free.push(i);
+        continue;
       }
-      // Every pair is a route: a search that found nothing would read low and prove nothing.
-      expect(empty, 'pairs with no route').toBe(0);
-      const figure = median(deltas, WINDOW) - emptyPairMedian();
-      figures.push(figure);
-      best = Math.min(best, figure);
+      const c = cellCenter(grid, i);
+      for (const [dx, dy] of [[0.2, 0.2], [-0.2, 0.2], [-0.2, -0.2], [0.2, -0.2]] as const) {
+        const p = { x: c.x + dx, y: c.y + dy };
+        if (cellIndexAt(grid, p) === i && !pointBlocked(grid, p)) {
+          inBlocked.push(p);
+          break;
+        }
+      }
     }
-    console.log(`plan allocation, findPath over ${WINDOW} pairs: ${figures.map((f) => Math.round(f)).join(', ')} B per plan`);
-    expect(best, `lowest round of the median bytes per plan: ${figures.map(Math.round).join(', ')}`).toBeLessThan(
-      PLAN_ALLOCATION_LIMIT_BYTES,
-    );
+    // Two fixed spreads of pairs, made before the measured calls so the test allocates nothing in
+    // them. Clear: both ends in free cells. Fallback: both ends in blocked cells, so the plan
+    // searches for a free cell at each end.
+    const spread = (cells: number[], a: number, b: number): Vec2[] => {
+      const points: Vec2[] = [];
+      for (let i = 0; i < WINDOW; i++) points.push(cellCenter(grid, cells[(i * a + b) % cells.length] as number));
+      return points;
+    };
+    const spreadOf = (points: Vec2[], a: number, b: number): Vec2[] => {
+      const out: Vec2[] = [];
+      for (let i = 0; i < WINDOW; i++) out.push(points[(i * a + b) % points.length] as Vec2);
+      return out;
+    };
+    const clear = { from: spread(free, 211, 7), to: spread(free, 389, 101), name: 'clear' };
+    const fallback = { from: spreadOf(inBlocked, 31, 3), to: spreadOf(inBlocked, 53, 17), name: 'fallback' };
+    const out: MoveCommand = { moveX: 0, moveY: 0 };
+    const figures: Record<string, number[]> = {};
+    for (const set of [clear, fallback]) {
+      const followers: PathFollower[] = [];
+      const plan = (i: number): void =>
+        followPathInto(out, grid, followers[i] as PathFollower, set.from[i] as Vec2, set.to[i] as Vec2);
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < WINDOW; i++) followers[i] = createFollower();
+        for (let i = 0; i < WINDOW; i++) plan(i);
+      }
+      const rounds: number[] = [];
+      for (let round = 0; round < ROUNDS; round++) {
+        for (let i = 0; i < WINDOW; i++) followers[i] = createFollower();
+        let planned = 0;
+        for (let i = 0; i < WINDOW; i++) {
+          const before = heap();
+          plan(i);
+          deltas[i] = heap() - before;
+          if ((followers[i] as PathFollower).points.length > 0) planned++;
+        }
+        // A plan that found nothing would read low and prove nothing: every clear pair has a
+        // route, and at least half the fallback pairs reach a free cell at both ends.
+        if (set === clear) expect(planned, 'clear pairs with no points').toBe(WINDOW);
+        else expect(planned, 'fallback pairs with points').toBeGreaterThanOrEqual(WINDOW / 2);
+        rounds.push(median(deltas, WINDOW) - emptyPairMedian());
+      }
+      figures[set.name] = rounds;
+    }
+    const lines = Object.entries(figures).map(([name, rounds]) => `${name} ${rounds.map((f) => Math.round(f)).join(', ')}`);
+    console.log(`plan allocation, the follower's plan step over ${WINDOW} pairs: ${lines.join('; ')} B per plan`);
+    for (const [name, rounds] of Object.entries(figures)) {
+      const limit = name === 'clear' ? PLAN_ALLOCATION_LIMIT_BYTES : PLAN_FALLBACK_LIMIT_BYTES;
+      expect(
+        Math.min(...rounds),
+        `lowest round of the median bytes per ${name} plan: ${rounds.map(Math.round).join(', ')}`,
+      ).toBeLessThan(limit);
+    }
   });
 
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {
