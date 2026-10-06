@@ -1,6 +1,7 @@
 import arena01Json from '../../../data/arenas/arena01.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
+import skerrowJson from '../../../data/kits/skerrow.json';
 import {
   Button,
   CHAMPION_RADIUS,
@@ -31,11 +32,13 @@ import { profileFor } from '../src/profile';
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
 
 /**
- * The shipped Hargrim and Quillon kits from `data/kits`, for `createMatch`, which validates them.
- * The JSON is a plain object tree, so the cast is the one the sim's roster test makes.
+ * The shipped Hargrim, Quillon and Skerrow kits from `data/kits`, for `createMatch`, which
+ * validates them and keeps only the kits the players use, so a match without a Skerrow has the
+ * same state as before. The JSON is a plain object tree, so the cast is the one the sim's roster
+ * test makes.
  */
 export function jsonKits(): KitDef[] {
-  return [hargrimJson, quillonJson].map((kit) => structuredClone(kit) as unknown as KitDef);
+  return [hargrimJson, quillonJson, skerrowJson].map((kit) => structuredClone(kit) as unknown as KitDef);
 }
 
 function validAxis(v: number): boolean {
