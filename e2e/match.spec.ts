@@ -48,16 +48,15 @@ async function readHooks(page: Page): Promise<Hooks> {
     const canvas = document.querySelector('canvas');
     if (!canvas) throw new Error('no canvas');
     const d = canvas.dataset;
-    const [x, y] = (d['p0'] ?? '').split(',').map(Number);
     return {
       tick: Number(d['tick']),
       phase: d['phase'] ?? '',
       round: d['round'] ?? '',
-      x: x ?? NaN,
-      y: y ?? NaN,
+      x: Number(d['p0x']),
+      y: Number(d['p0y']),
       projectiles: Number(d['projectiles']),
       hits: Number(d['hits']),
-      bars: (d['bars'] ?? '').split(','),
+      bars: [0, 1, 2, 3].map((id) => d[`bar${id}`] ?? ''),
       timer: document.querySelector('[data-hud="round-timer"]')?.textContent ?? '',
       resultVisible: document.querySelector('[data-result="panel"]')?.getAttribute('data-visible') ?? null,
     };

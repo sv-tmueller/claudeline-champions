@@ -128,18 +128,37 @@ describe('health bars', () => {
     expect(fillOf(bars.group, 3).visible).toBe(true);
   });
 
-  it('reports the fill percent per champion in id order, x when hidden', () => {
+  it('reports the fill percent per champion, -1 when hidden', () => {
     const champions = four();
     const bars = createHealthBars(champions, 'A');
     bars.update(champions, poses(champions));
-    expect(bars.hookText()).toBe('100,100,100,100');
+    expect([0, 1, 2, 3].map((id) => bars.percent(id))).toEqual([100, 100, 100, 100]);
     (champions[2] as ChampionState).health = 90;
     bars.update(champions, poses(champions));
-    expect(bars.hookText()).toBe('100,100,75,100');
+    expect([0, 1, 2, 3].map((id) => bars.percent(id))).toEqual([100, 100, 75, 100]);
     (champions[2] as ChampionState).health = 0;
     (champions[2] as ChampionState).alive = false;
     bars.update(champions, poses(champions));
-    expect(bars.hookText()).toBe('100,100,x,100');
+    expect([0, 1, 2, 3].map((id) => bars.percent(id))).toEqual([100, 100, -1, 100]);
+  });
+
+  it('flags which champion changed in the latest update only', () => {
+    const champions = four();
+    const bars = createHealthBars(champions, 'A');
+    bars.update(champions, poses(champions));
+    expect([0, 1, 2, 3].map((id) => bars.changed(id))).toEqual([true, true, true, true]);
+    bars.update(champions, poses(champions));
+    expect([0, 1, 2, 3].map((id) => bars.changed(id))).toEqual([false, false, false, false]);
+    (champions[2] as ChampionState).health = 90;
+    bars.update(champions, poses(champions));
+    expect([0, 1, 2, 3].map((id) => bars.changed(id))).toEqual([false, false, true, false]);
+    // A health change that rounds to the same percent is not a change.
+    (champions[2] as ChampionState).health = 89.9;
+    bars.update(champions, poses(champions));
+    expect(bars.changed(2)).toBe(false);
+    expect(bars.percent(2)).toBe(75);
+    bars.update(champions, poses(champions));
+    expect(bars.changed(2)).toBe(false);
   });
 
   it('says whether the reported percents changed', () => {

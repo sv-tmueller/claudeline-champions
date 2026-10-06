@@ -9,6 +9,12 @@ Fixed-step accumulator. The sim steps at 60 Hz, rendering runs at the display
 rate and interpolates positions between the last two ticks. Rendering never
 steps the sim.
 
+`createFixedStepClock(scale)` takes an integer time scale, 1 by default, which
+multiplies the elapsed time and the step cap (5 steps per frame, times the
+scale). Only the dev-only launch sets it, from `?timescale=<n>` (1 to 200, see
+Launch and match), so the e2e specs can play a whole match in a few dozen
+frames. A production page always runs at scale 1.
+
 ## Input
 
 Keyboard and mouse map to a `PlayerInput` each tick. Mouse aim is a ray from
@@ -23,10 +29,12 @@ shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
-`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now' packages/client/dist`,
+`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now|timescale' packages/client/dist`,
 which must print nothing. The same guard hides the dev-only probe hook,
 `window.__runProbeFrames`, which `combat.spec.ts` uses to run its heap-probe
-windows (see [testing](testing.md)).
+windows (see [testing](testing.md)), and the time scale of `dev-launch.ts`
+(`timescale` is the string that survives minification: the function names do
+not).
 
 ## Launch and match
 
@@ -40,15 +48,24 @@ later platform layer can pass its own arguments instead.
   reads as normal.
 - `?scene=sandbox`: the dev-only scene of the heap probe and the walk spec,
   honoured only when `import.meta.env.DEV` is true. A production build has one
-  scene.
+  scene. The sandbox roster and its read of the address are still in the
+  production bundle, as unreachable code: `parseLaunch` takes the dev flag as an
+  argument instead of the build dropping the branch. The sandbox keeps its
+  place in `match-setup.ts` for now and moving it behind `import.meta.env.DEV`
+  stays open (the dist grep finds the string `sandbox` for that reason).
+- `?timescale=<n>`: dev-only, read by `dev-launch.ts` (`readDevLaunch`), which
+  `main.ts` calls only as `import.meta.env.DEV ? readDevLaunch(location.search) :
+  undefined`, so a build drops the module. An integer from 1 to 200 is the time
+  scale of the loop clock; anything else reads as 1.
 
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`, so a later kit file joins the match and the champion select
 without a client change. `createMatch` validates them, and a bad kit file shows
-up as a page error. The pure modules (`launch`, `match-setup`, `bot-driver`,
-`models`, `roster`) take the kit list as an argument, so the unit tests load the
-two files statically instead: `tsconfig.tools.json` has `types: ["node"]` and
-rejects `import.meta.glob`.
+up as a page error. Of the pure modules, only `launch` and `match-setup` take
+the kit list as an argument (`result-dom` takes its ids; `bot-driver`, `models`
+and `roster` take neither), so the unit tests load the two files statically
+instead: `tsconfig.tools.json` has `types: ["node"]` and rejects
+`import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
 sim's constant, 3):
@@ -107,22 +124,30 @@ sim steps first and the views read its state afterwards.
   and the faded dead grey.
 - `debug-shot.ts`: the dev-only F4 shot above.
 - `bot-driver.ts`, `match-setup.ts` and `launch.ts`: see Launch and match.
-- Canvas data hooks: `data-tick`, `data-p0`, `data-f0`, `data-projectiles`,
-  `data-areas`, `data-hits`, `data-deaths`, `data-flashing`, `data-rings`,
-  `data-bars`, `data-overlay`, `data-debugShots`, `data-phase` (the sim's phase
+- Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's position
+  in centimetres), `data-f0` (its facing in radians, three decimals),
+  `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
+  `data-rings`, `data-bar0` to `data-bar3` (a champion's fill percent, "x" for a
+  hidden bar), `data-overlay`, `data-debugShots`, `data-phase` (the sim's phase
   string: warmup, round, roundEnd or matchEnd), `data-round` and the readiness
   flags `data-rendered` and `data-arena`. The e2e specs read them and pace
-  themselves by `data-tick`. A hook is written only when its value changes.
+  themselves by `data-tick`. A per-tick hook is written only when its value
+  changes, with `setAttribute` and text from the tables of `hook-text.ts`
+  (integers, signed centimetres, facing in milliradians, percents) and
+  `flashTexts` in `feedback.ts`, all made once at startup, so a change write
+  builds no string. A table falls back to the formatter past its range. A position
+  is two hooks and a bar is one hook per champion because a combined "x,y" or
+  "a,b,c,d" text cannot come from a table.
 
-The frame path allocates nothing in steady state: views are pooled, text is
-written only on a change, and the numbers a frame carries live in object
-fields. The combat spec measures it with a heap probe, see
+The frame path allocates nothing in steady state: views are pooled, text comes
+from tables and is written only on a change, and the numbers a frame carries live
+in object fields. The combat spec measures it with a heap probe, see
 [testing](testing.md). A match of bots is never in a steady state: hook and HUD
-values change in every window, and a change write that builds a string
-(`flashText`, `hookText`, the `p0` and `f0` hooks, the health and energy
-templates, the score) allocates by design. So the probe runs in the sandbox,
-where a casting champion in a stationary scene keeps the writes to a table of
-constants. The HUD writes its state with `setAttribute` and not `dataset`: in the
+values change in every window. The change writes come from tables and so build
+no string, but the probe still runs in the sandbox, where a casting champion in a
+stationary scene changes almost nothing. A probe scene on the live match, which
+would count those table writes with real changes, is issue #77 (batch 8).
+The HUD writes its state with `setAttribute` and not `dataset`: in the
 probe a `dataset` write allocated about 100 B per window whenever a slot
 changed, and `setAttribute` allocated none.
 
@@ -142,9 +167,9 @@ same commit.
 ## HUD
 
 An HTML and CSS overlay under `#hud`, built once at startup by `hud-dom.ts`.
-It has six elements, named by `data-hud` after
+It has seven elements, named by `data-hud` after
 [rules.md](../design/rules.md) section 8: `health-bar`, `energy-bar`,
-`cooldown-icons`, `round-score`, `round-timer` and `kill-feed`.
+`cooldown-icons`, `round-score`, `round-timer`, `ring-warning` and `kill-feed`.
 
 - Health bar: the local champion's health as `ceil(health) / maxHealth` and a
   fill.
@@ -165,14 +190,26 @@ It has six elements, named by `data-hud` after
   0:00; once `match.ring` exists it shows "Sudden death" and the timer's
   `data-sudden` is true (rules.md section 8). After a round and after the match
   it keeps its last text. A state without `match` reads 0 : 0 and 1:30.
+- Ring warning: a `RingView` read from `state.match` and the local champion by
+  `readRingView` (`hud-views.ts`), visible only in the round phase. In the 600
+  ticks before sudden death it counts down "Sudden death in 10" to 1 from
+  `phaseTicks` (one tick before the ring is made it still reads 1, since the sim
+  makes the ring in the step that starts at 5400 phase ticks). Once `match.ring`
+  exists it shows "Ring 18.0 m", the ring's own radius, which falls to 3.0 m. While
+  the local champion is alive and outside the ring (`dx² + dy² > r²`, the sim's
+  own test: exactly on the radius is inside) `data-outside` is true: the distance
+  past the edge shows ("1.3 m outside") and a red edge draws along the viewport.
+  The element carries `data-visible`, `data-counting` and `data-outside`, and the
+  spans `ring-countdown`, `ring-radius` and `ring-distance`. Lengths are
+  decimetres from the table of `hook-text.ts` (`dmText`).
 - Kill feed: up to 5 lines for 300 ticks each. `feedback.ts` pushes a death as
   killer and victim, and names come from `roster.ts`. `routeEvents` makes no ring
   for a `projectileExpired` with the reason `roundEnd`: that shot was cut off by
   the round, and nothing was hit. The deciding death still reaches the feed,
   since the sim emits the deaths before `roundEnded`.
 
-Not built yet: the ring warning, the shield segment on the health bar, the
-silence state of a slot, the scoreboard and the menu.
+Not built yet: the shield segment on the health bar, the silence state of a
+slot, the scoreboard and the menu.
 
 ### Result screen and champion select
 
@@ -184,37 +221,49 @@ reached `roundsToWin`) and the final score, local first, written once. The panel
 holds the select: one entry per roster id in roster order. An id with a loaded
 kit is a link to `?champion=<id>&difficulty=<current>` (`data-available="true"`);
 following it reloads the page, so the kill feed, the views and the bots start
-fresh and the tick never goes back to 0 within a page. Lumeth and Skerrow are
-greyed (`data-available="false"`) until their kit files exist. There is no
-pre-match screen. Only the visible panel takes pointer events; the HUD takes
+fresh and the tick never goes back to 0 within a page. A roster champion without
+a kit file is greyed (`data-available="false"`) until its file exists. There is
+no pre-match screen. Only the visible panel takes pointer events; the HUD takes
 none.
 
-No e2e plays a match to the end: a full match of bots is thousands of ticks, and
-a tick is one 17 to 24 ms frame at the probe viewport on the runner. The
-evidence is a headless integration test through the client's own setup and
-driver (`match-setup.test.ts`, one round to win), the result screen's unit tests
-and the e2e check that the hidden panel and its select exist.
+`e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
+`/?timescale=100` (see Launch and match), with the human idle: a 16 ms frame runs
+96 ticks, so the match of about 3300 ticks is some 35 frames at 5 frames a read,
+where without the scale it would be thousands of frames. It reads the panel hidden
+until `data-phase` is `matchEnd`, then the title, the score (equal to the HUD's),
+the select, takes `result.png` and follows the Quillon link. The headless
+integration test (`match-setup.test.ts`, one round to win and three) gives the
+tick budget, and the result screen's unit tests the Victory and Defeat cases that
+the idle human cannot reach.
 
 `Hud.update` runs once per stepping frame, after all of that frame's sim steps.
 It compares integers and booleans held in cache fields with the new values and
 writes the DOM only when one changed, so a steady frame writes and allocates
-nothing. The kill feed counts its pushes and expiries, and the HUD skips its
-line loop while that count has not moved. The e2e specs read the states from
-data attributes: `data-ready`, `data-windup` and `data-blocked` on a slot,
-`data-ready` on an energy mark, `data-visible` on a kill-feed line,
-`data-team` on its names and `data-sudden` on the timer.
+nothing. The texts come from tables made in the constructor: the health text and
+fill per whole health up to the local champion's maximum, the energy fill per
+whole energy, and the score per pair up to the rounds to win (`scoreTexts` in
+`hud-views.ts`, shared with the result screen). A value past a table builds its
+text, so nothing is wrong outside the range, only slower. The kill feed counts
+its pushes and expiries, and the HUD skips its line loop while that count has
+not moved. The e2e specs read the states from data attributes: `data-ready`,
+`data-windup` and `data-blocked` on a slot, `data-ready` on an energy mark,
+`data-visible` on a kill-feed line, `data-team` on its names and `data-sudden`
+on the timer.
 
-`hud.css` sizes everything from one viewport unit, `--hud-u`
-(`min(1vw, 1.78vh)`), so the HUD scales with the window, and sets
-`pointer-events: none` on everything, so a right click reaches the canvas.
-`result.css` follows the same rules with `--result-u` and `#result`, and one
-difference: the visible panel takes pointer events. The
-colours are hex custom properties on `#hud`. Panels are neutral black with
-alpha and every foreground element sits on one. Text is off-white, below 250 in
-every channel. Allies and enemies use the health-bar colours. No colour is blue,
-purple or magenta, none falls in the pixel boxes the e2e specs count (white,
-the yellow ring, the magenta overlay) and none is within 80 of a champion body
-colour. `hud-palette.test.ts` checks all of this over both style sheets.
+`hud.css` sizes everything from one viewport unit, `--hud-u` (`min(1vw,
+1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
+everything, so a right click reaches the canvas. `result.css` follows the same
+rules with `--result-u` and `#result`, and one difference: the visible panel
+takes pointer events. The colours are hex custom properties on `#hud`. Panels
+are neutral black with alpha and every foreground element sits on one, with one
+exception: the ring warning's red edge, an inset shadow in `var(--hud-enemy)`
+along the viewport that shows while the local champion is outside the ring
+(rules.md section 8 asks for an edge, which cannot sit on a panel). The
+warning's text is on a panel. Text is off-white, below 250 in every channel.
+Allies and enemies use the health-bar colours. No colour is blue, purple or
+magenta, none falls in the pixel boxes the e2e specs count (white, the yellow
+ring, the magenta overlay) and none is within 80 of a champion body colour.
+`hud-palette.test.ts` checks all of this over both style sheets.
 
 A debug overlay draws collision circles, obstacles, projectiles and line of
 sight. It draws as lines in the 3D scene, not in the HTML HUD, so its shapes

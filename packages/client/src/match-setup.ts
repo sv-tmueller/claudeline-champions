@@ -17,8 +17,10 @@ export interface LocalMatch {
   botIds: readonly number[];
 }
 
-// The sandbox of the e2e specs: Lumeth and Skerrow have no kit file yet and
-// must not get one later by accident, so the scene names its two kits itself.
+// The sandbox of the e2e specs: its roster has Lumeth and Skerrow on team B, and
+// the scene names exactly the Hargrim and Quillon kits itself, so a kit file that
+// joins the match later never changes the scene (champion 3 stays a bot without a
+// kit, which deals no damage).
 const SANDBOX_PLAYERS: readonly PlayerConfig[] = [
   { championId: 'hargrim', team: 'A' },
   { championId: 'quillon', team: 'A' },

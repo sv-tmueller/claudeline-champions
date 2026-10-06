@@ -17,7 +17,7 @@ npm run check                    # lint, typecheck, unit tests, asset checks, Pl
 npm run test                     # Vitest unit tests (all projects)
 npm run lint                     # ESLint, includes the package boundary rules
 npm run typecheck                # tsc for sim, bots, client and the tools/tests config
-npm run e2e                      # Playwright e2e; screenshots scene.png, arena.png, arena-overlay.png, walk.png, combat.png, match.png in test-results/*/
+npm run e2e                      # Playwright e2e; screenshots scene.png, arena.png, arena-overlay.png, walk.png, combat.png, match.png, result.png, ring.png in test-results/*/
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
 npm run build                    # production client bundle; CI runs it, check does not

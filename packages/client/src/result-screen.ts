@@ -1,5 +1,6 @@
 import type { MatchState, TeamId } from '@claudeline/sim';
 import type { HudElement } from './hud';
+import { scoreIndex, scoreTexts } from './hud-views';
 
 /** The elements of the result panel that change: the panel itself, the title and the score. */
 export interface ResultHandles {
@@ -31,11 +32,16 @@ export class ResultScreen {
   private won = -1;
   private localScore = -1;
   private otherScore = -1;
+  // The text of every score up to the rounds to win, made once by `scoreTexts`, as the HUD's is.
+  private readonly scoreTable: string[];
 
   constructor(
     private readonly handles: ResultHandles,
     private readonly localTeam: TeamId,
-  ) {}
+    private readonly roundsToWin: number,
+  ) {
+    this.scoreTable = scoreTexts(roundsToWin);
+  }
 
   update(state: ResultState): void {
     const match = state.match;
@@ -56,7 +62,7 @@ export class ResultScreen {
     if (local !== this.localScore || other !== this.otherScore) {
       this.localScore = local;
       this.otherScore = other;
-      this.handles.score.textContent = `${local} : ${other}`;
+      this.handles.score.textContent = this.scoreTable[scoreIndex(this.roundsToWin, local, other)] ?? `${local} : ${other}`;
     }
     if (this.visible !== 1) {
       this.visible = 1;

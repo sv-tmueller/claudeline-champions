@@ -18,11 +18,10 @@ async function readSim(page: Page): Promise<Sim> {
   return page.evaluate(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) throw new Error('no canvas');
-    const [x, y] = (canvas.dataset['p0'] ?? '').split(',').map(Number);
     return {
       tick: Number(canvas.dataset['tick']),
-      x: x ?? NaN,
-      y: y ?? NaN,
+      x: Number(canvas.dataset['p0x']),
+      y: Number(canvas.dataset['p0y']),
       facing: Number(canvas.dataset['f0']),
     };
   });

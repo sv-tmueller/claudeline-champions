@@ -10,7 +10,7 @@ import { TEST_KITS } from './test-kits';
 function rig() {
   const elements = { panel: fake(), title: fake(), score: fake() };
   const handles: ResultHandles = elements;
-  return { screen: new ResultScreen(handles, 'A'), elements };
+  return { screen: new ResultScreen(handles, 'A', 3), elements };
 }
 
 function matchAt(phase: MatchPhase, score: { A: number; B: number }, roundsToWin = 3): { match: MatchState } {
@@ -52,7 +52,7 @@ describe('result screen', () => {
 
   it('shows the score of the local team first', () => {
     const elements = { panel: fake(), title: fake(), score: fake() };
-    new ResultScreen(elements, 'B').update(matchAt('matchEnd', { A: 1, B: 3 }));
+    new ResultScreen(elements, 'B', 3).update(matchAt('matchEnd', { A: 1, B: 3 }));
     expect(elements.title.log).toEqual(['text=Victory']);
     expect(elements.score.log).toEqual(['text=3 : 1']);
   });

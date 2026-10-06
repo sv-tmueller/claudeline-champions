@@ -97,3 +97,90 @@ export const TIMER_TEXT: readonly string[] = (() => {
   }
   return text;
 })();
+
+/**
+ * The index of the score `a : b` in `scoreTexts(roundsToWin)`, or -1 for a score
+ * past the rounds to win (the table has no entry there, so a caller falls back).
+ */
+export function scoreIndex(roundsToWin: number, a: number, b: number): number {
+  if (a < 0 || b < 0 || a > roundsToWin || b > roundsToWin) return -1;
+  return a * (roundsToWin + 1) + b;
+}
+
+/**
+ * The text "a : b" of every score from 0 : 0 to `roundsToWin` : `roundsToWin`,
+ * made once at startup and indexed by `scoreIndex`. The HUD and the result
+ * screen share it, so writing a score builds no string.
+ */
+export function scoreTexts(roundsToWin: number): string[] {
+  const texts: string[] = [];
+  for (let a = 0; a <= roundsToWin; a++) {
+    for (let b = 0; b <= roundsToWin; b++) texts.push(`${a} : ${b}`);
+  }
+  return texts;
+}
+
+/** The ring warning counts down from this many ticks before sudden death: 10 s (rules.md section 8). */
+export const RING_COUNTDOWN_TICKS = 10 * TICK_RATE;
+
+/** What the HUD shows of the ring, read from `state.match` and the local champion. */
+export interface RingView {
+  /** The countdown or the ring is showing: only in the round phase. */
+  visible: boolean;
+  /** Whole seconds until sudden death, 10 down to 1; 0 once the ring exists. */
+  countdown: number;
+  /** The ring radius in decimetres, 0 until the ring exists. */
+  radiusDm: number;
+  /** How far the local champion is from the ring edge in decimetres, 0 until the ring exists. */
+  distanceDm: number;
+  /** The local champion is alive and outside the ring: the sim's own test, `dx² + dy² > r²`. */
+  outside: boolean;
+}
+
+export function createRingView(): RingView {
+  return { visible: false, countdown: 0, radiusDm: 0, distanceDm: 0, outside: false };
+}
+
+/** What the ring view reads from a champion: the sim's own fields. */
+export type RingSource = Pick<ChampionState, 'x' | 'y' | 'alive'>;
+
+/**
+ * Fills `out` for the champion `localId`. The warning shows only in the round
+ * phase: as a countdown from `RING_COUNTDOWN_TICKS` ticks before the ring, and
+ * from then on as the ring's radius with the local champion's distance to its
+ * edge. A champion exactly on the radius is inside, as in the sim (flow.ts), and
+ * a dead one is never outside. The radius is the ring's own, which falls in
+ * sudden death, not the arena's starting radius. Allocates nothing.
+ */
+export function readRingView(
+  state: { match?: MatchState; champions: readonly RingSource[] },
+  localId: number,
+  out: RingView,
+): void {
+  out.visible = false;
+  out.countdown = 0;
+  out.radiusDm = 0;
+  out.distanceDm = 0;
+  out.outside = false;
+  const match = state.match;
+  if (match === undefined || match.phase !== 'round') return;
+  const ring = match.ring;
+  if (ring === null) {
+    const left = ROUND_TICKS - match.phaseTicks;
+    if (left > RING_COUNTDOWN_TICKS) return;
+    out.visible = true;
+    // The sim creates the ring in the step that starts at ROUND_TICKS phase ticks, so a
+    // frame can read 0 left with no ring yet: that tick still shows 1.
+    out.countdown = Math.max(1, Math.ceil(left / TICK_RATE));
+    return;
+  }
+  out.visible = true;
+  out.radiusDm = Math.round(ring.radius * 10);
+  const champion = state.champions[localId];
+  if (champion === undefined || !champion.alive) return;
+  const dx = champion.x - ring.x;
+  const dy = champion.y - ring.y;
+  const squared = dx * dx + dy * dy;
+  out.outside = squared > ring.radius * ring.radius;
+  out.distanceDm = Math.round(Math.abs(Math.sqrt(squared) - ring.radius) * 10);
+}

@@ -2,14 +2,21 @@ import { EX_ENERGY_COST, MAX_ENERGY, ULTIMATE_ENERGY_COST, type MatchState, type
 import {
   SUDDEN_DEATH_TEXT,
   TIMER_TEXT,
+  createRingView,
   createRoundView,
   createSlotViews,
+  readRingView,
   readRoundView,
   readSlotViews,
+  scoreIndex,
+  scoreTexts,
+  type RingSource,
+  type RingView,
   type RoundView,
   type SlotSource,
   type SlotView,
 } from './hud-views';
+import { dmText, intText } from './hook-text';
 import { KILL_FEED_LINES, type KillFeed } from './kill-feed';
 import { championName } from './roster';
 
@@ -36,6 +43,8 @@ export interface HudHandles {
   slots: readonly { icon: HudElement; seconds: HudElement }[];
   score: HudElement;
   timer: HudElement;
+  /** The ring warning: its root carries the flags, the three spans carry the values. */
+  ring: { root: HudElement; countdown: HudElement; radius: HudElement; distance: HudElement };
   /** `KILL_FEED_LINES` lines, the oldest first. */
   lines: readonly { line: HudElement; killer: HudElement; victim: HudElement }[];
 }
@@ -45,7 +54,7 @@ export interface HudState {
   tick: number;
   /** Absent in free play, which reads as 0 : 0 and a full round. */
   match?: MatchState;
-  champions: readonly (SlotSource & { health: number; maxHealth: number })[];
+  champions: readonly (SlotSource & RingSource & { health: number; maxHealth: number })[];
 }
 
 const RING_NAME = 'Ring';
@@ -62,6 +71,10 @@ const SECONDS_TEXT: readonly string[] = Array.from({ length: 100 }, (_, seconds)
   seconds === 0 ? '' : String(seconds),
 );
 
+function healthFill(key: number, max: number): string {
+  return `scaleX(${max > 0 ? Math.min(Math.max(key / max, 0), 1) : 0})`;
+}
+
 function flag(value: boolean): string {
   return value ? TRUE : FALSE;
 }
@@ -74,9 +87,19 @@ function flag(value: boolean): string {
  */
 export class Hud {
   private readonly names: string[];
+  // The texts of the local champion's health (a whole health from 0 to the maximum
+  // it was built for), the energy fill (0 to MAX_ENERGY) and the score, made once.
+  // A value past a table falls back to the template.
+  private readonly tableMaxHealth: number;
+  private readonly healthTexts: string[] = [];
+  private readonly healthFills: string[] = [];
+  private readonly energyFills: string[] = [];
+  private readonly scoreTable: string[];
+  private readonly roundsToWin: number;
   private readonly sides: string[];
   private readonly slotViews: SlotView[] = createSlotViews();
   private readonly round: RoundView = createRoundView();
+  private readonly ringView: RingView = createRingView();
 
   private healthKey = -1;
   private maxHealth = -1;
@@ -88,6 +111,14 @@ export class Hud {
   // 0 to 90 for the seconds shown, SUDDEN_KEY for the sudden death text, -1 for not written yet.
   private timerKey = -1;
   private suddenFlag = -1;
+  // The ring warning is built hidden, not counting and not outside, so each flag
+  // starts at 0 and the first update writes nothing for it. The values start at -1.
+  private ringVisible = 0;
+  private ringCounting = 0;
+  private ringOutside = 0;
+  private ringCountdown = -1;
+  private ringRadius = -1;
+  private ringDistance = -1;
   private readonly slotSeconds: number[] = [];
   private readonly slotReady: number[] = [];
   private readonly slotWindup: number[] = [];
@@ -99,11 +130,20 @@ export class Hud {
 
   constructor(
     private readonly handles: HudHandles,
-    champions: readonly { championId: string; team: TeamId }[],
+    champions: readonly { championId: string; team: TeamId; maxHealth: number }[],
     private readonly localId: number,
     private readonly killFeed: KillFeed,
+    roundsToWin: number,
   ) {
     const localTeam = champions[localId]?.team;
+    this.tableMaxHealth = champions[localId]?.maxHealth ?? 0;
+    for (let key = 0; key <= this.tableMaxHealth; key++) {
+      this.healthTexts.push(`${key} / ${this.tableMaxHealth}`);
+      this.healthFills.push(healthFill(key, this.tableMaxHealth));
+    }
+    for (let key = 0; key <= MAX_ENERGY; key++) this.energyFills.push(`scaleX(${key / MAX_ENERGY})`);
+    this.roundsToWin = roundsToWin;
+    this.scoreTable = scoreTexts(roundsToWin);
     this.names = champions.map((champion) => championName(champion.championId));
     this.sides = champions.map((champion) => (champion.team === localTeam ? SIDE_ALLY : SIDE_ENEMY));
     for (let i = 0; i < this.slotViews.length; i++) {
@@ -127,6 +167,7 @@ export class Hud {
       this.updateSlots(champion);
     }
     this.updateRound(state);
+    this.updateRing(state);
     this.updateKillFeed(state.tick);
   }
 
@@ -136,15 +177,19 @@ export class Hud {
     if (key === this.healthKey && max === this.maxHealth) return;
     this.healthKey = key;
     this.maxHealth = max;
-    this.handles.healthText.textContent = `${key} / ${max}`;
-    this.handles.healthFill.style.transform = `scaleX(${max > 0 ? Math.min(Math.max(key / max, 0), 1) : 0})`;
+    // The tables hold a whole health of the maximum the HUD was built for; any other
+    // health or maximum builds its text.
+    const tabled = max === this.tableMaxHealth ? this.healthTexts[key] : undefined;
+    this.handles.healthText.textContent = tabled ?? `${key} / ${max}`;
+    this.handles.healthFill.style.transform =
+      tabled !== undefined ? (this.healthFills[key] as string) : healthFill(key, max);
   }
 
   private updateEnergy(energy: number): void {
     const key = Math.floor(Math.min(Math.max(energy, 0), MAX_ENERGY));
     if (key !== this.energyKey) {
       this.energyKey = key;
-      this.handles.energyFill.style.transform = `scaleX(${key / MAX_ENERGY})`;
+      this.handles.energyFill.style.transform = this.energyFills[key] ?? `scaleX(${key / MAX_ENERGY})`;
     }
     const ex = energy >= EX_ENERGY_COST ? 1 : 0;
     if (ex !== this.exReady) {
@@ -192,7 +237,8 @@ export class Hud {
     if (round.scoreA !== this.scoreA || round.scoreB !== this.scoreB) {
       this.scoreA = round.scoreA;
       this.scoreB = round.scoreB;
-      this.handles.score.textContent = `${round.scoreA} : ${round.scoreB}`;
+      this.handles.score.textContent =
+        this.scoreTable[scoreIndex(this.roundsToWin, round.scoreA, round.scoreB)] ?? `${round.scoreA} : ${round.scoreB}`;
     }
     // Outside the round phases the timer keeps what it shows.
     if (!round.live) return;
@@ -205,6 +251,47 @@ export class Hud {
     if (sudden !== this.suddenFlag) {
       this.suddenFlag = sudden;
       this.handles.timer.setAttribute('data-sudden', flag(sudden === 1));
+    }
+  }
+
+  private updateRing(state: HudState): void {
+    const view = this.ringView;
+    const ring = this.handles.ring;
+    readRingView(state, this.localId, view);
+    const visible = view.visible ? 1 : 0;
+    if (visible !== this.ringVisible) {
+      this.ringVisible = visible;
+      ring.root.setAttribute('data-visible', flag(visible === 1));
+    }
+    // Hidden: keep the last values, the next round writes only what differs.
+    if (visible === 0) return;
+    const counting = view.countdown > 0 ? 1 : 0;
+    if (counting !== this.ringCounting) {
+      this.ringCounting = counting;
+      ring.root.setAttribute('data-counting', flag(counting === 1));
+    }
+    // Written in the countdown too (never outside then), so a flag left over from the
+    // last round clears in the update that shows the warning again.
+    const outside = view.outside ? 1 : 0;
+    if (outside !== this.ringOutside) {
+      this.ringOutside = outside;
+      ring.root.setAttribute('data-outside', flag(outside === 1));
+    }
+    if (counting === 1) {
+      if (view.countdown !== this.ringCountdown) {
+        this.ringCountdown = view.countdown;
+        ring.countdown.textContent = intText(view.countdown);
+      }
+      return;
+    }
+    if (view.radiusDm !== this.ringRadius) {
+      this.ringRadius = view.radiusDm;
+      ring.radius.textContent = dmText(view.radiusDm);
+    }
+    // The distance shows only outside the ring, so inside it is not written.
+    if (outside === 1 && view.distanceDm !== this.ringDistance) {
+      this.ringDistance = view.distanceDm;
+      ring.distance.textContent = dmText(view.distanceDm);
     }
   }
 

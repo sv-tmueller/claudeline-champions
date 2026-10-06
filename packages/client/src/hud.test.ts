@@ -20,6 +20,7 @@ interface Rig {
     slots: { icon: Fake; seconds: Fake }[];
     score: Fake;
     timer: Fake;
+    ring: { root: Fake; countdown: Fake; radius: Fake; distance: Fake };
     lines: { line: Fake; killer: Fake; victim: Fake }[];
   };
 }
@@ -49,11 +50,12 @@ function rig(): Rig {
     slots: SLOTS.map(() => ({ icon: fake(), seconds: fake() })),
     score: fake(),
     timer: fake(),
+    ring: { root: fake(), countdown: fake(), radius: fake(), distance: fake() },
     lines: Array.from({ length: KILL_FEED_LINES }, () => ({ line: fake(), killer: fake(), victim: fake() })),
   };
   const feed = createKillFeed();
   const handles: HudHandles = elements;
-  const hud = new Hud(handles, state.champions, 0, feed);
+  const hud = new Hud(handles, state.champions, 0, feed, 3);
   return { hud, state, feed, elements };
 }
 
@@ -67,6 +69,10 @@ function allElements(elements: Rig['elements']): Fake[] {
     ...elements.slots.flatMap((slot) => [slot.icon, slot.seconds]),
     elements.score,
     elements.timer,
+    elements.ring.root,
+    elements.ring.countdown,
+    elements.ring.radius,
+    elements.ring.distance,
     ...elements.lines.flatMap((line) => [line.line, line.killer, line.victim]),
   ];
 }
@@ -155,6 +161,16 @@ describe('HUD health', () => {
     expect(writeCount(elements)).toBe(2);
   });
 
+  it('writes the template text and fill for every whole health from 0 to the maximum', () => {
+    const { hud, state, elements } = rig();
+    for (let health = 0; health <= 160; health++) {
+      local(state).health = health;
+      hud.update(state);
+      expect(elements.healthText.log.at(-1), `health ${health}`).toBe(`text=${health} / 160`);
+      expect(elements.healthFill.log.at(-1), `health ${health}`).toBe(`transform=scaleX(${health / 160})`);
+    }
+  });
+
   it('shows 1 for health 0.2 and 0 for none', () => {
     const { hud, state, elements } = rig();
     hud.update(state);
@@ -212,6 +228,15 @@ describe('HUD energy', () => {
     expect(elements.energyFill.log).toEqual(['transform=scaleX(0.25)']);
     expect(elements.ultimateMark.log).toEqual([]);
     expect(writeCount(elements)).toBe(2);
+  });
+
+  it('writes the template fill for every whole energy from 0 to 100', () => {
+    const { hud, state, elements } = rig();
+    for (let energy = 0; energy <= 100; energy++) {
+      local(state).energy = energy;
+      hud.update(state);
+      expect(elements.energyFill.log.at(-1), `energy ${energy}`).toBe(`transform=scaleX(${energy / 100})`);
+    }
   });
 
   it('flips the ultimate mark and unblocks F once at 100', () => {
@@ -389,6 +414,17 @@ describe('HUD round', () => {
     hud.update(state);
     hud.update(state);
     expect(elements.score.log).toEqual(['text=0 : 0', 'text=1 : 0']);
+  });
+
+  it('writes the score for a match of one round to win and past the rounds to win', () => {
+    const { elements, state, feed } = rig();
+    const hud = new Hud(elements, state.champions, 0, feed, 1);
+    match(state).score = { A: 1, B: 0 };
+    hud.update(state);
+    // A score past the table falls back to the template, whatever the rounds to win.
+    match(state).score = { A: 4, B: 2 };
+    hud.update(state);
+    expect(elements.score.log).toEqual(['text=1 : 0', 'text=4 : 2']);
   });
 
   it('reads a state without match flow as 0 : 0 and 1:30', () => {
