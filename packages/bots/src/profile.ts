@@ -1,5 +1,5 @@
-import type { KitDef, Slot } from "@claudeline/sim";
-import { RANGE_MARGIN, abilityReach } from "./reach";
+import type { KitDef, Slot } from '@claudeline/sim';
+import { RANGE_MARGIN, abilityReach } from './reach';
 
 export interface BotProfile {
   /** Closer than this, a ranged champion backs away. 0 means the champion never kites. */
@@ -12,10 +12,10 @@ const DEFAULT_PROFILE: BotProfile = { rangeMin: 4, rangeMax: 8 };
 
 // Keyed by champion id. A Map, so an id such as 'constructor' cannot reach the prototype.
 const PROFILES = new Map<string, BotProfile>([
-  ["hargrim", { rangeMin: 0, rangeMax: 3 }],
-  ["quillon", { rangeMin: 6, rangeMax: 13 }],
-  ["lumeth", { rangeMin: 6, rangeMax: 10 }],
-  ["skerrow", { rangeMin: 0, rangeMax: 2.5 }],
+  ['hargrim', { rangeMin: 0, rangeMax: 3 }],
+  ['quillon', { rangeMin: 6, rangeMax: 13 }],
+  ['lumeth', { rangeMin: 6, rangeMax: 10 }],
+  ['skerrow', { rangeMin: 0, rangeMax: 2.5 }],
 ]);
 
 /**
@@ -23,9 +23,9 @@ const PROFILES = new Map<string, BotProfile>([
  * kit field holds the minimum: roster-v1 words it as backing away from an enemy inside 6 m.
  */
 const KIT_RULES = new Map<string, number>([
-  ["hargrim", 0],
-  ["quillon", 6],
-  ["skerrow", 0],
+  ['hargrim', 0],
+  ['quillon', 6],
+  ['skerrow', 0],
 ]);
 
 /**
@@ -48,7 +48,7 @@ export function profileFor(championId: string, kit?: KitDef): BotProfile {
 }
 
 /** What a target must be doing for an opener: walking away from the bot, or toward it. */
-export type Motion = "away" | "closing";
+export type Motion = 'away' | 'closing';
 
 /**
  * An opener: a slot the bot presses on a condition narrower than its kit band. `band` is the
@@ -58,7 +58,7 @@ export type Motion = "away" | "closing";
  */
 export interface OpenerRule {
   readonly slot: Slot;
-  readonly band: "dash" | readonly [number, number] | null;
+  readonly band: 'dash' | readonly [number, number] | null;
   readonly motion: Motion | null;
 }
 
@@ -99,37 +99,27 @@ const NO_RULES: ChampionRules = Object.freeze({
  */
 const RULES = new Map<string, ChampionRules>([
   [
-    "hargrim",
+    'hargrim',
     rule(
       [
-        { slot: "SPACE", band: "dash", motion: null },
-        { slot: "E", band: [4, 7], motion: "away" },
+        { slot: 'SPACE', band: 'dash', motion: null },
+        { slot: 'E', band: [4, 7], motion: 'away' },
       ],
-      ["R"],
+      ['R'],
       false,
     ),
   ],
-  [
-    "quillon",
-    rule([{ slot: "Q", band: null, motion: "closing" }], ["SPACE", "R"], false),
-  ],
-  [
-    "skerrow",
-    rule([{ slot: "SPACE", band: "dash", motion: null }], ["R"], true),
-  ],
+  ['quillon', rule([{ slot: 'Q', band: null, motion: 'closing' }], ['SPACE', 'R'], false)],
+  ['skerrow', rule([{ slot: 'SPACE', band: 'dash', motion: null }], ['R'], true)],
 ]);
 
 /** A frozen row: the row, its two lists, each opener and each literal band. */
-function rule(
-  openers: OpenerRule[],
-  escapes: Slot[],
-  holdF: boolean,
-): ChampionRules {
+function rule(openers: OpenerRule[], escapes: Slot[], holdF: boolean): ChampionRules {
   const frozen = openers.map((opener) =>
     Object.freeze({
       ...opener,
       band:
-        typeof opener.band === "object" && opener.band !== null
+        typeof opener.band === 'object' && opener.band !== null
           ? Object.freeze([opener.band[0], opener.band[1]] as const)
           : opener.band,
     }),
@@ -142,8 +132,8 @@ function rule(
 }
 
 /**
- * The rules of a champion (openers, escapes and the hold of F). Like `KIT_RULES`, a rule applies only with a kit whose id equals
- * the champion id; otherwise there is none.
+ * The rules of a champion (openers, escapes and the hold of F). Like `KIT_RULES`, a rule applies
+ * only with a kit whose id equals the champion id; otherwise there is none.
  */
 export function rulesFor(championId: string, kit?: KitDef): ChampionRules {
   if (kit === undefined || kit.id !== championId) return NO_RULES;
