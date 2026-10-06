@@ -1,5 +1,6 @@
 import { Button } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_BINDINGS } from './bindings';
 import { bindInput, createInputCore, type InputCore } from './input';
 
 const NO_MODS = { ctrlKey: false, metaKey: false, altKey: false };
@@ -177,6 +178,71 @@ describe('input core: preventing the browser default', () => {
   });
 });
 
+describe('input core: rebinding', () => {
+  it('reads the defaults until a set is given, and then that set', () => {
+    const core = createInputCore();
+    expect(core.bindings).toEqual(DEFAULT_BINDINGS);
+    const custom = { ...DEFAULT_BINDINGS, right: 'KeyL' };
+    core.setBindings(custom);
+    expect(core.bindings).toEqual(custom);
+  });
+
+  it('moves with the new code of an action, and the old code does nothing and is not prevented', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, right: 'KeyL' });
+    expect(core.keyDown('KeyL', NO_MODS)).toBe(true);
+    expect(axes(core)).toEqual([1, 0]);
+    expect(core.keyUp('KeyL', NO_MODS)).toBe(true);
+    expect(axes(core)).toEqual([0, 0]);
+    expect(core.keyDown('KeyD', NO_MODS)).toBe(false);
+    expect(axes(core)).toEqual([0, 0]);
+    expect(core.keyUp('KeyD', NO_MODS)).toBe(false);
+  });
+
+  it('sets the button of a slot from its new code', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, Q: 'KeyT' });
+    press(core, 'KeyQ');
+    expect(core.toPlayerInput(0, 0).buttons).toBe(0);
+    press(core, 'KeyT');
+    expect(core.toPlayerInput(0, 0).buttons).toBe(Button.Q);
+    core.keyUp('KeyT', NO_MODS);
+    expect(core.toPlayerInput(0, 0).buttons).toBe(0);
+  });
+
+  it('lets a freed code take another action', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, right: 'KeyL', up: 'KeyD' });
+    press(core, 'KeyD');
+    expect(axes(core)).toEqual([0, 1]);
+  });
+
+  it('keeps Shift on both shift keys whatever the bindings', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, Q: 'KeyT', right: 'KeyL' });
+    press(core, 'ShiftLeft');
+    expect(core.toPlayerInput(0, 0).buttons).toBe(Button.SHIFT);
+    core.keyUp('ShiftLeft', NO_MODS);
+    press(core, 'ShiftRight');
+    expect(core.toPlayerInput(0, 0).buttons).toBe(Button.SHIFT);
+  });
+
+  it('does not record a rebound key pressed with a command modifier', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, right: 'KeyL' });
+    expect(core.keyDown('KeyL', { ...NO_MODS, ctrlKey: true })).toBe(false);
+    expect(axes(core)).toEqual([0, 0]);
+  });
+
+  it('clears a rebound key on releaseAll', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, right: 'KeyL' });
+    press(core, 'KeyL');
+    core.releaseAll();
+    expect(axes(core)).toEqual([0, 0]);
+  });
+});
+
 describe('input core: releaseAll', () => {
   it('clears keys and mouse buttons but keeps the pointer', () => {
     const core = createInputCore();
@@ -211,6 +277,19 @@ function fakeWindow(): EventTarget & { document: { hidden: boolean } } {
 }
 
 describe('bindInput', () => {
+  it('prevents a rebound key through the window listener, and not the old one', () => {
+    const win = fakeWindow();
+    const core = createInputCore();
+    bindInput(win, new EventTarget(), core);
+    core.setBindings({ ...DEFAULT_BINDINGS, right: 'KeyL' });
+    const rebound = fakeEvent('keydown', { code: 'KeyL', ...NO_MODS });
+    const old = fakeEvent('keydown', { code: 'KeyD', ...NO_MODS });
+    win.dispatchEvent(rebound);
+    win.dispatchEvent(old);
+    expect(rebound.defaultPrevented).toBe(true);
+    expect(old.defaultPrevented).toBe(false);
+  });
+
   function setup() {
     const win = fakeWindow();
     const canvas = new EventTarget();

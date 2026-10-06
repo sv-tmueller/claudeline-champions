@@ -1,6 +1,10 @@
 import { Button, type MoveAxis, type PlayerInput } from '@claudeline/sim';
+import { ACTIONS, DEFAULT_BINDINGS, type Bindings } from './bindings';
 
-// Keys match on `event.code` (the physical key), so WASD works on any layout.
+// Keys match on `event.code` (the physical key), so WASD works on any layout. The
+// tables below are keyed by the default code of each action, whatever it is bound
+// to: `held` holds default codes, and the core translates the physical code of an
+// event into one (`translation`), so `toPlayerInput` never sees a rebinding.
 const KEY_BUTTONS: Readonly<Record<string, number>> = {
   Space: Button.SPACE,
   KeyQ: Button.Q,
@@ -12,7 +16,8 @@ const KEY_BUTTONS: Readonly<Record<string, number>> = {
 };
 // The codes of KEY_BUTTONS in a plain array, so a frame walks it by index.
 const KEY_CODES: readonly string[] = Object.keys(KEY_BUTTONS);
-const MOVE_CODES = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+// Shift is not rebindable (rules.md section 6): both keys stay on the one bit.
+const FIXED_CODES: readonly string[] = ['ShiftLeft', 'ShiftRight'];
 const MOUSE_BUTTONS: Readonly<Record<number, number>> = { 0: Button.M1, 2: Button.M2 };
 
 export interface KeyMods {
@@ -22,6 +27,13 @@ export interface KeyMods {
 }
 
 export interface InputCore {
+  /** The key bindings in use: the defaults until `setBindings`. */
+  readonly bindings: Bindings;
+  /**
+   * Replaces the bindings. A key held at the time keeps its action, so the caller
+   * releases first (`releaseAll`); the menu does on open and on close.
+   */
+  setBindings(bindings: Bindings): void;
   /** Returns whether the caller should call preventDefault. */
   keyDown(code: string, mods: KeyMods): boolean;
   /** Always clears the code. Returns whether to call preventDefault. */
@@ -42,8 +54,12 @@ export interface InputCore {
   toPlayerInput(aimX: number, aimY: number): PlayerInput;
 }
 
-function isMapped(code: string): boolean {
-  return MOVE_CODES.has(code) || Object.hasOwn(KEY_BUTTONS, code);
+/** Physical code to the default code of its action, and the fixed Shift keys to themselves. */
+function translationOf(bindings: Bindings): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const action of ACTIONS) map.set(bindings[action], DEFAULT_BINDINGS[action]);
+  for (const code of FIXED_CODES) map.set(code, code);
+  return map;
 }
 
 function hasCommandModifier(mods: KeyMods): boolean {
@@ -58,6 +74,8 @@ function hasCommandModifier(mods: KeyMods): boolean {
  */
 export function createInputCore(): InputCore {
   const held = new Set<string>();
+  let bindings = DEFAULT_BINDINGS;
+  let translation = translationOf(bindings);
   let mouseBits = 0;
   let pointer: { clientX: number; clientY: number } | null = null;
   const out: PlayerInput = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0 };
@@ -66,14 +84,24 @@ export function createInputCore(): InputCore {
     ((held.has(positive) ? 1 : 0) - (held.has(negative) ? 1 : 0)) as MoveAxis;
 
   return {
+    get bindings() {
+      return bindings;
+    },
+    setBindings(next) {
+      bindings = next;
+      translation = translationOf(next);
+    },
     keyDown(code, mods) {
-      if (!isMapped(code) || hasCommandModifier(mods)) return false;
-      held.add(code);
+      const action = translation.get(code);
+      if (action === undefined || hasCommandModifier(mods)) return false;
+      held.add(action);
       return true;
     },
     keyUp(code, mods) {
-      held.delete(code);
-      return isMapped(code) && !hasCommandModifier(mods);
+      const action = translation.get(code);
+      if (action === undefined) return false;
+      held.delete(action);
+      return !hasCommandModifier(mods);
     },
     mouseDown(button) {
       mouseBits |= MOUSE_BUTTONS[button] ?? 0;
