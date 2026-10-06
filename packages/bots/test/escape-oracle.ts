@@ -1,0 +1,121 @@
+import { Button, cloneState, hasLineOfSight, step } from '@claudeline/sim';
+import type { ChampionState, GameState, PlayerInput, Slot } from '@claudeline/sim';
+import { oracleBlocked } from './helpers';
+
+// An independent oracle for the escape presses of the headless runs. It does not import src: the
+// trigger and the first-of-five landing are written here from docs/architecture/bots.md (Openers
+// and escapes), and the point a teleport lands on is read from the sim itself (a cloned state
+// stepped with the one press), not computed by a copy of the formula the bot uses.
+
+/** An escape think: a retreat with the target within this many metres, inclusive. */
+export const ESCAPE_REACH = 6;
+
+/** The rangeMin of each champion's profile, literal: a kite closer than this is an escape think. */
+export const RANGE_MIN: Record<string, number> = { hargrim: 0, quillon: 6, skerrow: 0 };
+
+/**
+ * One escape slot: the range of the teleport it starts with, and the teleport slot that goes
+ * first when it is ready and has a landing.
+ */
+export interface EscapeRow {
+  slot: Slot;
+  teleport: number | null;
+  after: { slot: Slot; teleport: number } | null;
+}
+
+/** Why the acted intent and distance are not an escape think; empty when they are. */
+export function triggerProblems(
+  c: ChampionState,
+  target: ChampionState,
+  intent: string,
+): string[] {
+  const d = Math.hypot(c.x - target.x, c.y - target.y);
+  const rangeMin = RANGE_MIN[c.championId] ?? 0;
+  const retreat = intent === 'retreat' && d <= ESCAPE_REACH;
+  const kite = intent === 'kite' && d < rangeMin;
+  return retreat || kite
+    ? []
+    : [`not an escape think: ${intent} at ${d} m (rangeMin ${rangeMin}, reach ${ESCAPE_REACH})`];
+}
+
+export interface OracleLanding {
+  /** Which of the five directions: 0 straight away, then +45, -45, +90, -90 degrees. */
+  k: number;
+  aimX: number;
+  aimY: number;
+  x: number;
+  y: number;
+}
+
+/**
+ * The first of the five directions from the target (straight away, then +45, -45, +90, -90
+ * degrees) whose landing is in a free grid cell, by the clearance of the cell centre, and has a
+ * line of sight from the champion. The landing of a direction is the point the sim teleports the
+ * champion to for the aim `range` metres off in whole centimetres: it is read from a clone of the
+ * state in which only this champion casts `slot`. Null when none passes.
+ */
+export function oracleLanding(
+  state: GameState,
+  c: ChampionState,
+  target: ChampionState,
+  slot: Slot,
+  range: number,
+): OracleLanding | null {
+  const d = Math.hypot(c.x - target.x, c.y - target.y);
+  const ax = d === 0 ? 1 : (c.x - target.x) / d;
+  const ay = d === 0 ? 0 : (c.y - target.y) / d;
+  const s = Math.SQRT1_2;
+  const directions = [
+    { x: ax, y: ay },
+    { x: ax * s - ay * s, y: ax * s + ay * s },
+    { x: ax * s + ay * s, y: -ax * s + ay * s },
+    { x: -ay, y: ax },
+    { x: ay, y: -ax },
+  ];
+  for (let k = 0; k < directions.length; k++) {
+    const dir = directions[k] as { x: number; y: number };
+    const aimX = Math.round((c.x + dir.x * range) * 100) + 0;
+    const aimY = Math.round((c.y + dir.y * range) * 100) + 0;
+    const at = teleportOf(state, c, slot, aimX, aimY);
+    if (at !== null && freeCell(state, at) && hasLineOfSight(state, c, at)) {
+      return { k, aimX, aimY, x: at.x, y: at.y };
+    }
+  }
+  return null;
+}
+
+/** Where the sim puts champion `c` when it casts `slot` aimed at the centimetres; null if it does not move. */
+function teleportOf(
+  state: GameState,
+  c: ChampionState,
+  slot: Slot,
+  aimX: number,
+  aimY: number,
+): { x: number; y: number } | null {
+  const clone = cloneState(state);
+  const me = clone.champions[c.id] as ChampionState;
+  // Only this champion acts, ready to cast: no cooldown, no cast in progress, no status.
+  me.cooldowns.fill(0);
+  me.cast = null;
+  me.statuses = [];
+  const input: PlayerInput = { moveX: 0, moveY: 0, aimX, aimY, buttons: Button[slot] };
+  const inputs: (PlayerInput | undefined)[] = [];
+  inputs[c.id] = input;
+  step(clone, inputs);
+  const event = clone.events.find((e) => e.type === 'teleport' && e.championId === c.id);
+  if (event === undefined || event.type !== 'teleport' || event.blocked) return null;
+  return { x: event.toX, y: event.toY };
+}
+
+/** Whether the 0.5 m grid cell holding p is free: its centre does not penetrate anything. */
+function freeCell(state: GameState, p: { x: number; y: number }): boolean {
+  const { width, height } = state.arena.size;
+  const col = Math.floor((p.x + width / 2) / 0.5);
+  const row = Math.floor((p.y + height / 2) / 0.5);
+  if (col < 0 || row < 0 || col >= Math.ceil(width / 0.5) || row >= Math.ceil(height / 0.5)) {
+    return false;
+  }
+  const cx = -width / 2 + (col + 0.5) * 0.5;
+  const cy = -height / 2 + (row + 0.5) * 0.5;
+  return !oracleBlocked(state.arena, cx, cy);
+}

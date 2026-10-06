@@ -1,20 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Button, SLOTS, createMatch } from '@claudeline/sim';
-import type {
-  AbilitySpec,
-  ArenaDef,
-  ChampionState,
-  GameState,
-  KitDef,
-  MatchConfig,
-  Slot,
-  SlotSpec,
-} from '@claudeline/sim';
-import { createBot } from '../src/bot';
+import type { AbilitySpec, KitDef, Slot, SlotSpec } from '@claudeline/sim';
 import { dashBand } from '../src/casting';
-import { TIERS } from '../src/difficulty';
-import type { Difficulty } from '../src/difficulty';
-import { arena01, jsonKits } from './helpers';
+import { jsonKits } from './helpers';
+import { pressOf, sceneOf } from './scenes';
 
 function kitById(id: string): KitDef {
   const kit = jsonKits().find((k) => k.id === id);
@@ -42,61 +30,6 @@ describe('the dash band of an opener', () => {
     expect(dashBand(slotOf('hargrim', 'R'))).toBeNull();
   });
 });
-
-// Frozen states on an open arena with the shipped kits. Champion 0 is the champion under test, 6 m
-// west of the origin, and champion 2, the only enemy, stands `distance` east of it; the other two
-// are dead. A frozen state repeats the same think, so the first press is what the bot would choose.
-const OPEN: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
-const THINKS = TIERS.hard.delay + TIERS.hard.castDelay + 60;
-
-interface Options {
-  energy?: number;
-  /** The slots left off cooldown; every other slot is on a long cooldown. All ready when absent. */
-  ready?: readonly Slot[];
-  /** The enemy's velocity along x, in m/s: positive is away from the champion under test. */
-  enemyVx?: number;
-  health?: number;
-}
-
-function sceneOf(championId: string, distance: number, options: Options = {}): GameState {
-  const config: MatchConfig = {
-    teamSize: 2,
-    players: [
-      { championId, team: 'A' },
-      { championId: 'dummy', team: 'A' },
-      { championId: 'dummy', team: 'B' },
-      { championId: 'dummy', team: 'B' },
-    ],
-  };
-  const state = createMatch(config, OPEN, 1, jsonKits());
-  for (const id of [1, 3]) (state.champions[id] as ChampionState).alive = false;
-  const me = state.champions[0] as ChampionState;
-  const enemy = state.champions[2] as ChampionState;
-  me.x = -6;
-  me.y = 0;
-  enemy.x = -6 + distance;
-  enemy.y = 0;
-  enemy.vx = options.enemyVx ?? 0;
-  me.energy = options.energy ?? 0;
-  if (options.health !== undefined) me.health = options.health * me.maxHealth;
-  if (options.ready !== undefined) {
-    me.cooldowns.fill(600);
-    for (const slot of options.ready) me.cooldowns[SLOTS.indexOf(slot)] = 0;
-  }
-  return state;
-}
-
-/** What the first press of a bot on the frozen state is: the slot and EX, or null for none. */
-function pressOf(state: GameState, tier: Difficulty = 'hard'): string | null {
-  const bot = createBot(0, tier, 1);
-  for (let i = 0; i < THINKS; i++) {
-    const { buttons } = bot.think(state);
-    if (buttons === 0) continue;
-    const slot = SLOTS.find((s) => (buttons & Button[s]) !== 0);
-    return `${slot}${(buttons & Button.SHIFT) !== 0 ? '+SHIFT' : ''}`;
-  }
-  return null;
-}
 
 describe('Rush, the dash opener of Hargrim', () => {
   it('presses base SPACE from 4 to 5 m with no energy, and not at 3.95 or 5.05 m', () => {

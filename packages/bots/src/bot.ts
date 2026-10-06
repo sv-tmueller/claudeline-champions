@@ -14,6 +14,7 @@ import {
 import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
+import { ESCAPE_RANGE, chooseEscape, createEscapeScratch } from './escape';
 import { createFollower, followPathInto } from './follow';
 import { buildNavGrid, cellCenterInto } from './grid';
 import type { NavGrid, Vec2 } from './grid';
@@ -207,6 +208,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const kiteScratch = createKiteScratch();
   const kitCache = createKitCache();
   const cues = createCastCues();
+  const escapeScratch = createEscapeScratch(kiteScratch);
   const dist = createMeasure();
   let follower = createFollower();
   // The kind of goal the follower served on the previous think and on this one. Null after a
@@ -487,13 +489,46 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         return input;
       }
       let pressed = false;
+      escapeScratch.tried = 0;
+      escapeScratch.landed = false;
       if (kit !== undefined) {
+        // An escape think: a retreat with the target within ESCAPE_RANGE, or a kite inside
+        // rangeMin. The escape slots count it as their run, and are chosen before the others.
+        distanceInto(dist, me, target);
+        const d = dist.metres;
+        cues.escape =
+          (acted.intent === 'retreat' && d <= ESCAPE_RANGE) ||
+          (acted.intent === 'kite' && d < profile.rangeMin);
         updateRuns(runs, state, kitCache, me, target, sight, dist, cues);
-        pressed = chooseCast(choice, runs, tier.castDelay, kit, kitCache, me);
+        if (cues.escape && kitCache.escapeOrder[0] !== -1) {
+          pressed = chooseEscape(
+            choice,
+            escapeScratch,
+            runs,
+            tier.castDelay,
+            kit,
+            kitCache,
+            me,
+            target,
+            state,
+            navGrid(state),
+            sight,
+            dist,
+          );
+        }
+        if (!pressed) {
+          pressed = chooseCast(choice, runs, tier.castDelay, kit, kitCache, me, escapeScratch.tried);
+        }
       } else {
         runs.fill(0);
       }
+      // aim() runs on every think, an escape press included, so the draw cadence of the aim error
+      // does not change; a teleport press then overwrites the aim with its landing, with no error.
       aim(me, target, kit, pressed);
+      if (pressed && escapeScratch.landed) {
+        input.aimX = escapeScratch.land.aimX;
+        input.aimY = escapeScratch.land.aimY;
+      }
       input.buttons = pressed ? buttonsOf(choice) : 0;
       return input;
     },

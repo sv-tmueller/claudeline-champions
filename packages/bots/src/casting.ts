@@ -72,6 +72,17 @@ export interface KitCache {
    * -1 walking toward it, 0 anything. An EX press has no such condition.
    */
   motion: Int8Array;
+  /** The slots of the escape rule in priority order, as indices into SLOTS, ended by -1. */
+  escapeOrder: Int8Array;
+  /** 1 when the slot is in `escapeOrder`. */
+  isEscape: Uint8Array;
+  /**
+   * The teleport an escape slot starts with, when its first effect is one: its range in metres
+   * (0 when the slot has none) and whether the range is fixed (it teleports the full range
+   * whatever the aim distance).
+   */
+  escapeRange: Float64Array;
+  escapeFixed: Uint8Array;
 }
 
 /**
@@ -84,10 +95,16 @@ export interface CastCues {
    * when it walks toward it, 0 when it stands or walks across.
    */
   dot: number;
+  /**
+   * True on an escape think: the acted intent is retreat with the target within `ESCAPE_RANGE`,
+   * or kite with the target inside rangeMin (see `ESCAPE_RANGE` in escape.ts). Set by the bot
+   * before `updateRuns`.
+   */
+  escape: boolean;
 }
 
 export function createCastCues(): CastCues {
-  return { dot: 0.5 };
+  return { dot: 0.5, escape: false };
 }
 
 export function createKitCache(): KitCache {
@@ -108,6 +125,10 @@ export function createKitCache(): KitCache {
     openMin: new Float64Array(SLOTS.length),
     openMax: new Float64Array(SLOTS.length),
     motion: new Int8Array(SLOTS.length),
+    escapeOrder: new Int8Array(SLOTS.length).fill(-1),
+    isEscape: new Uint8Array(SLOTS.length),
+    escapeRange: new Float64Array(SLOTS.length),
+    escapeFixed: new Uint8Array(SLOTS.length),
   };
 }
 
@@ -130,6 +151,9 @@ export function refreshKitCache(
     cache.hasEx[i] = 0;
     cache.hasOpen[i] = 0;
     cache.motion[i] = 0;
+    cache.isEscape[i] = 0;
+    cache.escapeRange[i] = 0;
+    cache.escapeFixed[i] = 0;
     if (kit === undefined) continue;
     const slot = SLOTS[i] as Slot;
     const spec = kit.slots[slot];
@@ -161,6 +185,19 @@ export function refreshKitCache(
     cache.openMin[i] = band[0];
     cache.openMax[i] = band[1];
   }
+  cache.escapeOrder.fill(-1);
+  let n = 0;
+  for (const slot of rules.escapes) {
+    if (kit === undefined) break;
+    const i = SLOTS.indexOf(slot);
+    cache.escapeOrder[n++] = i;
+    cache.isEscape[i] = 1;
+    const first = kit.slots[slot].effects[0];
+    if (first !== undefined && first.type === 'teleport') {
+      cache.escapeRange[i] = first.range;
+      cache.escapeFixed[i] = first.fixed ? 1 : 0;
+    }
+  }
 }
 
 /**
@@ -174,14 +211,14 @@ export function dashBand(spec: AbilitySpec): readonly [number, number] | null {
   return [first.distance - 1, first.distance];
 }
 
-function hasStatus(me: ChampionState, type: StatusType): boolean {
+export function hasStatus(me: ChampionState, type: StatusType): boolean {
   for (let i = 0; i < me.statuses.length; i++) {
     if ((me.statuses[i] as { type: StatusType }).type === type) return true;
   }
   return false;
 }
 
-function hasDash(ability: AbilitySpec): boolean {
+export function hasDash(ability: AbilitySpec): boolean {
   for (let i = 0; i < ability.effects.length; i++) {
     if ((ability.effects[i] as { type: string }).type === 'dash') return true;
   }
@@ -247,6 +284,11 @@ export function updateRuns(
   const d = dist.metres;
   cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
   for (let i = 0; i < SLOTS.length; i++) {
+    // An escape slot on an escape think counts the trigger: no band, no shot test.
+    if (cues.escape && cache.isEscape[i] === 1) {
+      runs[i] = (runs[i] as number) + 1;
+      continue;
+    }
     const ex = exFor(cache, i, me);
     let inBand = false;
     if (ex) {
@@ -275,7 +317,8 @@ export function updateRuns(
  * Q, SPACE, M2, M1 (the sim's own order) whose run is over `castDelay` and that passes the sim's
  * gates: no windup in progress unless it fires on this tick (windupLeft 1), the cooldown at most 1
  * (it counts down first), the energy for the cost (100 for F, 25 for an EX variant), no stun or
- * silence, and no root for a dash. Run `updateRuns` first.
+ * silence, and no root for a dash. Run `updateRuns` first. `skip` is a bit mask of slot indices
+ * the walk leaves out: the escape slots `chooseEscape` already tried (0 for none).
  */
 export function chooseCast(
   choice: CastChoice,
@@ -284,11 +327,14 @@ export function chooseCast(
   kit: KitDef,
   cache: KitCache,
   me: ChampionState,
+  skip: number,
 ): boolean {
   if (me.cast !== null && me.cast.windupLeft !== 1) return false;
   if (hasStatus(me, 'stun') || hasStatus(me, 'silence')) return false;
   const rooted = hasStatus(me, 'root');
   for (let i = SLOTS.length - 1; i >= 0; i--) {
+    // A slot the escape choice already tried on this think (a bit of `skip` per slot index).
+    if ((skip & (1 << i)) !== 0) continue;
     if ((runs[i] as number) <= castDelay) continue;
     if ((me.cooldowns[i] as number) > 1) continue;
     const slot = SLOTS[i] as Slot;

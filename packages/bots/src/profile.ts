@@ -64,16 +64,26 @@ export interface OpenerRule {
 /** The rules of a champion that its kit does not carry (kits carry no bot fields). */
 export interface ChampionRules {
   readonly openers: readonly OpenerRule[];
+  /**
+   * The slots pressed to get out of reach, in priority order: the first one that passes its gates
+   * (and, for a teleport, has a landing) is pressed on an escape think; it is a priority order, not
+   * a sequence. See `chooseEscape` in escape.ts.
+   */
+  readonly escapes: readonly Slot[];
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
-const NO_RULES: ChampionRules = Object.freeze({ openers: Object.freeze([]) });
+const NO_RULES: ChampionRules = Object.freeze({
+  openers: Object.freeze([]),
+  escapes: Object.freeze([]),
+});
 
 /**
  * Keyed by champion id, like `PROFILES`. The roster's bot sketches (docs/design/roster-v1.md) are
  * the source of the numbers. Rush is the base dash with the band of `dashBand`; Chain Hook is the
  * roster's 4 to 7 m, inside the kit band less the margin (0 to 8 m), and only at a target that
  * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
+ * Iron Hide, Skip and Hush Ward are the escapes of the roster sketches: Skip first, then Hush Ward.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -83,9 +93,16 @@ const RULES = new Map<string, ChampionRules>([
         { slot: 'SPACE', band: 'dash', motion: null },
         { slot: 'E', band: [4, 7], motion: 'away' },
       ],
+      escapes: ['R'],
     },
   ],
-  ['quillon', { openers: [{ slot: 'Q', band: null, motion: 'closing' }] }],
+  [
+    'quillon',
+    {
+      openers: [{ slot: 'Q', band: null, motion: 'closing' }],
+      escapes: ['SPACE', 'R'],
+    },
+  ],
 ]);
 
 /**

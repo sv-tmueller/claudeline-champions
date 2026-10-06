@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
+import { oracleLanding, triggerProblems } from './escape-oracle';
+import type { EscapeRow, OracleLanding } from './escape-oracle';
 import type { MatchRun } from './helpers';
 import {
   checkInvariants,
@@ -63,6 +65,19 @@ interface KitSet {
   bands: Record<string, Band>;
   clearances: Record<string, number>;
 }
+
+/**
+ * The escape rows, the same for both kit sets (Skip is a 4 m teleport in each; it is fixed in the
+ * shipped kit and not in the test kit, which the oracle does not need: it reads the landing from
+ * the sim). An escape press has no band and no shot test: it needs the trigger (a retreat with the
+ * target within 6 m, or a kite inside rangeMin), and for a teleport a landing that the oracle finds
+ * by its own first-of-five search. Hush Ward is pressed only when Skip is not ready or has none.
+ */
+const ESCAPES: Record<string, EscapeRow> = {
+  'hargrim:R': { slot: 'R', teleport: null, after: null },
+  'quillon:SPACE': { slot: 'SPACE', teleport: 4, after: null },
+  'quillon:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: 4 } },
+};
 
 const HARGRIM_BANDS: Record<string, Band> = {
   'hargrim:M1': { min: 0, max: 3 },
@@ -148,6 +163,8 @@ interface Press {
   ex: boolean;
   key: string;
   gates: string;
+  /** Where the oracle says an escape teleport lands, for the check after the step. */
+  landing: OracleLanding | null;
 }
 
 function hasStatus(c: ChampionState, type: string): boolean {
@@ -166,22 +183,46 @@ function pressProblems(
   state: GameState,
   c: ChampionState,
   pressed: { slot: Slot; ex: boolean },
-  targetId: number,
+  acted: { intent: string; targetId: number },
+  input: PlayerInput,
   set: KitSet,
-): { problems: string[]; key: string; gates: string } {
+): { problems: string[]; key: string; gates: string; landing: OracleLanding | null } {
   const key = `${c.championId}:${pressed.slot}${pressed.ex ? ':ex' : ''}`;
+  const targetId = acted.targetId;
   const target = state.champions[targetId];
   const problems: string[] = [];
+  const escape = pressed.ex ? undefined : ESCAPES[key];
+  let landing: OracleLanding | null = null
   const d = target === undefined ? NaN : Math.hypot(c.x - target.x, c.y - target.y);
   const cooldown = c.cooldowns[SLOTS.indexOf(pressed.slot)] ?? Infinity;
   const gates =
     `d ${d}, cooldown ${cooldown}, energy ${c.energy}, windupLeft ${c.cast?.windupLeft ?? 'none'}, ` +
     `statuses ${c.statuses.map((s) => s.type).join(',') || 'none'}`;
   const band = set.bands[key];
-  if (band === undefined) problems.push(`${key} has no reach band in the oracle table`);
+  if (band === undefined && escape === undefined) {
+    problems.push(`${key} has no reach band in the oracle table`);
+  }
   if (target === undefined || !target.alive || target.team === c.team) {
     problems.push(`target ${targetId} is not an alive enemy`);
-  } else {
+  } else if (escape !== undefined) {
+    problems.push(...triggerProblems(c, target, acted.intent));
+    if (escape.teleport !== null) {
+      landing = oracleLanding(state, c, target, escape.slot, escape.teleport);
+      if (landing === null) problems.push('a teleport escape was pressed with no landing');
+      else if (input.aimX !== landing.aimX || input.aimY !== landing.aimY) {
+        problems.push(
+          `aim ${input.aimX},${input.aimY} is not the first landing's ${landing.aimX},${landing.aimY} (direction ${landing.k})`,
+        );
+      }
+    }
+    if (escape.after !== null) {
+      const { slot: firstSlot, teleport } = escape.after;
+      const ready = (c.cooldowns[SLOTS.indexOf(firstSlot)] ?? Infinity) <= 1;
+      if (ready && oracleLanding(state, c, target, firstSlot, teleport) !== null) {
+        problems.push(`${key} pressed with ${firstSlot} ready and a landing`);
+      }
+    }
+  } else if (band !== undefined) {
     if (!hasLineOfSight(state, c, target)) problems.push('no line of sight');
     const clearance = set.clearances[key];
     if (clearance !== undefined && !clearShotOracle(state, c, target, clearance)) {
@@ -201,7 +242,7 @@ function pressProblems(
   if (hasStatus(c, 'stun') || hasStatus(c, 'silence')) problems.push('stunned or silenced');
   if (hasStatus(c, 'root') && DASHES.has(key)) problems.push('rooted and the ability holds a dash');
   if (c.cast !== null && c.cast.windupLeft !== 1) problems.push(`windupLeft ${c.cast.windupLeft}`);
-  return { problems, key, gates };
+  return { problems, key, gates, landing };
 }
 
 /**
@@ -233,6 +274,9 @@ interface Played {
   ultimates: number[];
   /** A champion that had a cast fire killed an enemy. */
   killed: boolean;
+  /** The teleports of the run, and how many the sim reported blocked. */
+  teleports: number;
+  blockedTeleports: number;
   summary: string;
 }
 
@@ -250,6 +294,8 @@ function play(set: KitSet, run: MatchRun): Played {
   const ultimates = state.champions.map(() => 0);
   const fired = new Set<number>();
   let killed = false;
+  let teleports = 0;
+  let blockedTeleports = 0;
   let firstDeath = -1;
   const presses = state.champions.map(() => 0);
 
@@ -269,9 +315,9 @@ function play(set: KitSet, run: MatchRun): Played {
       const acted = bots[id]?.inspect();
       if (pressed === null || acted === undefined) return;
       presses[id] = (presses[id] ?? 0) + 1;
-      const { problems, key, gates } = pressProblems(state, c, pressed, acted.targetId, set);
+      const { problems, key, gates, landing } = pressProblems(state, c, pressed, acted, input, set);
       expect(problems, `tick ${t} champion ${id} pressed ${key}: ${gates}`).toEqual([]);
-      pending.push({ id, slot: pressed.slot, ex: pressed.ex, key, gates });
+      pending.push({ id, slot: pressed.slot, ex: pressed.ex, key, gates, landing });
     });
     tracker.observe(inputs);
     const tick = state.tick;
@@ -284,7 +330,21 @@ function play(set: KitSet, run: MatchRun): Played {
         `tick ${tick} champion ${press.id} pressed ${press.slot}${press.ex ? ' with SHIFT' : ''} and the sim started nothing: ${press.gates}`,
       ).toBe(true);
     }
+    for (const press of pending) {
+      if (press.landing === null) continue;
+      const event = state.events.find((e) => e.type === 'teleport' && e.championId === press.id);
+      if (event === undefined || event.type !== 'teleport') continue;
+      // The sim puts the champion where the oracle found the first landing.
+      expect([event.toX, event.toY], `tick ${tick} champion ${press.id} teleport`).toEqual([
+        press.landing.x,
+        press.landing.y,
+      ]);
+    }
     for (const e of state.events) {
+      if (e.type === 'teleport') {
+        teleports++;
+        if (e.blocked) blockedTeleports++;
+      }
       if (e.type === 'castStarted') {
         started[e.championId] = (started[e.championId] ?? 0) + 1;
         if (e.ex) exStarted[e.championId] = (exStarted[e.championId] ?? 0) + 1;
@@ -302,8 +362,18 @@ function play(set: KitSet, run: MatchRun): Played {
     expect(Number.isFinite(checksum(state))).toBe(true);
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
-  return { state, worst: tracker.worst(), started, exStarted, ultimates, killed, summary };
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; teleports ${teleports}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  return {
+    state,
+    worst: tracker.worst(),
+    started,
+    exStarted,
+    ultimates,
+    killed,
+    teleports,
+    blockedTeleports,
+    summary,
+  };
 }
 
 function expectNoStall(played: Played): void {
@@ -327,6 +397,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
       `no EX cast: ${played.summary}`,
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
+    expect(played.blockedTeleports, played.summary).toBe(0);
     expectNoStall(played);
   }, 30_000);
 
@@ -345,6 +416,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
       `no F cast: ${played.summary}`,
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
+    expect(played.blockedTeleports, played.summary).toBe(0);
     expectNoStall(played);
   }, 30_000);
 });
