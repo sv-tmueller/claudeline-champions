@@ -1,12 +1,16 @@
 import { Button, CHAMPION_RADIUS, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } from '@claudeline/sim';
 import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
+import type { NavGrid } from './grid';
 import { distanceInto } from './hypot';
 import type { Measure } from './hypot';
+import { kiteStepInto } from './kite';
+import type { KiteScratch } from './kite';
 import { profileFor, rulesFor } from './profile';
 import type { BotProfile } from './profile';
 import { RANGE_MARGIN, abilityReach } from './reach';
 import { clearShotWith } from './sight';
 import type { SightScratch } from './sight';
+import type { MoveCommand } from './steer';
 
 // Casting: which slot a bot presses on a think. The gates copy steps 3b to 3d of the sim's `step`
 // (cooldowns count down, then a windup fires at 1, then a new cast may start), read on the state
@@ -83,6 +87,13 @@ export interface KitCache {
    */
   escapeRange: Float64Array;
   escapeFixed: Uint8Array;
+  /**
+   * True when F is held for a low or cornered target (see `ChampionRules.holdF`), and the health
+   * at or below which a target is low: the sum of the `damage` amounts of F's effects. A double
+   * field that starts as a double.
+   */
+  holdF: boolean;
+  lowHealth: number;
 }
 
 /**
@@ -98,6 +109,14 @@ export interface CastCues {
   /** True while F holds the energy back from the EX variants, see `computeCues`. */
   reserve: boolean;
   /**
+   * Whether F's own condition holds for the acted target: always true unless the kit's F is held
+   * (`KitCache.holdF`), then the target is low or cornered. The run of F and the reserve read it.
+   */
+  fOk: boolean;
+  /** Scratch for the cornered test: the kite points and the move it writes and nobody reads. */
+  kite: KiteScratch;
+  corner: MoveCommand;
+  /**
    * True on an escape think: the acted intent is retreat with the target within `ESCAPE_RANGE`,
    * or kite with the target inside rangeMin (see `ESCAPE_RANGE` in escape.ts). Set by the bot
    * before `updateRuns`.
@@ -105,8 +124,15 @@ export interface CastCues {
   escape: boolean;
 }
 
-export function createCastCues(): CastCues {
-  return { dot: 0.5, reserve: false, escape: false };
+export function createCastCues(kite: KiteScratch): CastCues {
+  return {
+    dot: 0.5,
+    reserve: false,
+    fOk: true,
+    kite,
+    corner: { moveX: 0, moveY: 0 },
+    escape: false,
+  };
 }
 
 export function createKitCache(): KitCache {
@@ -131,6 +157,8 @@ export function createKitCache(): KitCache {
     isEscape: new Uint8Array(SLOTS.length),
     escapeRange: new Float64Array(SLOTS.length),
     escapeFixed: new Uint8Array(SLOTS.length),
+    holdF: false,
+    lowHealth: 0.5,
   };
 }
 
@@ -187,6 +215,8 @@ export function refreshKitCache(
     cache.openMin[i] = band[0];
     cache.openMax[i] = band[1];
   }
+  cache.holdF = kit !== undefined && rules.holdF;
+  cache.lowHealth = kit !== undefined && rules.holdF ? damageIn(kit.slots.F.effects) : 0;
   cache.escapeOrder.fill(-1);
   let n = 0;
   for (const slot of rules.escapes) {
@@ -200,6 +230,27 @@ export function refreshKitCache(
       cache.escapeFixed[i] = first.fixed ? 1 : 0;
     }
   }
+}
+
+/**
+ * The sum of the `damage` amounts in a list of effects, looking into the effects an area, a
+ * projectile or a melee arc carries and into what a dash does where it ends. Statuses and
+ * knockbacks add nothing. Run on a rebuild only, so it may allocate.
+ */
+function damageIn(effects: readonly { type: string }[]): number {
+  let sum = 0;
+  for (const effect of effects) {
+    const node = effect as {
+      type: string;
+      amount?: number;
+      effects?: readonly { type: string }[];
+      then?: readonly { type: string }[];
+    };
+    if (node.type === 'damage' && typeof node.amount === 'number') sum += node.amount;
+    if (node.effects !== undefined) sum += damageIn(node.effects);
+    if (node.then !== undefined) sum += damageIn(node.then);
+  }
+  return sum;
 }
 
 /**
@@ -280,18 +331,26 @@ export function computeCues(
   target: ChampionState,
   sight: SightScratch,
   dist: Measure,
+  grid: NavGrid,
 ): void {
   distanceInto(dist, me, target);
   const d = dist.metres;
   cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
   cues.escape =
     (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
+  // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
+  // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
+  cues.fOk =
+    !cache.holdF ||
+    target.health <= cache.lowHealth ||
+    !kiteStepInto(cues.corner, cues.kite, grid, target, me, dist);
   cues.reserve =
     cache.hasBase[F_INDEX] === 1 &&
     (me.cooldowns[F_INDEX] as number) <= 1 &&
     me.energy >= EX_RESERVE_ENERGY &&
     (cache.baseMin[F_INDEX] as number) <= d &&
-    d <= (cache.baseMax[F_INDEX] as number) - RANGE_MARGIN;
+    d <= (cache.baseMax[F_INDEX] as number) - RANGE_MARGIN &&
+    cues.fOk;
   sight.standClearance = 0.5;
   if (cues.reserve && me.energy >= ULTIMATE_ENERGY_COST) {
     const wide = cache.baseClearance[F_INDEX] as number;
@@ -354,6 +413,7 @@ export function updateRuns(
       const motion = cache.motion[i] as number;
       if (motion > 0 && !(cues.dot > 0)) inBand = false;
       if (motion < 0 && !(cues.dot < 0)) inBand = false;
+      if (i === F_INDEX && !cues.fOk) inBand = false;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
   }

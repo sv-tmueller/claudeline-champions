@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
-import { oracleLanding, triggerProblems } from './escape-oracle';
+import { oracleCornered, oracleLanding, triggerProblems } from './escape-oracle';
 import type { EscapeRow, OracleLanding } from './escape-oracle';
 import type { MatchRun } from './helpers';
 import {
   checkInvariants,
   clearShotOracle,
   configMirror,
+  configSkerrow,
   createRun,
   createStallTracker,
   jsonKits,
@@ -77,7 +78,16 @@ const ESCAPES: Record<string, EscapeRow> = {
   'hargrim:R': { slot: 'R', teleport: null, after: null },
   'quillon:SPACE': { slot: 'SPACE', teleport: 4, after: null },
   'quillon:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: 4 } },
+  // Vanish Step: a 5 m teleport that is not fixed (the shipped Skerrow kit only).
+  'skerrow:R': { slot: 'R', teleport: 5, after: null },
 };
+
+/**
+ * The ultimates the bot holds for a low or cornered target: the key and the health at or below
+ * which a target is low, the damage F does (written from the kit file: 40). A press passes only
+ * when the target is that low or the oracle finds it cornered.
+ */
+const HELD: Record<string, number> = { 'skerrow:F': 40 };
 
 const HARGRIM_BANDS: Record<string, Band> = {
   'hargrim:M1': { min: 0, max: 3 },
@@ -96,6 +106,31 @@ const HARGRIM_CLEARANCES: Record<string, number> = {
   'hargrim:SPACE:ex': 0.5,
   'hargrim:E': 0.4,
   'hargrim:F': 0.5,
+};
+
+// data/kits/skerrow.json, in the shipped set only (the test kits have no Skerrow): a melee arc is
+// its radius plus 0.5; the bolts are speed times lifetime in ticks over 60; Lunge is the opener
+// band [5, 6] with no margin; the EX Lunge is the dash 8 plus its arc 2 plus 0.5; the ultimate is
+// the teleport 8 plus its arc 2.5 plus 0.5.
+const SKERROW_BANDS: Record<string, Band> = {
+  'skerrow:M1': { min: 0, max: 2.5 },
+  'skerrow:M2': { min: 0, max: (24 * 25) / 60 },
+  'skerrow:SPACE': { min: 5, max: 6, margin: 0 },
+  'skerrow:SPACE:ex': { min: 0, max: 10.5 },
+  'skerrow:Q': { min: 0, max: (20 * 33) / 60 },
+  'skerrow:E': { min: 0, max: 3 },
+  'skerrow:E:ex': { min: 0, max: 3 },
+  'skerrow:F': { min: 0, max: 11 },
+};
+const SKERROW_CLEARANCES: Record<string, number> = {
+  'skerrow:M1': 0.5,
+  'skerrow:M2': 0.2,
+  'skerrow:SPACE': 0.5,
+  'skerrow:SPACE:ex': 0.5,
+  'skerrow:Q': 0.3,
+  'skerrow:E': 0.5,
+  'skerrow:E:ex': 0.5,
+  'skerrow:F': 0.5,
 };
 
 const KIT_SETS: KitSet[] = [
@@ -138,6 +173,7 @@ const KIT_SETS: KitSet[] = [
       'quillon:E': { min: 0, max: (25 * 43) / 60 },
       'quillon:E:ex': { min: 0, max: (25 * 43) / 60 },
       'quillon:F': { min: 0, max: 20 },
+      ...SKERROW_BANDS,
     },
     clearances: {
       ...HARGRIM_CLEARANCES,
@@ -148,11 +184,18 @@ const KIT_SETS: KitSet[] = [
       'quillon:E': 0.2,
       'quillon:E:ex': 0.2,
       'quillon:F': 0.6,
+      ...SKERROW_CLEARANCES,
     },
   },
 ];
 /** The pressed abilities that hold a dash, which a root skips. */
-const DASHES = new Set(['hargrim:SPACE', 'hargrim:SPACE:ex', 'hargrim:F']);
+const DASHES = new Set([
+  'hargrim:SPACE',
+  'hargrim:SPACE:ex',
+  'hargrim:F',
+  'skerrow:SPACE',
+  'skerrow:SPACE:ex',
+]);
 const MARGIN = 1;
 const EX_COST = 25;
 const ULTIMATE_COST = 100;
@@ -199,6 +242,14 @@ function pressProblems(
     `d ${d}, cooldown ${cooldown}, energy ${c.energy}, windupLeft ${c.cast?.windupLeft ?? 'none'}, ` +
     `statuses ${c.statuses.map((s) => s.type).join(',') || 'none'}`;
   const band = set.bands[key];
+  const held = pressed.ex ? undefined : HELD[key];
+  if (
+    held !== undefined &&
+    target !== undefined &&
+    !(target.health <= held || oracleCornered(state, target, c))
+  ) {
+    problems.push(`${key} pressed at a target with ${target.health} health that is not cornered`);
+  }
   if (band === undefined && escape === undefined) {
     problems.push(`${key} has no reach band in the oracle table`);
   }
@@ -277,6 +328,10 @@ interface Played {
   /** The teleports of the run, and how many the sim reported blocked. */
   teleports: number;
   blockedTeleports: number;
+  /** The tick on which a team had no champion alive, or -1. */
+  eliminatedAt: number;
+  /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
+  firstLunge: number;
   summary: string;
 }
 
@@ -296,6 +351,8 @@ function play(set: KitSet, run: MatchRun): Played {
   let killed = false;
   let teleports = 0;
   let blockedTeleports = 0;
+  let eliminatedAt = -1;
+  let firstLunge = -1;
   let firstDeath = -1;
   const presses = state.champions.map(() => 0);
 
@@ -346,6 +403,9 @@ function play(set: KitSet, run: MatchRun): Played {
         if (e.blocked) blockedTeleports++;
       }
       if (e.type === 'castStarted') {
+        if (e.slot === 'SPACE' && state.champions[e.championId]?.championId === 'skerrow') {
+          if (firstLunge < 0) firstLunge = tick;
+        }
         started[e.championId] = (started[e.championId] ?? 0) + 1;
         if (e.ex) exStarted[e.championId] = (exStarted[e.championId] ?? 0) + 1;
         if (e.slot === 'F') ultimates[e.championId] = (ultimates[e.championId] ?? 0) + 1;
@@ -358,11 +418,15 @@ function play(set: KitSet, run: MatchRun): Played {
         if (victim && killer && victim.team !== killer.team && fired.has(e.sourceId)) killed = true;
       }
     }
+    if (eliminatedAt < 0) {
+      const alive = (team: string) => state.champions.some((c) => c.alive && c.team === team);
+      if (!alive('A') || !alive('B')) eliminatedAt = state.tick;
+    }
     expect(checkInvariants(state)).toEqual([]);
     expect(Number.isFinite(checksum(state))).toBe(true);
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; teleports ${teleports}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; teleports ${teleports}; eliminated ${eliminatedAt}; first Lunge ${firstLunge}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
@@ -372,6 +436,8 @@ function play(set: KitSet, run: MatchRun): Played {
     killed,
     teleports,
     blockedTeleports,
+    eliminatedAt,
+    firstLunge,
     summary,
   };
 }
@@ -417,6 +483,25 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
     expect(played.blockedTeleports, played.summary).toBe(0);
+    expectNoStall(played);
+  }, 30_000);
+});
+
+describe('a headless match with Skerrow on the shipped kits', () => {
+  const set = KIT_SETS[1] as KitSet;
+  const NORMAL = ['normal', 'normal', 'normal', 'normal'] as const;
+
+  // Free play with no match flow: one team has no champion left by tick 3600 (a round is 5400 ticks
+  // in match flow, which would decide the same way). Pinned seeds: a miss after a change to the
+  // bots, the sim or the Node version is governed by batch #53 decision 8.3.
+  it('Skerrow and Quillon against Hargrim and Quillon: a team is eliminated by tick 3600', () => {
+    const run = createRun(SEEDS, NORMAL, 7, { config: configSkerrow(), kits: set.kits() });
+    const played = play(set, run);
+    expect(played.eliminatedAt, played.summary).toBeGreaterThan(0);
+    expect(played.eliminatedAt, played.summary).toBeLessThanOrEqual(TICKS);
+    expect(played.firstLunge, `Skerrow started no Lunge: ${played.summary}`).toBeGreaterThanOrEqual(0);
+    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.state.tick).toBe(TICKS);
     expectNoStall(played);
   }, 30_000);
 });
@@ -488,5 +573,54 @@ describe('the band and clearance tables of the shipped kits', () => {
     const slam = ultimate.then[0];
     if (slam === undefined || slam.type !== 'area') throw new Error('no slam');
     expect(set.bands['hargrim:F']).toEqual({ min: 0, max: ultimate.distance + slam.radius + 0.5 });
+  });
+
+  it('has the reach, the width, the Lunge band and the hold of every Skerrow ability', () => {
+    const shipped = KIT_SETS[1] as KitSet;
+    const arcOf = (spec: AbilitySpec) => {
+      const effect = spec.effects[0];
+      if (effect === undefined || effect.type !== 'meleeArc') throw new Error('no arc');
+      return effect;
+    };
+    expect(shipped.bands['skerrow:M1']).toEqual({ min: 0, max: arcOf(slotOf('skerrow', 'M1')).radius + 0.5 });
+    for (const key of ['E', 'E:ex']) {
+      expect(shipped.bands[`skerrow:${key}`], key).toEqual({
+        min: 0,
+        max: arcOf(slotOf('skerrow', key)).radius + 0.5,
+      });
+    }
+    for (const key of ['M2', 'Q']) {
+      const bolt = projectile(slotOf('skerrow', key));
+      expect(shipped.bands[`skerrow:${key}`], key).toEqual({
+        min: 0,
+        max: (bolt.speed * bolt.lifetimeTicks) / 60,
+      });
+      expect(shipped.clearances[`skerrow:${key}`], key).toBe(bolt.radius);
+    }
+    // Lunge: the base dash gives [D - 1, D] with no margin; the EX dash its distance plus its arc.
+    const lunge = slotOf('skerrow', 'SPACE').effects[0];
+    if (lunge === undefined || lunge.type !== 'dash') throw new Error('no dash');
+    expect(shipped.bands['skerrow:SPACE']).toEqual({ min: lunge.distance - 1, max: lunge.distance, margin: 0 });
+    const exLunge = slotOf('skerrow', 'SPACE:ex').effects[0];
+    if (exLunge === undefined || exLunge.type !== 'dash') throw new Error('no dash');
+    const exArc = exLunge.then[0];
+    if (exArc === undefined || exArc.type !== 'meleeArc') throw new Error('no arc');
+    expect(shipped.bands['skerrow:SPACE:ex']).toEqual({ min: 0, max: exLunge.distance + exArc.radius + 0.5 });
+    // Reaper's Dance: the teleport plus its arc; held for a target at or below the damage it does.
+    const [jump, reap] = slotOf('skerrow', 'F').effects;
+    if (jump === undefined || jump.type !== 'teleport') throw new Error('no teleport');
+    if (reap === undefined || reap.type !== 'meleeArc') throw new Error('no arc');
+    expect(shipped.bands['skerrow:F']).toEqual({ min: 0, max: jump.range + reap.radius + 0.5 });
+    const damage = reap.effects.find((e) => e.type === 'damage');
+    expect(damage?.type === 'damage' && damage.amount).toBe(HELD['skerrow:F']);
+    // Vanish Step: a teleport the oracle finds a landing for.
+    const vanish = slotOf('skerrow', 'R').effects[0];
+    if (vanish === undefined || vanish.type !== 'teleport') throw new Error('no teleport');
+    expect(ESCAPES['skerrow:R']?.teleport).toBe(vanish.range);
+    expect(vanish.fixed).toBe(false);
+    const skip = slotOf('quillon', 'SPACE').effects[0];
+    if (skip === undefined || skip.type !== 'teleport') throw new Error('no teleport');
+    expect(ESCAPES['quillon:SPACE']?.teleport).toBe(skip.range);
+    expect(ESCAPES['quillon:R']?.after?.teleport).toBe(skip.range);
   });
 });

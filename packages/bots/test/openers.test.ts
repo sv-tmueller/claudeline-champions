@@ -86,3 +86,21 @@ describe('Snare Orb, the opener of Quillon on a target that closes in', () => {
     expect(pressOf(sceneOf('quillon', 9.05, { ready: ['Q'], enemyVx: -5.5 }))).toBeNull();
   });
 });
+
+describe('Lunge, the dash opener of Skerrow', () => {
+  const SPACE_ONLY = { ready: ['SPACE'] } as const;
+
+  it('presses base SPACE from 5 to 6 m with no energy, and not at 4.9 or 6.1 m', () => {
+    for (const d of [5, 5.5, 6]) {
+      expect(pressOf(sceneOf('skerrow', d, SPACE_ONLY)), `at ${d} m`).toBe('SPACE');
+    }
+    for (const d of [4.9, 6.1]) {
+      expect(pressOf(sceneOf('skerrow', d, SPACE_ONLY)), `at ${d} m`).toBeNull();
+    }
+  });
+
+  it('presses the EX Lunge at 9 m with 25 energy, where the EX band reaches, and nothing with 24', () => {
+    expect(pressOf(sceneOf('skerrow', 9, { ...SPACE_ONLY, energy: 25 }))).toBe('SPACE+SHIFT');
+    expect(pressOf(sceneOf('skerrow', 9, { ...SPACE_ONLY, energy: 24 }))).toBeNull();
+  });
+});

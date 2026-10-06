@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor } from '../src/profile';
+import { jsonKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -64,10 +65,14 @@ describe('profileFor with a kit', () => {
       rangeMin: 6,
       rangeMax: 10,
     });
-    expect(profileFor('skerrow', withM1(quietKit('skerrow'), boltSlot(21, 40)))).toEqual({
-      rangeMin: 0,
-      rangeMax: 2.5,
-    });
+  });
+
+  it('reads Skerrow from the base M1 band too: the arc of 2.5 m less the margin is 1.5 m', () => {
+    const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
+    expect(profileFor('skerrow', skerrow)).toEqual({ rangeMin: 0, rangeMax: 1.5 });
+    // Without a kit, or with a kit of another id, she keeps the table: 2.5 m.
+    expect(profileFor('skerrow')).toEqual({ rangeMin: 0, rangeMax: 2.5 });
+    expect(profileFor('skerrow', quietKit('hargrim'))).toEqual({ rangeMin: 0, rangeMax: 2.5 });
   });
 
   it('returns a fresh object every call', () => {

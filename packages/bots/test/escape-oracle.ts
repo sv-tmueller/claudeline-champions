@@ -1,6 +1,6 @@
 import { Button, cloneState, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, PlayerInput, Slot } from '@claudeline/sim';
-import { oracleBlocked } from './helpers';
+import { oracleBlocked, oracleSegmentViolates } from './helpers';
 
 // An independent oracle for the escape presses of the headless runs. It does not import src: the
 // trigger and the first-of-five landing are written here from docs/architecture/bots.md (Openers
@@ -105,6 +105,35 @@ function teleportOf(
   const event = clone.events.find((e) => e.type === 'teleport' && e.championId === c.id);
   if (event === undefined || event.type !== 'teleport' || event.blocked) return null;
   return { x: event.toX, y: event.toY };
+}
+
+/**
+ * Whether `target` is cornered as seen from `from`: none of the five points 1 m off the target
+ * (straight away from `from`, then +45, -45, +90, -90 degrees) is in a free grid cell that a
+ * straight walk from the target reaches without touching anything. Written here from the
+ * definition, with the sampled walk of `oracleSegmentViolates`, not from the code of the bot.
+ */
+export function oracleCornered(
+  state: GameState,
+  target: ChampionState,
+  from: ChampionState,
+): boolean {
+  const d = Math.hypot(target.x - from.x, target.y - from.y);
+  const ax = d === 0 ? 1 : (target.x - from.x) / d;
+  const ay = d === 0 ? 0 : (target.y - from.y) / d;
+  const s = Math.SQRT1_2;
+  const directions = [
+    { x: ax, y: ay },
+    { x: ax * s - ay * s, y: ax * s + ay * s },
+    { x: ax * s + ay * s, y: -ax * s + ay * s },
+    { x: -ay, y: ax },
+    { x: ay, y: -ax },
+  ];
+  for (const dir of directions) {
+    const point = { x: target.x + dir.x, y: target.y + dir.y };
+    if (freeCell(state, point) && !oracleSegmentViolates(state.arena, target, point)) return false;
+  }
+  return true;
 }
 
 /** Whether the 0.5 m grid cell holding p is free: its centre does not penetrate anything. */

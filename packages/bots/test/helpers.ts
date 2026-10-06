@@ -108,6 +108,19 @@ export function configMirror(): MatchConfig {
   };
 }
 
+/** Skerrow A, Quillon A, Hargrim B, Quillon B: Skerrow takes Hargrim's place on team A of the mirror. */
+export function configSkerrow(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'skerrow', team: 'A' },
+      { championId: 'quillon', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
 export interface Point {
   x: number;
   y: number;

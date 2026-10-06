@@ -25,6 +25,7 @@ const PROFILES = new Map<string, BotProfile>([
 const KIT_RULES = new Map<string, number>([
   ['hargrim', 0],
   ['quillon', 6],
+  ['skerrow', 0],
 ]);
 
 /**
@@ -70,12 +71,20 @@ export interface ChampionRules {
    * a sequence. See `chooseEscape` in escape.ts.
    */
   readonly escapes: readonly Slot[];
+  /**
+   * The ultimate is held for a target it can finish or one with no way out: its run counts only
+   * while the target's health is at most the damage F does (read from the kit) or the target is
+   * cornered, and the energy reserve needs the same condition (see `computeCues`). No champion of
+   * the 2026-10 roster but Skerrow holds it.
+   */
+  readonly holdF: boolean;
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
 const NO_RULES: ChampionRules = Object.freeze({
   openers: Object.freeze([]),
   escapes: Object.freeze([]),
+  holdF: false,
 });
 
 /**
@@ -84,6 +93,9 @@ const NO_RULES: ChampionRules = Object.freeze({
  * roster's 4 to 7 m, inside the kit band less the margin (0 to 8 m), and only at a target that
  * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
  * Iron Hide, Skip and Hush Ward are the escapes of the roster sketches: Skip first, then Hush Ward.
+ * Skerrow's Lunge is the base dash with its derived band (5 to 6 m, where she waits to strike is
+ * not built); Vanish Step is her escape on the common trigger (decision 6 of batch #80, not the
+ * roster's 50 percent health: that would send her back in at once); Reaper's Dance is held.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -94,6 +106,7 @@ const RULES = new Map<string, ChampionRules>([
         { slot: 'E', band: [4, 7], motion: 'away' },
       ],
       escapes: ['R'],
+      holdF: false,
     },
   ],
   [
@@ -101,6 +114,15 @@ const RULES = new Map<string, ChampionRules>([
     {
       openers: [{ slot: 'Q', band: null, motion: 'closing' }],
       escapes: ['SPACE', 'R'],
+      holdF: false,
+    },
+  ],
+  [
+    'skerrow',
+    {
+      openers: [{ slot: 'SPACE', band: 'dash', motion: null }],
+      escapes: ['R'],
+      holdF: true,
     },
   ],
 ]);

@@ -209,7 +209,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const goalPoint: Vec2 = { x: 0.5, y: 0.5 };
   const kiteScratch = createKiteScratch();
   const kitCache = createKitCache();
-  const cues = createCastCues();
+  const cues = createCastCues(kiteScratch);
   const escapeScratch = createEscapeScratch(kiteScratch);
   const dist = createMeasure();
   let follower = createFollower();
@@ -490,7 +490,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       lastActed.targetId = acted.targetId;
 
       if (kit !== undefined && target !== undefined && acted.intent !== 'idle') {
-        computeCues(cues, kitCache, profile, acted.intent, me, target, sight, dist);
+        computeCues(cues, kitCache, profile, acted.intent, me, target, sight, dist, navGrid(state));
       } else {
         cues.reserve = false;
         cues.escape = false;

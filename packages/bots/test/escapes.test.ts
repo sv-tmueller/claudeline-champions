@@ -82,6 +82,20 @@ describe('the escape trigger', () => {
   });
 });
 
+describe('Vanish Step, the escape of Skerrow', () => {
+  it('presses R at health 20 percent with the target 4 m away, aimed at a 5 m landing', () => {
+    // The common trigger: a retreat with the acted target within 6 m. Her teleport is not fixed:
+    // the landing is 5 m straight away from the target, at (-11, 0), and the aim is exactly there.
+    const state = sceneOf('skerrow', 4, { ready: ['R'], health: 0.2 });
+    expect(firstPress(state, 'easy', 1)).toEqual({ label: 'R', aimX: -1100, aimY: 0 });
+  });
+
+  it('does not press R at a healthy Skerrow, nor beyond 6 m', () => {
+    expect(pressOf(sceneOf('skerrow', 4, { ready: ['R'] }))).toBeNull();
+    expect(pressOf(sceneOf('skerrow', 6.05, { ready: ['R'], health: 0.2 }))).toBeNull();
+  });
+});
+
 describe('the order of an escape', () => {
   it('presses Skip, not the ultimate, when both are ready and the target is 3 m away', () => {
     // Quillon kites at 3 m with 100 energy: F is in reach, and a Skip is the escape.
