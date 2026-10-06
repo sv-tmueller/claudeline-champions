@@ -637,10 +637,12 @@ describe('a projectile with allyEffects', () => {
   });
 
   it('stops at the first champion of either team when both are inside one sweep (T4c)', () => {
-    // 120 m/s is 2 m per tick: from x = -5 the contacts at -3.9 and -3.1 are in the first sweep.
+    // 120 m/s is 2 m per tick. The two champions stand 1.2 m apart, so the collision push-out leaves
+    // them in place (a gap under 1.0 m would move the second one), and from x = -5 the contacts at
+    // -4.5 and -3.3 (t = 0.25 and 0.85) are both in the first sweep.
     const allyFirst = line();
-    place(allyFirst, 1, -3.2, 0);
-    place(allyFirst, 2, -2.4, 0);
+    place(allyFirst, 1, -3.8, 0);
+    place(allyFirst, 2, -2.6, 0);
     spawnProjectile(allyFirst, bolt({ speed: 120 }));
     step(allyFirst, []);
     expect(allyFirst.projectiles).toHaveLength(0);
@@ -650,8 +652,8 @@ describe('a projectile with allyEffects', () => {
     expect(champion(allyFirst, 2).health).toBe(120);
 
     const enemyFirst = line();
-    place(enemyFirst, 2, -3.2, 0);
-    place(enemyFirst, 1, -2.4, 0);
+    place(enemyFirst, 2, -3.8, 0);
+    place(enemyFirst, 1, -2.6, 0);
     champion(enemyFirst, 1).health = 100;
     spawnProjectile(enemyFirst, bolt({ speed: 120 }));
     step(enemyFirst, []);
