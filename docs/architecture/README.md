@@ -90,12 +90,10 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   Recorded in [ADR-003](decisions/ADR-003-typed-ability-modules.md) and
   [Simulation](simulation.md#kit-contract-and-registration).
 - The heap probe runs through the dev-only counted frame hook on two scenes,
-  asserting the median of five windows: 640 B for the sandbox and 780 B for the
+  asserting the median of five windows: 600 B for the sandbox and 780 B for the
   live match:
   [batch #53 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
-  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236),
-  [batch #80 decision 10](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6011944911),
-  [batch #80 decision 19](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012668313).
+  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236).
   Recorded in [Testing](testing.md#the-heap-probe).
 - arena01's two deviations are grandfathered:
   [batch #63 decision 14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).

@@ -291,9 +291,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   above for why). Window 0 of the sandbox holds the first-frame acquire of the
   volley's eight views and reads 636 to 1068 B counted in every attempt (74
   attempts: the 24 runner lines of the isolation, 35 local and the 15 of
-  1670d1b; the acquire is 336 to 660 B of it), which the median ignores; the live scene's windows hold
-  the round's first projectiles, the first hit and the rings: the event paths
-  (`entity-views.ts:acquire`, `feedback.ts:routeEvents`,
+  1670d1b; the acquire is 336 to 660 B of it), which the median ignores; the
+  live scene's windows hold the round's first projectiles, the first hit and the
+  rings: the event paths (`entity-views.ts:acquire`, `feedback.ts:routeEvents`,
   `impact-rings.ts:spawn`) cost 24 to 330 B in a window, with one-off spikes of
   1.3 to 5 KB in `hud.ts`, `impact-rings.ts`, `main.ts` and `champion-look.ts`,
   each in one window.
@@ -302,31 +302,41 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   above the largest clean median, local and runner, and below the smallest
   mutation the scene gates. They were read on a copy of the spec with the limit
   at 1 B and `expect.soft`, 15 attempts per scene on 1670d1b in 5 batches of 3
-  repeats, none blind. Sandbox: 640 B. In a steady state every counted function
+  repeats, none blind. Sandbox: 600 B. In a steady state every counted function
   reads 0 B except `frameMany`, which reads 300 to 588 B (9 to 18 B per frame,
   one boxed number per frame at the call into `frame`, which stays whatever the
   shape of the hook: the timestamp as an argument, as an integer, in a field of
   the loop clock, and with no argument at all, where no number crosses the call)
-  and carries the bytes of whatever V8 inlines into it. The median of five was
-  at most 456 B over the 15 local attempts and 504 B over the 24 runner attempts
-  of the isolation (before the fixes of #87 and #89), so 640 B stays: 136 B
-  above the largest of them and 252 B under the smallest sandbox-gated mutation
-  (892 B). The worst window is not a stable figure: window 0 read 744 to 1032 B
-  clean in the 15 attempts (636 to 1068 B in all 74) and 1224 to 2140 B with a
-  spike. Live: 780 B, its own literal, because the event windows raise the base
-  and a moving pointer is present in every window: on 1670d1b the median of five
-  was at most 684 B over the 15 local attempts (a worst clean window of 780 B,
-  and 3 spikes in 75 windows: `feedback.ts:hit` 1548 B, `hud.ts:updateRound`
-  1944 B and `health-bars.ts:update` 1944 B), above the sandbox's 640 B. The
-  runner medians of the earlier shape (7b80afd, no pointer, `draw` excluded:
-  jobs 112201476995, 112203346352 and 112205063119) were 588, 540 and 660 B, at
-  1.0 to 1.1 min per live attempt. The live limit is 96 B above the largest
-  clean local median (684 B), 120 B above the largest of those runner medians
-  (660 B) and 228 B under the smallest live-gated mutation, the per-change
-  `data-p0x` write (1008 to 1176 B). A runner live median above 780 B reopens
-  the limit under the limit rule (about 100 B above the largest clean median,
-  below the smallest live-gated mutation; if none fits, stop and report). The
-  figures of the PR's runner proof are in its body.
+  and carries the bytes of whatever V8 inlines into it. The largest clean median
+  of five is 504 B, from the 24 runner attempts of the isolation (before the
+  fixes of #87 and #89). With the fixes in it was at most 456 B over the 15
+  local attempts, 480 B over the tester's 3 local attempts on 3def3bc (360, 480
+  and 480 B) and 456 B over the 6 runner attempts on 3def3bc (384, 360, 432,
+  432, 456 and 408 B, run 37456539110). The limit is 96 B above 504 B (about 100
+  B, to a round 600 B) and 292 B under the smallest sandbox-gated mutation (892
+  B). It was 640 B, 136 B above the largest figure, which is outside the margins
+  the rule has accepted (96 to 120 B). Against 600 B the eight per-call
+  mutations of the table were rerun on the sandbox and all failed 3 of 3
+  (medians 940 to 3132 B). The worst window is not a stable figure: window 0
+  read 744 to 1032 B clean in the 15 attempts, 792 to 1092 B in the 6 runner
+  attempts (636 to 1068 B in the 74 attempts before those) and 1224 to 2140 B
+  with a spike. Live: 780 B, its own literal, because the event windows raise
+  the base and a moving pointer is present in every window: on 1670d1b the
+  median of five was at most 684 B over the 15 local attempts (a worst clean
+  window of 780 B, and 3 spikes in 75 windows: `feedback.ts:hit` 1548 B,
+  `hud.ts:updateRound` 1944 B and `health-bars.ts:update` 1944 B), above the
+  sandbox's 600 B. The runner medians of the earlier shape (7b80afd, no pointer,
+  `draw` excluded: jobs 112201476995, 112203346352 and 112205063119) were 588,
+  540 and 660 B, at 1.0 to 1.1 min per live attempt; the six runner attempts on
+  3def3bc read 660, 552, 636, 516, 576 and 528 B, with `sampleAim`, `camera.ts`
+  and `draw` at 0 B in every window and 2.7 to 4.2 min for the whole Playwright
+  job of 19 tests. The live limit is 96 B above the largest clean local median
+  (684 B), 120 B above the largest of those runner medians (660 B) and 228 B
+  under the smallest live-gated mutation, the per-change `data-p0x` write (1008
+  to 1176 B). A runner live median above 780 B reopens the limit under the limit
+  rule (about 100 B above the largest clean median, below the smallest
+  live-gated mutation; if none fits, stop and report). The figures of the PR's
+  runner proof are in its body.
 - `main.ts:sampleAim`, `camera.ts` and `entity-views.ts:draw` read 0 B. On
   1670d1b the three read 0 B in all 75 windows of the 15 live attempts (the
   pointer present and moving), and `draw` and the camera module in all 75
@@ -375,9 +385,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   `ResultScreen.update` template is the sandbox's (on the live scene it read red
   in 3 of 3 attempts here, but only 56 B over the limit, and 704 B and 752 B
   passed under 780 B in the 12 attempts before; the sandbox reads 892 to 944 B
-  against 640 B), and the per-change pair and the rect row are the live scene's
+  against 600 B), and the per-change pair and the rect row are the live scene's
   (the sandbox never changes the position or the facing in a window and never
-  moves the pointer). The limit is 640 B on the sandbox and 780 B on the live
+  moves the pointer). The limit is 600 B on the sandbox and 780 B on the live
   scene. Places are given by function, since line numbers go stale:
 
   | Mutation | Function and place | The line as applied | Sandbox, B | Live, B |
@@ -404,7 +414,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   `${x}`: V8's number-to-string cache returns a cached string for an integer it
   has seen, and the walk revisits the same centimetres every second window, so
   that form could read 0 B. Run once per scene, 3 attempts each: both pass on
-  the sandbox (medians 336 to 384 B and 360 to 408 B, under 640 B), which is the
+  the sandbox (medians 336 to 384 B and 360 to 408 B, under 600 B), which is the
   gap, and both fail on the live scene, every attempt (1008 to 1176 B and 1300
   to 1388 B on 1670d1b; 948 to 1028 B and 1220 to 1276 B on 8d80073, before the
   pointer joined the scene). The per-event writes (the flash, the bars, the
