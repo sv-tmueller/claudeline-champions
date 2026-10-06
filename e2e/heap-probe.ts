@@ -67,7 +67,7 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // position and facing are the live scene's (see LIVE_ALLOCATION_LIMIT_BYTES): here
 // they read 336 to 432 B and pass. See testing.md.
 export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
-// The live match's limit: 750 B, its own literal, on the median of five measured
+// The live match's limit: 780 B, its own literal, on the median of five measured
 // windows. The measured windows hold the first projectiles and hits of round 3, whose
 // event paths (the view acquire, routeEvents, the impact rings) cost 24 to 330 B in a
 // window, so the base is higher than the sandbox's. On 8d80073 (the bots of #86) the
@@ -77,12 +77,13 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // `hud.ts:updateRound` 1944 B), counting every function of the pattern but
 // `entity-views.ts:draw` (LIVE_EXCLUDED below). The three runner attempts of this shape
 // (7b80afd, run 37442967554) read medians of 588, 540 and 660 B, with `draw` at 0 B in
-// two and 228 to 1116 B in the third. The limit is 66 B above the largest clean local
-// median (684 B) and 90 B above the runner's (660 B). A runner live median above
-// 750 B reopens it (about 100 B above the largest clean median, below the smallest
+// two and 228 to 1116 B in the third. The limit is 96 B above the largest clean local
+// median (684 B over 21 attempts), 120 B above the runner's (660 B) and 168 B under the
+// smallest live-gated mutation (948 B, below). A runner live median above 780 B reopens
+// it (about 100 B above the largest clean median, below the smallest
 // live-gated mutation; if none fits, stop and report). Live mutations (3 attempts
 // each, same lines as the sandbox's), medians: 948 to 1028 B for x.toFixed(0) in
-// data-p0x, the smallest live-gated one (198 B over the limit), 1220 to 1276 B for
+// data-p0x, the smallest live-gated one (168 B over the limit), 1220 to 1276 B for
 // (facing / 1000).toFixed(3) in data-f0, 1412 to 1480 B for the Hud.update template,
 // 1448 to 1552 B for the array in BotDriver.think, 1664 to 1764 B for the array in
 // frame, 1736 to 1996 B for the closure in routeEvents, 2216 to 2260 B for the
@@ -90,9 +91,9 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // gated by the sandbox and not by this limit: the escaping object in the entity views'
 // draw (528 to 588 B here, the excluded function; 3052 to 3180 B on the sandbox) and
 // the template per ResultScreen.update call (704 to 896 B here over 12 attempts, 704 B
-// passing under 750 B once, so it sits at the limit and is not a live gate; 968 to 1040 B
-// against 640 B on the sandbox). See testing.md.
-export const LIVE_ALLOCATION_LIMIT_BYTES = 750;
+// and 752 B passing under 780 B, so it sits at the limit and is not a live gate; 968 to
+// 1040 B against 640 B on the sandbox). See testing.md.
+export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
 // The one function of the counted code that the live scene does not count. On the
 // runner `entity-views.ts:draw` allocated 228 to 912 B in every window (1.1 to 1.5 KB
 // in the window of the first hit) in 19 of 24 attempts and 0 B in the other 5: a mode

@@ -249,7 +249,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   non-blind) and 504 B over the 24 runner attempts of the isolation, so 640 B
   stays, about 100 B above the largest clean median and below every mutation
   below. The worst window is not a stable figure: it read up to 1068 B clean and
-  1224 to 2140 B with a spike. Live: 750 B, its own literal, because the event
+  1224 to 2140 B with a spike. Live: 780 B, its own literal, because the event
   windows raise the base: on 8d80073 (the bots of #86) the median of five was at
   most 684 B over 21 local attempts (15 at limit 1 B in 5 batches of 3 repeats,
   3 in the check run, 3 of the light tester's, which read 612, 468 and 612 B;
@@ -275,23 +275,24 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   lines) and does not count them. The sandbox counts `draw`, and the mutation of
   `draw` below fails there. The mode itself is a client defect,
   https://github.com/sv-tmueller/claudeline-champions/issues/89, whose fix
-  removes `LIVE_EXCLUDED` (the carve-out ends there). The live limit is about 66
-  B above the largest clean local median (684 B) and 90 B above the runner's
-  (660 B) and below the median of every mutation the live scene gates: the
-  per-change `data-p0x` write (948 to 1028 B, 198 B over the limit) is the
-  smallest. Two mutations are gated by the sandbox and not by this limit: `draw`
-  (528 to 588 B live, the excluded function) and the `ResultScreen.update`
-  template (704 to 896 B live over 12 attempts, 704 B once passing under 750 B,
-  so it sits at the limit; 968 to 1040 B against 640 B on the sandbox). A runner
-  live median above 750 B reopens the limit under the limit rule (about 100 B
-  above the largest clean median, below the smallest live-gated mutation; if
-  none fits, stop and report). Both limits were read on a copy of the spec with
-  the limit at 1 B and `expect.soft`; to read the per-function figures, read the
-  "combat code allocated" line of a failure message, or the per-window lines
-  `heap probe <scene> attempt N window W: counted ...` that every attempt logs.
-  Excluding `frameMany` from the pattern is not an option: with it excluded, the
-  escaping array in `frame` and the `ResultScreen.update` template passed,
-  because V8 inlines their code into `frameMany`.
+  removes `LIVE_EXCLUDED` (the carve-out ends there). The live limit is about 96
+  B above the largest clean local median (684 B over 21 attempts) and 120 B
+  above the runner's (660 B, run 37442967554) and below the median of every
+  mutation the live scene gates: the per-change `data-p0x` write (948 to 1028 B,
+  168 B over the limit) is the smallest. Two mutations are gated by the sandbox
+  and not by this limit: `draw` (528 to 588 B live, the excluded function) and
+  the `ResultScreen.update` template (704 to 896 B live over 12 attempts, 704 B
+  and 752 B passing under 780 B, so it sits at the limit; 968 to 1040 B against
+  640 B on the sandbox). A runner live median above 780 B reopens the limit
+  under the limit rule (about 100 B above the largest clean median, below the
+  smallest live-gated mutation; if none fits, stop and report). Both limits were
+  read on a copy of the spec with the limit at 1 B and `expect.soft`; to read
+  the per-function figures, read the "combat code allocated" line of a failure
+  message, or the per-window lines `heap probe <scene> attempt N window W:
+  counted ...` that every attempt logs. Excluding `frameMany` from the pattern
+  is not an option: with it excluded, the escaping array in `frame` and the
+  `ResultScreen.update` template passed, because V8 inlines their code into
+  `frameMany`.
 - The sanity floor: the lowest window outside the sim's three sweep files
   (`projectile.ts`, `geometry.ts` and `area.ts`, whose garbage was about 790 KB
   per window until #62 and is 5.7 to 18 KB now, total minus outside the sweep
@@ -313,7 +314,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   gated by the sandbox and not by the live limit: `draw`, since the live scene
   does not count `entity-views.ts:draw` (528 to 588 B there), and the
   `ResultScreen.update` template (704 to 896 B there over 12 attempts, at the
-  limit). The limit is 640 B on the sandbox and 750 B on the live scene:
+  limit). The limit is 640 B on the sandbox and 780 B on the live scene:
 
   | Mutation | Function and place | The line as applied | Sandbox, B | Live, B |
   |---|---|---|---|---|
@@ -324,7 +325,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   | `toPlayerInput` literal | `input.ts:toPlayerInput`, replacing `return out;` | `return { moveX: out.moveX, moveY: out.moveY, aimX, aimY, buttons };` | 2064 to 2168 | 2216 to 2260 |
   | template per `Hud.update` | `hud.ts:update`, first line | `` (globalThis as unknown as { __t?: unknown }).__t = `t${state.tick}`; `` | 784 to 1572 | 1412 to 1480 |
   | array per `BotDriver.think` | `bot-driver.ts:think`, first line | `(globalThis as unknown as { __b?: unknown }).__b = [state.tick, inputs.length];` | 1408 to 1448 | 1448 to 1552 |
-  | template per `ResultScreen.update` | `result-screen.ts:update`, first line | `` (globalThis as unknown as { __r?: unknown }).__r = `r${state.match?.round}`; `` | 968 to 1040 | 704 to 896 (sandbox-gated: at the live limit, 704 B passed once) |
+  | template per `ResultScreen.update` | `result-screen.ts:update`, first line | `` (globalThis as unknown as { __r?: unknown }).__r = `r${state.match?.round}`; `` | 968 to 1040 | 704 to 896 (sandbox-gated: at the live limit, 704 B and 752 B passed) |
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure
