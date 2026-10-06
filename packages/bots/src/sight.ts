@@ -226,7 +226,8 @@ export const SIGHT_RADIUS = 8;
 
 /**
  * The free cell nearest to p, within `radius` cells of p's own cell, whose centre has a clear
- * shot of a champion's width to the target at a distance in [rangeMin, rangeMax]; -1 when there
+ * shot to the target, of the width in `scratch.standClearance` (a champion's 0.5 m by default),
+ * at a distance in [rangeMin, rangeMax]; -1 when there
  * is none or p is off the grid or not finite. The bot's own cell never counts. The scan runs in
  * index order and keeps the smallest squared distance from p to the cell centre, so a tie goes
  * to the lower index. No segment test: the path follower routes to the cell. The cell centres

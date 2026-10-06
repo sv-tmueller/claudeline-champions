@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
-import { profileFor } from '../src/profile';
+import { profileFor, rulesFor } from '../src/profile';
 import { jsonKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
@@ -86,5 +86,27 @@ describe('profileFor without a kit', () => {
     expect(profileFor('hargrim')).toEqual({ rangeMin: 0, rangeMax: 3 });
     expect(profileFor('quillon')).toEqual({ rangeMin: 6, rangeMax: 13 });
     expect(profileFor('constructor')).toEqual({ rangeMin: 4, rangeMax: 8 });
+  });
+});
+
+describe('rulesFor', () => {
+  it('hands out frozen rules: the row, its openers and escapes, and each opener and band', () => {
+    for (const kit of jsonKits()) {
+      const rules = rulesFor(kit.id, kit);
+      expect(rules.openers.length + rules.escapes.length, kit.id).toBeGreaterThan(0);
+      expect(Object.isFrozen(rules), `${kit.id} row`).toBe(true);
+      expect(Object.isFrozen(rules.openers), `${kit.id} openers`).toBe(true);
+      expect(Object.isFrozen(rules.escapes), `${kit.id} escapes`).toBe(true);
+      for (const opener of rules.openers) {
+        expect(Object.isFrozen(opener), `${kit.id} ${opener.slot}`).toBe(true);
+        if (Array.isArray(opener.band)) expect(Object.isFrozen(opener.band)).toBe(true);
+      }
+    }
+  });
+
+  it('gives no rule without a kit or with a kit of another id', () => {
+    const quillon = jsonKits().find((kit) => kit.id === 'quillon') as KitDef;
+    expect(rulesFor('hargrim')).toEqual({ openers: [], escapes: [], holdF: false });
+    expect(rulesFor('hargrim', quillon)).toEqual({ openers: [], escapes: [], holdF: false });
   });
 });

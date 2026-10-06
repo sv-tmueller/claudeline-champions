@@ -10,9 +10,9 @@ import { lineOfSight } from './sight';
 import type { SightScratch } from './sight';
 
 // Escapes: the slots a bot presses to get out of reach (docs/architecture/bots.md, Openers and
-// escapes). The trigger is the escape think of `computeCues` in casting.ts; the choice is `chooseEscape`; a teleport escape
-// (Quillon's Skip, Skerrow's Vanish Step) needs a landing, which is `landingInto` and the search
-// over the five kite directions in `findLanding`.
+// escapes). The trigger is the escape think of `computeCues` in casting.ts; the choice is
+// `chooseEscape`; a teleport escape (Quillon's Skip, Skerrow's Vanish Step) needs a landing, which
+// is `landingInto` and the search over the five kite directions in `findLanding`.
 
 /**
  * The scratch of a teleport landing, in fields that start as doubles. `dirX`, `dirY`, `range` and
@@ -142,6 +142,9 @@ function findLanding(
  * landing is in `scratch.land` with `scratch.landed` set. Every slot of the order is marked in
  * `scratch.tried`, so the main walk of `chooseCast` skips it: a teleport that found no landing must
  * not be pressed there.
+ *
+ * There is no energy gate, unlike `chooseCast`: every escape row costs nothing (a base press that
+ * is not F), and a row with an EX variant or F would need the cost check added with its test.
  */
 export function chooseEscape(
   choice: CastChoice,

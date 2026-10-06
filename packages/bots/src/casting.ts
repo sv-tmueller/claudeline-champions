@@ -8,7 +8,7 @@ import type { KiteScratch } from './kite';
 import { profileFor, rulesFor } from './profile';
 import type { BotProfile } from './profile';
 import { RANGE_MARGIN, abilityReach } from './reach';
-import { clearShotWith } from './sight';
+import { SIGHT_CLEARANCE, clearShotWith } from './sight';
 import type { SightScratch } from './sight';
 import type { MoveCommand } from './steer';
 
@@ -118,10 +118,10 @@ export interface CastCues {
   corner: MoveCommand;
   /**
    * True on an escape think: the acted intent is retreat with the target within `ESCAPE_RANGE`,
-   * or kite with the target inside rangeMin (see `ESCAPE_RANGE` in escape.ts). Set by the bot
-   * before `updateRuns`.
+   * or kite with the target inside rangeMin (see `ESCAPE_RANGE` below). Set by `computeCues`
+   * before `updateRuns`. Not the cornered kiter's latch `escaping` of bot.ts.
    */
-  escape: boolean;
+  escapeThink: boolean;
 }
 
 export function createCastCues(kite: KiteScratch): CastCues {
@@ -131,7 +131,7 @@ export function createCastCues(kite: KiteScratch): CastCues {
     fOk: true,
     kite,
     corner: { moveX: 0, moveY: 0 },
-    escape: false,
+    escapeThink: false,
   };
 }
 
@@ -336,7 +336,7 @@ export function computeCues(
   distanceInto(dist, me, target);
   const d = dist.metres;
   cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
-  cues.escape =
+  cues.escapeThink =
     (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
   // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
   // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
@@ -351,10 +351,10 @@ export function computeCues(
     (cache.baseMin[F_INDEX] as number) <= d &&
     d <= (cache.baseMax[F_INDEX] as number) - RANGE_MARGIN &&
     cues.fOk;
-  sight.standClearance = 0.5;
+  sight.standClearance = SIGHT_CLEARANCE;
   if (cues.reserve && me.energy >= ULTIMATE_ENERGY_COST) {
     const wide = cache.baseClearance[F_INDEX] as number;
-    if (wide > 0.5) sight.standClearance = wide;
+    if (wide > SIGHT_CLEARANCE) sight.standClearance = wide;
   }
 }
 
@@ -391,7 +391,7 @@ export function updateRuns(
   const d = dist.metres;
   for (let i = 0; i < SLOTS.length; i++) {
     // An escape slot on an escape think counts the trigger: no band, no shot test.
-    if (cues.escape && cache.isEscape[i] === 1) {
+    if (cues.escapeThink && cache.isEscape[i] === 1) {
       runs[i] = (runs[i] as number) + 1;
       continue;
     }

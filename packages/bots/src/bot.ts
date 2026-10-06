@@ -493,7 +493,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         computeCues(cues, kitCache, profile, acted.intent, me, target, sight, dist, navGrid(state));
       } else {
         cues.reserve = false;
-        cues.escape = false;
+        cues.escapeThink = false;
         sight.standClearance = SIGHT_CLEARANCE;
       }
       move(state, me, profile);
@@ -513,7 +513,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         // On an escape think (see computeCues) the escape slots count the trigger as their run,
         // and are chosen before the others.
         updateRuns(runs, state, kitCache, me, target, sight, dist, cues);
-        if (cues.escape && kitCache.escapeOrder[0] !== -1) {
+        if (cues.escapeThink && kitCache.escapeOrder[0] !== -1) {
           pressed = chooseEscape(
             choice,
             escapeScratch,
