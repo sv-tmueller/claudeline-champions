@@ -261,6 +261,8 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
   Amended 2026-10-05 by [batch #53 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5954808062): the kit does not ship the bot
   profile. Bots derive the preferred range from the kit and keep their profiles in `packages/bots`;
   openers, escapes and finishers are not built.
+  Amended 2026-10-06 by [#81](https://github.com/sv-tmueller/claudeline-champions/issues/81) (batch #80): openers and escapes are built as stateless slot conditions in the bots' profiles
+  (bots.md, Openers and escapes); the one finisher is bots.md's Finisher rule; per-slot finishers are not built.
 - Aim: lead moving targets using their current velocity; add a tier-dependent
   angular error.
 - Difficulty tiers: easy, normal, hard. They differ in reaction delay (ticks
