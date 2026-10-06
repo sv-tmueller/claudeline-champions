@@ -707,7 +707,7 @@ class ContractCheckTests(unittest.TestCase):
         matrices = read_accessor(doc, bin_chunk, skin["inverseBindMatrices"])
         inverse = [column_major(m) for m in matrices]
         vertices = skinned_vertices(doc, bin_chunk)
-        run =next(a for a in doc["animations"] if a["name"] == "Run")
+        run = next(a for a in doc["animations"] if a["name"] == "Run")
         values = clip_values(doc, bin_chunk, run)
         key_lows = [
             pose_extremes(doc, joints, inverse, vertices, pose_between(doc, values, k, 0))[0]
@@ -722,7 +722,8 @@ class ContractCheckTests(unittest.TestCase):
         half = slerp((0.0, 0.0, 0.0, 1.0), quarter, 0.5)
         self.assertAlmostEqual(half[1], math.sin(math.pi / 8), places=6)
         self.assertAlmostEqual(half[3], math.cos(math.pi / 8), places=6)
-        # A quarter of the way, slerp and a normalised lerp differ in the third decimal.
+        # A quarter of the way, slerp and a normalised lerp differ in the second decimal
+        # (y 0.1951 against 0.1874).
         early = slerp((0.0, 0.0, 0.0, 1.0), quarter, 0.25)
         self.assertAlmostEqual(early[1], math.sin(math.pi / 16), places=6)
         flipped = tuple(-c for c in quarter)
