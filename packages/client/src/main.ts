@@ -9,7 +9,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import arena01Json from '../../../data/arenas/arena01.json';
+import { arenaById } from './arenas';
 import { createBotDriver } from './bot-driver';
 import { CAMERA_VERTICAL_FOV_DEG, fitCamera, groundAimCm, pointerToNdc } from './camera';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
@@ -37,7 +37,13 @@ import './result.css';
 
 const HUMAN_ID = 0;
 
-const arena = parseArenaDef(arena01Json);
+// Every arena file under data/arenas joins the match and the select the same
+// way. parseArenaDef validates each one, so a bad file is a page error. Sorted
+// by id, so the order does not depend on the file system.
+const arenas = Object.values(import.meta.glob('../../../data/arenas/*.json', { eager: true, import: 'default' }))
+  .map((json) => parseArenaDef(json))
+  .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+const arenaIds = arenas.map((candidate) => candidate.id);
 
 // Every kit file under data/kits joins the match and the select without a client
 // change. A bad kit file shows up as a page error from createMatch, which
@@ -46,7 +52,8 @@ const kits = (Object.values(
   import.meta.glob('../../../data/kits/*.json', { eager: true, import: 'default' }),
 ) as KitDef[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 const kitIds = kits.map((kit) => kit.id);
-const launch = parseLaunch(location.search, kitIds, import.meta.env.DEV);
+const launch = parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV);
+const arena = arenaById(arenas, launch.arena);
 
 const { state, botIds } = createLocalMatch(launch, arena, kits);
 // The bots think here, in the main thread, once per tick before `step`.
