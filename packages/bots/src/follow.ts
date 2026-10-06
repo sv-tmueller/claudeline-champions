@@ -67,20 +67,46 @@ export function nearestFreeCell(
   return best;
 }
 
-/** Each segment cut into points at most one cell apart: eight-direction steering drifts. */
-function splitPath(grid: NavGrid, path: readonly Vec2[]): Vec2[] {
+/** The points a segment is cut into: at most one cell apart, at least one. */
+function segmentPoints(grid: NavGrid, a: Vec2, b: Vec2): number {
+  distanceInto(measure, b, a);
+  return Math.max(1, Math.ceil(measure.metres / grid.cellSize));
+}
+
+/**
+ * Each segment cut into points at most one cell apart: eight-direction steering drifts. `exit`,
+ * when given, is the first point of the result. The array is made at its final length, counted in
+ * a first pass, so that no growing array leaves its old backing stores as garbage (what a plan
+ * allocates is its points, and V8's growth policy differs between versions).
+ */
+function splitPath(grid: NavGrid, path: readonly Vec2[], exit: Vec2 | undefined): Vec2[] {
   const first = path[0];
   if (first === undefined) return [];
-  if (path.length === 1) return [{ x: first.x, y: first.y }];
-  const points: Vec2[] = [];
+  let total = exit === undefined ? 0 : 1;
+  if (path.length === 1) {
+    total += 1;
+  } else {
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1];
+      const b = path[i];
+      if (a === undefined || b === undefined) continue;
+      total += segmentPoints(grid, a, b);
+    }
+  }
+  const points = new Array<Vec2>(total);
+  let at = 0;
+  if (exit !== undefined) points[at++] = exit;
+  if (path.length === 1) {
+    points[at] = { x: first.x, y: first.y };
+    return points;
+  }
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1];
     const b = path[i];
     if (a === undefined || b === undefined) continue;
-    distanceInto(measure, b, a);
-    const count = Math.max(1, Math.ceil(measure.metres / grid.cellSize));
+    const count = segmentPoints(grid, a, b);
     for (let k = 1; k <= count; k++) {
-      points.push({ x: a.x + ((b.x - a.x) * k) / count, y: a.y + ((b.y - a.y) * k) / count });
+      points[at++] = { x: a.x + ((b.x - a.x) * k) / count, y: a.y + ((b.y - a.y) * k) / count };
     }
   }
   return points;
@@ -100,7 +126,7 @@ function plan(grid: NavGrid, follower: PathFollower, position: Vec2, goal: Vec2)
   const goalPoint = cellCenter(grid, goalCell);
 
   if (grid.blocked[startCell] === false) {
-    follower.points = splitPath(grid, findPath(grid, position, goalPoint));
+    follower.points = splitPath(grid, findPath(grid, position, goalPoint), undefined);
     return;
   }
   const exit = nearestFreeCell(grid, position);
@@ -108,7 +134,7 @@ function plan(grid: NavGrid, follower: PathFollower, position: Vec2, goal: Vec2)
   const exitPoint = cellCenter(grid, exit);
   const route = findPath(grid, exitPoint, goalPoint);
   if (route.length === 0) return;
-  follower.points = [exitPoint, ...splitPath(grid, route)];
+  follower.points = splitPath(grid, route, exitPoint);
 }
 
 /** Skips the points already reached; `scratch` takes the steering test of each. */

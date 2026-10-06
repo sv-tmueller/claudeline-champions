@@ -111,8 +111,8 @@ const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
  * the output is most of what a plan reads: a fresh object per path or per call is the documented
  * limit of this check, the way a two-double point is for the think bound.
  */
-const PLAN_ALLOCATION_LIMIT_BYTES = 3300;
-const PLAN_FALLBACK_LIMIT_BYTES = 2560;
+const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
+const PLAN_FALLBACK_LIMIT_BYTES = 2300;
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -401,10 +401,10 @@ describe('think allocation', () => {
           deltas[i] = heap() - before;
           if ((followers[i] as PathFollower).points.length > 0) planned++;
         }
-        // A plan that found nothing would read low and prove nothing: every clear pair has a
-        // route, and at least half the fallback pairs reach a free cell at both ends.
+        // A plan that found nothing would read low and prove nothing: every pair of both spreads
+        // plans (the fallback ones through a free cell at each end), as 600 of 600 do.
         if (set === clear) expect(planned, 'clear pairs with no points').toBe(WINDOW);
-        else expect(planned, 'fallback pairs with points').toBeGreaterThanOrEqual(WINDOW / 2);
+        else expect(planned, 'fallback pairs with points').toBe(WINDOW);
         rounds.push(median(deltas, WINDOW) - emptyPairMedian());
       }
       figures[set.name] = rounds;
