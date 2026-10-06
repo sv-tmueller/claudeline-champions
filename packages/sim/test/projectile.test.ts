@@ -642,10 +642,17 @@ describe('a projectile with allyEffects', () => {
     place(allyThenEnemy, 2, 3, 0);
     champion(allyThenEnemy, 1).health = 100;
     spawnProjectile(allyThenEnemy, bolt({ pierce: true }));
-    for (let i = 0; i < 30; i++) step(allyThenEnemy, []);
+    allyThenEnemy.events.length = 0;
+    const a: SimEvent[] = [];
+    for (let i = 0; i < 30; i++) {
+      step(allyThenEnemy, []);
+      a.push(...allyThenEnemy.events);
+    }
     expect(allyThenEnemy.projectiles[0]?.hitIds).toEqual([1, 2]);
-    const a = runOut(allyThenEnemy);
-    expect(ofType(a, 'heal')).toHaveLength(0);
+    a.push(...runOut(allyThenEnemy));
+    expect(ofType(a, 'projectileHit').map((h) => h.targetId)).toEqual([1, 2]);
+    expect(ofType(a, 'heal')).toHaveLength(1);
+    expect(ofType(a, 'damage')).toHaveLength(1);
     expect(ofType(a, 'projectileExpired').map((e) => e.reason)).toEqual(['boundary']);
     expect(champion(allyThenEnemy, 1).health).toBe(110);
     expect(champion(allyThenEnemy, 2).health).toBe(110);
