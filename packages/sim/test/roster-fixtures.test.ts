@@ -37,30 +37,31 @@
 // floor(rnd * living enemies), drawn in every window and used only when the flag was below 0.3; (4)
 // the random ally index, floor(rnd * living allies other than the champion), drawn in every window
 // and used only by an ally aim; (5) the aim kind, where below 0.6 aims at the target, below 0.8 at
-// the ally, below 0.92 at a uniform point (two more draws, x = -14 + 28 * rnd and then y = -9 + 18
-// * rnd, in meters) and otherwise at the champion itself; a kind with nobody to aim at (no living
-// enemy, no living ally) falls through to the next one that applies, so an ally kind with no living
-// ally becomes the uniform point; the aim is then rounded to whole centimeters as Math.round(meters
-// * 100), which takes no draw; (6) the walk: one draw, where below 0.45 walks along the axes toward
-// the aim point (away from it when within 3.5 m, per axis only when more than 0.5 m off, with no
-// more draws), below 0.70 takes a uniform axis in each of x and y (two more draws, floor(rnd * 3) -
-// 1, x first) and otherwise stands, with no more draws; (7) seven button draws for M1, M2, SPACE,
-// Q, E, R, F against 0.5, 0.3, 0.2, 0.3, 0.3, 0.15, 0.3, then one for SHIFT against 0.3; (8) one
-// draw for a `setEnergy` action against 0.2, and when it is taken the champion, floor(rnd * 4), and
-// then the energy, [0, 24, 25, 98, 99, 100, 60][floor(rnd * 7)], both at the current tick. Three
-// details the steps leave open, as the rebuilt player does them: (a) a segment starts at every tick
-// where any window starts, and a segment whose inputs equal the one before it is merged into it;
-// only Skerrow's fixture shows this, at tick 352, where windows of 3 and 2 ticks make one segment
-// of 5, while Hargrim and Quillon have no equal neighbours, so a player that never merges
-// reproduces them and misses Skerrow by one segment; (b) "within 3.5 m" is the Euclidean distance
-// from the champion to the rounded aim point, strictly below 3.5; a Manhattan distance fails all
-// three fixtures, but the rounded or unrounded aim point and a bound of below or at 3.5 each
-// reproduce all three, so they cannot tell those readings apart, and the Lumeth search used the
-// rounded point and the strict bound; (c) the enemy and ally indices count living champions in id
-// order, and counting the dead too or counting in reverse fails all three. Flipping any one of
-// these choices (the order of the uniform point, centimeter rounding, allies including the
-// champion, the energy order, the ally threshold, a walk that always draws its axes) changes the
-// winning Skerrow segments within the first 90 ticks.
+// the ally, below 0.92 at a uniform point (two more draws, x = -14 + 28 * rnd and then
+// y = -9 + 18 * rnd, in meters) and otherwise at the champion itself; a kind with nobody to aim at
+// (no living enemy, no living ally) falls through to the next one that applies, so an ally kind
+// with no living ally becomes the uniform point; the aim is then rounded to whole centimeters as
+// Math.round(meters * 100), which takes no draw; (6) the walk: one draw, where below 0.45 walks
+// along the axes toward the aim point (away from it when within 3.5 m, per axis only when more than
+// 0.5 m off, with no more draws), below 0.70 takes a uniform axis in each of x and y (two more
+// draws, floor(rnd * 3) - 1, x first) and otherwise stands, with no more draws; (7) seven button
+// draws for M1, M2, SPACE, Q, E, R, F against 0.5, 0.3, 0.2, 0.3, 0.3, 0.15, 0.3, then one for
+// SHIFT against 0.3; (8) one draw for a `setEnergy` action against 0.2, and when it is taken the
+// champion, floor(rnd * 4), and then the energy, [0, 24, 25, 98, 99, 100, 60][floor(rnd * 7)], both
+// at the current tick. Three details the steps leave open, as the rebuilt player does them: (a) a
+// segment starts at every tick where any window starts, and a segment whose inputs equal the one
+// before it is merged into it; of the three earlier fixtures, only Skerrow's shows this, at tick
+// 352, where champion 3's window restarts at 355 with the same inputs, so cuts of 3 and 2 ticks
+// make one segment of 5; Hargrim and Quillon reproduce with or without merging, but a player that
+// never merges misses Skerrow by one segment; (b) "within 3.5 m" is the Euclidean distance from the
+// champion to the rounded aim point, strictly below 3.5; a Manhattan distance fails all three
+// fixtures, but the rounded or unrounded aim point and a bound of below or at 3.5 each reproduce
+// all three, so they cannot tell those readings apart, and the Lumeth search used the rounded point
+// and the strict bound; (c) the enemy and ally indices count living champions in id order, and
+// counting the dead too or counting in reverse fails all three. Flipping any one of these choices
+// (the order of the uniform point, centimeter rounding, allies including the champion, the energy
+// order, the ally threshold, a walk that always draws its axes) changes the winning Skerrow
+// segments within the first 90 ticks.
 //
 // The checksums were then generated as for the other fixtures: set every checksum to 0, run
 // `npx vitest run --project sim packages/sim/test/roster-fixtures.test.ts`, copy the actual values
@@ -185,7 +186,7 @@ function toInput(entry: Entry): PlayerInput | undefined {
 interface Expected {
   /** A castFired for each. */
   fired: string[];
-  /** An energyGained whose cast is each: every ability that damages. */
+  /** An energyGained whose cast is each: every ability that damages or heals a hurt ally. */
   gains: string[];
   /** The `then` of each dash fired: a dash end followed by a spawn of the same champion. */
   thens: string[];

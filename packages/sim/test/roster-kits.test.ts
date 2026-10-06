@@ -1,5 +1,6 @@
-// The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json` and `lumeth.json`,
-// whose numbers come from docs/design/roster-v1.md (ticks = seconds x 60, one hit = durationTicks 1 / intervalTicks 1).
+// The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json` and
+// `lumeth.json`, whose numbers come from docs/design/roster-v1.md (ticks = seconds x 60, one hit =
+// durationTicks 1 / intervalTicks 1).
 //
 // Every number the doc fixes is written out again here as a literal, so a kit file that drifts from
 // the doc fails a named test. The catalog ranges that `validateKit` leaves to roster tests (rules.md
@@ -1080,6 +1081,20 @@ describe('Lumeth', () => {
     rig.clean();
   });
 
+  it('M2 Soothing Surge stops at an ally at full health: no heal, no energy, the hot still lands', () => {
+    // The heal over time landing on a full-health ally is the sim's current behaviour.
+    const rig = new Rig(lumeth, { 1: [X0 + 6, 0], 2: [X0 + 9, 0] });
+    rig.run(18 + 30 + 185, press('M2'));
+    expect(rig.events('projectileHit').map(({ e }) => e.targetId)).toEqual([1]);
+    expect(rig.events('heal')).toEqual([]);
+    expect(rig.applied()).toEqual([[1, 'hot', 180]]);
+    expect(rig.events('energyGained')).toEqual([]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.health(2)).toBe(120);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
   it('M2 EX Soothing Surge heals 22, then eight pulses of 3 over 240 ticks', () => {
     const rig = new Rig(lumeth, { 1: [X0 + 7, 0] }, 25, true, { 1: 70 });
     rig.run(18 + 30 + 245, press('M2', { ex: true }));
@@ -1196,8 +1211,10 @@ describe('Lumeth', () => {
   });
 
   it('F Dawnbloom heals and renews the hurt ally, slows the enemy in reach and earns 15 for the one ally', () => {
-    const rig = new Rig(lumeth, { 1: [X0 + 5.4, 0], 2: [X0, 5.4], 3: [X0, -5.6] }, 100, true, { 1: 50 });
-    rig.run(36 + 190, press('F'));
+    const rig = new Rig(lumeth, { 1: [X0 + 5.4, 0], 2: [X0, 5.4], 3: [X0, -5.6] }, 100, true, { 1: 50, 2: 100 });
+    rig.run(37, press('F'));
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 30 }]);
+    rig.run(36 + 190 - 37);
     const spawned = rig.events('areaSpawned');
     expect(spawned.map(({ step }) => step)).toEqual([36, 36]);
     const [first, second] = spawned;
@@ -1215,7 +1232,9 @@ describe('Lumeth', () => {
     ]);
     expect(rig.applied()).toEqual([[0, 'hot', 180], [1, 'hot', 180], [2, 'slow', 120]]);
     expect(gains(rig)).toEqual([[0, 1, 15]]);
-    expect(rig.health(2)).toBe(120);
+    // Enemy 2 is hurt too, so a heal in the enemy area would show: the heals name the ally only.
+    expect(new Set(heals(rig).map(([target]) => target))).toEqual(new Set([1]));
+    expect(rig.health(2)).toBe(100);
     expect(rig.health(3)).toBe(120);
     expectOneHit(rig);
     rig.clean();
