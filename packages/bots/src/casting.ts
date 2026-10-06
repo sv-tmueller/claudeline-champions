@@ -76,6 +76,13 @@ export interface KitCache {
    * -1 walking toward it, 0 anything. An EX press has no such condition.
    */
   motion: Int8Array;
+  /**
+   * 1 when the base ability of the slot starts with a dash (its first effect), and the same for the
+   * EX variant of an EX slot of the kit (listed in `kit.ex`, has a variant, is not F), whether or
+   * not the variant has a reach band. An escape think presses neither (see `chooseCast`).
+   */
+  baseDash: Uint8Array;
+  exDash: Uint8Array;
   /** The slots of the escape rule in priority order, as indices into SLOTS, ended by -1. */
   escapeOrder: Int8Array;
   /** 1 when the slot is in `escapeOrder`. */
@@ -153,6 +160,8 @@ export function createKitCache(): KitCache {
     openMin: new Float64Array(SLOTS.length),
     openMax: new Float64Array(SLOTS.length),
     motion: new Int8Array(SLOTS.length),
+    baseDash: new Uint8Array(SLOTS.length),
+    exDash: new Uint8Array(SLOTS.length),
     escapeOrder: new Int8Array(SLOTS.length).fill(-1),
     isEscape: new Uint8Array(SLOTS.length),
     escapeRange: new Float64Array(SLOTS.length),
@@ -181,6 +190,8 @@ export function refreshKitCache(
     cache.hasEx[i] = 0;
     cache.hasOpen[i] = 0;
     cache.motion[i] = 0;
+    cache.baseDash[i] = 0;
+    cache.exDash[i] = 0;
     cache.isEscape[i] = 0;
     cache.escapeRange[i] = 0;
     cache.escapeFixed[i] = 0;
@@ -194,8 +205,10 @@ export function refreshKitCache(
       cache.baseMax[i] = base.max;
     }
     cache.baseClearance[i] = clearanceOf(spec);
+    cache.baseDash[i] = startsWithDash(spec) ? 1 : 0;
     const variant = spec.ex;
     if (variant !== undefined && slot !== 'F' && kit.ex.includes(slot)) {
+      cache.exDash[i] = startsWithDash(variant) ? 1 : 0;
       const band = abilityReach(variant);
       if (band !== null) {
         cache.hasEx[i] = 1;
@@ -262,6 +275,12 @@ export function dashBand(spec: AbilitySpec): readonly [number, number] | null {
   const first = spec.effects[0];
   if (first === undefined || first.type !== 'dash' || abilityReach(spec) !== null) return null;
   return [first.distance - 1, first.distance];
+}
+
+/** Whether the first effect of an ability is a dash: the champion is carried along its aim. */
+function startsWithDash(spec: AbilitySpec): boolean {
+  const first = spec.effects[0];
+  return first !== undefined && first.type === 'dash';
 }
 
 export function hasStatus(me: ChampionState, type: StatusType): boolean {
@@ -424,7 +443,8 @@ export function updateRuns(
  * Q, SPACE, M2, M1 (the sim's own order) whose run is over `castDelay` and that passes the sim's
  * gates: no windup in progress unless it fires on this tick (windupLeft 1), the cooldown at most 1
  * (it counts down first), the energy for the cost (100 for F, 25 for an EX variant), no stun or
- * silence, and no root for a dash. Run `updateRuns` first. `skip` is a bit mask of slot indices
+ * silence, no root for a dash, and on an escape think no dash at all (the ability of the press,
+ * its EX variant when it would be cast, starts with one). Run `updateRuns` first. `skip` is a bit mask of slot indices
  * the walk leaves out: the escape slots `chooseEscape` already tried (0 for none).
  */
 export function chooseCast(
@@ -450,6 +470,8 @@ export function chooseCast(
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if (me.energy < cost) continue;
     if (rooted && hasDash(abilityFor(kit, slot, ex))) continue;
+    // The dash hold: an escape think leaves the target, and a dash would carry the champion to it.
+    if (cues.escapeThink && (ex ? cache.exDash[i] : cache.baseDash[i]) === 1) continue;
     choice.slot = slot;
     choice.ex = ex;
     return true;

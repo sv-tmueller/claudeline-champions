@@ -191,7 +191,7 @@ const KIT_SETS: KitSet[] = [
     },
   },
 ];
-/** The pressed abilities that hold a dash, which a root skips. */
+/** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
   'hargrim:SPACE:ex',
@@ -295,6 +295,10 @@ function pressProblems(
   if (c.energy < cost) problems.push(`energy ${c.energy} below ${cost}`);
   if (hasStatus(c, 'stun') || hasStatus(c, 'silence')) problems.push('stunned or silenced');
   if (hasStatus(c, 'root') && DASHES.has(key)) problems.push('rooted and the ability holds a dash');
+  // The dash hold: on an escape think (the trigger of the escape rows) no dash is pressed.
+  if (target !== undefined && DASHES.has(key) && triggerProblems(c, target, acted.intent).length === 0) {
+    problems.push(`${key} is a dash pressed on an escape think (${acted.intent})`);
+  }
   if (c.cast !== null && c.cast.windupLeft !== 1) problems.push(`windupLeft ${c.cast.windupLeft}`);
   return { problems, key, gates, landing };
 }
