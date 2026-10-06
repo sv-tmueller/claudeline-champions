@@ -2,10 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { orFail, watchProblems } from './support';
 
 // The Escape menu: the pause, restart, the champion, arena and team select (the team row,
-// the 3v3 relaunch and a Restart that keeps it), and a rebinding that survives a reload. Like match.spec.ts the clock is paused and the test runs it in
-// 16 ms frames, reading the hooks between steps, so a slow machine changes the time a
-// test takes and never what it sees. A frame is one tick, about: the sim ticks every
-// 16.67 ms and the fake clock fires a frame every 16 ms.
+// the 3v3 relaunch and a Restart that keeps it), and a rebinding that survives a reload.
+// Like match.spec.ts the clock is paused and the test runs it in 16 ms frames, reading
+// the hooks between steps, so a slow machine changes the time a test takes and never
+// what it sees. A frame is one tick, about: the sim ticks every 16.67 ms and the fake
+// clock fires a frame every 16 ms.
 const FRAME_MS = 16;
 const PAUSE_AT_MS = 60_000;
 // The menu is clicked at the viewport of the screenshots, where its keys view fits. The

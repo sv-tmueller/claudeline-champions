@@ -107,8 +107,7 @@ async function runUntil(
 // from the address, not only that the page loads it: its first death is a tick budget like arena01's.
 // The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on 9612bff, the
 // same figures as the log lines of these rows. They are logged and never asserted: the 2v2 rows assert
-// budgets only too, every bots change moves them, and the headless match-setup tests pin the end ticks.
-// arena01 267 and 301, arena02 275 and 307. The budgets stay 600 and 1800.
+// budgets only too, and every bots change moves them. arena01 267 and 301, arena02 275 and 307. The budgets stay 600 and 1800.
 const ROWS = [
   { id: 'arena01', size: 2, address: '/', picture: 'match.png' },
   { id: 'arena02', size: 2, address: '/?arena=arena02', picture: 'match-arena02.png' },

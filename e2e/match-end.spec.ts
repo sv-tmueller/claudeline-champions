@@ -57,10 +57,11 @@ const TEST_TIMEOUT_MS = 60_000;
 //   arena02:  7 119 + 3200 + 7000 = 17 319, so 18 000 ticks; frames = ceil(18 000 / 96) + 25 = 213.
 // The headless runs end in a Victory 3 : 1 on arena01 (round 4, one sudden-death round) and a Defeat
 // 2 : 3 on arena02 (round 5). The rows read the result off the page and log it next to those
-// figures. The score is not asserted: the 2v2 rows derive the outcome from the score the same way,
-// every bots change moves the outcome, and the headless match-setup tests pin the end ticks. Each row logs
-// its wall time, and a row over 40 s gets its own test.setTimeout. None does: the 3v3 rows ran in
-// 0.7 s here (the runner's frame costs about ten times more, so about 7 s), under the 60 s default.
+// figures. The exact outcome is not pinned: the 2v2 rows derive it from the score the same way, and
+// every bots change moves it. The headless match-setup tests log the end tick and fail once a match
+// passes its budget. Each row logs its wall time, and a row over 40 s gets its own
+// test.setTimeout. None does: the 3v3 rows ran in 0.7 s here (the runner's frame costs
+// about ten times more, so about 7 s), under the 60 s default.
 const ROWS = [
   { id: 'arena01', size: 2, query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
   { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 13_000, budgetFrames: 161 },
