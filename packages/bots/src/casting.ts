@@ -1,12 +1,16 @@
 import { Button, CHAMPION_RADIUS, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } from '@claudeline/sim';
 import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
+import type { NavGrid } from './grid';
 import { distanceInto } from './hypot';
 import type { Measure } from './hypot';
-import { profileFor } from './profile';
+import { kiteStepInto } from './kite';
+import type { KiteScratch } from './kite';
+import { profileFor, rulesFor } from './profile';
 import type { BotProfile } from './profile';
 import { RANGE_MARGIN, abilityReach } from './reach';
-import { clearShotWith } from './sight';
+import { SIGHT_CLEARANCE, clearShotWith } from './sight';
 import type { SightScratch } from './sight';
+import type { MoveCommand } from './steer';
 
 // Casting: which slot a bot presses on a think. The gates copy steps 3b to 3d of the sim's `step`
 // (cooldowns count down, then a windup fires at 1, then a new cast may start), read on the state
@@ -60,6 +64,75 @@ export interface KitCache {
   exMin: Float64Array;
   exMax: Float64Array;
   exClearance: Float64Array;
+  /**
+   * 1 when the slot has an opener (see `OpenerRule`) with a band of its own: the base ability is
+   * tested against [openMin, openMax], inclusive and with no range margin, instead of its kit band.
+   */
+  hasOpen: Uint8Array;
+  openMin: Float64Array;
+  openMax: Float64Array;
+  /**
+   * What the target must be doing for the base ability of the slot: +1 walking away from the bot,
+   * -1 walking toward it, 0 anything. An EX press has no such condition.
+   */
+  motion: Int8Array;
+  /** The slots of the escape rule in priority order, as indices into SLOTS, ended by -1. */
+  escapeOrder: Int8Array;
+  /** 1 when the slot is in `escapeOrder`. */
+  isEscape: Uint8Array;
+  /**
+   * The teleport an escape slot starts with, when its first effect is one: its range in metres
+   * (0 when the slot has none) and whether the range is fixed (it teleports the full range
+   * whatever the aim distance).
+   */
+  escapeRange: Float64Array;
+  escapeFixed: Uint8Array;
+  /**
+   * True when F is held for a low or cornered target (see `ChampionRules.holdF`), and the health
+   * at or below which a target is low: the sum of the `damage` amounts of F's effects. A double
+   * field that starts as a double.
+   */
+  holdF: boolean;
+  lowHealth: number;
+}
+
+/**
+ * What a think works out once and the run test and the cast choice read, in fields that start as
+ * doubles. A bot owns one.
+ */
+export interface CastCues {
+  /**
+   * (target - bot) . target velocity: positive when the target walks away from the bot, negative
+   * when it walks toward it, 0 when it stands or walks across.
+   */
+  dot: number;
+  /** True while F holds the energy back from the EX variants, see `computeCues`. */
+  reserve: boolean;
+  /**
+   * Whether F's own condition holds for the acted target: always true unless the kit's F is held
+   * (`KitCache.holdF`), then the target is low or cornered. The run of F and the reserve read it.
+   */
+  fOk: boolean;
+  /** Scratch for the cornered test: the kite points and the move it writes and nobody reads. */
+  kite: KiteScratch;
+  corner: MoveCommand;
+  /**
+   * True on an escape think: the acted intent is retreat with the target within `ESCAPE_RANGE`,
+   * or kite with the target inside rangeMin (see `ESCAPE_RANGE` below). Set by `computeCues`
+   * before `updateRuns`. Not the cornered kiter's latch `escaping` of bot.ts.
+   */
+  escapeThink: boolean;
+}
+
+export function createCastCues(kite: KiteScratch): CastCues {
+  return {
+    dot: 0.5,
+    reserve: false,
+    fOk: true,
+    kite,
+    corner: { moveX: 0, moveY: 0 },
+    escapeThink: false,
+  };
 }
 
 export function createKitCache(): KitCache {
@@ -76,6 +149,16 @@ export function createKitCache(): KitCache {
     exMin: new Float64Array(SLOTS.length),
     exMax: new Float64Array(SLOTS.length),
     exClearance: new Float64Array(SLOTS.length),
+    hasOpen: new Uint8Array(SLOTS.length),
+    openMin: new Float64Array(SLOTS.length),
+    openMax: new Float64Array(SLOTS.length),
+    motion: new Int8Array(SLOTS.length),
+    escapeOrder: new Int8Array(SLOTS.length).fill(-1),
+    isEscape: new Uint8Array(SLOTS.length),
+    escapeRange: new Float64Array(SLOTS.length),
+    escapeFixed: new Uint8Array(SLOTS.length),
+    holdF: false,
+    lowHealth: 0.5,
   };
 }
 
@@ -92,9 +175,15 @@ export function refreshKitCache(
   const profile = profileFor(championId, kit);
   cache.profile.rangeMin = profile.rangeMin;
   cache.profile.rangeMax = profile.rangeMax;
+  const rules = rulesFor(championId, kit);
   for (let i = 0; i < SLOTS.length; i++) {
     cache.hasBase[i] = 0;
     cache.hasEx[i] = 0;
+    cache.hasOpen[i] = 0;
+    cache.motion[i] = 0;
+    cache.isEscape[i] = 0;
+    cache.escapeRange[i] = 0;
+    cache.escapeFixed[i] = 0;
     if (kit === undefined) continue;
     const slot = SLOTS[i] as Slot;
     const spec = kit.slots[slot];
@@ -116,21 +205,85 @@ export function refreshKitCache(
       cache.exClearance[i] = clearanceOf(variant);
     }
   }
+  for (const opener of rules.openers) {
+    if (kit === undefined) break;
+    const i = SLOTS.indexOf(opener.slot);
+    cache.motion[i] = opener.motion === 'away' ? 1 : opener.motion === 'closing' ? -1 : 0;
+    const band = opener.band === 'dash' ? dashBand(kit.slots[opener.slot]) : opener.band;
+    if (band === null) continue;
+    cache.hasOpen[i] = 1;
+    cache.openMin[i] = band[0];
+    cache.openMax[i] = band[1];
+  }
+  cache.holdF = kit !== undefined && rules.holdF;
+  cache.lowHealth = kit !== undefined && rules.holdF ? damageIn(kit.slots.F.effects) : 0;
+  cache.escapeOrder.fill(-1);
+  let n = 0;
+  for (const slot of rules.escapes) {
+    if (kit === undefined) break;
+    const i = SLOTS.indexOf(slot);
+    cache.escapeOrder[n++] = i;
+    cache.isEscape[i] = 1;
+    const first = kit.slots[slot].effects[0];
+    if (first !== undefined && first.type === 'teleport') {
+      cache.escapeRange[i] = first.range;
+      cache.escapeFixed[i] = first.fixed ? 1 : 0;
+    }
+  }
 }
 
-function hasStatus(me: ChampionState, type: StatusType): boolean {
+/**
+ * The sum of the `damage` amounts in a list of effects, looking into the effects an area, a
+ * projectile or a melee arc carries and into what a dash does where it ends. Statuses and
+ * knockbacks add nothing. Run on a rebuild only, so it may allocate.
+ */
+function damageIn(effects: readonly { type: string }[]): number {
+  let sum = 0;
+  for (const effect of effects) {
+    const node = effect as {
+      type: string;
+      amount?: number;
+      effects?: readonly { type: string }[];
+      then?: readonly { type: string }[];
+    };
+    if (node.type === 'damage' && typeof node.amount === 'number') sum += node.amount;
+    if (node.effects !== undefined) sum += damageIn(node.effects);
+    if (node.then !== undefined) sum += damageIn(node.then);
+  }
+  return sum;
+}
+
+/**
+ * The opener band of a base ability that starts with a dash of distance D and has no band of its
+ * own: [D - 1, D], with no range margin. Its windup is 0, so the target cannot walk out of reach
+ * before it fires, and at D the dash ends against the target's body. Null for any other ability.
+ */
+export function dashBand(spec: AbilitySpec): readonly [number, number] | null {
+  const first = spec.effects[0];
+  if (first === undefined || first.type !== 'dash' || abilityReach(spec) !== null) return null;
+  return [first.distance - 1, first.distance];
+}
+
+export function hasStatus(me: ChampionState, type: StatusType): boolean {
   for (let i = 0; i < me.statuses.length; i++) {
     if ((me.statuses[i] as { type: StatusType }).type === type) return true;
   }
   return false;
 }
 
-function hasDash(ability: AbilitySpec): boolean {
+export function hasDash(ability: AbilitySpec): boolean {
   for (let i = 0; i < ability.effects.length; i++) {
     if ((ability.effects[i] as { type: string }).type === 'dash') return true;
   }
   return false;
 }
+
+/**
+ * An escape think is a retreat with the acted target within this many metres, inclusive, or a
+ * kite with the acted target inside rangeMin. Six metres is the roster's "inside 6 m" for the
+ * ranged champion's back-off, applied to a retreat of any champion.
+ */
+export const ESCAPE_RANGE = 6;
 
 /** The slot index of F. */
 const F_INDEX = SLOTS.indexOf('F');
@@ -144,18 +297,65 @@ const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
 /**
  * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
  * `kit.ex`, has a variant with a reach band (the cache holds one only then), the champion has
- * the energy, and F is not holding the energy back. F holds it back while it is ready (its
- * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band and the
- * energy is at least `EX_RESERVE_ENERGY`: a support ultimate that reaches allies only has no band
- * and must not freeze the EX variants for good. F never has an EX variant.
+ * the energy, and F is not holding the energy back (`cues.reserve`, see `computeCues`). F never
+ * has an EX variant.
  */
-function exFor(cache: KitCache, index: number, me: ChampionState): boolean {
+function exFor(cache: KitCache, index: number, me: ChampionState, cues: CastCues): boolean {
   if (cache.hasEx[index] !== 1 || me.energy < EX_ENERGY_COST) return false;
-  const holding =
+  return !cues.reserve;
+}
+
+/**
+ * Works the cues of a think out, from the acted target: the motion of the target, whether this is
+ * an escape think, the energy reserve, and the clearance a stand needs. Run once per think, before
+ * the move (the stand reads `sight.standClearance`) and before `updateRuns`.
+ *
+ * The reserve: F holds the energy back, so the EX variants are not cast, while F is ready (its
+ * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band (a support
+ * ultimate that reaches allies only must not freeze every EX variant for good), the energy is at
+ * least `EX_RESERVE_ENERGY` (what F costs less one EX press, so the bar can reach the cost of F
+ * instead of falling back by an EX cast first) and the target is within F's reach, the band less
+ * the margin. Without the reach clause a bot at 75 energy or more did without its EX variants for
+ * as long as any ultimate was ready, whether or not an enemy was ever in reach of it.
+ *
+ * The stand clearance: a bot that could press F now (the reserve and the full cost) stands where
+ * a shot of F's width fits, not only a champion's 0.5 m: a wide ultimate (Quillon's 0.6 m) can
+ * wait behind cover that a 0.5 m shot clears. Any other think keeps 0.5.
+ */
+export function computeCues(
+  cues: CastCues,
+  cache: KitCache,
+  profile: BotProfile,
+  intent: string,
+  me: ChampionState,
+  target: ChampionState,
+  sight: SightScratch,
+  dist: Measure,
+  grid: NavGrid,
+): void {
+  distanceInto(dist, me, target);
+  const d = dist.metres;
+  cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
+  cues.escapeThink =
+    (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
+  // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
+  // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
+  cues.fOk =
+    !cache.holdF ||
+    target.health <= cache.lowHealth ||
+    !kiteStepInto(cues.corner, cues.kite, grid, target, me, dist);
+  cues.reserve =
     cache.hasBase[F_INDEX] === 1 &&
     (me.cooldowns[F_INDEX] as number) <= 1 &&
-    me.energy >= EX_RESERVE_ENERGY;
-  return !holding;
+    me.energy >= EX_RESERVE_ENERGY &&
+    (cache.baseMin[F_INDEX] as number) <= d &&
+    d <= (cache.baseMax[F_INDEX] as number) - RANGE_MARGIN &&
+    cues.fOk;
+  sight.standClearance = SIGHT_CLEARANCE;
+  if (cues.reserve && me.energy >= ULTIMATE_ENERGY_COST) {
+    const wide = cache.baseClearance[F_INDEX] as number;
+    if (wide > SIGHT_CLEARANCE) sight.standClearance = wide;
+  }
 }
 
 /**
@@ -185,20 +385,35 @@ export function updateRuns(
   target: ChampionState,
   scratch: SightScratch,
   dist: Measure,
+  cues: CastCues,
 ): void {
   distanceInto(dist, me, target);
   const d = dist.metres;
   for (let i = 0; i < SLOTS.length; i++) {
-    const ex = exFor(cache, i, me);
+    // An escape slot on an escape think counts the trigger: no band, no shot test.
+    if (cues.escapeThink && cache.isEscape[i] === 1) {
+      runs[i] = (runs[i] as number) + 1;
+      continue;
+    }
+    const ex = exFor(cache, i, me, cues);
     let inBand = false;
     if (ex) {
       // `inReach` of the EX band, written out over the typed arrays.
       inBand = (cache.exMin[i] as number) <= d && d <= (cache.exMax[i] as number) - RANGE_MARGIN;
       scratch.clearance = cache.exClearance[i] as number;
-    } else if (cache.hasBase[i] === 1) {
-      const max = (cache.baseMax[i] as number) - RANGE_MARGIN;
-      inBand = (cache.baseMin[i] as number) <= d && d <= max;
+    } else {
+      if (cache.hasOpen[i] === 1) {
+        inBand = (cache.openMin[i] as number) <= d && d <= (cache.openMax[i] as number);
+      } else if (cache.hasBase[i] === 1) {
+        const max = (cache.baseMax[i] as number) - RANGE_MARGIN;
+        inBand = (cache.baseMin[i] as number) <= d && d <= max;
+      }
       scratch.clearance = cache.baseClearance[i] as number;
+      // The condition of the slot: a target walking away (+1) or toward the bot (-1).
+      const motion = cache.motion[i] as number;
+      if (motion > 0 && !(cues.dot > 0)) inBand = false;
+      if (motion < 0 && !(cues.dot < 0)) inBand = false;
+      if (i === F_INDEX && !cues.fOk) inBand = false;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
   }
@@ -209,7 +424,8 @@ export function updateRuns(
  * Q, SPACE, M2, M1 (the sim's own order) whose run is over `castDelay` and that passes the sim's
  * gates: no windup in progress unless it fires on this tick (windupLeft 1), the cooldown at most 1
  * (it counts down first), the energy for the cost (100 for F, 25 for an EX variant), no stun or
- * silence, and no root for a dash. Run `updateRuns` first.
+ * silence, and no root for a dash. Run `updateRuns` first. `skip` is a bit mask of slot indices
+ * the walk leaves out: the escape slots `chooseEscape` already tried (0 for none).
  */
 export function chooseCast(
   choice: CastChoice,
@@ -218,15 +434,19 @@ export function chooseCast(
   kit: KitDef,
   cache: KitCache,
   me: ChampionState,
+  cues: CastCues,
+  skip: number,
 ): boolean {
   if (me.cast !== null && me.cast.windupLeft !== 1) return false;
   if (hasStatus(me, 'stun') || hasStatus(me, 'silence')) return false;
   const rooted = hasStatus(me, 'root');
   for (let i = SLOTS.length - 1; i >= 0; i--) {
+    // A slot the escape choice already tried on this think (a bit of `skip` per slot index).
+    if ((skip & (1 << i)) !== 0) continue;
     if ((runs[i] as number) <= castDelay) continue;
     if ((me.cooldowns[i] as number) > 1) continue;
     const slot = SLOTS[i] as Slot;
-    const ex = exFor(cache, i, me);
+    const ex = exFor(cache, i, me, cues);
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if (me.energy < cost) continue;
     if (rooted && hasDash(abilityFor(kit, slot, ex))) continue;

@@ -11,6 +11,7 @@ import {
   createSightScratch,
   lineOfSight,
   nearestSightCell,
+  nearestSightCellIn,
 } from '../src/sight';
 import { arena01, clearShotOracle, config2v2 } from './helpers';
 
@@ -200,6 +201,29 @@ describe('nearestSightCell', () => {
         // The nearest cell with a bare line of sight, the old rule.
         const plain = bruteForce(grid, state, p, target, 6, 13, SIGHT_RADIUS, 0);
         if (plain !== cell) differs++;
+      }
+    }
+    expect(differs).toBeGreaterThan(0);
+  });
+
+  it('tests the shot with the stand clearance in the scratch: a wider ultimate needs a wider cell', () => {
+    const state = stateOf(arena01);
+    const grid = buildNavGrid(arena01);
+    const target = { x: 4.25, y: 1.75 };
+    let differs = 0;
+    for (let x = -9; x <= -3; x += 0.5) {
+      for (const y of [-1, 0, 1, 2, 3, 4]) {
+        const p = { x, y };
+        const scratch = createSightScratch();
+        scratch.rangeMin = 6;
+        scratch.rangeMax = 13;
+        scratch.standClearance = 0.6;
+        const cell = nearestSightCellIn(grid, state, p, target, SIGHT_RADIUS, scratch);
+        expect(cell, `${x}, ${y}`).toBe(bruteForce(grid, state, p, target, 6, 13, SIGHT_RADIUS, 0.6));
+        if (cell >= 0) {
+          expect(clearShotOracle(state, cellCenter(grid, cell), target, 0.6), `${x}, ${y}`).toBe(true);
+        }
+        if (cell !== nearestSightCell(grid, state, p, target, 6, 13)) differs++;
       }
     }
     expect(differs).toBeGreaterThan(0);

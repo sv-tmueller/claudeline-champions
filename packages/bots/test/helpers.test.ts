@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createMatch } from '@claudeline/sim';
 import type { GameState, PlayerInput } from '@claudeline/sim';
 import type { Bot } from '../src/bot';
-import { createRun, runMatch } from './helpers';
+import { arena01, configMirror, createRun, jsonKits, runMatch } from './helpers';
 
 /**
  * A bot that owns one input record and rewrites it on every think, as the real bots do: a caller
@@ -40,5 +41,13 @@ describe('createRun', () => {
   it('gives one distinct input object per bot per tick on real bots', () => {
     const run = runMatch([101, 102, 103, 104], ['easy', 'normal', 'hard', 'normal'], 60);
     expect(new Set(run.inputs.flat()).size).toBe(60 * 4);
+  });
+});
+
+describe('jsonKits', () => {
+  it('holds the three shipped kits, and a match keeps only the kits its players use', () => {
+    expect(jsonKits().map((kit) => kit.id)).toEqual(['hargrim', 'quillon', 'skerrow']);
+    const state = createMatch(configMirror(), arena01, 7, jsonKits());
+    expect(state.kits.map((kit) => kit.id)).toEqual(['hargrim', 'quillon']);
   });
 });

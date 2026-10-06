@@ -286,3 +286,21 @@ export function quillonKit(): KitDef {
     },
   };
 }
+
+/**
+ * Quillon with an M2 whose EX bolt flies faster than the base bolt: base 15 m/s, EX 18 m/s. The
+ * shipped kits give base and EX the same speed on every slot, so only a fixture can tell whether
+ * the aim leads with the speed of the variant that is winding up.
+ */
+export function quillonFastExKit(): KitDef {
+  const kit = quillonKit();
+  kit.slots.M2 = boltSlot(15, 48, {
+    cooldownTicks: 360,
+    windupTicks: 18,
+    movement: 'slowed',
+    radius: 0.4,
+    damage: 14,
+    ex: boltAbility(18, 40, { windupTicks: 18, movement: 'slowed', radius: 0.6, damage: 20 }),
+  });
+  return kit;
+}

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { checksum, createMatch, step } from '@claudeline/sim';
-import type { ChampionState, GameState } from '@claudeline/sim';
+import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
+import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import type { Intent } from '../src/intent';
-import { arena01, config2v2, configMirror, jsonKits } from './helpers';
+import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './helpers';
 
 /*
  * Platform gate: this test gates on the native runner (a GitHub-hosted x86 job or an Apple
@@ -37,6 +37,12 @@ import { arena01, config2v2, configMirror, jsonKits } from './helpers';
  *   deadlock advance     5776            5760            0              0
  *   deadlock flee        8656            9584            0              0
  *   deadlock stand       8512            9472            0              0
+ *   opener press         (new scene)     (new scene)     0              0
+ *   escape press         (new scene)     (new scene)     0              0
+ *   skerrow engage       (new scene)     (new scene)     0              0
+ *
+ * The last three scenes have no main figure: they test paths main does not have. The unit job of
+ * the draft pull request (#86) read 0 for each of them in both of its runs.
  *
  * The branch reads 0 in the lowest round of every scene, and 256 in one round of the press scene
  * while V8 tiers up (the other two read 0). The mutations that put a cost back each go over the
@@ -44,6 +50,10 @@ import { arena01, config2v2, configMirror, jsonKits } from './helpers';
  * every think 480 to 632, the two shifted points of a clear shot made fresh 720 to 2880 in the
  * scenes that test a shot, a cell centre object in the sight scan 10296. It cannot see one small
  * object per think: a fresh returned input reads 96, and the decision record is smaller still.
+ * A fresh object kept reachable in a module variable on each of the three new paths reads 336
+ * (six doubles, in the opener band test: the three Hargrim scenes that reach it), 200 (a fresh
+ * `Landing`, in the escape landing search) and 168 (six doubles, in the held ultimate's cornered
+ * test); a two-double point reads 72 and stays under the bound, like the returned input.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
@@ -124,8 +134,9 @@ function scene(
   presses: boolean,
   moves: boolean,
   arrange: (state: GameState, bot: Bot) => void,
+  config: MatchConfig = configMirror(),
 ): Scene {
-  const state = createMatch(configMirror(), arena01, 1, jsonKits());
+  const state = createMatch(config, arena01, 1, jsonKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', 5);
   arrange(state, bot);
@@ -205,6 +216,40 @@ function buildScenes(): Scene[] {
       put(state, 2, -3, -3);
       ch(state, 1).cooldowns.fill(100);
     }),
+    // An opener press: Hargrim 4.5 m from a Hargrim walking away, energy 0. Chain Hook (E, 4 to 7 m
+    // at a target walking away) is pressed, and Rush's band (SPACE, 4 to 5 m) is tested on the same
+    // think: the motion cue, the opener bands and the run of every slot.
+    scene('opener press', 0, 'engage', true, true, (state) => {
+      put(state, 0, -4, -3);
+      put(state, 2, 0.5, -3);
+      ch(state, 2).vx = 5.5;
+    }),
+    // An escape press: Quillon 3 m from Hargrim, kiting, with Skip ready: the escape trigger, the
+    // landing search over the kite directions with a line of sight each, and the aim override run
+    // on every think. The other slots are ready too, and Skip is chosen first.
+    scene('escape press', 1, 'kite', true, true, (state) => {
+      put(state, 1, -4, -3);
+      put(state, 2, -1, -3);
+    }),
+    // A Skerrow engage: Skerrow 7 m from a Hargrim that stands against the east wall, energy 100, F
+    // ready but held (the target is healthy and has a way along the wall), every other slot on
+    // cooldown: the cornered test of the held ultimate runs on every think and presses nothing.
+    scene(
+      'skerrow engage',
+      0,
+      'engage',
+      false,
+      true,
+      (state) => {
+        put(state, 0, 7.4, -3);
+        put(state, 2, 14.4, -3);
+        const me = ch(state, 0);
+        me.energy = 100;
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('F')] = 0;
+      },
+      configSkerrow(),
+    ),
   ];
 }
 
