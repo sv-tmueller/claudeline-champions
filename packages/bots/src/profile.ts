@@ -1,4 +1,4 @@
-import type { KitDef } from '@claudeline/sim';
+import type { KitDef, Slot } from '@claudeline/sim';
 import { RANGE_MARGIN, abilityReach } from './reach';
 
 export interface BotProfile {
@@ -44,4 +44,39 @@ export function profileFor(championId: string, kit?: KitDef): BotProfile {
     }
   }
   return { rangeMin: table.rangeMin, rangeMax: table.rangeMax };
+}
+
+/** What a target must be doing for an opener: walking away from the bot, or toward it. */
+export type Motion = 'away' | 'closing';
+
+/**
+ * An opener: a slot the bot presses on a condition narrower than its kit band. `band` is the
+ * distance band in metres, inclusive and with no range margin: a literal pair, `'dash'` for the
+ * band derived from the base ability's leading dash (see `dashBand` in casting.ts), or null for
+ * the kit band less the margin. `motion` is what the target must be doing, or null.
+ */
+export interface OpenerRule {
+  readonly slot: Slot;
+  readonly band: 'dash' | readonly [number, number] | null;
+  readonly motion: Motion | null;
+}
+
+/** The rules of a champion that its kit does not carry (kits carry no bot fields). */
+export interface ChampionRules {
+  readonly openers: readonly OpenerRule[];
+}
+
+/** No rule: every slot is pressed on its kit band alone. */
+const NO_RULES: ChampionRules = Object.freeze({ openers: Object.freeze([]) });
+
+/** Keyed by champion id, like `PROFILES`. No champion has a rule yet. */
+const RULES = new Map<string, ChampionRules>();
+
+/**
+ * The openers of a champion. Like `KIT_RULES`, a rule applies only with a kit whose id equals
+ * the champion id; otherwise there is none.
+ */
+export function rulesFor(championId: string, kit?: KitDef): ChampionRules {
+  if (kit === undefined || kit.id !== championId) return NO_RULES;
+  return RULES.get(championId) ?? NO_RULES;
 }

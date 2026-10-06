@@ -14,13 +14,13 @@ import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
 import { createFollower, followPathInto } from './follow';
-import { segmentClear } from './geometry';
-import { buildNavGrid, cellCenterInto, cellIndexAt } from './grid';
+import { buildNavGrid, cellCenterInto } from './grid';
 import type { NavGrid, Vec2 } from './grid';
 import { createMeasure, distanceInto } from './hypot';
 import type { Measure } from './hypot';
 import { chooseIntent, scoreIntentsInto } from './intent';
 import type { Intent, ScoredIntent, Scores } from './intent';
+import { KITE_STEP, createKiteScratch, kiteStepInto } from './kite';
 import type { BotProfile } from './profile';
 import { createRng } from './rng';
 import {
@@ -31,8 +31,9 @@ import {
   nearestSightCellIn,
 } from './sight';
 import type { SightScratch } from './sight';
-import { steerTowardInto } from './steer';
 import type { MoveCommand } from './steer';
+
+export { KITE_STEP };
 
 export interface Bot {
   /**
@@ -46,8 +47,6 @@ export interface Bot {
 
 /** A target stays the target unless another enemy is more than this much nearer, in metres. */
 export const TARGET_SWITCH_MARGIN = 1;
-/** How far a kiting bot looks for a free step, in metres. */
-export const KITE_STEP = 1;
 /** Thinks for which one aim error draw is kept. */
 export const AIM_ERROR_HOLD = 15;
 
@@ -175,61 +174,6 @@ function ownSpawnInto(out: Vec2, state: GameState, me: ChampionState): boolean {
   return true;
 }
 
-/** True when the grid cell holding p is free, the cell the path follower would plan to. */
-function cellFree(grid: NavGrid, p: Vec2): boolean {
-  const cell = cellIndexAt(grid, p);
-  return cell >= 0 && grid.blocked[cell] === false;
-}
-
-/**
- * The first of straight away, +45, -45, +90, -90 degrees whose point 1 m off lies in a free grid
- * cell and is reached by a clear straight segment: the move toward it is written into `out` and
- * the result is true. False when all five fail: the bot is cornered. `point` is scratch. The 45
- * degree turns use exact constants, no trigonometry.
- */
-function kiteStepInto(
-  out: MoveCommand,
-  point: Vec2,
-  grid: NavGrid,
-  me: ChampionState,
-  target: ChampionState,
-  dist: Measure,
-): boolean {
-  distanceInto(dist, me, target);
-  const d = dist.metres;
-  const awayX = d === 0 ? 1 : (me.x - target.x) / d;
-  const awayY = d === 0 ? 0 : (me.y - target.y) / d;
-  const c = Math.SQRT1_2;
-  for (let k = 0; k < 5; k++) {
-    let dirX: number;
-    let dirY: number;
-    if (k === 0) {
-      dirX = awayX;
-      dirY = awayY;
-    } else if (k === 1) {
-      dirX = awayX * c - awayY * c;
-      dirY = awayX * c + awayY * c;
-    } else if (k === 2) {
-      const s = -Math.SQRT1_2;
-      dirX = awayX * c - awayY * s;
-      dirY = awayX * s + awayY * c;
-    } else if (k === 3) {
-      dirX = -awayY;
-      dirY = awayX;
-    } else {
-      dirX = awayY;
-      dirY = -awayX;
-    }
-    point.x = me.x + dirX * KITE_STEP;
-    point.y = me.y + dirY * KITE_STEP;
-    if (cellFree(grid, point) && segmentClear(grid, me, point)) {
-      steerTowardInto(out, me, point);
-      return true;
-    }
-  }
-  return false;
-}
-
 export function createBot(playerId: number, difficulty: Difficulty, seed: number): Bot {
   if (!Number.isInteger(playerId) || playerId < 0) fail('playerId must be a non-negative integer');
   if (typeof difficulty !== 'string' || !Object.hasOwn(TIERS, difficulty)) {
@@ -259,7 +203,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const sight: SightScratch = createSightScratch();
   const spawnPoint: Vec2 = { x: 0.5, y: 0.5 };
   const goalPoint: Vec2 = { x: 0.5, y: 0.5 };
-  const stepPoint: Vec2 = { x: 0.5, y: 0.5 };
+  const kiteScratch = createKiteScratch();
   const kitCache = createKitCache();
   const dist = createMeasure();
   let follower = createFollower();
@@ -379,7 +323,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         return follow('target', g, me, target);
       case 'kite': {
         if (d < profile.rangeMin) {
-          if (!wasEscaping && kiteStepInto(command, stepPoint, g, me, target, dist)) return;
+          if (!wasEscaping && kiteStepInto(command, kiteScratch, g, me, target, dist)) return;
           // Cornered: leave along the path to the own spawn. The escape counts only while the
           // path gives a move: at the spawn, or with no path, the bot stands for this think and
           // tries the kite steps again on the next.

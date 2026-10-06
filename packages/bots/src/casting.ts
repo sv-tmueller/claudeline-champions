@@ -2,7 +2,7 @@ import { Button, CHAMPION_RADIUS, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } 
 import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
 import { distanceInto } from './hypot';
 import type { Measure } from './hypot';
-import { profileFor } from './profile';
+import { profileFor, rulesFor } from './profile';
 import type { BotProfile } from './profile';
 import { RANGE_MARGIN, abilityReach } from './reach';
 import { clearShotWith } from './sight';
@@ -60,6 +60,13 @@ export interface KitCache {
   exMin: Float64Array;
   exMax: Float64Array;
   exClearance: Float64Array;
+  /**
+   * 1 when the slot has an opener (see `OpenerRule`) with a band of its own: the base ability is
+   * tested against [openMin, openMax], inclusive and with no range margin, instead of its kit band.
+   */
+  hasOpen: Uint8Array;
+  openMin: Float64Array;
+  openMax: Float64Array;
 }
 
 export function createKitCache(): KitCache {
@@ -76,6 +83,9 @@ export function createKitCache(): KitCache {
     exMin: new Float64Array(SLOTS.length),
     exMax: new Float64Array(SLOTS.length),
     exClearance: new Float64Array(SLOTS.length),
+    hasOpen: new Uint8Array(SLOTS.length),
+    openMin: new Float64Array(SLOTS.length),
+    openMax: new Float64Array(SLOTS.length),
   };
 }
 
@@ -92,9 +102,11 @@ export function refreshKitCache(
   const profile = profileFor(championId, kit);
   cache.profile.rangeMin = profile.rangeMin;
   cache.profile.rangeMax = profile.rangeMax;
+  const rules = rulesFor(championId, kit);
   for (let i = 0; i < SLOTS.length; i++) {
     cache.hasBase[i] = 0;
     cache.hasEx[i] = 0;
+    cache.hasOpen[i] = 0;
     if (kit === undefined) continue;
     const slot = SLOTS[i] as Slot;
     const spec = kit.slots[slot];
@@ -116,6 +128,26 @@ export function refreshKitCache(
       cache.exClearance[i] = clearanceOf(variant);
     }
   }
+  for (const opener of rules.openers) {
+    if (kit === undefined) break;
+    const i = SLOTS.indexOf(opener.slot);
+    const band = opener.band === 'dash' ? dashBand(kit.slots[opener.slot]) : opener.band;
+    if (band === null) continue;
+    cache.hasOpen[i] = 1;
+    cache.openMin[i] = band[0];
+    cache.openMax[i] = band[1];
+  }
+}
+
+/**
+ * The opener band of a base ability that starts with a dash of distance D and has no band of its
+ * own: [D - 1, D], with no range margin. Its windup is 0, so the target cannot walk out of reach
+ * before it fires, and at D the dash ends against the target's body. Null for any other ability.
+ */
+export function dashBand(spec: AbilitySpec): readonly [number, number] | null {
+  const first = spec.effects[0];
+  if (first === undefined || first.type !== 'dash' || abilityReach(spec) !== null) return null;
+  return [first.distance - 1, first.distance];
 }
 
 function hasStatus(me: ChampionState, type: StatusType): boolean {
@@ -195,6 +227,9 @@ export function updateRuns(
       // `inReach` of the EX band, written out over the typed arrays.
       inBand = (cache.exMin[i] as number) <= d && d <= (cache.exMax[i] as number) - RANGE_MARGIN;
       scratch.clearance = cache.exClearance[i] as number;
+    } else if (cache.hasOpen[i] === 1) {
+      inBand = (cache.openMin[i] as number) <= d && d <= (cache.openMax[i] as number);
+      scratch.clearance = cache.baseClearance[i] as number;
     } else if (cache.hasBase[i] === 1) {
       const max = (cache.baseMax[i] as number) - RANGE_MARGIN;
       inBand = (cache.baseMin[i] as number) <= d && d <= max;
