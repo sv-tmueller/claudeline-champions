@@ -705,12 +705,16 @@ describe('aim lead', () => {
         me.cast = { castId: 1, slot, ex: variant, windupTicks: 30, windupLeft: 10 };
       }
 
-      // The edges of the lead: on a line with the shooter a target that stands still across it or
-      // at exactly the speed of the projectile, toward the shooter and away, makes `b` or `a` zero.
+      // The edges of the lead, on a line with the shooter, in three variants: a target that stands
+      // still (b is 0), one closing at exactly the speed of the projectile (a is 0), and one
+      // receding along the line at the speed of the projectile less a billionth (a is about -1e-6
+      // and b is positive, where the two forms of the root differ by ten metres of aim).
       if (i % 13 === 0 && !zero) {
+        const variant = Math.floor(i / 13) % 3;
+        const away = target.x > me.x ? 1 : -1;
         target.y = me.y;
         target.vy = 0;
-        target.vx = i % 26 === 0 ? 0 : target.x > me.x ? -speed : speed;
+        target.vx = variant === 0 ? 0 : variant === 1 ? -away * speed : away * speed * (1 - 1e-9);
       }
 
       const seed = 1 + Math.floor(rng.next() * 1e6);

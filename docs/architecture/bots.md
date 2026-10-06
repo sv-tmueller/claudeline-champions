@@ -138,11 +138,11 @@ finisher still takes over when an enemy that qualifies comes into reach.
 
 The advance is latched. Once begun it goes on, and the bot stands in reach to cast, until the acted
 intent is not retreat, the acted target is another champion, the team gets ahead or the bot dies (a
-bot revived at a new round starts afresh). Why: without a latch a bot behind on health, say a Quillon
-against a Hargrim ahead and standing at its spawn, advances until the target is within `rangeMax`,
-then the first rule no longer holds, so it steps back out of reach, and again, and its cast run
-restarts on every other think and nothing ever lands. The latch is per bot state and is rewritten in
-place, so the think stays allocation free.
+bot revived at a new round starts afresh). Why: without a latch a bot behind on health, say a
+Quillon against a Hargrim ahead and standing at its spawn, advances until the target is within
+`rangeMax`, then the first rule no longer holds, so it steps back out of reach, and again, and its
+cast run restarts on every other think and nothing ever lands. The latch is per bot state and is
+rewritten in place, so the think stays allocation free.
 
 A stand needs a clear shot of a champion's width, not only a line of sight: see
 Clear shot. Wherever this document says a stand needs line of sight, it means
