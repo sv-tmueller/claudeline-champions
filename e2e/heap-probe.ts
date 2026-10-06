@@ -50,8 +50,9 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // its argument: it stayed with the timestamp as an argument, as an integer, in a field
 // of the loop clock and with no argument at all) and counts the bytes of the callees
 // inlined into it. The largest clean median of five is 504 B, from the 24 runner
-// attempts of the isolation of #77 (run 37434090996, before the fixes of #87 and #89).
-// The figures with the fixes in: at most 456 B over 15 local attempts at limit 1 B on
+// attempts of the isolation of #77 (run 37434090996, before the fixes of #87 and #89)
+// and, with the fixes in, once locally on b7df9fb (2 attempts: 336 and 504 B). The other
+// figures with the fixes in: at most 456 B over 15 local attempts at limit 1 B on
 // 1670d1b (5 batches of 3 repeats, none blind: see testing.md), at most 480 B over the
 // tester's 3 local attempts on 3def3bc (360, 480 and 480 B), and at most 456 B over the
 // 6 runner attempts on 3def3bc (384, 360, 432, 432, 456 and 408 B, run 37456539110).
