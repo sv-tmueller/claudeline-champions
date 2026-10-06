@@ -133,7 +133,7 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     expect(hud.result.entries).toEqual([
       { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01', text: 'Hargrim' },
       { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal&arena=arena01', text: 'Quillon' },
-      { champion: 'lumeth', available: 'false', href: null, text: 'Lumeth' },
+      { champion: 'lumeth', available: 'true', href: '?champion=lumeth&difficulty=normal&arena=arena01', text: 'Lumeth' },
       { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal&arena=arena01', text: 'Skerrow' },
     ]);
     expect(hud.result.arenas).toEqual([

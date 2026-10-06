@@ -1,5 +1,5 @@
-// The roster kits as data: `data/kits/hargrim.json`, `quillon.json` and `skerrow.json`, whose numbers come
-// from docs/design/roster-v1.md (ticks = seconds x 60, one hit = durationTicks 1 / intervalTicks 1).
+// The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json` and `lumeth.json`,
+// whose numbers come from docs/design/roster-v1.md (ticks = seconds x 60, one hit = durationTicks 1 / intervalTicks 1).
 //
 // Every number the doc fixes is written out again here as a literal, so a kit file that drifts from
 // the doc fails a named test. The catalog ranges that `validateKit` leaves to roster tests (rules.md
@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
+import lumethJson from '../../../data/kits/lumeth.json';
 import { Button, SLOTS, createMatch, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -20,11 +21,13 @@ const KITS = [
   { stem: 'hargrim', json: hargrimJson },
   { stem: 'quillon', json: quillonJson },
   { stem: 'skerrow', json: skerrowJson },
+  { stem: 'lumeth', json: lumethJson },
 ];
 
 const hargrim = validateKit(hargrimJson);
 const quillon = validateKit(quillonJson);
 const skerrow = validateKit(skerrowJson);
+const lumeth = validateKit(lumethJson);
 
 function mirror(id: string) {
   return {
@@ -80,6 +83,7 @@ describe('the kit stats', () => {
     expect(stats(hargrim)).toEqual({ id: 'hargrim', maxHealth: 160, moveSpeed: 5.5, support: false, ex: ['M2', 'SPACE'] });
     expect(stats(quillon)).toEqual({ id: 'quillon', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(skerrow)).toEqual({ id: 'skerrow', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['SPACE', 'E'] });
+    expect(stats(lumeth)).toEqual({ id: 'lumeth', maxHealth: 120, moveSpeed: 5.5, support: true, ex: ['M2', 'R'] });
   });
 
   it('gives a path-precise message for a number outside the contract', () => {
@@ -206,6 +210,10 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(skerrow)).toEqual([]);
   });
 
+  it('hold for the Lumeth kit', () => {
+    expect(catalogProblems(lumeth)).toEqual([]);
+  });
+
   it('name the path of a number outside them', () => {
     const copy = copyOf(hargrim);
     const dash = copy.slots.F.effects[0];
@@ -314,6 +322,10 @@ describe('the EX variants', () => {
       ['effects[0].distance', 'effects[0].then[0]', 'effects[1].status.percent', 'effects[1].status.ticks'].sort(),
     );
     expect(exDiff(skerrow, 'E')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.perPulse'].sort());
+    expect(exDiff(lumeth, 'M2')).toEqual(
+      ['effects[0].allyEffects[0].amount', 'effects[0].allyEffects[1].status.perPulse', 'effects[0].allyEffects[1].status.ticks'].sort(),
+    );
+    expect(exDiff(lumeth, 'R')).toEqual(['effects[0].effects[0].absorb', 'effects[0].effects[0].ticks', 'effects[0].effects[1]'].sort());
   });
 });
 
@@ -339,6 +351,7 @@ class Rig {
     spots: Partial<Record<number, Spot>> = {},
     energy = 0,
     private readonly watched = true,
+    health: Partial<Record<number, number>> = {},
   ) {
     this.state = createMatch(mirror(kit.id), openArena(), 7, [validateKit(kit)]);
     PARKED.forEach((parked, id) => {
@@ -346,6 +359,9 @@ class Rig {
       place(this.state, id, x, y);
     });
     champion(this.state, 0).energy = energy;
+    for (const [id, value] of Object.entries(health)) {
+      if (value !== undefined) champion(this.state, Number(id)).health = value;
+    }
     this.watcher = new AbilityWatcher(this.state);
   }
 
@@ -420,7 +436,7 @@ function press(slot: Slot, options: { ex?: boolean; aim?: Spot; moveY?: -1 | 0 |
   return input(0, options.moveY ?? 0, Math.round(aimX * 100), Math.round(aimY * 100), buttons);
 }
 
-describe('every slot of the three kits', () => {
+describe('every slot of the four kits', () => {
   interface Row {
     kit: KitDef;
     slot: Slot;
@@ -459,6 +475,15 @@ describe('every slot of the three kits', () => {
     { kit: skerrow, slot: 'E', ex: true, cooldown: 420, windup: 15, walk: 2.75, cost: 25 },
     { kit: skerrow, slot: 'R', ex: false, cooldown: 960, windup: 0, cost: 0 },
     { kit: skerrow, slot: 'F', ex: false, cooldown: 600, windup: 18, walk: 0, cost: 100 },
+    { kit: lumeth, slot: 'M1', ex: false, cooldown: 36, windup: 6, walk: 5.5, cost: 0 },
+    { kit: lumeth, slot: 'M2', ex: false, cooldown: 300, windup: 18, walk: 2.75, cost: 0 },
+    { kit: lumeth, slot: 'M2', ex: true, cooldown: 300, windup: 18, walk: 2.75, cost: 25 },
+    { kit: lumeth, slot: 'SPACE', ex: false, cooldown: 480, windup: 0, cost: 0 },
+    { kit: lumeth, slot: 'Q', ex: false, cooldown: 780, windup: 30, walk: 2.75, cost: 0 },
+    { kit: lumeth, slot: 'E', ex: false, cooldown: 540, windup: 12, walk: 2.75, cost: 0 },
+    { kit: lumeth, slot: 'R', ex: false, cooldown: 720, windup: 0, cost: 0 },
+    { kit: lumeth, slot: 'R', ex: true, cooldown: 720, windup: 0, cost: 25 },
+    { kit: lumeth, slot: 'F', ex: false, cooldown: 600, windup: 36, walk: 2.75, cost: 100 },
   ];
 
   it.each(rows)('$kit.id $slot ex=$ex casts with its cooldown, windup, cost and walk rule', (row) => {
@@ -973,6 +998,226 @@ describe('Skerrow', () => {
     const [teleport] = rig.events('teleport');
     expect(teleport?.e.blocked).toBe(false);
     expect(teleport?.e.toX).toBeCloseTo(X0 + 8, 9);
+    rig.clean();
+  });
+});
+
+describe('Lumeth', () => {
+  // A hurt ally is what makes a heal row show: a heal that restores nothing has no event and earns
+  // nothing. The caster is champion 0, the ally champion 1, the enemies champions 2 and 3.
+  const heals = (rig: Rig) => rig.events('heal').map(({ e }) => [e.targetId, e.amount, e.health]);
+  const gains = (rig: Rig) => rig.events('energyGained').map(({ e }) => [e.championId, e.targetId, e.amount]);
+
+  it('M1 Mend Bolt flies 12 m in 36 sweeps', () => {
+    const rig = new Rig(lumeth);
+    rig.run(6 + 36, press('M1'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(6);
+    expect(spawned?.e.radius).toBe(0.35);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 6 + 1).toBe(36);
+    expect(expired?.e.x).toBeCloseTo(X0 + 12, 9);
+    rig.clean();
+  });
+
+  it('M1 Mend Bolt heals the ally in line for 10, never the caster, and earns 5', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 6, 0] }, 0, true, { 0: 100, 1: 100 });
+    rig.run(6 + 20, press('M1'));
+    expect(rig.events('projectileHit').map(({ e }) => e.targetId)).toEqual([1]);
+    expect(heals(rig)).toEqual([[1, 10, 110]]);
+    expect(gains(rig)).toEqual([[0, 1, 5]]);
+    expect(rig.health(0)).toBe(100);
+    expect(rig.events('damage')).toEqual([]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('M1 Mend Bolt does 10 damage to an enemy, earns 5 and heals nobody', () => {
+    const rig = new Rig(lumeth, { 2: [X0 + 8, 0] });
+    rig.run(6 + 25, press('M1'));
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 10, 110]]);
+    expect(gains(rig)).toEqual([[0, 2, 5]]);
+    expect(rig.events('heal')).toEqual([]);
+    expect(rig.applied()).toEqual([]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('M2 Soothing Surge flies 10.13 m in 38 sweeps', () => {
+    const rig = new Rig(lumeth);
+    rig.run(18 + 38, press('M2'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.5);
+    expect(spawned?.e.vx).toBe(16);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(38);
+    expect(expired?.e.x).toBeCloseTo(X0 + 608 / 60, 9);
+    rig.clean();
+  });
+
+  it('M2 Soothing Surge passes the enemy in line and heals the ally behind it: 14, then six pulses of 2', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 7, 0], 2: [X0 + 3, 0] }, 0, true, { 1: 90 });
+    rig.run(18 + 30 + 185, press('M2'));
+    expect(rig.events('projectileHit').map(({ e }) => e.targetId)).toEqual([1]);
+    expect(heals(rig)).toEqual([
+      [1, 14, 104],
+      [1, 2, 106],
+      [1, 2, 108],
+      [1, 2, 110],
+      [1, 2, 112],
+      [1, 2, 114],
+      [1, 2, 116],
+    ]);
+    expect(rig.applied()).toEqual([[1, 'hot', 180]]);
+    expect(gains(rig)).toEqual([[0, 1, 10]]);
+    expect(rig.health(2)).toBe(120);
+    expect(rig.events('damage')).toEqual([]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('M2 EX Soothing Surge heals 22, then eight pulses of 3 over 240 ticks', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 7, 0] }, 25, true, { 1: 70 });
+    rig.run(18 + 30 + 245, press('M2', { ex: true }));
+    expect(heals(rig)).toEqual([
+      [1, 22, 92],
+      [1, 3, 95],
+      [1, 3, 98],
+      [1, 3, 101],
+      [1, 3, 104],
+      [1, 3, 107],
+      [1, 3, 110],
+      [1, 3, 113],
+      [1, 3, 116],
+    ]);
+    expect(rig.applied()).toEqual([[1, 'hot', 240]]);
+    expect(gains(rig)).toEqual([[0, 1, 10]]);
+    rig.clean();
+  });
+
+  it('SPACE Glide dashes 4 m in 12 ticks with haste on self and fires nothing at the end', () => {
+    const rig = new Rig(lumeth);
+    rig.step(press('SPACE'));
+    expect(rig.applied()).toEqual([[0, 'haste', 60]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 30 }]);
+    rig.run(11);
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 4, 12]]);
+    const ended = rig.events('dashEnded');
+    expect(ended.map(({ step, e }) => [step, e.reason])).toEqual([[11, 'complete']]);
+    expect(ended[0]?.e.x).toBeCloseTo(X0 + 4, 9);
+    expect(rig.events('meleeArc')).toEqual([]);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.clean();
+  });
+
+  it('Q Binding Sigil lands where it is aimed, 8 damage and a 90 tick root, and misses what is 2.1 m off', () => {
+    const rig = new Rig(lumeth, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.1] });
+    rig.run(30 + 1, press('Q', { aim: [X0 + 6, 0] }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(30);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 6, 9);
+    expect(spawned?.e.radius).toBe(1.5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 8, 112]]);
+    expect(rig.applied()).toEqual([[2, 'root', 90]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'root' }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(120);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('Q Binding Sigil aimed far ahead lands 9 m away', () => {
+    const rig = new Rig(lumeth);
+    rig.run(30 + 1, press('Q'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(30);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 9, 9);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('E Lantern Burst hits the enemy at 3.4 m for 12 and throws it 2 m away in 8 ticks, and misses the one at 3.6 m', () => {
+    const rig = new Rig(lumeth, { 2: [X0 + 3.4, 0], 3: [X0, 3.6] });
+    rig.run(12 + 1, press('E'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(12);
+    expect(spawned?.e.x).toBe(X0);
+    expect(spawned?.e.radius).toBe(3);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 12, 108]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 8]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 2, totalTicks: 8, dirX: 1, dirY: 0 }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(120);
+    rig.run(8);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 5.4, 9);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('R Aegis Veil shields the caster and the ally at 5.4 m, not the enemy, and earns nothing', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 5.4, 0], 2: [X0, 3] });
+    rig.step(press('R'));
+    expect(rig.events('areaSpawned')[0]?.e.radius).toBe(5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[0, 1]]);
+    expect(rig.applied()).toEqual([[0, 'shield', 240], [1, 'shield', 240]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 30 }]);
+    expect(rig.statuses(1)).toEqual([{ type: 'shield', absorb: 30 }]);
+    expect(rig.statuses(2)).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('R Aegis Veil does not reach an ally at 5.6 m', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 5.6, 0] });
+    rig.step(press('R'));
+    expect(rig.applied()).toEqual([[0, 'shield', 240]]);
+    expect(rig.statuses(1)).toEqual([]);
+    rig.clean();
+  });
+
+  it('R EX Aegis Veil gives the caster and the ally a shield of 45 for 300 ticks and haste for 120', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 4, 0] }, 25);
+    rig.step(press('R', { ex: true }));
+    expect(rig.applied()).toEqual([
+      [0, 'shield', 300],
+      [0, 'haste', 120],
+      [1, 'shield', 300],
+      [1, 'haste', 120],
+    ]);
+    expect(rig.statuses(1)).toEqual([{ type: 'shield', absorb: 45 }, { type: 'haste', percent: 20 }]);
+    rig.clean();
+  });
+
+  it('F Dawnbloom heals and renews the hurt ally, slows the enemy in reach and earns 15 for the one ally', () => {
+    const rig = new Rig(lumeth, { 1: [X0 + 5.4, 0], 2: [X0, 5.4], 3: [X0, -5.6] }, 100, true, { 1: 50 });
+    rig.run(36 + 190, press('F'));
+    const spawned = rig.events('areaSpawned');
+    expect(spawned.map(({ step }) => step)).toEqual([36, 36]);
+    const [first, second] = spawned;
+    expect([second?.e.x, second?.e.y, second?.e.radius]).toEqual([first?.e.x, first?.e.y, first?.e.radius]);
+    expect(first?.e.radius).toBe(5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[0, 1], [2]]);
+    expect(heals(rig)).toEqual([
+      [1, 30, 80],
+      [1, 5, 85],
+      [1, 5, 90],
+      [1, 5, 95],
+      [1, 5, 100],
+      [1, 5, 105],
+      [1, 5, 110],
+    ]);
+    expect(rig.applied()).toEqual([[0, 'hot', 180], [1, 'hot', 180], [2, 'slow', 120]]);
+    expect(gains(rig)).toEqual([[0, 1, 15]]);
+    expect(rig.health(2)).toBe(120);
+    expect(rig.health(3)).toBe(120);
+    expectOneHit(rig);
     rig.clean();
   });
 });
