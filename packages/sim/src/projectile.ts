@@ -28,6 +28,8 @@ export interface ProjectileSpec {
   lifetimeTicks: number;
   pierce: boolean;
   effects: readonly Effect[];
+  /** Lands on the owner's team instead of `effects`; when given, `effects` may be empty. */
+  readonly allyEffects?: readonly Effect[];
 }
 
 /** Smallest direction component, in magnitude, that `length` measures without underflow. */
@@ -35,6 +37,10 @@ const MIN_DIRECTION = 1e-150;
 
 function fail(problem: string): never {
   throw new Error(`Invalid projectile: ${problem}`);
+}
+
+function failAlly(problem: string): never {
+  return fail(`allyEffects: ${problem}`);
 }
 
 /**
@@ -69,6 +75,13 @@ export function spawnProjectile(
   }
   if (typeof spec.pierce !== 'boolean') return fail('pierce must be a boolean');
   const effects = copyEffects(spec.effects, fail);
+  let allyEffects: Effect[] | undefined;
+  if (spec.allyEffects !== undefined) {
+    if (!Array.isArray(spec.allyEffects) || spec.allyEffects.length === 0) {
+      return fail('allyEffects must be a non-empty array');
+    }
+    allyEffects = copyEffects(spec.allyEffects, failAlly);
+  }
   if (castId !== null) {
     // A plain loop: a closure over `castId` here would allocate on every spawn.
     const { casts } = state;
@@ -96,6 +109,8 @@ export function spawnProjectile(
     effects,
     castId,
   };
+  // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
+  if (allyEffects !== undefined) projectile.allyEffects = allyEffects;
   state.projectiles.push(projectile);
   state.events.push({
     type: 'projectileSpawned',
@@ -118,10 +133,11 @@ const target: Circle = { cx: 0.5, cy: 0.5, cr: 0.5 };
  * The champions one sweep touches, in ascending (t, id) order, written in place: the first
  * `contactCount` entries are live. `sweep` fills them before the first hit and reads them in
  * the hit pass, and nothing a hit calls sweeps. `contactT` holds doubles and `contactId` holds
- * small integers, so each array keeps its element kind from the start.
+ * small integers, so each array keeps its element kind from the start. Six slots: in 3v3 a
+ * projectile touches at most five champions (never its owner), so the arrays never grow.
  */
-const contactT: number[] = [0.5, 0.5, 0.5, 0.5];
-const contactId: number[] = [0, 0, 0, 0];
+const contactT: number[] = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+const contactId: number[] = [0, 0, 0, 0, 0, 0];
 let contactCount = 0;
 
 /**
@@ -152,7 +168,10 @@ function hitAt(state: GameState, p: ProjectileState, t: number, targetId: number
     x: pos.x,
     y: pos.y,
   });
-  landHit(state, p, targetId, p.effects, pos);
+  // `allyEffects` is only read for a champion of the owner's team, which only an ally-effect
+  // projectile touches (see `sweep`).
+  const ally = state.champions[targetId]?.team === p.team;
+  landHit(state, p, targetId, ally ? (p.allyEffects as Effect[]) : p.effects, pos);
 }
 
 /** Ends the projectile at time t along `seg`. */
@@ -220,9 +239,17 @@ function sweep(state: GameState, p: ProjectileState): boolean {
   contactCount = 0;
   const reach = CHAMPION_RADIUS + p.radius;
   const champions = state.champions;
+  // An ally-effect projectile touches the owner's team (never the owner); an empty `effects`
+  // beside `allyEffects` makes it pass the other team. Without `allyEffects` only the other team
+  // is a candidate.
+  const allies = p.allyEffects !== undefined;
+  const enemies = !allies || p.effects.length > 0;
   for (let i = 0; i < champions.length; i++) {
     const c = champions[i] as ChampionState;
-    if (!c.alive || c.team === p.team || p.hitIds.includes(c.id)) continue;
+    if (!c.alive || p.hitIds.includes(c.id)) continue;
+    if (c.team === p.team) {
+      if (!allies || c.id === p.ownerId) continue;
+    } else if (!enemies) continue;
     target.cx = c.x;
     target.cy = c.y;
     target.cr = reach;

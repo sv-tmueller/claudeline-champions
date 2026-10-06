@@ -21,6 +21,13 @@ export interface SightScratch {
   /** The distance band `nearestSightCellIn` looks for, for the same reason. */
   rangeMin: number;
   rangeMax: number;
+  /**
+   * The width of the shot a stand and a sight cell must clear on this think: 0.5 m (a champion),
+   * or the width of F while the bot could press it now (see `computeCues`). Read by the stands of
+   * the bot and by `nearestSightCellIn`; the finisher, the reach test and the tests' stall
+   * oracle keep `SIGHT_CLEARANCE`.
+   */
+  standClearance: number;
   /** The arena `table` was built from, an identity check like the navigation grid's arena. */
   arena: GameState['arena'] | undefined;
   table: Float64Array;
@@ -35,6 +42,7 @@ export function createSightScratch(): SightScratch {
     clearance: 0.5,
     rangeMin: 0.5,
     rangeMax: 0.5,
+    standClearance: SIGHT_CLEARANCE,
     arena: undefined,
     table: new Float64Array(0),
   };
@@ -218,11 +226,12 @@ export const SIGHT_RADIUS = 8;
 
 /**
  * The free cell nearest to p, within `radius` cells of p's own cell, whose centre has a clear
- * shot of a champion's width to the target at a distance in [rangeMin, rangeMax]; -1 when there
- * is none or p is off the grid or not finite. The bot's own cell never counts. The scan runs in
- * index order and keeps the smallest squared distance from p to the cell centre, so a tie goes
- * to the lower index. No segment test: the path follower routes to the cell. The cell centres
- * are computed as numbers and written into `scratch`; the default allocates, for a direct call.
+ * shot to the target, of the width in `scratch.standClearance` (a champion's 0.5 m by default),
+ * at a distance in [rangeMin, rangeMax]; -1 when there is none or p is off the grid or not
+ * finite. The bot's own cell never counts. The scan runs in index order and keeps the smallest
+ * squared distance from p to the cell centre, so a tie goes to the lower index. No segment test:
+ * the path follower routes to the cell. The cell centres are computed as numbers and written into
+ * `scratch`; the default allocates, for a direct call.
  */
 export function nearestSightCell(
   grid: NavGrid,
@@ -278,7 +287,8 @@ export function nearestSightCellIn(
       // The clear shot sweep runs last: it is the costly filter.
       scratch.from.x = cx;
       scratch.from.y = cy;
-      if (!clearShot(state, scratch.from, target, SIGHT_CLEARANCE, scratch)) continue;
+      scratch.clearance = scratch.standClearance;
+      if (!clearShotWith(state, scratch.from, target, scratch)) continue;
       best = index;
       bestDistance = distance;
     }

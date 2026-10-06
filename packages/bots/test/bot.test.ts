@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, hasLineOfSight, step } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
+import type { ArenaDef, ChampionState, GameState, KitDef, PlayerInput } from '@claudeline/sim';
 import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
@@ -14,6 +14,7 @@ import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
 import { arena01, clearShotOracle, config2v2, configMirror, jsonKits } from './helpers';
+import { hargrimKit, quillonFastExKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const STEP = 5.5 / 60;
@@ -673,12 +674,15 @@ describe('aim lead', () => {
   // is the one the aim leads with), and no cast (the nominal speed).
   it('matches the reference chain on random frozen states, to the centimetre', () => {
     const rng = createRng(20241005);
-    const kits = jsonKits();
+    // Half the states use the shipped kits, half a fixture whose M2 EX bolt (18 m/s) is faster than
+    // its base bolt (15 m/s): the shipped kits give both the same speed on every slot.
+    const kitSets = [jsonKits, () => [hargrimKit(), quillonFastExKit()]];
     const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
     const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, speeds: new Set<number>() };
     let checked = 0;
     for (let i = 0; i < 4000; i++) {
-      const state = createMatch(configMirror(), open, 1, jsonKits());
+      const kits = (kitSets[Math.floor(i / 4) % 2] as () => KitDef[])();
+      const state = createMatch(configMirror(), open, 1, kits);
       const botId = i % 2;
       const enemyId = 2 + (Math.floor(i / 2) % 2);
       for (const id of [0, 1, 2, 3]) if (id !== botId && id !== enemyId) kill(state, id);
@@ -744,8 +748,11 @@ describe('aim lead', () => {
     expect(seen.retreat).toBeGreaterThan(300);
     expect(seen.fast).toBeGreaterThan(300);
     expect(seen.zero).toBeGreaterThan(100);
-    // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25.
-    for (const speed of [12, 14, 20, 22, 25]) expect([...seen.speeds], `speed ${speed}`).toContain(speed);
+    // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25,
+    // and the fixture's: 15 for its base M2 and 18 for its EX.
+    for (const speed of [12, 14, 15, 18, 20, 22, 25]) {
+      expect([...seen.speeds], `speed ${speed}`).toContain(speed);
+    }
   });
 });
 

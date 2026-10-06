@@ -1,4 +1,4 @@
-import type { KitDef } from '@claudeline/sim';
+import type { KitDef, Slot } from '@claudeline/sim';
 import { RANGE_MARGIN, abilityReach } from './reach';
 
 export interface BotProfile {
@@ -25,6 +25,7 @@ const PROFILES = new Map<string, BotProfile>([
 const KIT_RULES = new Map<string, number>([
   ['hargrim', 0],
   ['quillon', 6],
+  ['skerrow', 0],
 ]);
 
 /**
@@ -44,4 +45,97 @@ export function profileFor(championId: string, kit?: KitDef): BotProfile {
     }
   }
   return { rangeMin: table.rangeMin, rangeMax: table.rangeMax };
+}
+
+/** What a target must be doing for an opener: walking away from the bot, or toward it. */
+export type Motion = 'away' | 'closing';
+
+/**
+ * An opener: a slot the bot presses on a condition narrower than its kit band. `band` is the
+ * distance band in metres, inclusive and with no range margin: a literal pair, `'dash'` for the
+ * band derived from the base ability's leading dash (see `dashBand` in casting.ts), or null for
+ * the kit band less the margin. `motion` is what the target must be doing, or null.
+ */
+export interface OpenerRule {
+  readonly slot: Slot;
+  readonly band: 'dash' | readonly [number, number] | null;
+  readonly motion: Motion | null;
+}
+
+/** The rules of a champion that its kit does not carry (kits carry no bot fields). */
+export interface ChampionRules {
+  readonly openers: readonly OpenerRule[];
+  /**
+   * The slots pressed to get out of reach, in priority order: the first one that passes its gates
+   * (and, for a teleport, has a landing) is pressed on an escape think; it is a priority order, not
+   * a sequence. See `chooseEscape` in escape.ts.
+   */
+  readonly escapes: readonly Slot[];
+  /**
+   * The ultimate is held for a target it can finish or one with no way out: its run counts only
+   * while the target's health is at most the damage F does (read from the kit) or the target is
+   * cornered, and the energy reserve needs the same condition (see `computeCues`). No champion of
+   * the 2026-10 roster but Skerrow holds it.
+   */
+  readonly holdF: boolean;
+}
+
+/** No rule: every slot is pressed on its kit band alone. */
+const NO_RULES: ChampionRules = Object.freeze({
+  openers: Object.freeze([]),
+  escapes: Object.freeze([]),
+  holdF: false,
+});
+
+/**
+ * Keyed by champion id, like `PROFILES`. The roster's bot sketches (docs/design/roster-v1.md) are
+ * the source of the numbers. Rush is the base dash with the band of `dashBand`; Chain Hook is the
+ * roster's 4 to 7 m, inside the kit band less the margin (0 to 8 m), and only at a target that
+ * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
+ * Iron Hide, Skip and Hush Ward are the escapes of the roster sketches: Skip first, then Hush Ward.
+ * Skerrow's Lunge is the base dash with its derived band (5 to 6 m, where she waits to strike is
+ * not built); Vanish Step is her escape on the common trigger (decision 6 of batch #80, not the
+ * roster's 50 percent health: that would send her back in at once); Reaper's Dance is held.
+ */
+const RULES = new Map<string, ChampionRules>([
+  [
+    'hargrim',
+    rule(
+      [
+        { slot: 'SPACE', band: 'dash', motion: null },
+        { slot: 'E', band: [4, 7], motion: 'away' },
+      ],
+      ['R'],
+      false,
+    ),
+  ],
+  ['quillon', rule([{ slot: 'Q', band: null, motion: 'closing' }], ['SPACE', 'R'], false)],
+  ['skerrow', rule([{ slot: 'SPACE', band: 'dash', motion: null }], ['R'], true)],
+]);
+
+/** A frozen row: the row, its two lists, each opener and each literal band. */
+function rule(openers: OpenerRule[], escapes: Slot[], holdF: boolean): ChampionRules {
+  const frozen = openers.map((opener) =>
+    Object.freeze({
+      ...opener,
+      band:
+        typeof opener.band === 'object' && opener.band !== null
+          ? Object.freeze([opener.band[0], opener.band[1]] as const)
+          : opener.band,
+    }),
+  );
+  return Object.freeze({
+    openers: Object.freeze(frozen),
+    escapes: Object.freeze([...escapes]),
+    holdF,
+  });
+}
+
+/**
+ * The rules of a champion (openers, escapes and the hold of F). Like `KIT_RULES`, a rule applies
+ * only with a kit whose id equals the champion id; otherwise there is none.
+ */
+export function rulesFor(championId: string, kit?: KitDef): ChampionRules {
+  if (kit === undefined || kit.id !== championId) return NO_RULES;
+  return RULES.get(championId) ?? NO_RULES;
 }
