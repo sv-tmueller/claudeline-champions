@@ -285,7 +285,7 @@ describe('the canvas rect', () => {
     expect(calls).toBe(2);
   });
 
-  it('moves the aim when the rect changes, so a resize that skips the refresh would be caught', () => {
+  it('reads the cached rect: the same pointer aims at another ground point when its fields change', () => {
     const arena = parseArenaDef(arena01Json);
     const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
     const rect = createCanvasRect();
