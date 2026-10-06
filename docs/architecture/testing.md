@@ -55,9 +55,7 @@ port 5173, which Playwright starts itself.
 - `match-end.spec.ts`: two tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
-  idle human to its result screen (`result.png`), within 12 000 ticks and 150
-  frames (a headless run through the client's setup and driver ends at tick 2998
-  on main's bots), and follows the Quillon link. The other plays the sandbox to
+  idle human to its result screen (`result.png`), within 15 000 ticks and 182 frames (`ceil(15000 / 96) + 25`; the match ends at tick 5184 in the e2e and 5117 in a headless run through the client's setup and driver, on 8d80073), and follows the Quillon link. The other plays the sandbox to
   the red edge: the ring warning hidden until 600 ticks before the ring, the
   countdown, the radius text equal to the sim's within 0.1 m and falling, and the
   red edge (`ring.png`, counted as red pixels against a picture without the edge).
@@ -209,15 +207,26 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   show on it, and bots bytes inlined into the glue show in `bot-driver.ts` or
   `stepSim`.
 - A blind mode, seen locally only. In some local attempts every counted function
-  read 0 B, `frameMany` included (which otherwise reads 300 to 588 B), and a
-  mutation read 0 B too: 13 and 15 attempts of the first two 35-attempt runs,
-  and 2 attempts of 3 in one mutation run (the same mutation read 1312 to 1424 B
-  when rerun), with the machine busy throughout. The local figures below rest on
-  reruns of 35 attempts per scene in which no attempt was blind (the lowest
-  median was 336 B live and 324 B in the sandbox). No runner attempt did (48 of
-  48 read at least 228 B in the counted code). A green local run therefore
-  proves nothing alone: a mutation check needs every attempt red, and a clean
-  read of 0 B is not a measurement of the code.
+  read 0 B, `frameMany` included (which otherwise reads 252 to 588 B per window,
+  one boxed number per frame), and a mutation read no mutation-sized figure: 13
+  and 15 attempts of the first two 35-attempt runs read 0 B, and in mutation
+  runs two lines read 216 to 276 B (a blind `frame` array and a blind
+  `BotDriver.think` array; the same lines read 1664 to 1764 B and 1448 to 1552 B
+  when rerun), with the machine busy throughout. It came back on 8d80073 in a
+  35-repeat run in a single browser process, from the sixth attempt on, and not
+  in batches of 3 repeats (13 live and 10 sandbox attempts, and 15 live attempts
+  in 5 batches, had none). So the practice is batches of 3 repeats per
+  invocation, and the criterion for calling an attempt non-blind is that every
+  one of its windows has counted bytes (a window with 0 B counted, or a mutation
+  run whose medians sit at the `frameMany` figure, is blind): the 15 live
+  attempts of the current shape all read at least 276 B in every window. The
+  local figures below rest on such attempts only (the lowest median was 492 B
+  live and 324 B in the sandbox). No runner attempt was blind (48 of 48 of the
+  isolation read at least 228 B in the counted code), but 216 to 276 B, the
+  figure of a blind mutation run, is above that, so a floor on the bytes does
+  not separate blind from clean: a green local run proves nothing alone, a
+  mutation check needs every attempt red and the mutated function in the log,
+  and a clean read near 0 B is not a measurement of the code.
 - The asserted figure is the median of the five measured windows, in both
   scenes, and a window's figure is its counted bytes (see the retries bullet
   above for why). Window 0 of the sandbox holds the first-frame acquire of the
@@ -242,13 +251,18 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   below. The worst window is not a stable figure: it read up to 1068 B clean and
   1224 to 2140 B with a spike. Live: 750 B, its own literal, because the event
   windows raise the base: on 8d80073 (the bots of #86) the median of five was at
-  most 648 B over 15 local attempts at limit 1 B (batches of 3 repeats, none
-  blind; a worst window of 864 B clean, and 2 spikes in 75 windows:
-  `main.ts:writeCombatHooks` 1944 B and `hud.ts:updateRound` 1944 B), which is
-  above the sandbox's 640 B. The measured windows of the earlier shape (the
-  first 5 windows of round 3, no events, on f7e10f0) read at most 504 B over 35
-  local attempts and 540 B over the 24 runner attempts of the isolation; the
-  runner has not yet measured the new shape. One function is left out of the
+  most 684 B over 21 local attempts (15 at limit 1 B in 5 batches of 3 repeats,
+  3 in the check run, 3 of the light tester's, which read 612, 468 and 612 B;
+  none blind; a worst window of 924 B clean, and 3 spikes in 105 windows:
+  `main.ts:writeCombatHooks` 1944 B and 4148 B, `hud.ts:updateRound` 1944 B),
+  which is above the sandbox's 640 B. The measured windows of the earlier shape
+  (the first 5 windows of round 3, no events, on f7e10f0) read at most 504 B
+  over 35 local attempts and 540 B over the 24 runner attempts of the isolation;
+  the runner jobs of the new shape (7b80afd, jobs 112201476995, 112203346352 and
+  112205063119) read medians of 588 B, 540 B and 660 B, with `draw` at 0 B in
+  the first and third and 228 to 1116 B in the second, 1.0 to 1.1 min per live
+  attempt, and the same projectiles and hits per window as locally (0>1 and 0,
+  1>1 and 2, 1>4 and 0, 4>2 and 3, 2>2 and 2). One function is left out of the
   live count, `entity-views.ts:draw`: the runner read two modes of it,
   allocating 228 to 912 B in every window (and 1.1 to 1.5 KB in the window of
   the first hit) in 19 of 24 attempts and 0 B in the other 5, so the median of
@@ -261,16 +275,23 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   lines) and does not count them. The sandbox counts `draw`, and the mutation of
   `draw` below fails there. The mode itself is a client defect,
   https://github.com/sv-tmueller/claudeline-champions/issues/89, whose fix
-  removes `LIVE_EXCLUDED` (the carve-out ends there). The live limit is about
-  100 B above the largest clean median (648 B) and below the median of every
-  failing live mutation below (772 B and up; the margin under the smallest, the
-  `ResultScreen.update` template, is 22 B). Both limits were read on a copy of
-  the spec with the limit at 1 B and `expect.soft`; to read the per-function
-  figures, read the "combat code allocated" line of a failure message, or the
-  per-window lines `heap probe <scene> attempt N window W: counted ...` that
-  every attempt logs. Excluding `frameMany` from the pattern is not an option:
-  with it excluded, the escaping array in `frame` and the `ResultScreen.update`
-  template passed, because V8 inlines their code into `frameMany`.
+  removes `LIVE_EXCLUDED` (the carve-out ends there). The live limit is about 66
+  B above the largest clean local median (684 B) and 90 B above the runner's
+  (660 B) and below the median of every mutation the live scene gates: the
+  per-change `data-p0x` write (948 to 1028 B, 198 B over the limit) is the
+  smallest. Two mutations are gated by the sandbox and not by this limit: `draw`
+  (528 to 588 B live, the excluded function) and the `ResultScreen.update`
+  template (704 to 896 B live over 12 attempts, 704 B once passing under 750 B,
+  so it sits at the limit; 968 to 1040 B against 640 B on the sandbox). A runner
+  live median above 750 B reopens the limit under the limit rule (about 100 B
+  above the largest clean median, below the smallest live-gated mutation; if
+  none fits, stop and report). Both limits were read on a copy of the spec with
+  the limit at 1 B and `expect.soft`; to read the per-function figures, read the
+  "combat code allocated" line of a failure message, or the per-window lines
+  `heap probe <scene> attempt N window W: counted ...` that every attempt logs.
+  Excluding `frameMany` from the pattern is not an option: with it excluded, the
+  escaping array in `frame` and the `ResultScreen.update` template passed,
+  because V8 inlines their code into `frameMany`.
 - The sanity floor: the lowest window outside the sim's three sweep files
   (`projectile.ts`, `geometry.ts` and `area.ts`, whose garbage was about 790 KB
   per window until #62 and is 5.7 to 18 KB now, total minus outside the sweep
@@ -288,21 +309,22 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   reachable through `globalThis` (the compiler removes an unused one: the lesson
   of #72). The median of five, as bytes per attempt over 3 attempts, plus the
   line (the sandbox column on 458f458, the live column on 8d80073, which has the
-  bots of #86, with the measured windows after the lead). One mutation passes on
-  the live scene and the sandbox is its gate: `draw`, since the live scene does
-  not count `entity-views.ts:draw` (528 to 588 B there). The limit is 640 B on
-  the sandbox and 750 B on the live scene:
+  bots of #86, with the measured windows after the lead). Two mutations are
+  gated by the sandbox and not by the live limit: `draw`, since the live scene
+  does not count `entity-views.ts:draw` (528 to 588 B there), and the
+  `ResultScreen.update` template (704 to 896 B there over 12 attempts, at the
+  limit). The limit is 640 B on the sandbox and 750 B on the live scene:
 
   | Mutation | Function and place | The line as applied | Sandbox, B | Live, B |
   |---|---|---|---|---|
-  | array in `frame` | `main.ts:frame`, after `const steps = clock.advance(now);` | `(globalThis as unknown as { __j?: unknown }).__j = [steps, now];` | 1600 to 1648 | 1600 to 1736 |
-  | template to `data-p0x` per call | `main.ts:writeHooks`, after `const x = Math.round(champion.x * 100);` | `` canvas.setAttribute('data-p0x', `${x},${Math.round(champion.y * 100)}`); `` | 3052 to 3128 | 2608 to 2676 |
-  | closure in `routeEvents` | `feedback.ts:routeEvents`, first line | `(globalThis as unknown as { __f?: unknown }).__f = () => state.tick;` | 1956 to 2064 | 1892 to 1924 |
-  | object in `draw` | `entity-views.ts:draw`, after `const y = this.options.y;` | `(globalThis as unknown as { __o?: unknown }).__o = { x: alpha, y };` | 3052 to 3180 | 432 to 456 (passes: `draw` is the excluded function) |
-  | `toPlayerInput` literal | `input.ts:toPlayerInput`, replacing `return out;` | `return { moveX: out.moveX, moveY: out.moveY, aimX, aimY, buttons };` | 2064 to 2168 | 1960 to 2180 |
-  | template per `Hud.update` | `hud.ts:update`, first line | `` (globalThis as unknown as { __t?: unknown }).__t = `t${state.tick}`; `` | 784 to 1572 | 1572 to 1632 |
-  | array per `BotDriver.think` | `bot-driver.ts:think`, first line | `(globalThis as unknown as { __b?: unknown }).__b = [state.tick, inputs.length];` | 1408 to 1448 | 1312 to 1424 |
-  | template per `ResultScreen.update` | `result-screen.ts:update`, first line | `` (globalThis as unknown as { __r?: unknown }).__r = `r${state.match?.round}`; `` | 968 to 1040 | 884 to 912 |
+  | array in `frame` | `main.ts:frame`, after `const steps = clock.advance(now);` | `(globalThis as unknown as { __j?: unknown }).__j = [steps, now];` | 1600 to 1648 | 1664 to 1764 |
+  | template to `data-p0x` per call | `main.ts:writeHooks`, after `const x = Math.round(champion.x * 100);` | `` canvas.setAttribute('data-p0x', `${x},${Math.round(champion.y * 100)}`); `` | 3052 to 3128 | 2516 to 2600 |
+  | closure in `routeEvents` | `feedback.ts:routeEvents`, first line | `(globalThis as unknown as { __f?: unknown }).__f = () => state.tick;` | 1956 to 2064 | 1736 to 1996 |
+  | object in `draw` | `entity-views.ts:draw`, after `const y = this.options.y;` | `(globalThis as unknown as { __o?: unknown }).__o = { x: alpha, y };` | 3052 to 3180 | 528 to 588 (passes: the excluded function) |
+  | `toPlayerInput` literal | `input.ts:toPlayerInput`, replacing `return out;` | `return { moveX: out.moveX, moveY: out.moveY, aimX, aimY, buttons };` | 2064 to 2168 | 2216 to 2260 |
+  | template per `Hud.update` | `hud.ts:update`, first line | `` (globalThis as unknown as { __t?: unknown }).__t = `t${state.tick}`; `` | 784 to 1572 | 1412 to 1480 |
+  | array per `BotDriver.think` | `bot-driver.ts:think`, first line | `(globalThis as unknown as { __b?: unknown }).__b = [state.tick, inputs.length];` | 1408 to 1448 | 1448 to 1552 |
+  | template per `ResultScreen.update` | `result-screen.ts:update`, first line | `` (globalThis as unknown as { __r?: unknown }).__r = `r${state.match?.round}`; `` | 968 to 1040 | 704 to 896 (sandbox-gated: at the live limit, 704 B passed once) |
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure
