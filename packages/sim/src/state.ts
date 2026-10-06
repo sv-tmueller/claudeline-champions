@@ -89,8 +89,14 @@ export interface ProjectileState {
   pierce: boolean;
   /** Champions already hit, in hit order. */
   hitIds: number[];
-  /** Applied in order to each champion hit. */
+  /** Applied in order to each champion of the other team that it hits. */
   effects: Effect[];
+  /**
+   * Applied in order to each champion of the owner's team (never the owner) that it hits. The
+   * key is missing, not undefined, when the projectile has none: `checksum` rejects undefined.
+   * With it, a projectile with empty `effects` passes enemies.
+   */
+  allyEffects?: Effect[];
   /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;
 }

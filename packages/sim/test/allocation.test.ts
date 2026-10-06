@@ -68,7 +68,7 @@ function window(state: GameState, n: number): Figure {
 function scene(shots: boolean): GameState {
   const state = createMatch(config2v2(), arena01, 1);
   if (shots) {
-    for (const y of LANES) {
+    LANES.forEach((y, lane) => {
       spawnProjectile(state, {
         ownerId: 0,
         x: SPAWN_X,
@@ -79,9 +79,12 @@ function scene(shots: boolean): GameState {
         radius: 0.25,
         lifetimeTicks: 100000,
         pierce: false,
-        effects: [{ type: 'damage', amount: 30 }],
+        // Lane 0 carries both lists and lane 1 only an ally list (an empty `effects`), so the
+        // ally branch and the second projectile shape are in the measured sweep.
+        effects: lane === 1 ? [] : [{ type: 'damage', amount: 30 }],
+        ...(lane < 2 ? { allyEffects: [{ type: 'heal' as const, amount: 10 }] } : {}),
       });
-    }
+    });
   }
   return state;
 }
@@ -91,7 +94,7 @@ function show(f: Figure): string {
 }
 
 describe('the projectile sweep', () => {
-  it('allocates under the limit per step while eight projectiles hit nothing', () => {
+  it('allocates under the limit per step while eight projectiles hit nothing, two of them with allyEffects', () => {
     const shots = scene(true);
     const base = scene(false);
     // Warm up through the same window code, so each scene is compiled before it is measured.
