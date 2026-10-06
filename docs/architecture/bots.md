@@ -407,7 +407,10 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   corner shields herself.
 - The dash hold: on an escape think no slot whose ability starts with a dash is
   pressed, base or EX variant (the one that would be cast), for every kit:
-  Hargrim's Rush, EX Rush and ultimate, Skerrow's Lunge and EX Lunge. A dash
+  Hargrim's Rush, EX Rush and ultimate, Skerrow's Lunge and EX Lunge, and
+  Lumeth's Glide (a dash with no band, so no rule presses it yet; the hold reads
+  the slot's ability and not the rule, so it covers Glide once the Lumeth
+  profile presses it). A dash
   carries the bot along its aim, toward the target it is leaving: a cornered
   Skerrow with Vanish Step cooling down used to Lunge into the Hargrim she was
   fleeing, and Rush did the same. The kit cache holds a flag per slot for each
@@ -553,19 +556,34 @@ On the runner (the live probe, three Playwright jobs on 04be0f9, run
 `steerTowardInto` and `updateRuns` were absent from every window. On the head
 rebased over #97, 15 local attempts read a median window of 3.2 to 3.7 KB.
 
-The live scene bounds the bots: the median of its five windows' own bots
-figures must be at most 9600 B (`LIVE_BOTS_LIMIT_BYTES` in
-`e2e/heap-probe.ts`). That is 50 percent above the largest median of any
-attempt, 6.4 KB (the one attempt where a single interpreted call of
-`lineOfSight` read 2.7 KB in the median window), and under a quarter of the
-smallest median with the plan search and the Maglev fixes reverted (38.9 KB;
-38.9 to 43.4 KB over 9 local attempts, every one over the limit). It does not
-catch one reverted Maglev fix: `aim`'s 1.2 KB, or the distance of
-`steerTowardInto` with the finite test of `cellIndexAt` at up to 5 KB a
-window, leave the median window under 9.6 KB. Nothing committed guards them
-singly: the Node check runs Turbofan, which inlines them, and the bound sits
-above their size; the Maglev-only scratch run is how they were found. A runner
-median above 9600 B reopens the limit.
+The dash hold of #98 shortens rounds 1 and 2, so round 3 begins by tick 2609
+(2879 before) and the measured windows are windows 4 to 8 of it, ticks 2729 to
+2879, earlier in the chase than windows 5 to 9 were. There the same bots read
+more: 15 local attempts on the head of #98 read a median window of 6404 to 7996
+B (the windows 4.0 to 10.5 KB, and 20 KB once), and the three runner jobs on
+4ea802d 6952, 7348 and 7200 B; main's bots on the same windows read 5744 to 6416
+B (3 attempts), and the tester's twelve attempts up to 7568 B. What is in them
+is the plans (`splitPath`, `plan`), the cold kite step and the escape landing
+code, no hot path: `aim`, `updateRuns` and `computeCues` read 0 B.
+
+The live scene bounds the bots: the median of its five windows' own bots figures
+must be at most 12 000 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
+is 50 percent above the largest median of any clean attempt of the three
+sources, 7996 B, one of the 15 local attempts on the head of #98 (the runner's
+largest is 7348 B, the tester's 7568 B; 11 994, rounded up to 100; decision 12
+of #91 set 9600 B on 6.4 KB, the one attempt where a single interpreted call of
+`lineOfSight` read 2.7 KB in the median window, and the move of the windows is
+why it was set again). The other clause, at most a quarter of the smallest
+median with the plan search and the Maglev fixes reverted, is not the lower one
+now: the revert reads 61.9, 65.8 and 66.7 KB on these windows (a quarter of 61.9
+KB is 15.5 KB), and fails 3 of 3 local attempts (38.9 to 43.4 KB on the old
+windows, 9 of 9). The -0 deopt of `aim` above is the second positive control:
+72.3 to 74.2 KB in 3 of 3 attempts. The bound does not catch one reverted Maglev
+fix: `aim`'s 1.2 KB, or the distance of `steerTowardInto` with the finite test
+of `cellIndexAt` at up to 5 KB a window, leave the median window under 12 KB.
+Nothing committed guards them singly: the Node check runs Turbofan, which
+inlines them, and the bound sits above their size; the Maglev-only scratch run
+is how they were found. A runner median above 12 000 B reopens the limit.
 
 The first windows of a round are not in that figure and are not bounded. With
 the profiler on from tick 0 locally, the first window of round 1 read 2.5 MB
@@ -597,9 +615,11 @@ Maglev (`not int32`, at the `+ 0` of x and of y) and it ran in the interpreter,
 65 KB a window, until it was optimized again. The match is deterministic, so the
 point comes at the same tick in every attempt: with the dash hold of #98 it fell
 just before the measured windows of the live scene in all of them, and the bots
-median read 73 KB. The rounding is `+ 0.5 - 0.5` in `aim` now (the same value
-for any aim in the arena; a double constant gives the sum number feedback from
-its first run), and the windows read 0 B in `aim` again. `escape.ts:landingInto`
+median read 73 KB. The rounding is `+ 0.5 - 0.5` in `aim` now: the same value as
+`+ 0` while |Math.round(x)| is below 2^52 cm (a whole number that size survives
+both additions, and -0 + 0.5 is 0.5; the aim of a champion in any arena is a few
+thousand cm), and a double constant gives the sum number feedback from its first
+run. The windows read 0 B in `aim` again. `escape.ts:landingInto`
 has the same `Math.round(...) + 0` and the same hazard, with a landing point in
 [-0.5, 0) cm, and is not changed: it runs a few times a window, not 90.
 
@@ -757,12 +777,13 @@ the pillar of arena 1 during F's 18 tick windup, the sim fires toward the
 current aim, reports the teleport blocked, Skerrow stays where the cast began,
 and the tally counts it apart with no blocked escape. A shadow-edge test on
 arena 1 pins that a position where the centre line is clear and a shifted line
-hits the pillar gets no press and is not chosen as a sight cell. The determinism test runs the same match twice, and two
-matches stepped in turn, on the test kits and on the shipped kits (the second one
-interleaved with a match on the test kits), and compares input streams and final checksums
-in memory; a Skerrow 2v2 block does the same on the shipped kits, interleaved with a match on the
-test kits and against another match seed, each with the guard of one distinct record per bot per
-tick. See [testing](testing.md).
+hits the pillar gets no press and is not chosen as a sight cell. The determinism
+test runs the same match twice, and two matches stepped in turn, on the test
+kits and on the shipped kits (the second one interleaved with a match on the
+test kits), and compares input streams and final checksums in memory; a Skerrow
+2v2 block does the same on the shipped kits, interleaved with a match on the
+test kits and against another match seed, each with the guard of one distinct
+record per bot per tick. See [testing](testing.md).
 
 The rules have their own pins on frozen states of the shipped kits (`openers.test.ts`,
 `escapes.test.ts`, `reserve.test.ts`, `reaper.test.ts`, with the scenes of `scenes.ts`), each
@@ -795,19 +816,22 @@ engage stand, a path follow past the age of the segment test, a kite with no cle
 kite step, a retreat, the deadlock rule's advance, flee and latched stand, an opener press, an
 escape press with its landing search, a Skerrow engage with F held and a Skerrow
 wait, the stand with its clear shot and the Quiet Dart cue on every think),
-warms each bot up with 20000 thinks and reads `process.memoryUsage().heapUsed` around one `think`, 600
-samples per round. The figure of a round is the median delta minus the median delta of an
-empty pair of reads, and the lowest of three rounds of every scene must be under a literal
-bound, 128 B per think. The think before the rewrite (b09b437) read 4 to 56 KB per think; the
-current think reads 0 B, and the bound sits between the two. The test also reads the sim's
-baseline step against the floor of the sim's own check, which proves the counter moves, and it
-checks that `think` leaves the checksum alone and that every scene stayed in its intent. It gates
-on the native runner and not on the Linux container (batch #53 decision 12). Differential tests
-keep the allocation-free forms honest: `hypot2` and `distanceInto` against `Math.hypot`,
-`lineOfSight` against the sim's `hasLineOfSight`, and `segmentClear` against a copy of the
-implementation before the rewrite and against the sampled clearance oracle. The test helpers
-copy every input a bot returns, and a guard counts one distinct record per bot per tick, since a
-stream of aliases would compare a few objects with themselves.
+warms each bot up with 20000 thinks and reads `process.memoryUsage().heapUsed`
+around one `think`, 600 samples per round. The figure of a round is the median
+delta minus the median delta of an empty pair of reads, and the lowest of three
+rounds of every scene must be under a literal bound, 128 B per think. The think
+before the rewrite (b09b437) read 4 to 56 KB per think; the current think reads
+0 B, and the bound sits between the two. The test also reads the sim's baseline
+step against the floor of the sim's own check, which proves the counter moves,
+and it checks that `think` leaves the checksum alone and that every scene stayed
+in its intent. It gates on the native runner and not on the Linux container
+(batch #53 decision 12). Differential tests keep the allocation-free forms
+honest: `hypot2` and `distanceInto` against `Math.hypot`, `lineOfSight` against
+the sim's `hasLineOfSight`, and `segmentClear` against a copy of the
+implementation before the rewrite and against the sampled clearance oracle. The
+test helpers copy every input a bot returns, and a guard counts one distinct
+record per bot per tick, since a stream of aliases would compare a few objects
+with themselves.
 
 A plan check in the same file reads the median `heapUsed` delta around one
 plan step of the path follower, `followPathInto` on a fresh follower (the
@@ -857,19 +881,20 @@ is a stall), or retreat standing in reach of its target with a clear shot (the l
 stand, which casts), or Skerrow's wait (an engage stand from 6 to 8 m with a
 clear shot while her SPACE has 2 to 90 ticks left, the oracle's own literals).
 The tracker works the team sums and the reach out with its own oracle
-(`clearShotOracle`), not with the code of the bot. Idle counts as standing, and a
-cornered kiter closer than `rangeMin` counts. Any other tick resets the run. No bot may
-stall for more than 120 ticks, in the headless run and in a corner-start run: the same match
-with one bot in the north-east corner of arena 1 and a melee champion 2.83 m
-away on the diagonal, which the old stand rule left frozen for the whole 3600
-ticks. A bot pushed by another champion keeps a non-zero input and is not
-counted: local avoidance is not built. A unit test of the tracker drives it with
-stub bots and zero inputs over 10 observes: engaging far from the enemy gives 10,
-retreating at the spawn while the team is ahead 0, retreating at the spawn while the team
-is not ahead and nothing is in reach 10, retreating at the spawn with an enemy in reach
-(the target or another one) 0, with the enemy in range behind an obstacle 10, retreating
-1 m off the spawn 10, retreating in reach of the target with a clear shot away from the
-spawn 0, kiting closer than `rangeMin` in sight 10, engaging in range 0, no alive enemy
+(`clearShotOracle`), not with the code of the bot. Idle counts as standing, and
+a cornered kiter closer than `rangeMin` counts. Any other tick resets the run.
+No bot may stall for more than 120 ticks, in the headless run and in a
+corner-start run: the same match with one bot in the north-east corner of arena
+1 and a melee champion 2.83 m away on the diagonal, which the old stand rule
+left frozen for the whole 3600 ticks. A bot pushed by another champion keeps a
+non-zero input and is not counted: local avoidance is not built. A unit test of
+the tracker drives it with stub bots and zero inputs over 10 observes: engaging
+far from the enemy gives 10, retreating at the spawn while the team is ahead 0,
+retreating at the spawn while the team is not ahead and nothing is in reach 10,
+retreating at the spawn with an enemy in reach (the target or another one) 0,
+with the enemy in range behind an obstacle 10, retreating 1 m off the spawn 10,
+retreating in reach of the target with a clear shot away from the spawn 0,
+kiting closer than `rangeMin` in sight 10, engaging in range 0, no alive enemy
 0, and a non-zero input resets the run. The wait of Skerrow reads 0 from 6 to 8
 m at a SPACE cooldown of 2 to 90, and 10 at 5.95 and 8.05 m, at a cooldown of 0,
 1 and 91, with no clear shot, for a Skerrow with no kit and for a Hargrim.

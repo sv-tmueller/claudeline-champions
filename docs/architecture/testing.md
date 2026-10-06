@@ -74,14 +74,14 @@ port 5173, which Playwright starts itself.
   headless and 4224 in the e2e, a Defeat 0 : 3), and 23 000 and 265 on the 3v3
   of arena01 (it ends at tick 12 431 headless and 12 864 in the e2e, a Defeat
   2 : 3) and 18 000 and 213 on the 3v3 of arena02 (tick 7125 headless and 7584
-  in the e2e, a Defeat 2 : 3). A headless run through the
-  client's setup and driver gives each row's tick, in
-  `match-setup.test.ts`. The budget is that tick plus two rounds of about 1000
-  and one round to sudden death of about 7000, rounded up to 1000, and the
-  frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their rows
-  use 1600 for a round (the longest measured is 1557). Each row logs its wall
-  time, and a row over 40 s gets its own timeout. The test follows the Quillon
-  link of the result panel, which keeps the arena and the team size.
+  in the e2e, a Defeat 2 : 3). A headless run through the client's setup and
+  driver gives each row's tick, in `match-setup.test.ts`. The budget is that
+  tick plus two rounds of about 1000 and one round to sudden death of about
+  7000, rounded up to 1000, and the frames are ceil(ticks / 96) + 25. The 3v3
+  rounds run longer, so their rows use 1600 for a round (the longest measured is
+  1557). Each row logs its wall time, and a row over 40 s gets its own timeout.
+  The test follows the Quillon link of the result panel, which keeps the arena
+  and the team size.
   The other plays the sandbox to the red edge: the ring warning hidden until 600
   ticks before the ring, the countdown, the radius text equal to the sim's within
   0.1 m and falling, and the red edge (`ring.png`, counted as red pixels against a
@@ -179,11 +179,10 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   to the end of the run (tick 3119), with the first death of the round read at
   tick 3419. Before the dash hold of #98 the round began by tick 2879, the first
   projectile spawned in window 5 (lead 5, windows 3029 to 3179) and the first
-  death was read at 3539. The margin after the last measured window is 540
-  ticks (the floor is 60). The human walks W and D in the
-  first window, then A and D in turn at y of about 3.9 m, west of the block at x
-  = -8, with M1 held; Hargrim's M1 windup is `slowed`, so the walk goes on under
-  the cast.
+  death was read at 3539. The margin after the last measured window is 540 ticks
+  (the floor is 60). The human walks W and D in the first window, then A and D
+  in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
+  Hargrim's M1 windup is `slowed`, so the walk goes on under the cast.
 - The live scene's pointer. Before every window of the run, from the first read
   (the warm-up, the lead, the measured windows and the run-on), a synthetic
   `mousemove` is dispatched on `window` through `page.evaluate`. The page runs
@@ -264,7 +263,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   sixth figure of the probe line; the live scene bounds them apart: the median
   of the five measured windows' bots figures (not the bots figure of the
   window that is the median by counted bytes) must be at most
-  `LIVE_BOTS_LIMIT_BYTES`, 9600 B (`heap-probe.ts` has the figures, and
+  `LIVE_BOTS_LIMIT_BYTES`, 12 000 B (`heap-probe.ts` has the figures, and
   bots.md, Allocation, In the browser, the causes). The bytes in a browser
   window were: 0.7 to 1.2 KB per window in the sandbox (`bot.ts:move` and
   `rng.ts:next` of its one bot, not asserted), and in the live scene's
@@ -272,14 +271,19 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   window of 52 and 40 KB in two jobs (39 to 44 KB over 15 local attempts): the
   garbage of the plan search, about 53 KB a plan, and the calls V8's Maglev
   tier boxes, `Number.isFinite` and `hypot2` among them (bots.md). After the
-  fixes of #93 the median window reads 3.2 to 4.0 KB locally (windows of about
+  fixes of #93 the median window read 3.2 to 4.0 KB locally (windows of about
   6.1, 10.8, 2.6, 3.7 and 1.6 KB) and 3588, 3912 and 3756 B in the three
-  runner jobs on 04be0f9. The limit is 50 percent above the largest median,
-  6.4 KB (a tester's attempt where one interpreted call of `lineOfSight` read
-  2.7 KB, counted as clean), and under a quarter of the smallest median with
-  the fixes reverted (38.9 KB), which fails the bound in every attempt (9 of 9
-  local). It does not catch one reverted fix alone (`aim`'s 1.2 KB leaves the
-  median under 9.6 KB). The windows after a round starts are not asserted:
+  runner jobs on 04be0f9, on windows 5 to 9 of round 3. The dash hold of #98
+  moved the measured windows to windows 4 to 8 of a round 3 that begins at tick
+  2609, and there the median window reads 6404 to 7996 B over 15 local attempts
+  6952, 7348 and 7200 B in three runner jobs on 4ea802d and up to 7568 B in the
+  tester's twelve attempts (main's bots read 5744 to 6416 B there). The limit
+  is 50 percent above the largest clean median of the three, 7996 B, a local
+  one (11 994, rounded up to 100), and it is also under a quarter of the
+  smallest median with the fixes reverted (61.9 KB on these windows, 38.9 KB on
+  the old ones), which fails the bound in every attempt (3 of 3 local, 9 of 9
+  before). It does not catch one reverted fix alone (`aim`'s 1.2 KB leaves the
+  median under 12 KB). The windows after a round starts are not asserted:
   megabytes before the fixes, 0.04 to 0.72 MB in the first window of a round
   after them, locally (bots.md). `summarise` gives the bots' files the prefix
   `bots/`, as it gives the sim's `sim/`, so a bots file such as `bot.ts` never

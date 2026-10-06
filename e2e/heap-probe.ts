@@ -103,25 +103,33 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 600;
 // the earlier 12, so it is not a live gate; 892 to 944 B against 600 B on the
 // sandbox). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
-// The live match's bots limit: 9600 B, its own literal (the bots stay out of
+// The live match's bots limit: 12 000 B, its own literal (the bots stay out of
 // COMBAT_CODE), on the median of the five measured windows' own bots figures, not on the
 // bots figure of the window that is the median by counted bytes. On bc1d6f1 the bots read
 // a median window of 39 to 44 KB over 15 local attempts and 52 and 40 KB on the runner
 // (windows from 25 to 132 KB): the plan search's garbage (about 53 KB a plan) and the
 // calls V8's Maglev tier boxes (Number.isFinite, hypot2), see bots.md, Allocation. With
-// both fixed (#93) the median window read 3.2 to 3.7 KB over 15 local attempts on the
-// rebased head (3.5 to 4.0 KB over 15 on 04be0f9), 3588, 3912 and 3756 B on the runner
-// (run 37457728094, 04be0f9), and 6.4 KB once, in a tester's attempt, where
-// `sight.ts:lineOfSight` read 2732 B in the median window: one interpreted call after a
-// deopt, counted as clean by decision 12 of #91. The limit is 50 percent above that
-// largest median (6.4 KB) and under a quarter of the smallest revert median (38.9 KB, so
-// 9.7 KB). Reverting the plan search and the Maglev fixes (`packages/bots/src` as on
-// bc1d6f1) reads medians of 38.9 to 43.4 KB and fails 9 of 9 local attempts (3 batches of
-// 3). It does not catch one reverted Maglev fix alone: `bot.ts:aim` adds about 1.2 KB, the
-// distance of `steerTowardInto` and the finite test of `cellIndexAt` up to 5 KB a window
-// together, and the median window stays under 9.6 KB then. A runner median above 9600 B
-// reopens the limit. See bots.md and testing.md.
-export const LIVE_BOTS_LIMIT_BYTES = 9600;
+// both fixed (#93) the median window read 3.2 to 3.9 KB, on windows 5 to 9 of round 3
+// (6.4 KB once, where `sight.ts:lineOfSight` read 2732 B after a deopt, clean by decision
+// 12 of #91, which set 9600 B). #98 moved the windows: the dash hold shortens rounds 1
+// and 2, round 3 begins by tick 2609 and the measured windows are windows 4 to 8 of it,
+// in the chase, where plans and cold kite and escape code read more. On the head of #98
+// the median window read 6404 to 7996 B over 15 local attempts (6404, 6876, 7092, 7100,
+// 7108, 7128, 7148, 7180, 7192, 7196, 7292, 7372, 7652, 7740, 7996), 6952, 7348 and 7200
+// B in three runner jobs (4ea802d) and 7176 to 7568 B in the tester's twelve attempts;
+// main's bots on the same windows read 5744 to 6416 B in 3 local attempts. The limit is
+// 50 percent above the largest clean median of the three sources, 7996 B, a local one
+// (11994, rounded up to 100), the rule of decision 12, and it also satisfies the other
+// clause, at most a quarter of the smallest revert median: reverting the plan search and
+// the Maglev fixes (`packages/bots/src` as on bc1d6f1) reads 61.9, 65.8 and 66.7 KB on
+// these windows (a quarter of 61.9 KB is 15.5 KB) and fails 3 of 3 local attempts; so
+// does the -0 deopt of `aim` (bots.md), 72.3 to 74.2 KB in 3 of 3, the second positive
+// control. The 50 percent clause is the lower one here, so it sets the limit. It does not
+// catch one reverted Maglev fix alone: `bot.ts:aim` adds about 1.2 KB, the distance of
+// `steerTowardInto` and the finite test of `cellIndexAt` up to 5 KB a window together,
+// and the median window stays under 12 KB then. A runner median above 12 000 B reopens
+// the limit. See bots.md and testing.md.
+export const LIVE_BOTS_LIMIT_BYTES = 12_000;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains
