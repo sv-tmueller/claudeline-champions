@@ -85,11 +85,11 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 3500 frames on 8d80073 (the warm-up to tick 2879, the lead, the five
-// windows and the run-on to the first death) and took 23 to 27 s for about 2500 frames on
-// the runner on f7e10f0 (6 attempts of job 112172123856), about 10 ms a frame, so about
-// 35 s now and 180 s is a margin of 5x. It also covers the warm-up budget above (9100
-// frames, about 90 s at that rate).
+// A live attempt is about 3500 frames on 8d80073 (the warm-up to tick 2879, the lead, the
+// five windows and the run-on to the first death). It took 1.0 to 1.1 min on the runner
+// (jobs 112201476995 and 112203346352 on 7b80afd), about 18 ms a frame, so 180 s is a
+// margin of 2.7x. The warm-up budget above (9100 frames, about 165 s at that rate) is
+// reached only when the spec is already failing, and then the timeout may fire first.
 const TEST_TIMEOUT_MS = 180_000;
 
 async function readHooks(page: Page): Promise<Hooks> {

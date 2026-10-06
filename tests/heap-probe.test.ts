@@ -167,7 +167,7 @@ describe('conclude', () => {
 });
 
 describe('measureWindows', () => {
-  it('profiles each window in turn, with the exclusion, and concludes on them', async () => {
+  it('profiles each window in turn, counting every function of the pattern, and concludes on them', async () => {
     const calls: string[] = [];
     const draw = node('http://127.0.0.1:5173/packages/client/src/entity-views.ts', 'draw', 700);
     const frameMany = node('http://127.0.0.1:5173/packages/client/src/main.ts', 'frameMany', 360);
@@ -182,10 +182,10 @@ describe('measureWindows', () => {
     };
     const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     try {
-      const measured = await measureWindows(page as never, cdp as never, 'live', 0, 3, LIVE_EXCLUDED);
+      const measured = await measureWindows(page as never, cdp as never, 'sandbox', 0, 3);
       expect(calls).toEqual(Array.from({ length: 3 }, () => ['HeapProfiler.startSampling', 'window', 'HeapProfiler.stopSampling']).flat());
-      expect(measured.windows.map((w) => [w.combat, w.excluded])).toEqual([[360, 700], [360, 700], [360, 700]]);
-      expect(measured.asserted.combat).toBe(360);
+      expect(measured.windows.map((w) => [w.combat, w.excluded])).toEqual([[1060, 0], [1060, 0], [1060, 0]]);
+      expect(measured.asserted.combat).toBe(1060);
     } finally {
       spy.mockRestore();
     }

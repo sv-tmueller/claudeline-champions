@@ -142,7 +142,8 @@ async function fireVolley(page: Page): Promise<void> {
 // No retries: the asserted figure is the median of five windows, which a one-off JIT
 // spike in one window does not move (the spikes of the isolation, 5 attempts of 24 on
 // the runner, were each in one window), and a regression of the sizes measured (784 B
-// and up, see COMBAT_ALLOCATION_LIMIT_BYTES) raises every window. The global retries stay 0 in playwright.config.ts.
+// and up, see COMBAT_ALLOCATION_LIMIT_BYTES) raises every window. The global retries
+// stay 0 in playwright.config.ts.
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
   test.setTimeout(TEST_TIMEOUT_MS);
