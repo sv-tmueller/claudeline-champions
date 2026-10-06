@@ -490,9 +490,12 @@ Not the cause: an unoptimized `aim` (Ignition, `--no-turbofan --no-maglev`)
 boxes about 755 B a think in `aim` itself (the whole think reads 44 KB a think
 there), 68 KB a window for `aim` alone, and the live one read 13 B; a deopt
 loop on live feedback (none of those functions deoptimized in the windows, and
-`--no-concurrent-recompilation` left `aim` at 1.0 to 1.3 KB). The deopts the
-trace does show are three's `needsUpdate` and code a GC clears (`embedded weak
-objects cleared`), which the plans' garbage fed.
+`--no-concurrent-recompilation`, which counts tier-up in ticks and not in
+time, left `aim` at 1.0 to 1.3 KB while `steerTowardInto` read 6 to 16 KB and
+`scoreIntentsInto` 7.5 KB a window and the counted client code 37 KB: counting
+tier-up in ticks does not clean the figures, it moves which functions box).
+The deopts the trace does show are three's `needsUpdate` and code a GC clears
+(`embedded weak objects cleared`), which the plans' garbage fed.
 
 After, 15 local attempts: a median window of 3.5 to 4.0 KB, the five windows
 6.1, 10.8, 2.6, 3.7 and 1.6 KB, with `aim`, `updateRuns`, `computeCues`,
@@ -502,12 +505,34 @@ KB a window), the rng draw (`rng.next` runs in the interpreter, one call in 15
 thinks: 0.5 to 0.7 KB) and the kite step in the first two windows (cold code,
 2 to 3 KB).
 
+On the runner (the live probe, three Playwright jobs on 04be0f9, run
+37457728094) the median window read 3588, 3912 and 3756 B, against 52.2 and
+39.9 KB at bc1d6f1; `aim`, `searchCells`, `canStep`, `hypot2`, `cellIndexAt`,
+`steerTowardInto` and `updateRuns` were absent from every window. On the head
+rebased over #97, 15 local attempts read a median window of 3.2 to 3.7 KB.
+
+The live scene bounds the bots: the median of its five windows' own bots
+figures must be at most 9600 B (`LIVE_BOTS_LIMIT_BYTES` in
+`e2e/heap-probe.ts`). That is 50 percent above the largest median of any
+attempt, 6.4 KB (the one attempt where a single interpreted call of
+`lineOfSight` read 2.7 KB in the median window), and under a quarter of the
+smallest median with the plan search and the Maglev fixes reverted (38.9 KB;
+38.9 to 43.4 KB over 9 local attempts, every one over the limit). It does not
+catch one reverted Maglev fix: `aim`'s 1.2 KB, or the distance of
+`steerTowardInto` with the finite test of `cellIndexAt` at up to 5 KB a
+window, leave the median window under 9.6 KB. Nothing committed guards them
+singly: the Node check runs Turbofan, which inlines them, and the bound sits
+above their size; the Maglev-only scratch run is how they were found. A runner
+median above 9600 B reopens the limit.
+
 The first windows of a round are not in that figure and are not bounded. With
 the profiler on from tick 0 locally, the first window of round 1 read 2.5 MB
 of bots bytes before and 0.72 MB after (cold code: the first plans and shot
 tests run in the interpreter), of round 2 1.5 MB before and 40 KB after, of
 round 3 1.1 MB before and 0.11 MB after, and the fifth window of a round 0.2
-MB before and under 0.15 MB after (round 3: 8 KB).
+MB before and under 0.15 MB after (round 3: 8 KB). The probe prints no bytes
+for the warm-up, so these windows are unmeasured on the runner, and these
+local figures stand for them.
 
 One kind of byte is probably not caused by the bots' code: an optimized
 function that deoptimizes in a window runs its next call or calls in the
