@@ -133,7 +133,8 @@ const target: Circle = { cx: 0.5, cy: 0.5, cr: 0.5 };
  * The champions one sweep touches, in ascending (t, id) order, written in place: the first
  * `contactCount` entries are live. `sweep` fills them before the first hit and reads them in
  * the hit pass, and nothing a hit calls sweeps. `contactT` holds doubles and `contactId` holds
- * small integers, so each array keeps its element kind from the start.
+ * small integers, so each array keeps its element kind from the start. Six slots: in 3v3 a
+ * projectile touches at most five champions (never its owner), so the arrays never grow.
  */
 const contactT: number[] = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
 const contactId: number[] = [0, 0, 0, 0, 0, 0];
@@ -239,7 +240,7 @@ function sweep(state: GameState, p: ProjectileState): boolean {
   const reach = CHAMPION_RADIUS + p.radius;
   const champions = state.champions;
   // An ally-effect projectile touches the owner's team (never the owner); an empty `effects`
-  // beside `allyEffects` makes it pass the other team. Without `allyEffects` it is as ever.
+  // beside `allyEffects` makes it pass the other team. Without `allyEffects` only the other team is a candidate.
   const allies = p.allyEffects !== undefined;
   const enemies = !allies || p.effects.length > 0;
   for (let i = 0; i < champions.length; i++) {
