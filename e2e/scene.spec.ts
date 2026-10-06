@@ -31,6 +31,7 @@ interface HudRead {
   result: {
     visible: string | null;
     entries: { champion: string | null; available: string | null; href: string | null; text: string }[];
+    arenas: { id: string | null; current: string | null; href: string | null; text: string }[];
   };
 }
 
@@ -65,6 +66,12 @@ async function readHud(page: Page): Promise<HudRead> {
         entries: [...document.querySelectorAll<HTMLElement>('[data-result="panel"] [data-champion]')].map((entry) => ({
           champion: entry.getAttribute('data-champion'),
           available: entry.getAttribute('data-available'),
+          href: entry.getAttribute('href'),
+          text: entry.textContent ?? '',
+        })),
+        arenas: [...document.querySelectorAll<HTMLElement>('[data-result="panel"] [data-arena-id]')].map((entry) => ({
+          id: entry.getAttribute('data-arena-id'),
+          current: entry.getAttribute('data-current'),
           href: entry.getAttribute('href'),
           text: entry.textContent ?? '',
         })),
@@ -119,14 +126,19 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     expect(await page.locator('[data-hud="ring-warning"]').getAttribute('data-visible')).toBe('false');
     expect(await page.locator('[data-hud="ring-warning"]').isVisible()).toBe(false);
     // The result panel exists and stays hidden until the match ends. Its select
-    // lists the roster in order: the champions with a kit link to a relaunch, the
-    // others are greyed and have no link.
+    // lists the roster in order: the champions with a kit link to a relaunch on the
+    // arena being played, the others are greyed and have no link. The arena row
+    // lists both arenas in id order, each linking with the current champion.
     expect(hud.result.visible).toBe('false');
     expect(hud.result.entries).toEqual([
-      { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal', text: 'Hargrim' },
-      { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal', text: 'Quillon' },
+      { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01', text: 'Hargrim' },
+      { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal&arena=arena01', text: 'Quillon' },
       { champion: 'lumeth', available: 'false', href: null, text: 'Lumeth' },
-      { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal', text: 'Skerrow' },
+      { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal&arena=arena01', text: 'Skerrow' },
+    ]);
+    expect(hud.result.arenas).toEqual([
+      { id: 'arena01', current: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01', text: 'Arena 1' },
+      { id: 'arena02', current: 'false', href: '?champion=hargrim&difficulty=normal&arena=arena02', text: 'Arena 2' },
     ]);
     expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
 
@@ -164,6 +176,33 @@ test('starts as Quillon from the launch address', async ({ page }) => {
     await page.goto('/?champion=quillon');
     await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
     expect((await readHud(page)).healthText).toBe('120 / 120');
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('starts on arena02 from the launch address', async ({ page }, testInfo) => {
+  const { problems, failed } = watchProblems(page);
+  try {
+    await page.goto('/?arena=arena02');
+    await orFail(page.waitForSelector('canvas[data-arena="arena02"]'), failed);
+    // The sim got arena02, not only the hook: the human stands on its first team A spawn, (-11, 2).
+    const canvas = page.locator('canvas');
+    expect(Number(await canvas.getAttribute('data-p0x'))).toBe(-1100);
+    expect(Number(await canvas.getAttribute('data-p0y'))).toBe(200);
+    // The select carries the arena: the champion links stay on it, and arena02 is the current one.
+    const hud = await readHud(page);
+    expect(hud.result.entries.map((entry) => entry.href)).toEqual([
+      '?champion=hargrim&difficulty=normal&arena=arena02',
+      '?champion=quillon&difficulty=normal&arena=arena02',
+      null,
+      '?champion=skerrow&difficulty=normal&arena=arena02',
+    ]);
+    expect(hud.result.arenas.map((entry) => [entry.id, entry.current])).toEqual([
+      ['arena01', 'false'],
+      ['arena02', 'true'],
+    ]);
+    await page.screenshot({ path: testInfo.outputPath('scene-arena02.png') });
   } finally {
     expect(problems).toEqual([]);
   }

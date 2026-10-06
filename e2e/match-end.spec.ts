@@ -43,6 +43,15 @@ const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
 // picture (the enemy bars, the HUD text) is in the picture without the edge too.
 const RED: ColourRange = { min: [140, 30, 30], max: [255, 100, 100] };
 const TEST_TIMEOUT_MS = 60_000;
+// The match test runs once per arena. `query` leads the address and ends in `&` when it is not empty.
+// arena02 has its own headless run (match-setup.test.ts, tick 2642 on main's bots), and its
+// budget is built the same way as arena01's: the measured tick, two more rounds of about 1000
+// and one round to sudden death of about 7000, rounded up to 1000, which is 12 000 as well.
+// The frame budget is ceil(12 000 / 96) + 25 = 150 for both.
+const ARENAS = [
+  { id: 'arena01', query: '' },
+  { id: 'arena02', query: 'arena=arena02&' },
+] as const;
 
 interface Hooks {
   tick: number;
@@ -147,70 +156,72 @@ async function runUntil(
   }
 }
 
-test('plays the default match to the result screen and relaunches from its select', async ({ page }, testInfo) => {
-  test.setTimeout(TEST_TIMEOUT_MS);
-  const { problems, failed } = watchProblems(page);
+for (const arena of ARENAS) {
+  test(`plays the default match on ${arena.id} to the result screen and relaunches from its select`, async ({ page }, testInfo) => {
+    test.setTimeout(TEST_TIMEOUT_MS);
+    const { problems, failed } = watchProblems(page);
 
-  try {
-    const startedAt = Date.now();
-    await open(page, `/?timescale=${SCALE}`, failed);
+    try {
+      const startedAt = Date.now();
+      await open(page, `/?${arena.query}timescale=${SCALE}`, failed);
 
-    // The human sends no input. Until the phase is matchEnd the panel stays hidden.
-    const { hooks, frames } = await runUntil(
-      page,
-      'the match end',
-      MATCH_BUDGET_TICKS,
-      MATCH_BUDGET_FRAMES,
-      (h) => h.phase === 'matchEnd',
-      (h) => {
-        if (h.phase !== 'matchEnd') expect(h.panelVisible, `the panel at tick ${h.tick}, phase ${h.phase}`).toBe('false');
-      },
-    );
+      // The human sends no input. Until the phase is matchEnd the panel stays hidden.
+      const { hooks, frames } = await runUntil(
+        page,
+        'the match end',
+        MATCH_BUDGET_TICKS,
+        MATCH_BUDGET_FRAMES,
+        (h) => h.phase === 'matchEnd',
+        (h) => {
+          if (h.phase !== 'matchEnd') expect(h.panelVisible, `the panel at tick ${h.tick}, phase ${h.phase}`).toBe('false');
+        },
+      );
 
-    // The panel is up, with Victory exactly when the local score reached "first to N".
-    const [local, other] = hooks.score.split(' : ').map(Number) as [number, number];
-    expect(hooks.panelVisible).toBe('true');
-    expect(await page.locator('[data-result="panel"]').isVisible()).toBe(true);
-    expect(hooks.firstTo).toBe(3);
-    expect(hooks.title).toBe(local === hooks.firstTo ? 'Victory' : 'Defeat');
-    expect(hooks.resultScore, 'the result score is the HUD score').toBe(hooks.score);
-    expect(Math.max(local, other)).toBe(hooks.firstTo);
-    expect(hooks.round, 'every won round was played').toBeGreaterThanOrEqual(local + other);
-    console.log(
-      `match end: tick ${hooks.tick}, score ${hooks.score}, ${frames} frames, ${Date.now() - startedAt} ms`,
-    );
+      // The panel is up, with Victory exactly when the local score reached "first to N".
+      const [local, other] = hooks.score.split(' : ').map(Number) as [number, number];
+      expect(hooks.panelVisible).toBe('true');
+      expect(await page.locator('[data-result="panel"]').isVisible()).toBe(true);
+      expect(hooks.firstTo).toBe(3);
+      expect(hooks.title).toBe(local === hooks.firstTo ? 'Victory' : 'Defeat');
+      expect(hooks.resultScore, 'the result score is the HUD score').toBe(hooks.score);
+      expect(Math.max(local, other)).toBe(hooks.firstTo);
+      expect(hooks.round, 'every won round was played').toBeGreaterThanOrEqual(local + other);
+      console.log(
+        `match end on ${arena.id}: tick ${hooks.tick}, score ${hooks.score}, ${frames} frames, ${Date.now() - startedAt} ms`,
+      );
 
-    // The select: the roster in order, a link per champion with a kit and no link for the rest.
-    expect(hooks.entries.map((entry) => entry.champion)).toEqual(ROSTER);
-    for (const entry of hooks.entries) {
-      if (entry.available === 'true') {
-        expect(entry.tag, entry.champion ?? '').toBe('A');
-        expect(entry.href, entry.champion ?? '').toBe(`?champion=${entry.champion}&difficulty=normal`);
-      } else {
-        expect(entry.available, entry.champion ?? '').toBe('false');
-        expect(entry.href, entry.champion ?? '').toBeNull();
+      // The select: the roster in order, a link per champion with a kit and no link for the rest.
+      expect(hooks.entries.map((entry) => entry.champion)).toEqual(ROSTER);
+      for (const entry of hooks.entries) {
+        if (entry.available === 'true') {
+          expect(entry.tag, entry.champion ?? '').toBe('A');
+          expect(entry.href, entry.champion ?? '').toBe(`?champion=${entry.champion}&difficulty=normal&arena=${arena.id}`);
+        } else {
+          expect(entry.available, entry.champion ?? '').toBe('false');
+          expect(entry.href, entry.champion ?? '').toBeNull();
+        }
       }
+      const available = hooks.entries.filter((entry) => entry.available === 'true').map((entry) => entry.champion);
+      expect(available).toContain('hargrim');
+      expect(available).toContain('quillon');
+
+      await page.setViewportSize(SCREENSHOT_VIEWPORT);
+      await runFrames(page, 2);
+      await page.screenshot({ path: testInfo.outputPath('result.png') });
+
+      // Following a link reloads the page as that champion: Quillon has 120 health, and
+      // the new match starts with the panel hidden.
+      await page.locator('[data-result="panel"] [data-champion="quillon"]').click();
+      await orFail(page.waitForSelector(`canvas[data-arena="${arena.id}"][data-tick]`), failed);
+      const reloaded = await readHooks(page);
+      expect(reloaded.panelVisible).toBe('false');
+      expect(await page.locator('[data-hud="health-bar"] [data-part="health-text"]').textContent()).toBe('120 / 120');
+      expect(reloaded.phase).not.toBe('matchEnd');
+    } finally {
+      expect(problems).toEqual([]);
     }
-    const available = hooks.entries.filter((entry) => entry.available === 'true').map((entry) => entry.champion);
-    expect(available).toContain('hargrim');
-    expect(available).toContain('quillon');
-
-    await page.setViewportSize(SCREENSHOT_VIEWPORT);
-    await runFrames(page, 2);
-    await page.screenshot({ path: testInfo.outputPath('result.png') });
-
-    // Following a link reloads the page as that champion: Quillon has 120 health, and
-    // the new match starts with the panel hidden.
-    await page.locator('[data-champion="quillon"]').click();
-    await orFail(page.waitForSelector('canvas[data-arena][data-tick]'), failed);
-    const reloaded = await readHooks(page);
-    expect(reloaded.panelVisible).toBe('false');
-    expect(await page.locator('[data-hud="health-bar"] [data-part="health-text"]').textContent()).toBe('120 / 120');
-    expect(reloaded.phase).not.toBe('matchEnd');
-  } finally {
-    expect(problems).toEqual([]);
-  }
-});
+  });
+}
 
 /** The sim's ring radius in metres at a tick, from the rules (the ring is made at 180 + 5400 ticks, and shrinks over 1800). */
 function simRadius(tick: number): number {

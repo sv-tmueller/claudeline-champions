@@ -98,7 +98,7 @@ scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.
 
 // Built before the models load, so the HUD shows while they do.
 const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
-const result = new ResultScreen(buildResult(resultRoot, kitIds, launch.difficulty), human.team, roundsToWin);
+const result = new ResultScreen(buildResult(resultRoot, kitIds, arenas, launch), human.team, roundsToWin);
 
 const camera = new PerspectiveCamera(CAMERA_VERTICAL_FOV_DEG, 1, 0.1, 500);
 
