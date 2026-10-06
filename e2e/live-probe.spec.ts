@@ -62,10 +62,19 @@ const WARM_UP_TICKS = 2100;
 // runs to sudden death, about 7000 ticks: a round in progress at WARM_UP_TICKS can end
 // that late, and the next one begins then.
 const WARM_UP_BUDGET_TICKS = 9100;
-// The windows measured, from the first window of the round. The median of the five is
-// the asserted figure, as in the sandbox (see testing.md). The first death of a round
-// came 630 ticks after its start on 8d80073 (tick 3509, round 3 begun by tick 2879), 480
-// ticks after the last window.
+// Plain windows of the round before the measured ones, so that the measured windows
+// hold the round's first projectiles and hits, the event paths this scene exists to
+// cover. Measured on 8d80073 over 17 windows of round 3 (begun by tick 2879): the
+// first projectile spawns in window 5 (ticks 3029 to 3059, 150 ticks into the windows
+// of the round), the first hit lands in window 6, then 1 to 4 projectiles are live and
+// 1 to 3 hits land per window to the end of the run (tick 3389). The first death of the
+// round is read at tick 3509. The lead is a count of windows, not a tick, because
+// windows are the unit the spec runs in; a bots change moves the first projectile, and
+// the assertion that the measured windows hold one fails then, so re-measure.
+const EVENT_LEAD_WINDOWS = 5;
+// The windows measured, after the lead: windows 5 to 9 of round 3, ticks 3029 to 3179.
+// The median of the five is the asserted figure, as in the sandbox (see testing.md).
+// The last of them ends 330 ticks before the first death of the round.
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
@@ -76,7 +85,7 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 3500 frames on 8d80073 (the warm-up to tick 2879, the five
+// A live attempt is about 3500 frames on 8d80073 (the warm-up to tick 2879, the lead, the five
 // windows and the run-on to the first death) and took 23 to 27 s for about 2500 frames on
 // the runner on f7e10f0 (6 attempts of job 112172123856), about 10 ms a frame, so about
 // 35 s now and 180 s is a margin of 5x. It also covers the warm-up budget above (9100
@@ -183,7 +192,13 @@ test('the live match: the writes of a changing match allocate under the limit', 
     const roundStart = hooks;
     console.log(`heap probe live warm-up: round ${hooks.round} began by tick ${hooks.tick}, deaths ${hooks.deaths}`);
 
-    // The measured windows, the first of the round. Every read is kept, for the end assertions.
+    // The lead: plain windows, so the measured ones hold the first projectiles and hits.
+    for (let window = 0; window < EVENT_LEAD_WINDOWS; window++) {
+      await driver.run(hooks);
+      hooks = await readHooks(page);
+    }
+
+    // The measured windows. Every read is kept, for the end assertions.
     const reads: Hooks[] = [hooks];
     const windows: Allocations[] = [];
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
@@ -204,6 +219,10 @@ test('the live match: the writes of a changing match allocate under the limit', 
       expect(read.deaths, `deaths at tick ${read.tick}`).toBe(roundStart.deaths);
     }
     expect(hooks.bars[0], 'the human is alive').not.toBe('x');
+    // The windows hold the events: a projectile in flight at some read, and a hit
+    // landed between the first read and the last. The counts are in the per-window log.
+    expect(Math.max(...reads.map((read) => read.projectiles)), 'a projectile in the measured windows').toBeGreaterThanOrEqual(1);
+    expect(hooks.hits - (reads[0] as Hooks).hits, 'hits landed in the measured windows').toBeGreaterThanOrEqual(1);
     // Every window ran its frames, and the hooks written on every tick changed in each.
     for (let i = 1; i < reads.length; i++) {
       const before = reads[i - 1] as Hooks;

@@ -134,18 +134,25 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   before the page loads and never runs a frame, so the first read is tick 0 and
   every tick is the hook's. The warm-up is plain windows with no profiler from
   tick 0 to the first round that begins after tick 2100 (round 3, begun by tick
-  2879 on 8d80073 on every run so far: the bots are deterministic), then the
-  first 5 windows of that round are measured. The human walks W and D in the
+  2879 on 8d80073 on every run so far: the bots are deterministic), then 5 plain
+  windows of the round (the lead, 150 ticks), then the next 5 windows are
+  measured, ticks 3029 to 3179 on 8d80073. The lead is derived from a 17-window
+  run of round 3 on 8d80073: the first projectile spawns in window 5 (ticks 3029
+  to 3059), the first hit lands in window 6, and then 1 to 4 projectiles are
+  live and 1 to 3 hits land per window to the end of the run (tick 3389), with
+  the first death of the round read at tick 3509. The human walks W and D in the
   first window, then A and D in turn at y of about 3.9 m, west of the block at x
   = -8, with M1 held; Hargrim's M1 windup is `slowed`, so the walk goes on under
   the cast. The end assertions: phase round, the same round and the same death
-  count at every read, the human's bar not "x", 29 to 31 ticks per window, `p0x`
-  and `f0` different across every window, |sin f0| over 0.5 at every read, M1 on
-  cooldown in at least one read, then the sanity floor and the limit. After them
-  the windows run on to the first death of the round, which must come at least
-  60 ticks after the last measured window (it came 480 ticks after, at tick
-  3509, on every run). Logged, not asserted: per window, the projectiles, hits
-  and bars that changed.
+  count at every read, the human's bar not "x", a projectile in flight at some
+  read and a hit landed between the first read and the last (the counts per
+  window are in the log), 29 to 31 ticks per window, `p0x` and `f0` different
+  across every window, |sin f0| over 0.5 at every read, M1 on cooldown in at
+  least one read, then the sanity floor and the limit. After them the windows
+  run on to the first death of the round, which must come at least 60 ticks
+  after the last measured window (it came 330 ticks after, at tick 3509, on
+  every run). Logged, not asserted: per window, the projectiles, hits and bars
+  that changed.
 - Why the live scene is measured in round 3 and without a pointer. A live match
   gives the engine no time before its first death (tick 449 on the normal bots
   of f7e10f0, 719 on easy): from tick 0 the counted code read 16 to 81 KB per
@@ -216,14 +223,12 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   above for why). Window 0 of the sandbox holds the first-frame acquire of the
   volley's eight views and reads 636 to 1068 B counted in every attempt (59
   attempts: the 24 runner lines of the isolation and 35 local; the acquire is
-  336 to 660 B of it), which the median ignores; the live scene's windows held
-  the first projectile, the first hit and the rings before the bots of #86 (they
-  cost 24 to 300 B in `entity-views.ts`, `feedback.ts` and `impact-rings.ts`,
-  with one-off spikes of 1.3 to 5 KB in `hud.ts`, `impact-rings.ts`, `main.ts`
-  and `champion-look.ts`, each in one window). On 8d80073 the five measured
-  windows hold no projectile and no hit (the bots are still walking to contact,
-  deterministically), so they cover the human's per-change writes, the HUD and
-  the glue; the first events come in the windows after them.
+  336 to 660 B of it), which the median ignores; the live scene's windows hold
+  the round's first projectiles, the first hit and the rings: the event paths
+  (`entity-views.ts:acquire`, `feedback.ts:routeEvents`,
+  `impact-rings.ts:spawn`) cost 24 to 330 B in a window, with one-off spikes of
+  1.3 to 5 KB in `hud.ts`, `impact-rings.ts`, `main.ts` and `champion-look.ts`,
+  each in one window.
 - The limits are literals in `e2e/heap-probe.ts`, one per scene, with their
   figures in the comment beside them. Sandbox: 640 B. In a steady state every
   counted function reads 0 B except `frameMany`, which reads 300 to 588 B (9 to
@@ -235,35 +240,37 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   non-blind) and 504 B over the 24 runner attempts of the isolation, so 640 B
   stays, about 100 B above the largest clean median and below every mutation
   below. The worst window is not a stable figure: it read up to 1068 B clean and
-  1224 to 2140 B with a spike. Live: 640 B as well, with its own figures: the
-  median of five was at most 504 B over 35 local attempts at limit 1 B on
-  f7e10f0 (all non-blind; 456 B over 13 attempts on 8d80073, with a worst window
-  of 552 B; the worst window up to 672 B clean, and 4 spikes in 175 windows:
-  `hud.ts:updateRound` 4132 B, `impact-rings.ts:draw` 1296 B and
-  `hud.ts:updateRing` 1296 B twice) and at most 540 B over the 24 runner
-  attempts, with one function left out of the count, `entity-views.ts:draw`. The
-  runner read two modes of that function: it allocated 228 to 912 B in every
-  window (and 1.1 to 1.5 KB in the window of the first hit) in 19 of 24
-  attempts, and read 0 B in the other 5, so the median of five with it counted
-  was 336 to 504 B in 6 attempts and 864 to 1176 B in the 18 others, overlapping
-  the live mutation of `ResultScreen.update` (884 to 912 B on f7e10f0), which no
-  limit could separate. It is probably a cold path of `draw` (few active views,
-  so the engine reaches optimized code for the active-slot branch late; the
-  sandbox's 8 shots keep it hot and read 0 B there), so the live scene logs its
-  bytes apart (`LIVE_EXCLUDED` in `heap-probe.ts`, the `excluded` figures of the
-  per-window lines) and does not count them. The sandbox counts `draw`, and the
-  mutation of `draw` below fails there. The mode itself is a client defect,
+  1224 to 2140 B with a spike. Live: 750 B, its own literal, because the event
+  windows raise the base: on 8d80073 (the bots of #86) the median of five was at
+  most 648 B over 15 local attempts at limit 1 B (batches of 3 repeats, none
+  blind; a worst window of 864 B clean, and 2 spikes in 75 windows:
+  `main.ts:writeCombatHooks` 1944 B and `hud.ts:updateRound` 1944 B), which is
+  above the sandbox's 640 B. The measured windows of the earlier shape (the
+  first 5 windows of round 3, no events, on f7e10f0) read at most 504 B over 35
+  local attempts and 540 B over the 24 runner attempts of the isolation; the
+  runner has not yet measured the new shape. One function is left out of the
+  live count, `entity-views.ts:draw`: the runner read two modes of it,
+  allocating 228 to 912 B in every window (and 1.1 to 1.5 KB in the window of
+  the first hit) in 19 of 24 attempts and 0 B in the other 5, so the median of
+  five with it counted was 336 to 504 B in 6 attempts and 864 to 1176 B in the
+  18 others, which overlaps the smaller live mutations and no limit could
+  separate. It is probably a cold path of `draw` (few active views, so the
+  engine reaches optimized code for the active-slot branch late; the sandbox's 8
+  shots keep it hot and read 0 B there), so the live scene logs its bytes apart
+  (`LIVE_EXCLUDED` in `heap-probe.ts`, the `excluded` figures of the per-window
+  lines) and does not count them. The sandbox counts `draw`, and the mutation of
+  `draw` below fails there. The mode itself is a client defect,
   https://github.com/sv-tmueller/claudeline-champions/issues/89, whose fix
   removes `LIVE_EXCLUDED` (the carve-out ends there). The live limit is about
-  100 B above the largest clean median and below the median of every live
-  mutation below but two (`draw` and the `ResultScreen.update` template, see the
-  table). Both limits were read on a copy of the spec with the limit at 1 B and
-  `expect.soft`; to read the per-function figures, read the "combat code
-  allocated" line of a failure message, or the per-window lines `heap probe
-  <scene> attempt N window W: counted ...` that every attempt logs. Excluding
-  `frameMany` from the pattern is not an option: with it excluded, the escaping
-  array in `frame` and the `ResultScreen.update` template passed, because V8
-  inlines their code into `frameMany`.
+  100 B above the largest clean median (648 B) and below the median of every
+  failing live mutation below (772 B and up; the margin under the smallest, the
+  `ResultScreen.update` template, is 22 B). Both limits were read on a copy of
+  the spec with the limit at 1 B and `expect.soft`; to read the per-function
+  figures, read the "combat code allocated" line of a failure message, or the
+  per-window lines `heap probe <scene> attempt N window W: counted ...` that
+  every attempt logs. Excluding `frameMany` from the pattern is not an option:
+  with it excluded, the escaping array in `frame` and the `ResultScreen.update`
+  template passed, because V8 inlines their code into `frameMany`.
 - The sanity floor: the lowest window outside the sim's three sweep files
   (`projectile.ts`, `geometry.ts` and `area.ts`, whose garbage was about 790 KB
   per window until #62 and is 5.7 to 18 KB now, total minus outside the sweep
@@ -280,12 +287,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   string built on every `ResultScreen.update` call. Each line keeps its object
   reachable through `globalThis` (the compiler removes an unused one: the lesson
   of #72). The median of five, as bytes per attempt over 3 attempts, plus the
-  line (limit 640 B in both scenes; the sandbox column on 458f458, the live
-  column on 8d80073, which has the bots of #86). Two mutations pass on the live
-  scene and the sandbox is their gate: `draw`, since the live scene does not
-  count `entity-views.ts:draw`, and the `ResultScreen.update` template, which
-  read 556 to 616 B there on 8d80073 (884 to 912 B on f7e10f0: the live windows
-  no longer hold events, and V8 allocates the string less often there):
+  line (the sandbox column on 458f458, the live column on 8d80073, which has the
+  bots of #86, with the measured windows after the lead). One mutation passes on
+  the live scene and the sandbox is its gate: `draw`, since the live scene does
+  not count `entity-views.ts:draw` (528 to 588 B there). The limit is 640 B on
+  the sandbox and 750 B on the live scene:
 
   | Mutation | Function and place | The line as applied | Sandbox, B | Live, B |
   |---|---|---|---|---|
@@ -309,10 +315,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   cached string for an integer it has seen, and the walk revisits the same
   centimetres every second window, so that form could read 0 B. Run once per
   scene, 3 attempts each: both pass on the sandbox (medians 336 to 408 B and 360
-  to 432 B, under 640 B), which is the gap, and both fail on the live scene (688
-  to 816 B and 948 to 1004 B on 8d80073; 976 to 1088 B and 1352 to 1388 B on
-  f7e10f0). The per-event writes (the flash, the bars, the counts) are not
-  mutated: they are on review only.
+  to 432 B, under 640 B), which is the gap, and both fail on the live scene,
+  every attempt (948 to 1028 B and 1220 to 1276 B on 8d80073 with the measured
+  windows after the lead; 688 to 816 B and 948 to 1004 B with the windows before
+  it). The per-event writes (the flash, the bars, the counts) are not mutated:
+  they are on review only.
 - Each attempt logs one line, `heap probe <scene> attempt N: bytes per window,
   total/onAnimationFrame/fake requestAnimationFrame/outside the sweep
   files/counted code/bots/excluded`, with the seven figures of each measured
