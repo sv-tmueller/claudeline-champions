@@ -56,7 +56,8 @@ first.
   scoreboard, the other three `Platform` methods (`identity`,
   `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
-  Quillon, Skerrow and Lumeth kits; placeholder models for the four roster ids.
+  Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
+  placeholder, each rigged, with four clips the client does not play yet.
 - `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
 
 ## Index

@@ -32,13 +32,13 @@ newer and no packages, so they can run in CI.
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
-| `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs |
-| `blender_common.py` | Scene clearing, materials and export, shared by the generators |
+| `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs: the body, the six-bone rig and the four clips from constant pose tables |
+| `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
-| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, feet, facing, height, footprint, budgets and colour rules. Standard library only, no Blender |
-| `validate_glb.py` | Checks glb structure, node names and the arena JSON. Standard library only |
-| `test_validate_glb.py` | Unit tests for the validator, over both arenas where they read the committed models. Those tests need `assets/models` to exist |
+| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets and colour rules. Standard library only, no Blender |
+| `validate_glb.py` | Checks glb structure, node names, a champion's rig and clips and the arena JSON. Standard library only |
+| `test_validate_glb.py` | Unit tests for the validator, one rejection per rig and clip rule against a synthetic rigged document, and a drift test between the two tables in `assets.md` and the validator's constants. The committed-model tests need `assets/models` to exist |
 
 ## Runner
 
@@ -100,11 +100,23 @@ not vertical.
 - It faces +X in both Blender and glTF, so the client can set
   `rotation.y = aimAngle` directly. An accent-coloured visor and chest plate
   mark the front.
-- Body and accent are flat colours. No rig, no animation.
+- Body and accent are flat colours.
 - All five files share the node layout, the origin, the facing, the body
-  geometry and the accent. A roster champion differs only in the body colour
-  and one cue mesh, which is in the body colour so the accent still marks
-  only the front.
+  geometry, the rig, the clips and the accent. A roster champion differs only
+  in the body colour and one cue mesh, which is in the body colour so the
+  accent still marks only the front.
+- The scene lists `Rig`, whose children are the joint `Hips` and the skinned
+  mesh `Champion`. The rest pose is the static geometry, so the bind pose
+  equals it and a model with no clip playing looks as it did unrigged. Every
+  part is rigid, with weight 1.0 on one of the six bones.
+- The bones (`Hips`, `Spine`, `Arm_L`, `Arm_R`, `Leg_L`, `Leg_R`) and the clips
+  (`Idle`, `Run`, `Cast`, `Death`, at 30 fps, LINEAR keys) are the two tables
+  in `docs/architecture/assets.md`, which the validator's constants must match.
+  The pose values are constant tables in `gen_champion.py`.
+- The export writes the keys as authored, so each file stays near 46 KB at
+  most. `export_glb(out, rigged=True)` sets every skin and animation flag by
+  name; arenas keep their flags. Python's `keyframe_insert` ignores the
+  interpolation preference, so `key_clip` sets each key to LINEAR.
 - The top of every model is at most 1.90 m, because the health bar starts
   above 1.97 m, and the ground radius is at most 0.50 m. Each file is at most
   48 KiB and 600 triangles.
@@ -139,9 +151,18 @@ reported as that file's FAIL line, and the remaining files still run.
 - The parent folder decides the rules. `arenas/<id>.glb` is checked against
   `data/arenas/<id>.json`, and `champions/*.glb` needs a `Champion` node. Any
   other folder fails.
-- Every file fails if it has `animations`, `skins`, `textures` or `images`.
-  This enforces flat colours and no rigs. It gets relaxed for champions in
-  milestone 5.
+- Every file fails if it has `textures` or `images`, which enforces flat
+  colours. An arena also fails if it has `animations` or `skins`.
+- A champion needs the rig and the clips: a `Champion` node with a mesh and a
+  skin and exactly one skin; the six joint names once each with the parents of
+  the rig table, `Hips` under `Rig`; `inverseBindMatrices` as a FLOAT MAT4
+  accessor with one entry per joint; `JOINTS_0` and `WEIGHTS_0` on every
+  primitive; exactly the four clip names; channels on joints only, with a
+  rotation channel per joint and a translation channel on `Hips`; and LINEAR
+  samplers that share one input with the table's key count, a minimum of 0 and
+  a maximum of frames / 30 within 1e-4. A key moved to another frame makes the
+  exporter write a second input, and a dropped key makes it bake the channel,
+  so both fail.
 - The arena JSON must match spec 8.1 key for key, with positive sizes, 2 to 3
   spawns per team, obstacles and spawns (a 0.5 m circle) inside the playable
   rectangle, no spawn touching an obstacle, `startRadius > endRadius > 0`, and
