@@ -37,9 +37,12 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  *   deadlock advance     5776            5760            0              0
  *   deadlock flee        8656            9584            0              0
  *   deadlock stand       8512            9472            0              0
- *   opener press         (new scene)     (new scene)     0              -
- *   escape press         (new scene)     (new scene)     0              -
- *   skerrow engage       (new scene)     (new scene)     0              -
+ *   opener press         (new scene)     (new scene)     0              0
+ *   escape press         (new scene)     (new scene)     0              0
+ *   skerrow engage       (new scene)     (new scene)     0              0
+ *
+ * The last three scenes have no main figure: they test paths main does not have. The unit job of
+ * the draft pull request (#86) read 0 for each of them in both of its runs.
  *
  * The branch reads 0 in the lowest round of every scene, and 256 in one round of the press scene
  * while V8 tiers up (the other two read 0). The mutations that put a cost back each go over the
