@@ -509,12 +509,12 @@ tests run in the interpreter), of round 2 1.5 MB before and 40 KB after, of
 round 3 1.1 MB before and 0.11 MB after, and the fifth window of a round 0.2
 MB before and under 0.15 MB after (round 3: 8 KB).
 
-One kind of byte is probably not in the code: an optimized function that
-deoptimizes in a window runs its next call or calls in the interpreter.
-`sight.ts:lineOfSight` read 2.7 KB in one window of one local attempt (a
-median window of 6.4 KB, window 3) and 1.7 KB in one window of a runner
-attempt (window 1), and 0 B in the other 100 or so attempts. The cause is
-inferred, not traced: one interpreted call of it reads 1.1 to 3.1 KB in a
+One kind of byte is probably not caused by the bots' code: an optimized
+function that deoptimizes in a window runs its next call or calls in the
+interpreter. `sight.ts:lineOfSight` read 2.7 KB in one window of one local
+attempt (a median window of 6.4 KB, window 3) and 1.7 KB in one window of a
+runner attempt (window 1), and 0 B in the other 100 or so attempts. The cause
+is inferred, not traced: one interpreted call of it reads 1.1 to 3.1 KB in a
 micro-run (Node 26), the size of both events, and the trace shows a first-time
 deopt of it once per run (`Insufficient type feedback for binary operation`,
 tick 299) and `clearShotWith` deoptimizing on `wrong map`; no late deopt of it
@@ -713,17 +713,21 @@ against 2280 B on Node 22, and no one limit held on both. A fresh six-double
 object kept in a module variable goes over the limit on both Node majors
 (lowest round, clear and fallback, within 100 B between them) per edge test
 (44260 and 22792 B), per open push (25716 and 14224 B), per point of
-`splitPath` (7320 and 4920 B), per segment of `splitPath` (3200 and 2400 B),
-per cell of `nearestFreeCell` (19636 B, fallback), per call of
-`nearestFreeCell` (2400 B fallback, invisible on clear) and per call of
-`plan`, `findPath` or `pullString` (2952 B clear, 2 B over: the edge of what
-the check sees). A smaller object per plan or a typed array per search is not
-measured and is the limit of this check, as a two-double point is for the
-think bound. The steady-state scenes cannot see what only Maglev boxes (see
-Allocation, In the browser). A fresh six-double object kept in a module
-variable at each rewritten site of the think (`steerTowardInto`,
-`cellIndexAt`, `clearShotWith`, `needsPlan`, `aim`, `segmentClear`) reads 168
-B or more in the scenes that reach it.
+`splitPath` (7320 and 4920 B) and per segment of `splitPath` (3200 and 2400
+B), and per cell of `nearestFreeCell` (19636 B, fallback). Two mutations are
+at the edge and not guarded: per call of `plan`, `findPath` or `pullString`
+reads 2952 B on clear, 2 B over the limit on both majors (clean 2800 B on Node
+22, 2784 B on Node 26), and per call of `nearestFreeCell` is red on Node 22
+(2400 to 2408 B on the fallback spread, clean 2072 to 2132 B) but at the limit
+on Node 26 (2400 B in one run, 2256 B in another, against 2300 B; clean 1920
+to 2064 B), and invisible on clear. The fallback limit stays 2300 B: 2200 B
+would leave Node 22's clean figure a margin of 3 percent. A smaller object per
+plan or a typed array per search is not measured and is the limit of this
+check, as a two-double point is for the think bound. The steady-state scenes
+cannot see what only Maglev boxes (see Allocation, In the browser). A fresh
+six-double object kept in a module variable at each rewritten site of the
+think (`steerTowardInto`, `cellIndexAt`, `clearShotWith`, `needsPlan`, `aim`,
+`segmentClear`) reads 168 B or more in the scenes that reach it.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the

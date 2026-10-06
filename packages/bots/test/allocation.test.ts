@@ -111,13 +111,16 @@ const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
  *
  * A fresh six-double object kept in a module variable, clear then fallback, lowest round (the
  * same on Node 22 and Node 26 within 100 B): per edge test 44260 and 22792 B, per open push 25716
- * and 14224, per point of `splitPath` 7320 and 4920, per segment of `splitPath` 3200 and 2400,
- * per cell of `nearestFreeCell` 19636 (fallback; the clear spread never calls it), per call of
- * `nearestFreeCell` 2400 (fallback; invisible on clear), per call of `plan`, `findPath` or
- * `pullString` 2952 clear (2 B over the limit, so a fresh object per plan sits at the edge) and
- * 2232 fallback. All go red against these limits on both. A smaller object per plan, or a typed
- * array per search, is not measured here and is the limit of this check, as a two-double point
- * is for the think bound.
+ * and 14224, per point of `splitPath` 7320 and 4920, per segment of `splitPath` 3200 and 2400, per
+ * cell of `nearestFreeCell` 19636 (fallback; the clear spread never calls it). These go red on both
+ * majors. Two mutations are at the edge and not guarded. Per call of `plan`, `findPath` or
+ * `pullString`: 2952 clear, 2 B over the limit on both majors (clean 2800 on Node 22, 2784 on
+ * Node 26), 2232 fallback. Per call of `nearestFreeCell`: 336 B on a fallback plan (it is called at
+ * both ends), red on Node 22 (2400 to 2408 B, clean 2072 to 2132) and at the limit on Node 26
+ * (2400 B in one run, 2256 B in another, clean 1920 to 2064), invisible on clear. The fallback
+ * limit stays 2300 B: 2200 B would leave Node 22's clean fallback a margin of 3 percent. A smaller
+ * object per plan, or a typed array per search, is not measured here and is the limit of this
+ * check, as a two-double point is for the think bound.
  */
 const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
 const PLAN_FALLBACK_LIMIT_BYTES = 2300;
