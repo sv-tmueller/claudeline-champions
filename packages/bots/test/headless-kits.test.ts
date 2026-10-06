@@ -356,6 +356,8 @@ interface Played {
    * (Reaper's Dance), each with how many the sim blocked.
    */
   tally: TeleportTally;
+  /** The champion of each teleport the tally counted apart, in order: who cast Reaper's Dance. */
+  otherTeleporters: number[];
   /** The tick on which a team had no champion alive, or -1. */
   eliminatedAt: number;
   /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
@@ -378,6 +380,7 @@ function play(set: KitSet, run: MatchRun): Played {
   const fired = new Set<number>();
   let killed = false;
   const tally = createTeleportTally();
+  const otherTeleporters: number[] = [];
   let eliminatedAt = -1;
   let firstLunge = -1;
   let firstDeath = -1;
@@ -423,6 +426,9 @@ function play(set: KitSet, run: MatchRun): Played {
       state.events,
       escapes.map((press) => press.id),
     );
+    for (const e of state.events) {
+      if (e.type === 'teleport' && !found.includes(e)) otherTeleporters.push(e.championId);
+    }
     escapes.forEach((press, n) => {
       const event = found[n];
       if (event === undefined || press.landing === null) return;
@@ -466,6 +472,7 @@ function play(set: KitSet, run: MatchRun): Played {
     ultimates,
     killed,
     tally,
+    otherTeleporters,
     eliminatedAt,
     firstLunge,
     summary,
@@ -548,7 +555,9 @@ describe('a headless match with Skerrow on the shipped kits', () => {
     for (const id of [2, 3]) (run.state.champions[id] as ChampionState).health = 40;
     const played = play(set, run);
     expect(played.ultimates[0], played.summary).toBeGreaterThan(0);
+    // The teleport counted apart is Skerrow's own (champion 0): Reaper's Dance, not another's.
     expect(played.tally.others, played.summary).toBeGreaterThan(0);
+    expect(played.otherTeleporters, played.summary).toEqual(Array(played.tally.others).fill(0));
     expect(played.tally.escapes, played.summary).toBe(2);
     expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expect(played.state.tick).toBe(TICKS);

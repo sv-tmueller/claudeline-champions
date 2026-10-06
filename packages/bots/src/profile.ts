@@ -116,12 +116,13 @@ const NO_RULES: ChampionRules = Object.freeze({
  * roster's 4 to 7 m, inside the kit band less the margin (0 to 8 m), and only at a target that
  * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
  * Iron Hide, Skip and Hush Ward are the escapes of the roster sketches: Skip first, then Hush Ward.
- * Skerrow's Lunge is the base dash with its derived band (5 to 6 m); Quiet Dart keeps its kit band and needs a target with an escape ready (the roster:
- * "Q first if the target has an escape ready"); Vanish Step is her escape on the common trigger
- * (decision 6 of batch #80, not the roster's 50 percent health: that would send her back in at
- * once); Reaper's Dance is held. Skerrow waits for Lunge: she stands from 6 to 8 m with a clear
- * shot while Lunge has 2 to 90 ticks left, bounded so a long cooldown is no stall (the roster:
- * "waits at 6 to 8 m for the opening"; decision 3 of batch #91 fixes the bound).
+ * Skerrow's Lunge is the base dash with its derived band (5 to 6 m); Quiet Dart keeps its kit
+ * band and needs a target with an escape ready (the roster: "Q first if the target has an escape
+ * ready"); Vanish Step is her escape on the common trigger (decision 6 of batch #80, not the
+ * roster's 50 percent health: that would send her back in at once); Reaper's Dance is held.
+ * Skerrow waits for Lunge: she stands from 6 to 8 m with a clear shot while Lunge has 2 to 90
+ * ticks left, bounded so a long cooldown is no stall (the roster: "waits at 6 to 8 m for the
+ * opening"; decision 3 of batch #91 fixes the bound).
  */
 const RULES = new Map<string, ChampionRules>([
   [

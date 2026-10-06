@@ -66,8 +66,9 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * same object (six doubles) kept on each of the three paths of #98 reads 168 in the skerrow wait
  * scene: in the wait test (`waitsFor`, also 168 in the opener press and skerrow engage scenes), in
  * the target's escape test (`targetEscapeReady`, skerrow engage and wait) and in the Quiet Dart
- * condition of `updateRuns` (168 in each of the scenes read). `waitsFor` takes the distance as a measure and not as a
- * number: on Node 26 a double argument to it read 16 B a think in the opener press scene.
+ * condition of `updateRuns` (168 in each of the scenes read). `waitsFor` takes the distance as a
+ * measure and not as a number: on Node 26 a double argument to it read 16 B a think in the opener
+ * press scene.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
