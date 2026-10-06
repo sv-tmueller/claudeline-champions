@@ -381,10 +381,23 @@ export function enemyInReachOracle(state: GameState, c: ChampionState, rangeMax:
 }
 
 /**
+ * Skerrow's wait for Lunge, written from bots.md (Openers and escapes) and not from the rule of
+ * src: with her kit, an engaging Skerrow stands from 6 to 8 m (inclusive) while her SPACE has 2 to
+ * 90 ticks of cooldown left; at 1 or 0 Lunge is ready, and past 90 the wait is over. The stand also
+ * needs a clear shot, which `holding` tests.
+ */
+function waitsForLunge(state: GameState, c: ChampionState, d: number): boolean {
+  if (c.championId !== 'skerrow' || kitOf(state, c) === undefined) return false;
+  const cooldown = c.cooldowns[SLOTS.indexOf('SPACE')] ?? 0;
+  return d >= 6 && d <= 8 && cooldown >= 2 && cooldown <= 90;
+}
+
+/**
  * True when the intent in `acted` is a stand that bots.md documents. A retreating bot holds at its
  * own spawn only while its team is ahead or an enemy is in its reach: otherwise the rule of the
  * bot says advance, and a stand there is a stall. A retreating bot that stands in reach of its
- * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts.
+ * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts. An
+ * engaging bot holds in its range, and Skerrow in her wait for Lunge.
  */
 export function holding(
   state: GameState,
@@ -412,7 +425,9 @@ export function holding(
   const d = Math.hypot(c.x - target.x, c.y - target.y);
   // A stand needs a clear shot of the width of a champion, not only a line of sight.
   const clear = () => clearShotOracle(state, c, target, CHAMPION_RADIUS);
-  if (acted.intent === 'engage') return d <= rangeMax && clear();
+  if (acted.intent === 'engage') {
+    return (d <= rangeMax || waitsForLunge(state, c, d)) && clear();
+  }
   if (acted.intent === 'kite') return d >= rangeMin && d <= rangeMax && clear();
   return false;
 }

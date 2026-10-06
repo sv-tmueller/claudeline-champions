@@ -71,6 +71,17 @@ export interface OpenerRule {
   readonly when: Condition | null;
 }
 
+/**
+ * A bounded wait: an engaging bot stands, instead of walking in, while the target is within `band`
+ * metres (inclusive, with a clear shot) and the cooldown of `slot` is above the ready cooldown and
+ * at most `maxTicks`. The bound keeps the stand inside the stall bound of 120 ticks.
+ */
+export interface WaitRule {
+  readonly slot: Slot;
+  readonly band: readonly [number, number];
+  readonly maxTicks: number;
+}
+
 /** The rules of a champion that its kit does not carry (kits carry no bot fields). */
 export interface ChampionRules {
   readonly openers: readonly OpenerRule[];
@@ -87,6 +98,8 @@ export interface ChampionRules {
    * the 2026-10 roster but Skerrow holds it.
    */
   readonly holdF: boolean;
+  /** Where the champion stands to wait for an opener to come off cooldown, or null. */
+  readonly wait: WaitRule | null;
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
@@ -94,6 +107,7 @@ const NO_RULES: ChampionRules = Object.freeze({
   openers: Object.freeze([]),
   escapes: Object.freeze([]),
   holdF: false,
+  wait: null,
 });
 
 /**
@@ -102,11 +116,12 @@ const NO_RULES: ChampionRules = Object.freeze({
  * roster's 4 to 7 m, inside the kit band less the margin (0 to 8 m), and only at a target that
  * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
  * Iron Hide, Skip and Hush Ward are the escapes of the roster sketches: Skip first, then Hush Ward.
- * Skerrow's Lunge is the base dash with its derived band (5 to 6 m, where she waits to strike is
- * not built); Quiet Dart keeps its kit band and needs a target with an escape ready (the roster:
+ * Skerrow's Lunge is the base dash with its derived band (5 to 6 m); Quiet Dart keeps its kit band and needs a target with an escape ready (the roster:
  * "Q first if the target has an escape ready"); Vanish Step is her escape on the common trigger
  * (decision 6 of batch #80, not the roster's 50 percent health: that would send her back in at
- * once); Reaper's Dance is held.
+ * once); Reaper's Dance is held. Skerrow waits for Lunge: she stands from 6 to 8 m with a clear
+ * shot while Lunge has 2 to 90 ticks left, bounded so a long cooldown is no stall (the roster:
+ * "waits at 6 to 8 m for the opening"; decision 3 of batch #91 fixes the bound).
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -133,12 +148,18 @@ const RULES = new Map<string, ChampionRules>([
       ],
       ['R'],
       true,
+      { slot: 'SPACE', band: [6, 8], maxTicks: 90 },
     ),
   ],
 ]);
 
-/** A frozen row: the row, its two lists, each opener and each literal band. */
-function rule(openers: OpenerRule[], escapes: Slot[], holdF: boolean): ChampionRules {
+/** A frozen row: the row, its two lists, each opener and each literal band, and the wait. */
+function rule(
+  openers: OpenerRule[],
+  escapes: Slot[],
+  holdF: boolean,
+  wait: WaitRule | null = null,
+): ChampionRules {
   const frozen = openers.map((opener) =>
     Object.freeze({
       ...opener,
@@ -152,6 +173,10 @@ function rule(openers: OpenerRule[], escapes: Slot[], holdF: boolean): ChampionR
     openers: Object.freeze(frozen),
     escapes: Object.freeze([...escapes]),
     holdF,
+    wait:
+      wait === null
+        ? null
+        : Object.freeze({ ...wait, band: Object.freeze([wait.band[0], wait.band[1]] as const) }),
   });
 }
 

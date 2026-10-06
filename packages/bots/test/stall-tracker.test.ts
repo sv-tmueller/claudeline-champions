@@ -4,6 +4,7 @@ import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudelin
 import type { Bot } from '../src/bot';
 import type { Intent } from '../src/intent';
 import { arena01, config2v2, createStallTracker, ownSpawnOf } from './helpers';
+import { sceneOf } from './scenes';
 
 function setHealth(state: GameState, id: number, fraction: number): void {
   const c = ch(state, id);
@@ -190,5 +191,34 @@ describe('createStallTracker', () => {
     const tracker = createStallTracker(state, bots);
     for (let i = 0; i < 3; i++) tracker.observe(zeros());
     expect(tracker.worst()).toEqual({ id: 0, from: 0, length: 3, intent: 'engage' });
+  });
+});
+
+// The tracker's own oracle (`holding` in helpers.ts) knows the wait of Skerrow for Lunge, written
+// from bots.md and not from the rule of src: a stand from 6 to 8 m with a clear shot while her SPACE
+// has 2 to 90 ticks left.
+describe('createStallTracker and the wait of Skerrow', () => {
+  const waiting = (distance: number, cooldown: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('skerrow', distance, { ready: [], cooldown: { SPACE: cooldown }, ...options });
+  const stalls = (state: GameState): number => worstAfter(state, [stub('engage', 2)], [ZERO]);
+
+  it('does not count the stand from 6 to 8 m at a SPACE cooldown of 2 to 90', () => {
+    for (const d of [6, 7, 8]) expect(stalls(waiting(d, 50)), `at ${d} m`).toBe(0);
+    for (const cooldown of [2, 90]) expect(stalls(waiting(7, cooldown)), `cooldown ${cooldown}`).toBe(0);
+  });
+
+  it('counts the same stand just outside the band or the cooldown: 10 of 10', () => {
+    for (const d of [5.95, 8.05]) expect(stalls(waiting(d, 50)), `at ${d} m`).toBe(10);
+    for (const cooldown of [0, 1, 91]) expect(stalls(waiting(7, cooldown)), `cooldown ${cooldown}`).toBe(10);
+  });
+
+  it('counts the stand with no clear shot: 10 of 10', () => {
+    const behind = waiting(7, 50, { arena: arena01, me: [-3.5, 0], enemy: [3.5, 0] });
+    expect(stalls(behind)).toBe(10);
+  });
+
+  it('counts the stand of a Skerrow that has no kit, and of a champion that is not Skerrow', () => {
+    expect(stalls(waiting(7, 50, { kits: [] }))).toBe(10);
+    expect(stalls(sceneOf('hargrim', 7, { ready: [], cooldown: { SPACE: 50 } }))).toBe(10);
   });
 });

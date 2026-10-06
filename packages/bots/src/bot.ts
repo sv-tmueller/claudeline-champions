@@ -11,6 +11,7 @@ import {
   findKit,
   refreshKitCache,
   updateRuns,
+  waitsFor,
 } from './casting';
 import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
@@ -337,6 +338,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         if (d <= profile.rangeMax && standShot(state, me, target)) {
           return stand();
         }
+        // The wait of a champion for its opener to come off cooldown (Skerrow's Lunge).
+        if (waitsFor(kitCache, me, dist) && standShot(state, me, target)) return stand();
         return follow('target', g, me, target);
       case 'kite': {
         if (d < profile.rangeMin) {

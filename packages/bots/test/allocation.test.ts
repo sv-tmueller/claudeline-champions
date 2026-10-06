@@ -46,9 +46,12 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  *   opener press         (new scene)     (new scene)     0              0
  *   escape press         (new scene)     (new scene)     0              0
  *   skerrow engage       (new scene)     (new scene)     0              0
+ *   skerrow wait         (new scene)     (new scene)     0              (not run)
  *
- * The last three scenes have no main figure: they test paths main does not have. The unit job of
- * the draft pull request (#86) read 0 for each of them in both of its runs.
+ * The last four scenes have no main figure: they test paths main does not have. The unit job of
+ * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
+ * skerrow wait scene (#98) reads 0 on macOS on Node 22 and Node 26, and its runner figure is the
+ * unit job of that pull request.
  *
  * The branch reads 0 in the lowest round of every scene, and 256 in one round of the press scene
  * while V8 tiers up (the other two read 0). The mutations that put a cost back each go over the
@@ -59,7 +62,12 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * A fresh object kept reachable in a module variable on each of the three new paths reads 336
  * (six doubles, in the opener band test: the three Hargrim scenes that reach it), 200 (a fresh
  * `Landing`, in the escape landing search) and 168 (six doubles, in the held ultimate's cornered
- * test); a two-double point reads 72 and stays under the bound, like the returned input.
+ * test); a two-double point reads 72 and stays under the bound, like the returned input. The
+ * same object (six doubles) kept on each of the three paths of #98 reads 168 in the skerrow wait
+ * scene: in the wait test (`waitsFor`, also 168 in the opener press and skerrow engage scenes), in
+ * the target's escape test (`targetEscapeReady`, skerrow engage and wait) and in the Quiet Dart
+ * condition of `updateRuns` (168 in each of the scenes read). `waitsFor` takes the distance as a measure and not as a
+ * number: on Node 26 a double argument to it read 16 B a think in the opener press scene.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
@@ -303,6 +311,27 @@ function buildScenes(): Scene[] {
         me.energy = 100;
         me.cooldowns.fill(100);
         me.cooldowns[SLOTS.indexOf('F')] = 0;
+      },
+      configSkerrow(),
+    ),
+    // A Skerrow wait: Skerrow 7 m from a Hargrim on a clear lane, Lunge 50 ticks from ready, Quiet
+    // Dart ready but held back (the Hargrim's Iron Hide is cooling down, so it has no escape ready)
+    // and every other slot on cooldown: the wait stand with its clear shot and the Dart cue run on
+    // every think, and nothing is pressed.
+    scene(
+      'skerrow wait',
+      0,
+      'engage',
+      false,
+      false,
+      (state) => {
+        put(state, 0, -3, 3);
+        put(state, 2, 4, 3);
+        const me = ch(state, 0);
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('SPACE')] = 50;
+        me.cooldowns[SLOTS.indexOf('Q')] = 0;
+        ch(state, 2).cooldowns.fill(100);
       },
       configSkerrow(),
     ),

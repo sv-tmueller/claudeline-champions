@@ -106,7 +106,29 @@ describe('rulesFor', () => {
 
   it('gives no rule without a kit or with a kit of another id', () => {
     const quillon = jsonKits().find((kit) => kit.id === 'quillon') as KitDef;
-    expect(rulesFor('hargrim')).toEqual({ openers: [], escapes: [], holdF: false });
-    expect(rulesFor('hargrim', quillon)).toEqual({ openers: [], escapes: [], holdF: false });
+    const none = { openers: [], escapes: [], holdF: false, wait: null };
+    expect(rulesFor('hargrim')).toEqual(none);
+    expect(rulesFor('hargrim', quillon)).toEqual(none);
+  });
+
+  it('gives Skerrow the wait of 6 to 8 m for SPACE with at most 90 ticks, frozen, and no one else', () => {
+    const kits = jsonKits();
+    const kit = (id: string) => kits.find((k) => k.id === id) as KitDef;
+    const wait = rulesFor('skerrow', kit('skerrow')).wait;
+    expect(wait).toEqual({ slot: 'SPACE', band: [6, 8], maxTicks: 90 });
+    expect(Object.isFrozen(wait)).toBe(true);
+    expect(Object.isFrozen(wait?.band)).toBe(true);
+    expect(rulesFor('hargrim', kit('hargrim')).wait).toBeNull();
+    expect(rulesFor('quillon', kit('quillon')).wait).toBeNull();
+  });
+
+  it('gives Skerrow the Quiet Dart opener on a target with an escape ready, and no one else', () => {
+    const kits = jsonKits();
+    const rules = rulesFor('skerrow', kits.find((k) => k.id === 'skerrow') as KitDef);
+    expect(rules.openers.map((o) => `${o.slot}:${o.when}`)).toEqual(['SPACE:null', 'Q:escapeReady']);
+    for (const id of ['hargrim', 'quillon']) {
+      const other = rulesFor(id, kits.find((k) => k.id === id) as KitDef);
+      expect(other.openers.map((o) => o.when), id).not.toContain('escapeReady');
+    }
   });
 });

@@ -84,6 +84,13 @@ export interface KitCache {
   needsEscape: Uint8Array;
   anyEscapeCondition: boolean;
   /**
+   * The wait of the champion (see `WaitRule`): the slot index in `waitSlot[0]`, -1 for none, and
+   * in `waitBand` the band's two ends and the most ticks of cooldown. Typed arrays, so a double
+   * is read without boxing.
+   */
+  waitSlot: Int8Array;
+  waitBand: Float64Array;
+  /**
    * 1 when the base ability of the slot starts with a dash (its first effect), and the same for the
    * EX variant of an EX slot of the kit (listed in `kit.ex`, has a variant, is not F), whether or
    * not the variant has a reach band. An escape think presses neither (see `chooseCast`).
@@ -175,6 +182,8 @@ export function createKitCache(): KitCache {
     motion: new Int8Array(SLOTS.length),
     needsEscape: new Uint8Array(SLOTS.length),
     anyEscapeCondition: false,
+    waitSlot: new Int8Array(1).fill(-1),
+    waitBand: new Float64Array(3),
     baseDash: new Uint8Array(SLOTS.length),
     exDash: new Uint8Array(SLOTS.length),
     escapeOrder: new Int8Array(SLOTS.length).fill(-1),
@@ -249,6 +258,13 @@ export function refreshKitCache(
     cache.openMin[i] = band[0];
     cache.openMax[i] = band[1];
   }
+  cache.waitSlot[0] = -1;
+  if (kit !== undefined && rules.wait !== null) {
+    cache.waitSlot[0] = SLOTS.indexOf(rules.wait.slot);
+    cache.waitBand[0] = rules.wait.band[0];
+    cache.waitBand[1] = rules.wait.band[1];
+    cache.waitBand[2] = rules.wait.maxTicks;
+  }
   cache.holdF = kit !== undefined && rules.holdF;
   cache.lowHealth = kit !== undefined && rules.holdF ? damageIn(kit.slots.F.effects) : 0;
   cache.escapeOrder.fill(-1);
@@ -316,6 +332,25 @@ export function hasDash(ability: AbilitySpec): boolean {
     if ((ability.effects[i] as { type: string }).type === 'dash') return true;
   }
   return false;
+}
+
+/**
+ * Whether the bot waits for its opener: the target is `dist.metres` away (a measure, not a number:
+ * a double passed to a call that V8 does not inline is boxed), inside the band of the wait rule,
+ * and the cooldown of the rule's slot is at least 2 (at 1 or 0 the slot casts) and at most the
+ * rule's `maxTicks`. Always false for a champion with no wait. The caller adds the clear shot.
+ */
+export function waitsFor(cache: KitCache, me: ChampionState, dist: Measure): boolean {
+  const slot = cache.waitSlot[0] as number;
+  if (slot < 0) return false;
+  const d = dist.metres;
+  const cooldown = me.cooldowns[slot] as number;
+  return (
+    (cache.waitBand[0] as number) <= d &&
+    d <= (cache.waitBand[1] as number) &&
+    cooldown >= 2 &&
+    cooldown <= (cache.waitBand[2] as number)
+  );
 }
 
 /**

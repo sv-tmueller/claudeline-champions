@@ -26,6 +26,8 @@ export interface Options {
   energy?: number;
   /** The slots left off cooldown; every other slot is on a long cooldown. All ready when absent. */
   ready?: readonly Slot[];
+  /** The cooldown of single slots of the champion under test, in ticks, applied after `ready`. */
+  cooldown?: Partial<Record<Slot, number>>;
   /** The enemy's velocity along x, in m/s: positive is away from the champion under test. */
   enemyVx?: number;
   /** The champion id of the enemy (champion 2). Default: `dummy`, which has no kit and no rule. */
@@ -66,6 +68,9 @@ export function sceneOf(championId: string, distance: number, options: Options =
   if (options.ready !== undefined) {
     me.cooldowns.fill(600);
     for (const slot of options.ready) me.cooldowns[SLOTS.indexOf(slot)] = 0;
+  }
+  for (const [slot, ticks] of Object.entries(options.cooldown ?? {})) {
+    me.cooldowns[SLOTS.indexOf(slot as Slot)] = ticks;
   }
   if (options.enemyReady !== undefined) {
     enemy.cooldowns.fill(600);
@@ -112,4 +117,15 @@ export function firstPress(
 /** The label of the first press, or null. */
 export function pressOf(state: GameState, tier: Difficulty = 'hard'): string | null {
   return firstPress(state, tier)?.label ?? null;
+}
+
+/** Whether a bot of champion 0 walks on its last think of a frozen state, after `thinks` thinks. */
+export function walks(state: GameState, tier: Difficulty = 'hard', seed = 1, thinks = THINKS): boolean {
+  const bot = createBot(0, tier, seed);
+  let moving = false;
+  for (let i = 0; i < thinks; i++) {
+    const input = bot.think(state);
+    moving = input.moveX !== 0 || input.moveY !== 0;
+  }
+  return moving;
 }
