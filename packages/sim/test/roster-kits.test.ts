@@ -106,6 +106,9 @@ function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, out: Vis
     if (effect.type === 'projectile' || effect.type === 'area' || effect.type === 'meleeArc') {
       effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit }));
     }
+    if (effect.type === 'projectile') {
+      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit }));
+    }
     if (effect.type === 'dash') effect.then.forEach((t, i) => visit(t, `${path}.then[${i}]`));
   };
   ability.effects.forEach((effect, i) => visit(effect, `${prefix}.effects[${i}]`));
@@ -214,6 +217,16 @@ describe('the catalog ranges', () => {
     stun.status.ticks = 121;
     expect(catalogProblems(copy)).toEqual([
       'hargrim.slots.F.effects[0].then[0].effects[1].status.ticks: stun of 121 ticks is outside 30 to 120',
+    ]);
+  });
+
+  it('visit the allyEffects of a projectile too', () => {
+    const copy = copyOf(quillon);
+    const bolt = copy.slots.M1.effects[0];
+    if (bolt?.type !== 'projectile') throw new Error('Quillon M1 is not a projectile');
+    bolt.allyEffects = [{ type: 'heal', amount: 31 }];
+    expect(catalogProblems(copy)).toEqual([
+      'quillon.slots.M1.effects[0].allyEffects[0].amount: heal 31 is not 8 to 30',
     ]);
   });
 
