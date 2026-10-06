@@ -31,8 +31,9 @@ production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
 `grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now|timescale' packages/client/dist`,
 which must print nothing. The same guard hides the dev-only probe hook,
-`window.__runProbeFrames`, which `combat.spec.ts` uses to run its heap-probe
-windows (see [testing](testing.md)), and the time scale of `dev-launch.ts`
+`window.__runProbeFrames`, which `combat.spec.ts` and `live-probe.spec.ts` use
+to run their heap-probe windows (see [testing](testing.md)), and the time scale
+of `dev-launch.ts`
 (`timescale` is the string that survives minification: the function names do
 not).
 
@@ -80,8 +81,9 @@ sim's constant, 3):
 - The sandbox is the old roster (Hargrim and Quillon against Lumeth and Skerrow)
   with match flow and exactly the Hargrim and Quillon kits, named in the code, so
   a later kit file never changes it. Champions 0 to 2 stand and champion 3 is a
-  bot without a kit, which deals no damage. The heap probe needs a steady state,
-  and a match of three bots is never in one (see the frame path below).
+  bot without a kit, which deals no damage. It is the heap probe's steady-state
+  scene, since a match of three bots is never in one (see the frame path below);
+  the live match is the probe's second scene.
 
 The bots run in the main thread, through `bot-driver.ts`. `createBotDriver(ids,
 difficulty, seed)` makes one bot per driven id with the seed `seed * 100 + id`
@@ -142,13 +144,16 @@ sim steps first and the views read its state afterwards.
 
 The frame path allocates nothing in steady state: views are pooled, text comes
 from tables and is written only on a change, and the numbers a frame carries live
-in object fields. The combat spec measures it with a heap probe, see
+in object fields. The two heap-probe specs measure it, see
 [testing](testing.md). A match of bots is never in a steady state: hook and HUD
 values change in every window. The change writes come from tables and so build
-no string, but the probe still runs in the sandbox, where a casting champion in a
-stationary scene changes almost nothing. A probe scene on the live match, which
-would count those table writes with real changes, is issue #77 (batch 8).
-The HUD writes its state with `setAttribute` and not `dataset`: in the
+no string. The probe has two scenes: the sandbox, where a casting champion in a
+stationary scene changes almost nothing, and the live match, which counts those
+table writes with real changes (`live-probe.spec.ts`, issue #77). The live scene
+is measured in a round after about 2100 ticks of play with no pointer, because
+the engine needs that long to reach its optimized tier, and because
+`sampleAim` allocates about 2.5 KB per window whenever a pointer exists (issue
+#87). The HUD writes its state with `setAttribute` and not `dataset`: in the
 probe a `dataset` write allocated about 100 B per window whenever a slot
 changed, and `setAttribute` allocated none.
 

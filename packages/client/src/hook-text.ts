@@ -1,9 +1,11 @@
 // The text of the canvas data hooks and of the HUD, made once at startup. A change
 // write that builds its string (String(n), a template, toFixed) leaves garbage on
-// the frame path, which the heap probe of e2e/combat.spec.ts counts. Each table here replaces such a formatter, and
-// each function falls back to the formatter past the end of its table, so a value
-// outside the range is only slower, never wrong. hook-text.test.ts checks every
-// entry against the formatter it replaces.
+// the frame path, which the heap probes of e2e/combat.spec.ts (a steady state) and
+// e2e/live-probe.spec.ts (the live match, where the hooks change in every window)
+// count. Each table here replaces such a formatter, and each function falls back to
+// the formatter past the end of its table, so a value outside the range is only
+// slower, never wrong. hook-text.test.ts checks every entry against the formatter
+// it replaces.
 
 /** The integer table covers 0 to this minus 1: ten minutes of ticks. */
 export const INT_TEXT_COUNT = 36_000;

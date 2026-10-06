@@ -47,7 +47,7 @@ first.
   with a kit and `?difficulty=` picks the tier. The HUD has the ring warning
   and the kill feed, and the result screen has the champion select. Dev only:
   `?scene=sandbox`, `?timescale=` and the `__runProbeFrames` hook. The heap
-  probe measures the sandbox scene. Not built: a pre-match screen, menus,
+  probe measures two scenes, the sandbox and the live match. Not built: a pre-match screen, menus,
   keybinding, audio, the arena select, the `Platform` interface.
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon and Skerrow kits; placeholder models for the four roster ids. The
@@ -83,10 +83,13 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [batch #53 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996621415).
   Recorded in [ADR-003](decisions/ADR-003-typed-ability-modules.md) and
   [Simulation](simulation.md#kit-contract-and-registration).
-- The heap probe runs through the dev-only counted frame hook with a 640 B
-  limit per window, on the sandbox scene:
+- The heap probe runs through the dev-only counted frame hook on two scenes,
+  asserting the median of five windows: 640 B for the sandbox and 780 B for the
+  live match:
   [batch #53 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
-  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236).
+  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236),
+  [batch #80 decision 10](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6011944911),
+  [batch #80 decision 19](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012668313).
   Recorded in [Testing](testing.md#the-heap-probe).
 - arena01's two deviations are grandfathered:
   [batch #63 decision 14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).
