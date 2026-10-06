@@ -195,7 +195,7 @@ test('starts on arena02 from the launch address', async ({ page }, testInfo) => 
     expect(hud.result.entries.map((entry) => entry.href)).toEqual([
       '?champion=hargrim&difficulty=normal&arena=arena02',
       '?champion=quillon&difficulty=normal&arena=arena02',
-      null,
+      '?champion=lumeth&difficulty=normal&arena=arena02',
       '?champion=skerrow&difficulty=normal&arena=arena02',
     ]);
     expect(hud.result.arenas.map((entry) => [entry.id, entry.current])).toEqual([
