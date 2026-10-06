@@ -71,6 +71,35 @@ describe('fixed-step clock', () => {
     }
   });
 
+  describe('reset', () => {
+    it('makes the next advance return 0 whatever the gap, so a pause is never caught up', () => {
+      const clock = createFixedStepClock();
+      clock.advance(0);
+      expect(clock.advance(STEP_MS)).toBe(1);
+      clock.reset();
+      expect(clock.advance(60_000)).toBe(0);
+      // The clock goes on from there: one tick's worth of time is one step.
+      expect(clock.advance(60_000 + STEP_MS)).toBe(1);
+    });
+
+    it('drops the time banked before it, so the remainder is not a step later', () => {
+      const clock = createFixedStepClock();
+      clock.advance(0);
+      expect(clock.advance(1.9 * STEP_MS)).toBe(1);
+      clock.reset();
+      clock.advance(10_000);
+      expect(clock.advance(10_000 + 0.2 * STEP_MS)).toBe(0);
+    });
+
+    it('keeps the time scale', () => {
+      const clock = createFixedStepClock(10);
+      clock.advance(0);
+      clock.reset();
+      clock.advance(5000);
+      expect(clock.advance(5000 + STEP_MS)).toBe(10);
+    });
+  });
+
   describe('with a time scale', () => {
     it('steps 6000 times per 60 frames at scale 100', () => {
       const clock = createFixedStepClock(100);

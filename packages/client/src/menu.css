@@ -1,0 +1,142 @@
+/*
+ * The Escape menu, over the paused match. The rules of hud.css and result.css
+ * hold here too, and packages/client/src/hud-palette.test.ts checks them over
+ * this file:
+ * - colours are hex literals, and only in the custom properties of #menu;
+ * - every size derives from --menu-u, so the panel scales with the window;
+ * - no colour lands in the pixel boxes the e2e specs count or near a champion
+ *   body colour, and none is blue, purple or magenta;
+ * - the one difference, as in result.css: the visible panel takes pointer
+ *   events, because its buttons and links are clicked. #menu itself takes
+ *   none, and so does the hidden panel.
+ * The panel shows one section at a time, chosen by data-view on the panel.
+ */
+#menu {
+  --menu-u: min(1vw, 1.78vh);
+  --menu-panel: #000000e6;
+  --menu-text: #e6e9ee;
+  --menu-error: #ff4d4f;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--menu-text);
+  font-family: system-ui, sans-serif;
+  font-size: calc(var(--menu-u) * 1.8);
+  line-height: 1.2;
+}
+
+#menu * {
+  box-sizing: border-box;
+}
+
+#menu [data-menu='panel'] {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--menu-u) * 1.5);
+  min-width: calc(var(--menu-u) * 36);
+  padding: calc(var(--menu-u) * 3) calc(var(--menu-u) * 4);
+  background: var(--menu-panel);
+  border-radius: calc(var(--menu-u) * 1);
+  text-align: center;
+}
+
+#menu [data-menu='panel'][data-visible='true'] {
+  display: flex;
+  pointer-events: auto;
+}
+
+#menu [data-part='title'] {
+  font-size: calc(var(--menu-u) * 4);
+  font-weight: 700;
+}
+
+#menu [data-section] {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--menu-u) * 1.2);
+  width: 100%;
+}
+
+#menu [data-view='main'] [data-section='main'],
+#menu [data-view='select'] [data-section='select'],
+#menu [data-view='keys'] [data-section='keys'] {
+  display: flex;
+}
+
+#menu button,
+#menu [data-champion],
+#menu [data-arena-id] {
+  padding: calc(var(--menu-u) * 0.6) calc(var(--menu-u) * 1.2);
+  border: calc(var(--menu-u) * 0.15) solid var(--menu-text);
+  border-radius: calc(var(--menu-u) * 0.5);
+  background: none;
+  color: var(--menu-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#menu [data-section='main'] button {
+  min-width: calc(var(--menu-u) * 24);
+}
+
+#menu [data-part='select-label'] {
+  margin-top: calc(var(--menu-u) * 1);
+  font-size: calc(var(--menu-u) * 1.4);
+}
+
+#menu [data-part='select'],
+#menu [data-part='arena-select'] {
+  display: flex;
+  gap: calc(var(--menu-u) * 1.5);
+}
+
+#menu [data-champion][data-available='false'] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The arena being played: a heavier border, since a colour would break the palette. */
+#menu [data-arena-id][data-current='true'] {
+  border-width: calc(var(--menu-u) * 0.4);
+}
+
+#menu [data-part='bindings'] {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--menu-u) * 0.6);
+  width: 100%;
+}
+
+#menu [data-binding] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--menu-u) * 2);
+}
+
+#menu [data-part='key'] {
+  min-width: calc(var(--menu-u) * 8);
+  font-weight: 700;
+}
+
+/* The row waiting for a key: a heavier border on its button. */
+#menu [data-binding][data-capturing='true'] button {
+  border-width: calc(var(--menu-u) * 0.4);
+}
+
+#menu [data-part='error'] {
+  display: none;
+  color: var(--menu-error);
+}
+
+#menu [data-error='duplicate'] [data-part='error'][data-for='duplicate'],
+#menu [data-error='reserved'] [data-part='error'][data-for='reserved'] {
+  display: block;
+}
