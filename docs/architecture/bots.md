@@ -80,9 +80,10 @@ it: the bots derive the range from the kit data (see Profiles), and the openers 
 escapes are stateless slot conditions of the profile (see Openers and escapes). The one
 finisher is the rule under Finisher below; per-slot finishers are not built.
 
-Built so far: engage, kite, retreat, plus idle, casting (see Casting), the openers and
-escapes of a profile (see Openers and escapes) and the advance of a retreating bot (see
-Deadlock). Idle means no enemy is alive: the bot stands and keeps its aim.
+Built so far: engage, kite, retreat, plus idle, casting (see Casting), the
+openers, escapes, dash hold and wait of a profile (see Openers and escapes) and
+the advance of a retreating bot (see Deadlock). Idle means no enemy is alive:
+the bot stands and keeps its aim.
 
 Target: the bot keeps its current target while it is alive, unless another
 alive enemy is more than 1 m nearer. Otherwise the target is the nearest alive
@@ -94,7 +95,7 @@ With `d` the distance to the target, `h` health over maximum health, and
 
 | Intent  | Score                                                | Movement                                                                                                                                                                                |
 | ------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, otherwise follow the path to the target                                                                                  |
+| engage  | 0.5                                                  | stand when `d <= rangeMax` and the target is in line of sight, or in the wait of the profile (see Openers and escapes), otherwise follow the path to the target                         |
 | kite    | `rangeMin > 0 ? 0.6 + (rangeMin - d) / rangeMin : 0` | step away, leave a corner or regain line of sight, see Kite movement                                                                                                                    |
 | retreat | `0.6 + (0.3 - h) / 0.3`                              | follow the path to the bot's own spawn point (slot = teammates with a lower id) and stand there, unless a finisher qualifies, see Finisher, or the deadlock rule advances, see Deadlock |
 
@@ -205,12 +206,12 @@ The rule table of the profile (`RULES` in profile.ts, applied under the same con
 `KIT_RULES`: a kit of the champion's own id) adds what no kit field holds. Roster-v1's bot
 profile sketches are its source; see Openers and escapes for what each row means.
 
-| Champion | Openers                                                                    | Escapes                          | Ultimate F                        |
-| -------- | -------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
-| hargrim  | SPACE (Rush, the dash band); E (Chain Hook), 4 to 7 m, target walking away | R (Iron Hide)                    | pressed in reach                  |
-| quillon  | Q (Snare Orb), kit band, target walking toward her                         | SPACE (Skip), then R (Hush Ward) | pressed in reach                  |
-| skerrow  | SPACE (Lunge, the dash band)                                               | R (Vanish Step)                  | held for a low or cornered target |
-| other    | none                                                                       | none                             | pressed in reach                  |
+| Champion | Openers                                                                                                                                                | Escapes                          | Ultimate F                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- | --------------------------------- |
+| hargrim  | SPACE (Rush, the dash band); E (Chain Hook), 4 to 7 m, target walking away                                                                             | R (Iron Hide)                    | pressed in reach                  |
+| quillon  | Q (Snare Orb), kit band, target walking toward her                                                                                                     | SPACE (Skip), then R (Hush Ward) | pressed in reach                  |
+| skerrow  | SPACE (Lunge, the dash band); Q (Quiet Dart), kit band, target with an escape ready; waits at 6 to 8 m while SPACE has 2 to 90 ticks of cooldown left | R (Vanish Step)                  | held for a low or cornered target |
+| other    | none                                                                                                                                                   | none                             | pressed in reach                  |
 
 ## Clear shot
 
@@ -277,6 +278,7 @@ step 3d tries a new cast. For each slot, with the ability it would cast:
 - energy: F needs 100, an EX variant 25, otherwise 0;
 - no `stun` and no `silence` (silence includes SPACE); under `root` an ability with
   a top-level `dash` is skipped;
+- on an escape think no ability that starts with a dash: the dash hold, below;
 - in reach, with a clear shot (see Clear shot) of the width of that ability, and the slot's
   condition if its opener rule has one (see Openers and escapes);
 - the cast delay, below.
@@ -318,7 +320,9 @@ stays in reach is pressed on the first tick the sim would cast it.
 Never pressed: an ability with no band that no rule presses (an ally ability: Hargrim Q), and
 any slot of a champion without a kit. The rules press two kinds of slot that have no band: the
 base dash opener (Hargrim SPACE, Skerrow SPACE: its band is derived from the dash), and the
-escape slots (Hargrim R, Quillon SPACE and R, Skerrow R, on an escape think only).
+escape slots (Hargrim R, Quillon SPACE and R, Skerrow R, on an escape think
+only). On an escape think the dash openers are not pressed either (see the dash
+hold under Openers and escapes).
 
 ## Openers and escapes
 
@@ -333,9 +337,9 @@ Openers: a slot with an opener rule is pressed on a condition narrower than its 
   that has no band of its own and whose first effect is a dash of distance D, the band [D - 1, D]
   derived from the kit (`dashBand`): its windup is 0, so the target cannot walk out of reach before
   it fires, and at D the dash ends against the target's body. That gives Hargrim's Rush [4, 5],
-  the roster's numbers, and Skerrow's Lunge [5, 6]; the roster's 6 to 8 m for Skerrow is where she
-  waits for the opening, which is not built. An EX variant keeps its kit band, and an EX press
-  has no opener condition.
+  the roster's numbers, and Skerrow's Lunge [5, 6]; the roster's 6 to 8 m for
+  Skerrow is where she waits for the opening, see the wait below. An EX variant
+  keeps its kit band, and an EX press has no opener condition.
 - Motion: a target walking away has `dot > 0`, one closing in `dot < 0`, with
   `dot = (target - bot) . (target velocity)` from the state, worked out once per think. A target
   that stands or walks across is neither, so `>` and `<` are strict.
@@ -343,12 +347,37 @@ Openers: a slot with an opener rule is pressed on a condition narrower than its 
   and only while the target walks away: it restricts the press, where a condition that only added
   presses would change nothing. Quillon Q (Snare Orb) keeps its kit band less the margin and needs
   a target walking toward her; otherwise she goes on to M2.
+- Quiet Dart (Skerrow Q) keeps its kit band less the margin and needs a target
+  with an escape ready (the roster: "Q first if the target has an escape
+  ready"): one of the escapes of the target's own rule (`rulesFor` with the kit
+  of its champion id) has a cooldown of at most 1, and the target is neither
+  stunned nor silenced. The target's rule decides, so a Quillon counts Skip and
+  Hush Ward, a Hargrim Iron Hide, and a champion with no rule (Lumeth, or any
+  champion without a kit) never has one: Skerrow goes on to M2 there. It
+  restricts the press the way Chain Hook's motion test restricts E, and it is
+  worked out once per think into a cue, only for a champion that has such an
+  opener. The point is the silence: Quiet Dart is what stops Skip and Hush Ward
+  from being pressed, and at a target with nothing to stop it is only a slower
+  M2.
 - The condition is part of the cast-delay run, so the delay counts from the moment it holds, as it
   does for reach, and the run restarts when it stops holding.
 - With the reserve holding the EX variants, an opener is the base ability: Hargrim at 80 energy
   with F ready presses base Rush at 4.5 m, with no SHIFT.
 - The shot test of a dash opener sees only the obstacles that block projectiles, so a low wall in
   the way can stop a Lunge that would be blocked in the sim; the EX dashes already work this way.
+
+The wait: an engaging Skerrow stands, instead of walking in, while the target is
+6 to 8 m away (both ends inclusive), the stand has a clear shot (the stand's
+own, see Clear shot) and her SPACE has 2 to 90 ticks of cooldown left (the
+`wait` field of her row: band [6, 8], slot SPACE, at most 90 ticks). At a
+cooldown of 1 or 0 Lunge is ready and she closes to its band of 5 to 6 m; past
+90 it is too far off to wait for. Why bounded (decision 3 of batch #91): a stand
+of the whole 360 tick cooldown, 6 s under fire, just makes her a target, and 90
+ticks stays inside the stall bound of 120. She casts from the stand like any
+engaging bot, so Quiet Dart and M2 come from there. It is a slot condition of
+the profile read from the kit cache's typed arrays (`waitsFor` in casting.ts,
+which takes the distance as a measure, not a number), with no bot state, and the
+stall tracker's oracle knows the stand in its own code.
 
 Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 
@@ -376,6 +405,19 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   sees only obstacles that block projectiles, as the sim's teleport does, so a teleport may cross
   a low wall. When no direction passes the slot is skipped and R comes next: a Quillon boxed in a
   corner shields herself.
+- The dash hold: on an escape think no slot whose ability starts with a dash is
+  pressed, base or EX variant (the one that would be cast), for every kit:
+  Hargrim's Rush, EX Rush and ultimate, Skerrow's Lunge and EX Lunge. A dash
+  carries the bot along its aim, toward the target it is leaving: a cornered
+  Skerrow with Vanish Step cooling down used to Lunge into the Hargrim she was
+  fleeing, and Rush did the same. The kit cache holds a flag per slot for each
+  (`baseDash`, `exDash`), and the gate is in `chooseCast`; no escape slot of the
+  current rules starts with a dash (Iron Hide, Skip, Hush Ward and Vanish Step
+  do not), so `chooseEscape` needs none. A dash escape away from the target
+  (Lunge away, Glide with a landing search) is not built. A press the hold
+  withholds leaves the slot unpressed on that think: the walk goes on to the
+  next slot, and a dash with an EX variant that would be cast is not replaced by
+  its base.
 - The aim: `aim()` runs on every think, so the draw cadence of the aim error does not change; an
   escape press with a landing then overwrites `aimX` and `aimY` with the landing's aim, with no
   error and no draw.
@@ -548,6 +590,19 @@ that no earlier shot took, first taken late, V8's feedback decides it, and
 this document knows no change that removes it. Either way the live bound has
 to tolerate one such event in the median window.
 
+A second deopt, found by #98: `Math.round` of an aim point in [-0.5, 0) cm is
+-0, and the `+ 0` after it that makes it 0 had int32 feedback (every earlier
+value was a whole number in a Smi), so the first such point deoptimized `aim` in
+Maglev (`not int32`, at the `+ 0` of x and of y) and it ran in the interpreter,
+65 KB a window, until it was optimized again. The match is deterministic, so the
+point comes at the same tick in every attempt: with the dash hold of #98 it fell
+just before the measured windows of the live scene in all of them, and the bots
+median read 73 KB. The rounding is `+ 0.5 - 0.5` in `aim` now (the same value
+for any aim in the arena; a double constant gives the sum number feedback from
+its first run), and the windows read 0 B in `aim` again. `escape.ts:landingInto`
+has the same `Math.round(...) + 0` and the same hazard, with a landing point in
+[-0.5, 0) cm, and is not changed: it runs a few times a window, not 90.
+
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
 polymorphic feedback), the median of single thinks hides the plans and the aim
@@ -641,10 +696,12 @@ match replays exactly from its input stream.
   a fixed 3600 ticks.
 - Local steering around champions and projectiles, dodging and ally logic.
 - The Lumeth profile, abilities that land on allies or on the caster that no rule presses
-  (Hargrim Q), and the rest of the roster's bot sketches: Skerrow waiting at 6 to 8 m for the
-  opening, "Quiet Dart first if an escape is ready" (the slot order already presses Q before
-  SPACE, so no rule is needed for it), a target choice by lowest health (the target is the nearest
-  enemy), and per-slot finishers (the one finisher is the rule above).
+  (Hargrim Q), and the rest of the roster's bot sketches: a target choice by
+  lowest health (the target is the nearest enemy), and per-slot finishers (the
+  one finisher is the rule above).
+- Dash escapes: a dash away from the target (Lunge away, Glide with a landing
+  search), which the dash hold leaves unpressed on an escape think. Batch 10,
+  with the Lumeth profile.
 
 ## Testing
 
@@ -668,12 +725,19 @@ champion), and for a teleport its own first-of-five landing, found by casting th
 of the state, checked with `hasLineOfSight` and the clearance of the cell centre: the aim of the
 press must be that landing's and the sim must put the champion on it, and Hush Ward is pressed
 only when Skip is not ready or has no landing. The ultimate of Skerrow passes only for a target at
-40 health or less, or one the oracle finds cornered by its own walk of the five points. Every
-escape teleport of the runs (a press with a landing, not Reaper's Dance) must be reported
-unblocked. The run must end with a death from a cast, every champion must start a cast, and one
-cast must be an EX. The seeds are 101 to 104, the match seed 7 and the tiers easy, normal, hard,
-normal; they are pinned, and a miss after a change to the bots, the sim or the Node
-version is governed by batch #53 decision 8.3. The ultimate has its own pinned run: the 2v2
+40 health or less, or one the oracle finds cornered by its own walk of the five
+points. The dash rows (Rush, EX Rush, Hargrim's ultimate, Lunge, EX Lunge) fail
+a press on an escape think, and Quiet Dart's row fails a press at a target the
+oracle finds with no escape ready (its own table of escape slots, a cooldown of
+at most 1, no stun or silence). A tally (`tallyTeleports` in the test helpers)
+counts the escape teleports of the runs (a press with a landing) apart from
+every other teleport (Reaper's Dance), each with its blocked count: every escape
+teleport must be reported unblocked, and Reaper's Dance may be blocked
+legitimately. The run must end with a death from a cast, every champion must
+start a cast, and one cast must be an EX. The seeds are 101 to 104, the match
+seed 7 and the tiers easy, normal, hard, normal; they are pinned, and a miss
+after a change to the bots, the sim or the Node version is governed by batch #53
+decision 8.3. The ultimate has its own pinned run: the 2v2
 ends its fights by tick 700 with the energy bar at 75 at most, and 9000 matches of it on the
 shipped kits gave no F cast, so a 3v3 of Hargrim and two Quillons a side, seeds 101 to 106 at
 the hard tier, runs through the same checks and must start an F (decision 8 of #63 allows a
@@ -682,9 +746,18 @@ lets it fire: without it the run starts none. A Skerrow 2v2 pins the Skerrow pro
 Quillon against Hargrim and Quillon on the shipped kits in free play, seeds 101 to 104, every bot
 on normal, match seed 7; a team is eliminated by tick 3600 (a round is 5400 ticks in match flow,
 which would decide the same way), Skerrow starts a Lunge, every press passes the oracle and no bot
-stalls for more than 120 ticks. A shadow-edge test on arena 1 pins that a
-position where the centre line is clear and a shifted line hits the pillar gets no press and
-is not chosen as a sight cell. The determinism test runs the same match twice, and two
+stalls for more than 120 ticks. The same match with a start edit declared in the
+test, Skerrow at 100 energy and both enemies at 40 health, runs the oracle's F
+row on a real press: Skerrow starts Reaper's Dance, the tally counts a teleport
+of it apart, the escape teleports are exactly 2 and none is blocked. One run
+only, with the seeds above (a miss is governed by decision 8.3 of batch #53; the
+declared fallback is Skerrow against a Quillon at 40 health, the other two dead,
+9 m apart). `reaper.test.ts` also blocks it: a target at 40 health steps behind
+the pillar of arena 1 during F's 18 tick windup, the sim fires toward the
+current aim, reports the teleport blocked, Skerrow stays where the cast began,
+and the tally counts it apart with no blocked escape. A shadow-edge test on
+arena 1 pins that a position where the centre line is clear and a shifted line
+hits the pillar gets no press and is not chosen as a sight cell. The determinism test runs the same match twice, and two
 matches stepped in turn, on the test kits and on the shipped kits (the second one
 interleaved with a match on the test kits), and compares input streams and final checksums
 in memory; a Skerrow 2v2 block does the same on the shipped kits, interleaved with a match on the
@@ -699,14 +772,30 @@ clause), the order of an escape against F, the landing order and its line of sig
 a direction, a low wall does not), the boxed-in Hush Ward, the draw cadence across an escape
 press, the reach and condition clauses of the reserve, the wide-ultimate stand and the hold of
 Reaper's Dance. A differential test compares the landing with the sim's teleport end bit for bit
-over 2000 seeded aims.
+over 2000 seeded aims. The rules of #98 have theirs: `escapes.test.ts` pins the
+dash hold (Lunge at 5.5 m, EX Lunge at 4 m with 50 energy, Rush at 4.5 m and
+Hargrim's ultimate on a retreat are not pressed, and are pressed on a think that
+is no escape think; two edited kits tell the base flag from the EX flag),
+`openers.test.ts` Quiet Dart (Q at a Quillon with Skip or Hush Ward ready, M2
+with both cooling down, at a cooldown of 1 and of 2, at a silenced and at a
+stunned Quillon, Q at a Hargrim with Iron Hide ready, M2 at a champion with no
+rule) and `wait.test.ts` the wait (a stand at 6, 7 and 8 m and not at 5.95 or
+8.05, at a cooldown of 2 and 90 and not at 0, 1 or 91, no stand behind the
+pillar, none for a Hargrim, none on a retreat). Mutations that turn each red:
+the dash hold dropped, read from the base flag only or the EX flag only; the
+Quiet Dart condition dropped, inverted, ignoring silence, ignoring stun, with a
+cooldown test of below 1 or at most 2, and never worked out; each edge of the
+wait moved past the pin (the band at 5.9, 6.05, 7.95 and 8.1, the cooldown
+bounds at 1, 3, 89 and 91, each comparison made strict) and the clear shot
+dropped; the tally counting every teleport and every block.
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation section. It
-builds twelve frozen scenes on arena 1 with the shipped kits (a press, an
+builds thirteen frozen scenes on arena 1 with the shipped kits (a press, an
 engage stand, a path follow past the age of the segment test, a kite with no clear shot, a
 kite step, a retreat, the deadlock rule's advance, flee and latched stand, an opener press, an
-escape press with its landing search and a Skerrow engage with F held), warms each
-bot up with 20000 thinks and reads `process.memoryUsage().heapUsed` around one `think`, 600
+escape press with its landing search, a Skerrow engage with F held and a Skerrow
+wait, the stand with its clear shot and the Quiet Dart cue on every think),
+warms each bot up with 20000 thinks and reads `process.memoryUsage().heapUsed` around one `think`, 600
 samples per round. The figure of a round is the median delta minus the median delta of an
 empty pair of reads, and the lowest of three rounds of every scene must be under a literal
 bound, 128 B per think. The think before the rewrite (b09b437) read 4 to 56 KB per think; the
@@ -752,7 +841,10 @@ check, as a two-double point is for the think bound. The steady-state scenes
 cannot see what only Maglev boxes (see Allocation, In the browser). A fresh
 six-double object kept in a module variable at each rewritten site of the
 think (`steerTowardInto`, `cellIndexAt`, `clearShotWith`, `needsPlan`, `aim`,
-`segmentClear`) reads 168 B or more in the scenes that reach it.
+`segmentClear`) reads 168 B or more in the scenes that reach it, and the same
+object in each new path of #98 (`waitsFor`, the target's escape test, the Quiet
+Dart condition) reads 168 B in the skerrow wait scene. A double argument to
+`waitsFor` read 16 B a think on Node 26, so it takes the distance as a measure.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the
@@ -762,8 +854,10 @@ sight, kite in `[rangeMin, rangeMax]` with line of sight, retreat within 0.5 m
 of its own spawn while the team of the bot is ahead or an enemy is in its reach (with
 no enemy in reach and the team not ahead the deadlock rule says advance, so that stand
 is a stall), or retreat standing in reach of its target with a clear shot (the latched
-stand, which casts). The tracker works the team sums and the reach out with its own
-oracle (`clearShotOracle`), not with the code of the bot. Idle counts as standing, and a
+stand, which casts), or Skerrow's wait (an engage stand from 6 to 8 m with a
+clear shot while her SPACE has 2 to 90 ticks left, the oracle's own literals).
+The tracker works the team sums and the reach out with its own oracle
+(`clearShotOracle`), not with the code of the bot. Idle counts as standing, and a
 cornered kiter closer than `rangeMin` counts. Any other tick resets the run. No bot may
 stall for more than 120 ticks, in the headless run and in a corner-start run: the same match
 with one bot in the north-east corner of arena 1 and a melee champion 2.83 m
@@ -776,7 +870,9 @@ is not ahead and nothing is in reach 10, retreating at the spawn with an enemy i
 (the target or another one) 0, with the enemy in range behind an obstacle 10, retreating
 1 m off the spawn 10, retreating in reach of the target with a clear shot away from the
 spawn 0, kiting closer than `rangeMin` in sight 10, engaging in range 0, no alive enemy
-0, and a non-zero input resets the run.
+0, and a non-zero input resets the run. The wait of Skerrow reads 0 from 6 to 8
+m at a SPACE cooldown of 2 to 90, and 10 at 5.95 and 8.05 m, at a cooldown of 0,
+1 and 91, with no clear shot, for a Skerrow with no kit and for a Hargrim.
 
 `packages/bots/test/deadlock.test.ts` pins the rule. Unit scenes on frozen states cover
 the advance, the stay of a team that is ahead, the tie (a mirror where all four advance),
