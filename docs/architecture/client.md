@@ -144,7 +144,7 @@ sim steps first and the views read its state afterwards.
 
 The frame path allocates nothing in steady state: views are pooled, text comes
 from tables and is written only on a change, and the numbers a frame carries live
-in object fields. The combat spec measures it with a heap probe, see
+in object fields. The two heap-probe specs measure it, see
 [testing](testing.md). A match of bots is never in a steady state: hook and HUD
 values change in every window. The change writes come from tables and so build
 no string. The probe has two scenes: the sandbox, where a casting champion in a
