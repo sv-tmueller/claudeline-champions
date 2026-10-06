@@ -559,8 +559,8 @@ press must be that landing's and the sim must put the champion on it, and Hush W
 only when Skip is not ready or has no landing. The ultimate of Skerrow passes only for a target at
 40 health or less, or one the oracle finds cornered by its own walk of the five points. Every
 escape teleport of the runs (a press with a landing, not Reaper's Dance) must be reported
-unblocked. The run must end with a death from a cast, every champion must start a cast, and one cast must
-be an EX. The seeds are 101 to 104, the match seed 7 and the tiers easy, normal, hard,
+unblocked. The run must end with a death from a cast, every champion must start a cast, and one
+cast must be an EX. The seeds are 101 to 104, the match seed 7 and the tiers easy, normal, hard,
 normal; they are pinned, and a miss after a change to the bots, the sim or the Node
 version is governed by batch #53 decision 8.3. The ultimate has its own pinned run: the 2v2
 ends its fights by tick 700 with the energy bar at 75 at most, and 9000 matches of it on the
