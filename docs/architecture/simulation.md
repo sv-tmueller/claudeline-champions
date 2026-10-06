@@ -275,11 +275,12 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   of the other team is a candidate unless the projectile is ally-only (it has
   `allyEffects` and an empty `effects`); a champion of the owner's team is a
   candidate only when the projectile has `allyEffects`. A projectile without
-  `allyEffects` therefore never hits an ally, as before, and an empty `effects`
-  without `allyEffects` (a dev spawn) still stops at the first enemy. A champion
-  it already overlaps at spawn is hit at t = 0, ally or enemy: an ally pressed
-  against the owner is reached only by a radius of 0.5 m or more. Dead champions
-  are passed through. The hit applies `allyEffects` to an ally and `effects` to
+  `allyEffects` therefore never hits an ally, and an empty `effects` without
+  `allyEffects` (a dev spawn) still stops at the first enemy. A champion it
+  already overlaps at spawn is hit at t = 0, ally or enemy. A cast projectile
+  starts at the caster's centre, so it touches an ally pressed against the caster
+  at t = 0 only with a radius of 0.5 m or more. Dead champions are passed
+  through. The hit applies `allyEffects` to an ally and `effects` to
   an enemy, and `projectileHit` names the champion hit, which may be an ally.
 - Order: contacts at or before the blocker time are taken by time, then by
   champion id. A non-piercing projectile ends at the first one of either team
@@ -713,9 +714,10 @@ All times are integer ticks. `AbilityEffect` is one of:
 
 `effects` inside a projectile, area or arc are hit effects (the `Effect` union,
 including `energyGain`) that land on each champion the entity touches.
-`allyEffects` is a projectile-only key: any other effect that carries it, at any
-depth (also inside a `dash` `then`), fails validation. When present it must not
-be empty; a projectile that has it may have an empty `effects`, which makes it
+`allyEffects` is a projectile-only key: an area, meleeArc, dash, teleport or
+top-level hit effect that carries it fails validation, and so does one inside a
+dash `then`. A hit effect inside an `effects` or `allyEffects` list is copied
+field by field, so a stray key there is dropped. When present it must not be empty; a projectile that has it may have an empty `effects`, which makes it
 ally-only, and one without it must keep `effects` non-empty.
 
 `createMatch(config, arena, seed, kits = [])` validates every kit it is given
