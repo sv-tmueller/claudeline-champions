@@ -24,6 +24,20 @@ object per input core and returns it, so a frame allocates nothing; a caller
 that keeps inputs (a replay, a bot) must copy them. `step` copies it through
 `resolveInput`.
 
+The aim sampling allocates nothing either, with a pointer present. `camera.ts`
+copies the canvas's client rect into an object once per resize
+(`refreshCanvasRect`, called by the resize handler in `main.ts` after
+`setSize`), because `getBoundingClientRect` makes a new `DOMRect` on every
+call, and `groundAimFromPointer` casts the pointer's ray through that copy and
+writes the ground point into a scratch record (`aimHit`), returning only
+whether the ray hit the plane. The rule for the frame path is that no raw
+double crosses a call: objects go in and fields are read out, since a double
+passed to a call that V8 does not inline is boxed. The copy assumes the canvas
+fills `#app`, so only a resize moves its rect; a layout change without a resize
+event would leave it stale. The mapping itself is unchanged, and
+`camera.test.ts` keeps the two functions it replaced as an oracle, compared to
+the new path with `Object.is` over a grid of canvases and pointers.
+
 Keys match on `event.code`, and the nine movement and slot actions can be
 rebound: `bindings.ts` (pure) holds `Action` (up, left, down, right, SPACE, Q,
 E, R, F), `DEFAULT_BINDINGS` (the table of rules.md section 6), `rebind`
@@ -42,13 +56,16 @@ shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
-`grep -rE 'debugShots|"F4"|fireDebugShot|spawnProjectile|runProbeFrames|performance\.now|timescale' packages/client/dist`,
-which must print nothing. The same guard hides the dev-only probe hook,
+`grep -rE 'debugShots|spawnProjectile|runProbeFrames|performance\.now|timescale' packages/client/dist`,
+which must print nothing. The pattern has no `"F4"` and no `fireDebugShot`: a
+build minifies function names, and the key code `F4` also ships in the reserved
+list of `bindings.ts`, so neither tells the debug shot from the rest. The terms
+that survive minification in any quote style are the property names `debugShots`
+and `spawnProjectile`. The same guard hides the dev-only probe hook,
 `window.__runProbeFrames`, which `combat.spec.ts` and `live-probe.spec.ts` use
 to run their heap-probe windows (see [testing](testing.md)), and the time scale
-of `dev-launch.ts`
-(`timescale` is the string that survives minification: the function names do
-not).
+of `dev-launch.ts` (`timescale` is the string that survives minification: the
+function names do not).
 
 ## Launch and match
 
@@ -166,19 +183,21 @@ sim steps first and the views read its state afterwards.
   "a,b,c,d" text cannot come from a table.
 
 The frame path allocates nothing in steady state: views are pooled, text comes
-from tables and is written only on a change, and the numbers a frame carries live
-in object fields. The two heap-probe specs measure it, see
+from tables and is written only on a change, and the numbers a frame carries
+live in object fields. The two heap-probe specs measure it, see
 [testing](testing.md). A match of bots is never in a steady state: hook and HUD
 values change in every window. The change writes come from tables and so build
 no string. The probe has two scenes: the sandbox, where a casting champion in a
 stationary scene changes almost nothing, and the live match, which counts those
 table writes with real changes (`live-probe.spec.ts`, issue #77). The live scene
-is measured in a round after about 2100 ticks of play with no pointer, because
-the engine needs that long to reach its optimized tier, and because
-`sampleAim` allocates about 2.5 KB per window whenever a pointer exists (issue
-#87). The HUD writes its state with `setAttribute` and not `dataset`: in the
-probe a `dataset` write allocated about 100 B per window whenever a slot
-changed, and `setAttribute` allocated none.
+is measured in a round after about 2100 ticks of play, because the engine needs
+that long to reach its optimized tier, and with a pointer that moves before
+every window, so the aim sampling and the entity drawing are counted:
+`sampleAim` used to allocate about 2.5 KB per window whenever a pointer existed
+(issue #87) and `EntityViews.draw` boxed the three doubles of `position.set` on
+the runner (issue #89), and both now read 0 B. The HUD writes its state with
+`setAttribute` and not `dataset`: in the probe a `dataset` write allocated about
+100 B per window whenever a slot changed, and `setAttribute` allocated none.
 
 The colours that the world view draws are constants in these files. Champion
 model colours must stay clear of them, and `tools/blender/test_champion_models.py`
@@ -338,9 +357,10 @@ the key of a capture) and a plain DOM click on each button.
   `data-error` and changes and saves nothing. Reset restores the defaults and
   saves them.
 - **Pointer.** The menu reads no pointer position and calls no
-  `getBoundingClientRect`. The window `mousemove` listener of the input core keeps
-  setting `input.pointer`, so after a menu click `main.ts:sampleAim` allocates
-  exactly as it does for any mouse (issue #87, not fixed here).
+  `getBoundingClientRect`. The window `mousemove` listener of the input core
+  keeps setting `input.pointer`, so after a menu click `main.ts:sampleAim`
+  samples it exactly as it does for any mouse, and allocates nothing (issue
+  #87).
 
 The menu pauses in local matches only. Pausing online is milestone 6.
 
