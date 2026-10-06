@@ -77,6 +77,13 @@ export interface KitCache {
    */
   motion: Int8Array;
   /**
+   * 1 when the opener of the slot needs a target with an escape ready (`OpenerRule.when`); an EX
+   * press has no such condition. `anyEscapeCondition` is true when some slot has one, so a think
+   * works the cue out only for a champion that reads it.
+   */
+  needsEscape: Uint8Array;
+  anyEscapeCondition: boolean;
+  /**
    * 1 when the base ability of the slot starts with a dash (its first effect), and the same for the
    * EX variant of an EX slot of the kit (listed in `kit.ex`, has a variant, is not F), whether or
    * not the variant has a reach band. An escape think presses neither (see `chooseCast`).
@@ -129,6 +136,11 @@ export interface CastCues {
    * before `updateRuns`. Not the cornered kiter's latch `escaping` of bot.ts.
    */
   escapeThink: boolean;
+  /**
+   * Whether the acted target has a way out (see `targetEscapeReady`). Only worked out when the
+   * champion has an opener that reads it (`KitCache.anyEscapeCondition`), else false.
+   */
+  escapeReady: boolean;
 }
 
 export function createCastCues(kite: KiteScratch): CastCues {
@@ -139,6 +151,7 @@ export function createCastCues(kite: KiteScratch): CastCues {
     kite,
     corner: { moveX: 0, moveY: 0 },
     escapeThink: false,
+    escapeReady: false,
   };
 }
 
@@ -160,6 +173,8 @@ export function createKitCache(): KitCache {
     openMin: new Float64Array(SLOTS.length),
     openMax: new Float64Array(SLOTS.length),
     motion: new Int8Array(SLOTS.length),
+    needsEscape: new Uint8Array(SLOTS.length),
+    anyEscapeCondition: false,
     baseDash: new Uint8Array(SLOTS.length),
     exDash: new Uint8Array(SLOTS.length),
     escapeOrder: new Int8Array(SLOTS.length).fill(-1),
@@ -190,6 +205,7 @@ export function refreshKitCache(
     cache.hasEx[i] = 0;
     cache.hasOpen[i] = 0;
     cache.motion[i] = 0;
+    cache.needsEscape[i] = 0;
     cache.baseDash[i] = 0;
     cache.exDash[i] = 0;
     cache.isEscape[i] = 0;
@@ -218,10 +234,15 @@ export function refreshKitCache(
       cache.exClearance[i] = clearanceOf(variant);
     }
   }
+  cache.anyEscapeCondition = false;
   for (const opener of rules.openers) {
     if (kit === undefined) break;
     const i = SLOTS.indexOf(opener.slot);
     cache.motion[i] = opener.motion === 'away' ? 1 : opener.motion === 'closing' ? -1 : 0;
+    if (opener.when === 'escapeReady') {
+      cache.needsEscape[i] = 1;
+      cache.anyEscapeCondition = true;
+    }
     const band = opener.band === 'dash' ? dashBand(kit.slots[opener.slot]) : opener.band;
     if (band === null) continue;
     cache.hasOpen[i] = 1;
@@ -298,6 +319,22 @@ export function hasDash(ability: AbilitySpec): boolean {
 }
 
 /**
+ * Whether the target has a way out: one of the escapes of its own rule (`rulesFor` with the kit of
+ * its champion id, none for a champion without a rule) has a cooldown of at most 1, as the cast
+ * gate reads it, and the target is neither stunned nor silenced. A rooted target can still blink or
+ * shield. Allocates nothing: the escape list of a rule is shared and frozen.
+ */
+function targetEscapeReady(state: GameState, target: ChampionState): boolean {
+  if (hasStatus(target, 'stun') || hasStatus(target, 'silence')) return false;
+  const { escapes } = rulesFor(target.championId, findKit(state, target.championId));
+  for (let n = 0; n < escapes.length; n++) {
+    const i = SLOTS.indexOf(escapes[n] as Slot);
+    if ((target.cooldowns[i] as number) <= 1) return true;
+  }
+  return false;
+}
+
+/**
  * An escape think is a retreat with the acted target within this many metres, inclusive, or a
  * kite with the acted target inside rangeMin. Six metres is the roster's "inside 6 m" for the
  * ranged champion's back-off, applied to a retreat of any champion.
@@ -326,8 +363,9 @@ function exFor(cache: KitCache, index: number, me: ChampionState, cues: CastCues
 
 /**
  * Works the cues of a think out, from the acted target: the motion of the target, whether this is
- * an escape think, the energy reserve, and the clearance a stand needs. Run once per think, before
- * the move (the stand reads `sight.standClearance`) and before `updateRuns`.
+ * an escape think, whether the target has an escape ready, the energy reserve, and the clearance
+ * a stand needs. Run once per think, before the move (the stand reads `sight.standClearance`) and
+ * before `updateRuns`.
  *
  * The reserve: F holds the energy back, so the EX variants are not cast, while F is ready (its
  * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band (a support
@@ -346,6 +384,7 @@ export function computeCues(
   cache: KitCache,
   profile: BotProfile,
   intent: string,
+  state: GameState,
   me: ChampionState,
   target: ChampionState,
   sight: SightScratch,
@@ -357,6 +396,7 @@ export function computeCues(
   cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
   cues.escapeThink =
     (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
+  cues.escapeReady = cache.anyEscapeCondition && targetEscapeReady(state, target);
   // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
   // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
   cues.fOk =
@@ -432,6 +472,8 @@ export function updateRuns(
       const motion = cache.motion[i] as number;
       if (motion > 0 && !(cues.dot > 0)) inBand = false;
       if (motion < 0 && !(cues.dot < 0)) inBand = false;
+      // The target must have an escape ready (Quiet Dart).
+      if (cache.needsEscape[i] === 1 && !cues.escapeReady) inBand = false;
       if (i === F_INDEX && !cues.fOk) inBand = false;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
@@ -444,8 +486,9 @@ export function updateRuns(
  * gates: no windup in progress unless it fires on this tick (windupLeft 1), the cooldown at most 1
  * (it counts down first), the energy for the cost (100 for F, 25 for an EX variant), no stun or
  * silence, no root for a dash, and on an escape think no dash at all (the ability of the press,
- * its EX variant when it would be cast, starts with one). Run `updateRuns` first. `skip` is a bit mask of slot indices
- * the walk leaves out: the escape slots `chooseEscape` already tried (0 for none).
+ * its EX variant when it would be cast, starts with one). Run `updateRuns` first. `skip` is a bit
+ * mask of slot indices the walk leaves out: the escape slots `chooseEscape` already tried (0 for
+ * none).
  */
 export function chooseCast(
   choice: CastChoice,

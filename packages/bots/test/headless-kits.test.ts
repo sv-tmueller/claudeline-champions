@@ -49,13 +49,15 @@ function config3v3(): MatchConfig {
  * A band of centre distances. A row without `margin` is a kit band, tested with the 1 m range
  * margin off its top; an opener row (see bots.md, Openers and escapes) is the literal band with
  * `margin: 0`. `motion` is the condition of an opener: the target walks away from the champion or
- * toward it, by the sign of (target - champion) . target velocity.
+ * toward it, by the sign of (target - champion) . target velocity. `needs` is the other one.
  */
 interface Band {
   min: number;
   max: number;
   margin?: number;
   motion?: 'away' | 'closing';
+  /** Quiet Dart: the target has an escape ready, see `escapeReady`. */
+  needs?: 'escapeReady';
 }
 
 // The oracle's own band and clearance tables, one per kit set, written out from the kit files
@@ -84,6 +86,20 @@ const ESCAPES: Record<string, EscapeRow> = {
   // Vanish Step: a 5 m teleport that is not fixed (the shipped Skerrow kit only).
   'skerrow:R': { slot: 'R', teleport: 5, after: null },
 };
+
+/**
+ * Whether the target has a way out, by the escape rows above: one of its escape slots has a
+ * cooldown of at most 1 and it is neither stunned nor silenced. Written here from the rows, not
+ * from the rules of src.
+ */
+function escapeReady(target: ChampionState): boolean {
+  if (target.statuses.some((st) => st.type === 'stun' || st.type === 'silence')) return false;
+  return Object.entries(ESCAPES).some(
+    ([key, row]) =>
+      key.startsWith(`${target.championId}:`) &&
+      (target.cooldowns[SLOTS.indexOf(row.slot)] ?? Infinity) <= 1,
+  );
+}
 
 /**
  * The ultimates the bot holds for a low or cornered target: the key and the health at or below
@@ -120,7 +136,7 @@ const SKERROW_BANDS: Record<string, Band> = {
   'skerrow:M2': { min: 0, max: (24 * 25) / 60 },
   'skerrow:SPACE': { min: 5, max: 6, margin: 0 },
   'skerrow:SPACE:ex': { min: 0, max: 10.5 },
-  'skerrow:Q': { min: 0, max: (20 * 33) / 60 },
+  'skerrow:Q': { min: 0, max: (20 * 33) / 60, needs: 'escapeReady' },
   'skerrow:E': { min: 0, max: 3 },
   'skerrow:E:ex': { min: 0, max: 3 },
   'skerrow:F': { min: 0, max: 11 },
@@ -288,6 +304,9 @@ function pressProblems(
       const dot = (target.x - c.x) * target.vx + (target.y - c.y) * target.vy;
       if (band.motion === 'away' && !(dot > 0)) problems.push(`target not moving away: dot ${dot}`);
       if (band.motion === 'closing' && !(dot < 0)) problems.push(`target not closing: dot ${dot}`);
+      if (band.needs === 'escapeReady' && !escapeReady(target)) {
+        problems.push(`${key} pressed at a target with no escape ready`);
+      }
     }
   }
   if (cooldown > 1) problems.push(`cooldown ${cooldown} above 1`);
@@ -622,10 +641,11 @@ describe('the band and clearance tables of the shipped kits', () => {
     }
     for (const key of ['M2', 'Q']) {
       const bolt = projectile(slotOf('skerrow', key));
-      expect(shipped.bands[`skerrow:${key}`], key).toEqual({
-        min: 0,
-        max: (bolt.speed * bolt.lifetimeTicks) / 60,
-      });
+      // Quiet Dart is an opener: the kit band less the margin, at a target with an escape ready.
+      const reach = { min: 0, max: (bolt.speed * bolt.lifetimeTicks) / 60 };
+      expect(shipped.bands[`skerrow:${key}`], key).toEqual(
+        key === 'Q' ? { ...reach, needs: 'escapeReady' } : reach,
+      );
       expect(shipped.clearances[`skerrow:${key}`], key).toBe(bolt.radius);
     }
     // Lunge: the base dash gives [D - 1, D] with no margin; the EX dash its distance plus its arc.

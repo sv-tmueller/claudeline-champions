@@ -497,10 +497,12 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       lastActed.targetId = acted.targetId;
 
       if (kit !== undefined && target !== undefined && acted.intent !== 'idle') {
-        computeCues(cues, kitCache, profile, acted.intent, me, target, sight, dist, navGrid(state));
+        const g = navGrid(state);
+        computeCues(cues, kitCache, profile, acted.intent, state, me, target, sight, dist, g);
       } else {
         cues.reserve = false;
         cues.escapeThink = false;
+        cues.escapeReady = false;
         sight.standClearance = SIGHT_CLEARANCE;
       }
       move(state, me, profile);

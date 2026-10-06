@@ -28,6 +28,14 @@ export interface Options {
   ready?: readonly Slot[];
   /** The enemy's velocity along x, in m/s: positive is away from the champion under test. */
   enemyVx?: number;
+  /** The champion id of the enemy (champion 2). Default: `dummy`, which has no kit and no rule. */
+  enemyId?: string;
+  /** The enemy's slots left off cooldown, as `ready` does for the champion under test. */
+  enemyReady?: readonly Slot[];
+  /** The enemy's cooldown of single slots, in ticks, applied after `enemyReady`. */
+  enemyCooldown?: Partial<Record<Slot, number>>;
+  /** A status the enemy carries, which its gates read. */
+  enemyStatus?: 'stun' | 'silence';
   /** Health of the champion under test and of the enemy, as fractions of the maximum. */
   health?: number;
   enemyHealth?: number;
@@ -39,7 +47,7 @@ export function sceneOf(championId: string, distance: number, options: Options =
     players: [
       { championId, team: 'A' },
       { championId: 'dummy', team: 'A' },
-      { championId: 'dummy', team: 'B' },
+      { championId: options.enemyId ?? 'dummy', team: 'B' },
       { championId: 'dummy', team: 'B' },
     ],
   };
@@ -58,6 +66,16 @@ export function sceneOf(championId: string, distance: number, options: Options =
   if (options.ready !== undefined) {
     me.cooldowns.fill(600);
     for (const slot of options.ready) me.cooldowns[SLOTS.indexOf(slot)] = 0;
+  }
+  if (options.enemyReady !== undefined) {
+    enemy.cooldowns.fill(600);
+    for (const slot of options.enemyReady) enemy.cooldowns[SLOTS.indexOf(slot)] = 0;
+  }
+  for (const [slot, ticks] of Object.entries(options.enemyCooldown ?? {})) {
+    enemy.cooldowns[SLOTS.indexOf(slot as Slot)] = ticks;
+  }
+  if (options.enemyStatus !== undefined) {
+    enemy.statuses.push({ type: options.enemyStatus, sourceId: 0, slot: null, remainingTicks: 600 });
   }
   return state;
 }

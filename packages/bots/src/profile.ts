@@ -51,15 +51,24 @@ export function profileFor(championId: string, kit?: KitDef): BotProfile {
 export type Motion = 'away' | 'closing';
 
 /**
+ * What else must hold of the target for an opener: `'escapeReady'`, the target has a way out
+ * (one of the escapes of its own rule is ready, and it is neither stunned nor silenced; see
+ * `targetEscapeReady` in casting.ts).
+ */
+export type Condition = 'escapeReady';
+
+/**
  * An opener: a slot the bot presses on a condition narrower than its kit band. `band` is the
  * distance band in metres, inclusive and with no range margin: a literal pair, `'dash'` for the
  * band derived from the base ability's leading dash (see `dashBand` in casting.ts), or null for
- * the kit band less the margin. `motion` is what the target must be doing, or null.
+ * the kit band less the margin. `motion` is what the target must be doing, or null. `when` is
+ * what the target must have, or null.
  */
 export interface OpenerRule {
   readonly slot: Slot;
   readonly band: 'dash' | readonly [number, number] | null;
   readonly motion: Motion | null;
+  readonly when: Condition | null;
 }
 
 /** The rules of a champion that its kit does not carry (kits carry no bot fields). */
@@ -94,23 +103,38 @@ const NO_RULES: ChampionRules = Object.freeze({
  * walks away; Snare Orb keeps its kit band and needs a target that walks toward the champion.
  * Iron Hide, Skip and Hush Ward are the escapes of the roster sketches: Skip first, then Hush Ward.
  * Skerrow's Lunge is the base dash with its derived band (5 to 6 m, where she waits to strike is
- * not built); Vanish Step is her escape on the common trigger (decision 6 of batch #80, not the
- * roster's 50 percent health: that would send her back in at once); Reaper's Dance is held.
+ * not built); Quiet Dart keeps its kit band and needs a target with an escape ready (the roster:
+ * "Q first if the target has an escape ready"); Vanish Step is her escape on the common trigger
+ * (decision 6 of batch #80, not the roster's 50 percent health: that would send her back in at
+ * once); Reaper's Dance is held.
  */
 const RULES = new Map<string, ChampionRules>([
   [
     'hargrim',
     rule(
       [
-        { slot: 'SPACE', band: 'dash', motion: null },
-        { slot: 'E', band: [4, 7], motion: 'away' },
+        { slot: 'SPACE', band: 'dash', motion: null, when: null },
+        { slot: 'E', band: [4, 7], motion: 'away', when: null },
       ],
       ['R'],
       false,
     ),
   ],
-  ['quillon', rule([{ slot: 'Q', band: null, motion: 'closing' }], ['SPACE', 'R'], false)],
-  ['skerrow', rule([{ slot: 'SPACE', band: 'dash', motion: null }], ['R'], true)],
+  [
+    'quillon',
+    rule([{ slot: 'Q', band: null, motion: 'closing', when: null }], ['SPACE', 'R'], false),
+  ],
+  [
+    'skerrow',
+    rule(
+      [
+        { slot: 'SPACE', band: 'dash', motion: null, when: null },
+        { slot: 'Q', band: null, motion: null, when: 'escapeReady' },
+      ],
+      ['R'],
+      true,
+    ),
+  ],
 ]);
 
 /** A frozen row: the row, its two lists, each opener and each literal band. */
