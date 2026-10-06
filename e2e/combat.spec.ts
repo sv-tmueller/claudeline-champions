@@ -107,9 +107,13 @@ const WINDOWS_PER_FLIGHT = 6;
 // change the bad mode of the heap probe (decision 9 of batch #32: 4 and 8
 // volleys read alike), so the warm-up is the short one, 12 s less on the runner.
 const WARM_UP_VOLLEYS = 4;
-// One window after the volley, then the measured ones. All of them end before the first shot does.
-const SETTLE_WINDOWS = 1;
-const MEASURED_WINDOWS = 3;
+// Five windows measured right after the volley, with no settle window: 150 ticks, all
+// of them before the first shot ends (162). The asserted figure is the median of the
+// five (decision 12 of batch #63, from the isolation of #77, see testing.md): window 0
+// holds the first frame's acquire of the volley's eight views (336 to 660 B on the
+// runner), and a one-off spike in another function can land in any window, so the
+// worst window is not a stable figure and the median is.
+const MEASURED_WINDOWS = 5;
 // The viewport of the screenshots, which is also the default of playwright.config.ts.
 const SCREENSHOT_VIEWPORT = { width: 1280, height: 720 };
 // The warmup is 180 ticks, WARMUP_TICKS in the sim.
@@ -134,14 +138,10 @@ async function fireVolley(page: Page): Promise<void> {
   expect((await readHooks(page)).debugShots, 'every F4 press of the volley fired').toBe(before + SHOTS);
 }
 
-// Two retries stay because 1 runner attempt in 6 on 791b232 (job 111860976393)
-// failed the probe with a first-window spike of 3636 B in main.ts:writeCombatHooks
-// (4020 B counted, cause not isolated), and its retry passed. A flaky combat.spec
-// whose failed attempt shows this spike is that case; any other failure is real.
-// A retry also lets a marginal regression near the limit pass; a regression of
-// the sizes measured (1148 B and up) fails all three attempts. The global
-// retries stay 0 in playwright.config.ts.
-test.describe.configure({ retries: 2 });
+// No retries: the asserted figure is the median of five windows, which a one-off JIT
+// spike in one window does not move (the spikes of the isolation, 5 attempts of 24 on
+// the runner, were each in one window), and a regression of the sizes measured (1148 B
+// and up) raises every window. The global retries stay 0 in playwright.config.ts.
 
 test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind', async ({ page }) => {
   test.setTimeout(TEST_TIMEOUT_MS);
@@ -220,9 +220,10 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     // 8. Steady state: eight shots in flight and nothing to hit, the loop at
     // its busiest. The shots pass through the dead champion 2. Code warmed up
     // on an empty arena is thrown away when the first projectile arrives, so
-    // the engine warms up on volleys. The measured windows hold no spawn and no
-    // end of a shot, only frames with eight shots in flight, and in them the
-    // combat code allocates nothing. On the CI runner every frame costs 105 to
+    // the engine warms up on volleys. The measured windows hold no new spawn and
+    // no end of a shot, only frames with eight shots in flight, and in them the
+    // combat code allocates nothing but the hook's boxed numbers (window 0 also
+    // acquires the views of the volley). On the CI runner every frame costs 105 to
     // 210 ms of software rendering at 1280x720 whether or not hooks are read
     // between frames, and the heap probe counts JavaScript allocations and
     // never looks at pixels, so the canvas shrinks first. The resize is
@@ -239,10 +240,9 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
       for (let window = 0; window < WINDOWS_PER_FLIGHT; window++) await runWindow(page);
     }
     await fireVolley(page);
-    for (let window = 0; window < SETTLE_WINDOWS; window++) await runWindow(page);
-    // The worst of the windows is the asserted figure, and the line of the attempt
+    // The median of the windows is the asserted figure, and the line of the attempt
     // and the functions of every window with counted bytes are in the log.
-    const measured = await measureWindows(page, cdp, 'sandbox', test.info().retry, MEASURED_WINDOWS, 'worst');
+    const measured = await measureWindows(page, cdp, 'sandbox', test.info().retry, MEASURED_WINDOWS, 'median');
     await page.mouse.up();
     hooks = await readHooks(page);
     // The death line is long gone: the kill feed expires after 300 ticks.

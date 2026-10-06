@@ -44,24 +44,43 @@ const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // 66f4828). The sanity floor below leaves them out, so it does not depend on
 // them.
 const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
-// Measured in a warm steady state: every counted function reads 0 B but the
-// hook's frameMany, which reads 300 to 588 B per window (9 to 18 B per frame, one
-// boxed number per frame, whatever its argument: it stayed with the timestamp
-// as an argument, as an integer, in a field of the loop clock and with no
-// argument at all) and counts the bytes of the callees inlined into it. The limit
-// is 640 B: about 100 B above the largest clean window of the 35 attempts of #61,
-// and 52 B above the largest of 6 attempts after the table-driven writes (588 B).
-// Each of these fails it, with the figures of the pull request, as the bytes of
-// the worst window per attempt: an escaping array in frame (1352 to 1384 B), a
-// template string written to data-p0x on every writeHooks call (2820 to 3264 B),
-// a closure made per call in routeEvents (2080 to 2188 B), an escaping object in
-// draw (11.2 to 11.3 KB), a fresh literal from toPlayerInput (1680 to 1816 B), a
-// template string per Hud.update call (2260 to 2504 B), an escaping array per
-// BotDriver.think call (1148 to 1396 B) and a template string per
-// ResultScreen.update call (1592 to 1704 B). See testing.md.
+// The sandbox's limit, 640 B, on the median of five measured windows. In a warm
+// steady state every counted function reads 0 B but the hook's frameMany, which reads
+// 300 to 588 B per window (9 to 18 B per frame, one boxed number per frame, whatever
+// its argument: it stayed with the timestamp as an argument, as an integer, in a field
+// of the loop clock and with no argument at all) and counts the bytes of the callees
+// inlined into it. The median of five was at most 528 B over 35 local attempts at
+// limit 1 B and at most 504 B over the 24 runner attempts of the isolation of #77 (run
+// 37434090996); the limit is about 100 B above the largest. The worst window is not a
+// stable figure: window 0 holds the 8 views of the volley (684 to 1068 B in every
+// attempt) and a one-off spike lands in one window of some attempts (1224 to 2140 B).
+// Each of these fails the limit alone, as the median of the windows per attempt over 3
+// attempts, on 458f458 plus the line of testing.md: an escaping array in frame (1600 to
+// 1648 B), a template string written to data-p0x on every writeHooks call (3052 to
+// 3128 B), a closure made per call in routeEvents (1956 to 2064 B), an escaping object
+// in the entity views' draw (3052 to 3180 B), a fresh literal from toPlayerInput (2064
+// to 2168 B), a template string per Hud.update call (784 to 1572 B), an escaping array
+// per BotDriver.think call (1408 to 1448 B) and a template string per
+// ResultScreen.update call (968 to 1040 B). The per-change writes of the human's
+// position and facing are the live scene's (see LIVE_ALLOCATION_LIMIT_BYTES): here
+// they read 336 to 432 B and pass. See testing.md.
 export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
-// The live match's limit, provisional until the local attempts are in.
-export const LIVE_ALLOCATION_LIMIT_BYTES = 900;
+// The live match's limit: 640 B as well, with its own figures. The median of five
+// measured windows was at most 504 B over 35 local attempts at limit 1 B and at most
+// 540 B over the 24 runner attempts of the isolation (run 37434090996), counting
+// every function of the pattern but `entity-views.ts:draw` (LIVE_EXCLUDED in
+// live-probe.spec.ts). The limit is about 100 B above the largest clean median and
+// below the median of every live mutation but one (3 attempts each, same lines as
+// the sandbox's): 1600 to 1736 B for the array in frame, 2608 to 2676 B for the
+// p0x template, 1892 to 1924 B for the closure in routeEvents, 1960 to 2180 B for
+// the toPlayerInput literal, 1572 to 1632 B for the Hud.update template, 1312 to
+// 1424 B for the array in BotDriver.think, 884 to 912 B for the ResultScreen.update
+// template, the smallest, and for the per-change pair 976 to 1088 B (x.toFixed(0) in
+// data-p0x) and 1352 to 1388 B ((facing / 1000).toFixed(3) in data-f0). The one
+// exception is the escaping object in the entity views' draw: it lands in the
+// excluded function and reads 432 to 456 B here, so the sandbox, which counts draw,
+// is its gate (3052 to 3180 B). See testing.md.
+export const LIVE_ALLOCATION_LIMIT_BYTES = 640;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains
@@ -86,6 +105,8 @@ export interface Allocations {
   /** Bytes outside the sweep files of the sim, for the sanity floor. */
   outsideSweep: number;
   combat: number;
+  /** Bytes of the functions a scene leaves out of the counted code, see `summarise`. Logged, not counted. */
+  excluded: number;
   /** Bytes in the bots package. Logged, not counted: the think has its own gate (allocation.test.ts). */
   bots: number;
   /** Bytes in three's onAnimationFrame. Logged, not counted: no measured frame runs through it. */
@@ -94,19 +115,29 @@ export interface Allocations {
   fakeRequestAnimationFrame: number;
   /** Bytes per "file:function" for the combat code, for the failure message. */
   combatByFunction: Record<string, number>;
+  /** Bytes per "file:function" of the excluded functions, for the log. */
+  excludedByFunction: Record<string, number>;
   /** Bytes per "bots/file:function", for the log. */
   botsByFunction: Record<string, number>;
 }
 
-export function summarise(root: ProfileNode): Allocations {
+/**
+ * Sorts a profile into the figures of a window. `exclude` names functions of the
+ * counted code ("file:function") that a scene leaves out of `combat`: their bytes
+ * are in `excluded` and in the log instead. Only the live scene uses it (see
+ * live-probe.spec.ts).
+ */
+export function summarise(root: ProfileNode, exclude?: RegExp): Allocations {
   const result: Allocations = {
     total: 0,
     outsideSweep: 0,
     combat: 0,
+    excluded: 0,
     bots: 0,
     onAnimationFrame: 0,
     fakeRequestAnimationFrame: 0,
     combatByFunction: {},
+    excludedByFunction: {},
     botsByFunction: {},
   };
   const pending = [root];
@@ -125,7 +156,10 @@ export function summarise(root: ProfileNode): Allocations {
       result.bots += node.selfSize;
       result.botsByFunction[key] = (result.botsByFunction[key] ?? 0) + node.selfSize;
     }
-    if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
+    if (node.selfSize > 0 && exclude?.test(key) && COMBAT_CODE.test(key)) {
+      result.excluded += node.selfSize;
+      result.excludedByFunction[key] = (result.excludedByFunction[key] ?? 0) + node.selfSize;
+    } else if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
       result.combat += node.selfSize;
       result.combatByFunction[key] = (result.combatByFunction[key] ?? 0) + node.selfSize;
     }
@@ -183,7 +217,7 @@ export async function runWindow(page: Page): Promise<void> {
  * well as live objects. A plain heap delta cannot be used: the sim allocates
  * inside `step` on every projectile sweep, far more than any view.
  */
-export async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allocations> {
+export async function allocationsOverAWindow(page: Page, cdp: CDPSession, exclude?: RegExp): Promise<Allocations> {
   await cdp.send('HeapProfiler.startSampling', {
     samplingInterval: 16,
     includeObjectsCollectedByMajorGC: true,
@@ -191,7 +225,7 @@ export async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promi
   });
   await runWindow(page);
   const { profile } = await cdp.send('HeapProfiler.stopSampling');
-  return summarise(profile.head as ProfileNode);
+  return summarise(profile.head as ProfileNode, exclude);
 }
 
 export interface Measured {
@@ -231,9 +265,9 @@ export function conclude(
 ): Measured {
   console.log(probeLine(scene, attempt, windows));
   windows.forEach((w, index) => {
-    if (w.combat > 0) {
+    if (w.combat > 0 || w.excluded > 0) {
       console.log(
-        `heap probe ${scene} attempt ${attempt} window ${index}: counted ${JSON.stringify(w.combatByFunction)} bots ${JSON.stringify(w.botsByFunction)}`,
+        `heap probe ${scene} attempt ${attempt} window ${index}: counted ${JSON.stringify(w.combatByFunction)} excluded ${JSON.stringify(w.excludedByFunction)} bots ${JSON.stringify(w.botsByFunction)}`,
       );
     }
   });

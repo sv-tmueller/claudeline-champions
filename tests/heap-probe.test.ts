@@ -69,13 +69,37 @@ function window(combat: number): Allocations {
     total: 0,
     outsideSweep: 0,
     combat,
+    excluded: 0,
     bots: 0,
     onAnimationFrame: 0,
     fakeRequestAnimationFrame: 0,
     combatByFunction: {},
+    excludedByFunction: {},
     botsByFunction: {},
   };
 }
+
+describe('summarise with an excluded function', () => {
+  const root = node('', '(root)', 0, [
+    node(`${CLIENT}main.ts`, 'frameMany', 300),
+    node(`${CLIENT}entity-views.ts`, 'draw', 800),
+    node(`${CLIENT}entity-views.ts`, 'acquire', 24),
+  ]);
+
+  it('keeps the excluded bytes out of the counted code and logs them apart', () => {
+    const result = summarise(root, /^entity-views\.ts:draw$/);
+    expect(result.combat).toBe(324);
+    expect(result.combatByFunction).toEqual({ 'main.ts:frameMany': 300, 'entity-views.ts:acquire': 24 });
+    expect(result.excluded).toBe(800);
+    expect(result.excludedByFunction).toEqual({ 'entity-views.ts:draw': 800 });
+  });
+
+  it('counts everything of the pattern when nothing is excluded', () => {
+    const result = summarise(root);
+    expect(result.combat).toBe(1124);
+    expect(result.excluded).toBe(0);
+  });
+});
 
 describe('pickAsserted', () => {
   const windows = [window(336), window(4020), window(408)];
