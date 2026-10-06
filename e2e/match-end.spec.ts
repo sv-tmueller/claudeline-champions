@@ -21,7 +21,7 @@ const COUNTDOWN_TICKS = 600;
 const SUDDEN_DEATH_TICKS = 1800;
 const RING_START_M = 18;
 const RING_END_M = 3;
-// The match: this test's own run ended at tick 3264 on f7e10f0 (read in frames of 96
+// The match: this test's own run ended at tick 5184 on 8d80073 (read in frames of 96
 // ticks, with an idle human). Bot output moves with the bots package, so re-measure it
 // when the bots change. The budget is 12 000 ticks: the measured 3264, two more rounds
 // of about 1000 each and one round to sudden death of about 7000. Passing it fails the

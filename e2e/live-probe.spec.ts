@@ -24,7 +24,7 @@ import { orFail, watchProblems } from './support';
 //
 // The scene is measured late, in the first round that begins after
 // WARM_UP_TICKS, with no pointer and no profiler before it. A live match does
-// not give the engine time before its first death (tick 449 on normal bots):
+// not give the engine time before its first death (tick 449 on normal bots of f7e10f0):
 // the counted code reads 16 to 81 KB per window in the first 200 ticks and 3 to
 // 6 KB up to tick 720, the heap numbers of unoptimized code, and is clean only
 // after about 2100 ticks (see testing.md). The pointer is never moved, because
@@ -55,7 +55,7 @@ const PAUSE_AT_MS = 60_000;
 // https://github.com/sv-tmueller/claudeline-champions/issues/89 is fixed: that fix
 // removes LIVE_EXCLUDED, and the `draw` mutation then fails here too.
 // The warm-up: plain windows, no profiler, until this tick, then on to the start
-// of the next round. About 2300 ticks locally, with rounds 1 and 2 played.
+// of the next round: round 3, begun by tick 2879 on 8d80073, with rounds 1 and 2 played.
 const WARM_UP_TICKS = 2100;
 // The warm-up fails past this tick: the match ended or a round never began. It is
 // WARM_UP_TICKS plus the longest round that match-end.spec.ts budgets, a round that
@@ -64,7 +64,8 @@ const WARM_UP_TICKS = 2100;
 const WARM_UP_BUDGET_TICKS = 9100;
 // The windows measured, from the first window of the round. The median of the five is
 // the asserted figure, as in the sandbox (see testing.md). The first death of a round
-// came about 240 ticks after its start on f7e10f0, 120 ticks after the last window.
+// came 630 ticks after its start on 8d80073 (tick 3509, round 3 begun by tick 2879), 480
+// ticks after the last window.
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
@@ -75,9 +76,10 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 2500 frames (the warm-up, the five windows and the run-on) and
-// took 23 to 27 s on the runner (6 attempts of job 112172123856), about 10 ms a frame, so
-// 180 s is a margin of more than 6x, and it covers the warm-up budget above (9100
+// A live attempt is about 3500 frames on 8d80073 (the warm-up to tick 2879, the five
+// windows and the run-on to the first death) and took 23 to 27 s for about 2500 frames on
+// the runner on f7e10f0 (6 attempts of job 112172123856), about 10 ms a frame, so about
+// 35 s now and 180 s is a margin of 5x. It also covers the warm-up budget above (9100
 // frames, about 90 s at that rate).
 const TEST_TIMEOUT_MS = 180_000;
 
