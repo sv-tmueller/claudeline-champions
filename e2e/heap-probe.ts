@@ -8,7 +8,7 @@ import type { CDPSession, Page } from '@playwright/test';
 
 // The functions whose allocations the heap probe counts: every combat render
 // module, the pose and overlay helpers that run each frame, the loop clock, the
-// input sampler, the HUD writer with its views and the kill feed, the text tables
+// input sampler, the pointer aim (camera.ts), the HUD writer with its views and the kill feed, the text tables
 // of the hooks and the HUD (hook-text.ts), the champion names, the result screen's
 // writer, the client's bot-driving glue (bot-driver.ts) and every function in
 // main.ts (stepSim, sampleAim, draw and the hook writers). The HUD builder,
@@ -35,7 +35,7 @@ import type { CDPSession, Page } from '@playwright/test';
 // callee V8 inlines into it land on it, so excluding it would hide a regression
 // (the escaping array in frame passed with the hook excluded).
 export const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|hook-text|kill-feed|roster|bot-driver|result-screen)\.ts:|^main\.ts:/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|hook-text|kill-feed|roster|bot-driver|result-screen|camera)\.ts:|^main\.ts:/;
 // Three's own animation callback. It is logged and never counted.
 const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // The sweep files of the sim. Their garbage was huge (about 790 KB per window, in
@@ -94,17 +94,6 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // and 752 B passing under 780 B, so it sits at the limit and is not a live gate; 968 to
 // 1040 B against 640 B on the sandbox). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
-// The one function of the counted code that the live scene does not count. On the
-// runner `entity-views.ts:draw` allocated 228 to 912 B in every window (1.1 to 1.5 KB
-// in the window of the first hit) in 19 of 24 attempts and 0 B in the other 5: a mode
-// of the engine's tiers on a path with few active views, which the live scene reaches
-// late. The bytes are logged apart, as `excluded`. The sandbox, whose 8 shots keep
-// `draw` hot, counts it, and the mutation of `draw` fails there (see testing.md).
-// This is a carve-out: the client defect is
-// https://github.com/sv-tmueller/claudeline-champions/issues/89, and its fix removes
-// LIVE_EXCLUDED. Anchored, so `main.ts:draw` and `impact-rings.ts:draw`, which are
-// spike sites, stay counted.
-export const LIVE_EXCLUDED = /^entity-views\.ts:draw$/;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains
@@ -129,8 +118,6 @@ export interface Allocations {
   /** Bytes outside the sweep files of the sim, for the sanity floor. */
   outsideSweep: number;
   combat: number;
-  /** Bytes of the functions a scene leaves out of the counted code, see `summarise`. Logged, not counted. */
-  excluded: number;
   /** Bytes in the bots package. Logged, not counted: the think has its own gate (allocation.test.ts). */
   bots: number;
   /** Bytes in three's onAnimationFrame. Logged, not counted: no measured frame runs through it. */
@@ -139,29 +126,20 @@ export interface Allocations {
   fakeRequestAnimationFrame: number;
   /** Bytes per "file:function" for the combat code, for the failure message. */
   combatByFunction: Record<string, number>;
-  /** Bytes per "file:function" of the excluded functions, for the log. */
-  excludedByFunction: Record<string, number>;
   /** Bytes per "bots/file:function", for the log. */
   botsByFunction: Record<string, number>;
 }
 
-/**
- * Sorts a profile into the figures of a window. `exclude` names functions of the
- * counted code ("file:function") that a scene leaves out of `combat`: their bytes
- * are in `excluded` and in the log instead. Only the live scene uses it (see
- * live-probe.spec.ts).
- */
-export function summarise(root: ProfileNode, exclude?: RegExp): Allocations {
+/** Sorts a profile into the figures of a window: counted code, bots, sweep files and the rest. */
+export function summarise(root: ProfileNode): Allocations {
   const result: Allocations = {
     total: 0,
     outsideSweep: 0,
     combat: 0,
-    excluded: 0,
     bots: 0,
     onAnimationFrame: 0,
     fakeRequestAnimationFrame: 0,
     combatByFunction: {},
-    excludedByFunction: {},
     botsByFunction: {},
   };
   const pending = [root];
@@ -180,10 +158,7 @@ export function summarise(root: ProfileNode, exclude?: RegExp): Allocations {
       result.bots += node.selfSize;
       result.botsByFunction[key] = (result.botsByFunction[key] ?? 0) + node.selfSize;
     }
-    if (node.selfSize > 0 && exclude?.test(key) && COMBAT_CODE.test(key)) {
-      result.excluded += node.selfSize;
-      result.excludedByFunction[key] = (result.excludedByFunction[key] ?? 0) + node.selfSize;
-    } else if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
+    if (node.selfSize > 0 && COMBAT_CODE.test(key)) {
       result.combat += node.selfSize;
       result.combatByFunction[key] = (result.combatByFunction[key] ?? 0) + node.selfSize;
     }
@@ -207,9 +182,9 @@ export function pickAsserted(windows: readonly Allocations[]): Allocations {
 /** One line per attempt, so every log shows the figures of all its measured windows. */
 export function probeLine(scene: string, attempt: number, windows: readonly Allocations[]): string {
   const figures = windows.map(
-    (w) => `${w.total}/${w.onAnimationFrame}/${w.fakeRequestAnimationFrame}/${w.outsideSweep}/${w.combat}/${w.bots}/${w.excluded}`,
+    (w) => `${w.total}/${w.onAnimationFrame}/${w.fakeRequestAnimationFrame}/${w.outsideSweep}/${w.combat}/${w.bots}`,
   );
-  return `heap probe ${scene} attempt ${attempt}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots/excluded: ${figures.join(' ')}`;
+  return `heap probe ${scene} attempt ${attempt}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots: ${figures.join(' ')}`;
 }
 
 /** A CDP session with the heap profiler enabled, for the page. Open it after the clock is paused. */
@@ -238,7 +213,7 @@ export async function runWindow(page: Page): Promise<void> {
  * well as live objects. A plain heap delta cannot be used: the sim allocates
  * inside `step` on every projectile sweep, far more than any view.
  */
-export async function allocationsOverAWindow(page: Page, cdp: CDPSession, exclude?: RegExp): Promise<Allocations> {
+export async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allocations> {
   await cdp.send('HeapProfiler.startSampling', {
     samplingInterval: 16,
     includeObjectsCollectedByMajorGC: true,
@@ -246,7 +221,7 @@ export async function allocationsOverAWindow(page: Page, cdp: CDPSession, exclud
   });
   await runWindow(page);
   const { profile } = await cdp.send('HeapProfiler.stopSampling');
-  return summarise(profile.head as ProfileNode, exclude);
+  return summarise(profile.head as ProfileNode);
 }
 
 export interface Measured {
@@ -284,9 +259,9 @@ export function conclude(
 ): Measured {
   console.log(probeLine(scene, attempt, windows));
   windows.forEach((w, index) => {
-    if (w.combat > 0 || w.excluded > 0) {
+    if (w.combat > 0) {
       console.log(
-        `heap probe ${scene} attempt ${attempt} window ${index}: counted ${JSON.stringify(w.combatByFunction)} excluded ${JSON.stringify(w.excludedByFunction)} bots ${JSON.stringify(w.botsByFunction)}`,
+        `heap probe ${scene} attempt ${attempt} window ${index}: counted ${JSON.stringify(w.combatByFunction)} bots ${JSON.stringify(w.botsByFunction)}`,
       );
     }
   });
@@ -312,5 +287,4 @@ export function conclude(
 // means a window ran frames through the clock). The log line keeps its four
 // older figures, total, onAnimationFrame, fake requestAnimationFrame and outside
 // the sweep files, and adds the counted combat bytes of the window as a fifth and
-// the bots bytes as a sixth and the excluded bytes (the live scene's `draw`, 0 for the
-// sandbox) as a seventh.
+// the bots bytes as a sixth.

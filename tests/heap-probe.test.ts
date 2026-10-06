@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  LIVE_EXCLUDED,
   allocationsOverAWindow,
   conclude,
   measureWindows,
@@ -36,6 +35,22 @@ describe('summarise', () => {
     expect(result.combat).toBe(308);
     expect(result.combatByFunction).toEqual({ 'main.ts:frameMany': 300, 'hook-text.ts:intText': 8 });
     expect(result.total).toBe(300 + 8 + 5000 + 70 + 900);
+  });
+
+  it('counts the camera module and the entity views draw, the two frame-path sites of the pointer aim and the drawing', () => {
+    const root = node('', '(root)', 0, [
+      node(`${CLIENT}main.ts`, 'sampleAim', 0, [node(`${CLIENT}camera.ts`, 'groundAimFromPointer', 96)]),
+      node(`${CLIENT}camera.ts`, 'refreshCanvasRect', 24),
+      node(`${CLIENT}entity-views.ts`, 'draw', 36),
+      node(`${CLIENT}camera-extra.ts`, 'other', 500),
+    ]);
+    const result = summarise(root);
+    expect(result.combat).toBe(156);
+    expect(result.combatByFunction).toEqual({
+      'camera.ts:groundAimFromPointer': 96,
+      'camera.ts:refreshCanvasRect': 24,
+      'entity-views.ts:draw': 36,
+    });
   });
 
   it('logs the bots bytes as their own figure, keyed by function, and never counts them', () => {
@@ -79,46 +94,13 @@ function window(combat: number): Allocations {
     total: 0,
     outsideSweep: 0,
     combat,
-    excluded: 0,
     bots: 0,
     onAnimationFrame: 0,
     fakeRequestAnimationFrame: 0,
     combatByFunction: {},
-    excludedByFunction: {},
     botsByFunction: {},
   };
 }
-
-describe('summarise with an excluded function', () => {
-  const root = node('', '(root)', 0, [
-    node(`${CLIENT}main.ts`, 'frameMany', 300),
-    node(`${CLIENT}entity-views.ts`, 'draw', 800),
-    node(`${CLIENT}entity-views.ts`, 'acquire', 24),
-  ]);
-
-  it('keeps the excluded bytes out of the counted code and logs them apart', () => {
-    const result = summarise(root, LIVE_EXCLUDED);
-    expect(result.combat).toBe(324);
-    expect(result.combatByFunction).toEqual({ 'main.ts:frameMany': 300, 'entity-views.ts:acquire': 24 });
-    expect(result.excluded).toBe(800);
-    expect(result.excludedByFunction).toEqual({ 'entity-views.ts:draw': 800 });
-  });
-
-  it('counts everything of the pattern when nothing is excluded', () => {
-    const result = summarise(root);
-    expect(result.combat).toBe(1124);
-    expect(result.excluded).toBe(0);
-  });
-});
-
-describe('LIVE_EXCLUDED', () => {
-  it('matches the entity views draw and nothing else, so no other spike site is hidden', () => {
-    expect(LIVE_EXCLUDED.test('entity-views.ts:draw')).toBe(true);
-    for (const key of ['main.ts:draw', 'impact-rings.ts:draw', 'entity-views.ts:find', 'entity-views.ts:drawAll', 'sim/entity-views.ts:draw']) {
-      expect(LIVE_EXCLUDED.test(key), key).toBe(false);
-    }
-  });
-});
 
 describe('pickAsserted', () => {
   it('takes the middle window of an odd count, so one spiked window does not decide', () => {
@@ -133,12 +115,12 @@ describe('pickAsserted', () => {
 });
 
 describe('probeLine', () => {
-  it('names the scene and the attempt and gives seven figures per window, the excluded bytes last', () => {
-    const first = { ...window(336), total: 900_000, outsideSweep: 280_000, bots: 1200, excluded: 456 };
+  it('names the scene and the attempt and gives six figures per window, the bots bytes last', () => {
+    const first = { ...window(336), total: 900_000, outsideSweep: 280_000, bots: 1200 };
     const second = { ...window(408), total: 890_000, onAnimationFrame: 1, fakeRequestAnimationFrame: 2, outsideSweep: 270_000 };
     expect(probeLine('live', 1, [first, second])).toBe(
-      'heap probe live attempt 1: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots/excluded: ' +
-        '900000/0/0/280000/336/1200/456 890000/1/2/270000/408/0/0',
+      'heap probe live attempt 1: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots: ' +
+        '900000/0/0/280000/336/1200 890000/1/2/270000/408/0',
     );
   });
 });
@@ -151,16 +133,17 @@ describe('conclude', () => {
       const windows: Allocations[] = [
         { ...window(300), outsideSweep: 90_000, combatByFunction: { 'main.ts:frameMany': 300 } },
         { ...window(4000), outsideSweep: 85_000, combatByFunction: { 'hud.ts:updateRing': 4000 } },
-        { ...window(0), outsideSweep: 95_000, excluded: 480, excludedByFunction: { 'entity-views.ts:draw': 480 } },
+        { ...window(0), outsideSweep: 95_000 },
       ];
       const measured = conclude('live', 2, windows);
       expect(measured.asserted.combat).toBe(300);
       expect(measured.lowestOutsideSweep).toBe(85_000);
       expect(measured.windows).toHaveLength(3);
       expect(logged[0]).toBe(probeLine('live', 2, windows));
-      expect(logged).toHaveLength(4);
+      // Only a window with counted bytes gets a line of its functions.
+      expect(logged).toHaveLength(3);
       expect(logged[2]).toContain('"hud.ts:updateRing":4000');
-      expect(logged[3]).toContain('excluded {"entity-views.ts:draw":480}');
+      expect(logged[2]).not.toContain('excluded');
     } finally {
       spy.mockRestore();
     }
@@ -185,7 +168,7 @@ describe('measureWindows', () => {
     try {
       const measured = await measureWindows(page as never, cdp as never, 'sandbox', 0, 3);
       expect(calls).toEqual(Array.from({ length: 3 }, () => ['HeapProfiler.startSampling', 'window', 'HeapProfiler.stopSampling']).flat());
-      expect(measured.windows.map((w) => [w.combat, w.excluded])).toEqual([[1060, 0], [1060, 0], [1060, 0]]);
+      expect(measured.windows.map((w) => w.combat)).toEqual([1060, 1060, 1060]);
       expect(measured.asserted.combat).toBe(1060);
     } finally {
       spy.mockRestore();
@@ -194,7 +177,7 @@ describe('measureWindows', () => {
 });
 
 describe('allocationsOverAWindow', () => {
-  it('forwards the exclusion to the summary, so the live path counts the draw bytes apart', async () => {
+  it('counts the entity views draw in the window it runs, on either scene', async () => {
     const draw = node('http://127.0.0.1:5173/packages/client/src/entity-views.ts', 'draw', 700);
     const frameMany = node('http://127.0.0.1:5173/packages/client/src/main.ts', 'frameMany', 360);
     const page = { evaluate: async () => undefined };
@@ -202,9 +185,8 @@ describe('allocationsOverAWindow', () => {
       send: async (method: string) =>
         method === 'HeapProfiler.stopSampling' ? { profile: { head: node('', '(root)', 0, [draw, frameMany]) } } : {},
     };
-    const live = await allocationsOverAWindow(page as never, cdp as never, LIVE_EXCLUDED);
-    expect([live.combat, live.excluded]).toEqual([360, 700]);
-    const sandbox = await allocationsOverAWindow(page as never, cdp as never);
-    expect([sandbox.combat, sandbox.excluded]).toEqual([1060, 0]);
+    const window = await allocationsOverAWindow(page as never, cdp as never);
+    expect(window.combat).toBe(1060);
+    expect(window.combatByFunction).toEqual({ 'entity-views.ts:draw': 700, 'main.ts:frameMany': 360 });
   });
 });

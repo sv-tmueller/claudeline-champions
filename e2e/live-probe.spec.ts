@@ -1,7 +1,6 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import {
   LIVE_ALLOCATION_LIMIT_BYTES,
-  LIVE_EXCLUDED,
   PROBE_VIEWPORT,
   PROFILER_SANITY_BYTES,
   allocationsOverAWindow,
@@ -50,10 +49,6 @@ interface Hooks {
 // the page loads, as match-end.spec.ts does: no frame of the page runs a tick on
 // its own, so the first read is tick 0.
 const PAUSE_AT_MS = 60_000;
-// This scene does not count `entity-views.ts:draw` (LIVE_EXCLUDED in heap-probe.ts, with
-// the figures). The carve-out ends when the client defect
-// https://github.com/sv-tmueller/claudeline-champions/issues/89 is fixed: that fix
-// removes LIVE_EXCLUDED, and the `draw` mutation then fails here too.
 // The warm-up: plain windows, no profiler, until this tick, then on to the start
 // of the next round: round 3, begun by tick 2879 on 8d80073, with rounds 1 and 2 played.
 const WARM_UP_TICKS = 2100;
@@ -157,7 +152,7 @@ function createDriver(page: Page, cdp: CDPSession) {
     /** One window under the profiler, from a read. */
     async measure(hooks: Hooks): Promise<Allocations> {
       await press(hooks);
-      return allocationsOverAWindow(page, cdp, LIVE_EXCLUDED);
+      return allocationsOverAWindow(page, cdp);
     },
   };
 }
