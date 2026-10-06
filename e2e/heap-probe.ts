@@ -49,50 +49,55 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // 300 to 588 B per window (9 to 18 B per frame, one boxed number per frame, whatever
 // its argument: it stayed with the timestamp as an argument, as an integer, in a field
 // of the loop clock and with no argument at all) and counts the bytes of the callees
-// inlined into it. The median of five was at most 528 B over 35 local attempts at
-// limit 1 B (all 35 read, none blind: see testing.md) and at most 504 B over the 24
-// runner attempts of the isolation of #77 (run 37434090996); the limit is about 100 B
-// above the largest. The worst window is not a stable figure: window 0 holds the first
-// frame's acquire of the volley's 8 views and reads 636 to 1068 B counted in every
-// attempt (59 attempts: 24 runner, 35 local; the acquire is 336 to 660 B of it), and a
-// one-off spike lands in one window of some attempts (1224 to 2140 B).
+// inlined into it. On 1670d1b (the pointer aim of #87 and the draw of #89 fixed) the
+// median of five was at most 456 B over 15 local attempts at limit 1 B (5 batches of 3
+// repeats, none blind: see testing.md), and at most 504 B over the 24 runner attempts
+// of the isolation of #77 (run 37434090996, before those fixes); the limit is 136 B above
+// the largest figure, local or runner, and 252 B under the smallest mutation (892 B).
+// The worst window is not a stable figure: window 0 holds the first frame's acquire of
+// the volley's 8 views and reads 744 to 1032 B counted in the 15 local attempts (636 to
+// 1068 B over the 59 earlier ones, 24 runner and 35 local), and a one-off spike lands in
+// one window of some attempts (1224 to 2140 B).
 // Each of these fails the limit alone, as the median of the windows per attempt over 3
-// attempts, on 458f458 plus the line of testing.md: an escaping array in frame (1600 to
-// 1648 B), a template string written to data-p0x on every writeHooks call (3052 to
-// 3128 B), a closure made per call in routeEvents (1956 to 2064 B), an escaping object
-// in the entity views' draw (3052 to 3180 B), a fresh literal from toPlayerInput (2064
-// to 2168 B), a template string per Hud.update call (784 to 1572 B), an escaping array
-// per BotDriver.think call (1408 to 1448 B) and a template string per
-// ResultScreen.update call (968 to 1040 B). The per-change writes of the human's
-// position and facing are the live scene's (see LIVE_ALLOCATION_LIMIT_BYTES): here
-// they read 336 to 432 B and pass. See testing.md.
+// attempts, on 1670d1b plus the line of testing.md: an escaping array in frame (1600 to
+// 1728 B), a template string written to data-p0x on every writeHooks call (2844 to
+// 3068 B), a closure made per call in routeEvents (1884 to 2020 B), an escaping object
+// in the entity views' draw (3024 to 3144 B), a fresh literal from toPlayerInput (2016
+// to 2088 B), a template string per Hud.update call (1612 to 1776 B), an escaping array
+// per BotDriver.think call (1320 to 1996 B) and a template string per
+// ResultScreen.update call (892 to 944 B). The per-change writes of the human's
+// position and facing (336 to 408 B) and the canvas rect asked from the DOM on every
+// sampleAim call (336 to 504 B) are the live scene's (see LIVE_ALLOCATION_LIMIT_BYTES):
+// the sandbox's pointer never moves, so here they pass. See testing.md.
 export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
 // The live match's limit: 780 B, its own literal, on the median of five measured
 // windows. The measured windows hold the first projectiles and hits of round 3, whose
 // event paths (the view acquire, routeEvents, the impact rings) cost 24 to 330 B in a
-// window, so the base is higher than the sandbox's. On 8d80073 (the bots of #86) the
-// median of five was at most 684 B over 21 local attempts (15 at limit 1 B in 5 batches
-// of 3 repeats, 3 in the check run, 3 of the light tester's; none blind; a worst window
-// of 924 B, and 3 spikes in 105 windows: `main.ts:writeCombatHooks` 1944 B and 4148 B,
-// `hud.ts:updateRound` 1944 B), counting every function of the pattern but
-// `entity-views.ts:draw` (LIVE_EXCLUDED below). The three runner attempts of this shape
-// (7b80afd, run 37442967554) read medians of 588, 540 and 660 B, with `draw` at 0 B in
-// two and 228 to 1116 B in the third. The limit is 96 B above the largest clean local
-// median (684 B over 21 attempts), 120 B above the runner's (660 B) and 168 B under the
-// smallest live-gated mutation (948 B, below). A runner live median above 780 B reopens
-// it (about 100 B above the largest clean median, below the smallest
-// live-gated mutation; if none fits, stop and report). Live mutations (3 attempts
-// each, same lines as the sandbox's), medians: 948 to 1028 B for x.toFixed(0) in
-// data-p0x, the smallest live-gated one (168 B over the limit), 1220 to 1276 B for
-// (facing / 1000).toFixed(3) in data-f0, 1412 to 1480 B for the Hud.update template,
-// 1448 to 1552 B for the array in BotDriver.think, 1664 to 1764 B for the array in
-// frame, 1736 to 1996 B for the closure in routeEvents, 2216 to 2260 B for the
-// toPlayerInput literal and 2516 to 2600 B for the p0x template. Two mutations are
-// gated by the sandbox and not by this limit: the escaping object in the entity views'
-// draw (528 to 588 B here, the excluded function; 3052 to 3180 B on the sandbox) and
-// the template per ResultScreen.update call (704 to 896 B here over 12 attempts, 704 B
-// and 752 B passing under 780 B, so it sits at the limit and is not a live gate; 968 to
-// 1040 B against 640 B on the sandbox). See testing.md.
+// window, so the base is higher than the sandbox's, and a moving pointer is present
+// in every window, so `sampleAim` and the camera module are counted. On 1670d1b the
+// median of five was at most 684 B over 15 local attempts at limit 1 B (5 batches of 3
+// repeats; none blind; a worst clean window of 780 B, and 3 spikes in 75 windows:
+// `feedback.ts:hit` 1548 B, `hud.ts:updateRound` 1944 B, `health-bars.ts:update` 1944
+// B), and `main.ts:sampleAim`, `camera.ts:*` and `entity-views.ts:draw` read 0 B in all
+// 75 windows. The earlier shape (8d80073, no pointer, `draw` excluded) read at most 684 B
+// over 21 local attempts and medians of 588, 540 and 660 B on the runner (7b80afd, run
+// 37442967554). The limit is 96 B above the largest clean local median (684 B), 120 B
+// above the largest of those runner medians (660 B) and 228 B under the smallest
+// live-gated mutation (1008 B, below). A runner live median above 780 B reopens it
+// (about 100 B above the largest clean median, below the smallest live-gated mutation;
+// if none fits, stop and report). Live mutations (3 attempts each, same lines as the
+// sandbox's), medians: 1008 to 1176 B for x.toFixed(0) in data-p0x, the smallest
+// live-gated one (228 B over the limit), 1020 to 1148 B for the canvas rect asked from
+// the DOM in every sampleAim call, 1300 to 1388 B for (facing / 1000).toFixed(3) in
+// data-f0, 1352 to 1468 B for the Hud.update template, 1536 to 1568 B for the array in
+// BotDriver.think, 1720 to 1876 B for the array in frame, 1800 to 1988 B for the closure
+// in routeEvents, 2216 to 2320 B for the toPlayerInput literal, 2428 to 2628 B for the
+// p0x template and 3068 to 3348 B for the escaping object in the entity views' draw
+// (which fails on both scenes). One mutation is gated by the sandbox and not by this
+// limit: the template per ResultScreen.update call (836 to 860 B here over 3 attempts,
+// all red, but only 56 B over the limit, and 704 B and 752 B passed under 780 B in
+// the earlier 12, so it is not a live gate; 892 to 944 B against 640 B on the
+// sandbox). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per

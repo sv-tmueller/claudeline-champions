@@ -111,7 +111,7 @@ const WARM_UP_VOLLEYS = 4;
 // of them before the first shot ends (162). The asserted figure is the median of the
 // five (decision 12 of batch #63, from the isolation of #77, see testing.md): window 0
 // holds the first frame's acquire of the volley's eight views and reads 636 to 1068 B
-// counted (59 attempts, runner and local, see COMBAT_ALLOCATION_LIMIT_BYTES), and a
+// counted (74 attempts, runner and local, see COMBAT_ALLOCATION_LIMIT_BYTES), and a
 // one-off spike in another function can land in any window, so the worst window is not
 // a stable figure and the median is.
 const MEASURED_WINDOWS = 5;
@@ -141,7 +141,7 @@ async function fireVolley(page: Page): Promise<void> {
 
 // No retries: the asserted figure is the median of five windows, which a one-off JIT
 // spike in one window does not move (the spikes of the isolation, 5 attempts of 24 on
-// the runner, were each in one window), and a regression of the sizes measured (784 B
+// the runner, were each in one window), and a regression of the sizes measured (892 B
 // and up, see COMBAT_ALLOCATION_LIMIT_BYTES) raises every window. The global retries
 // stay 0 in playwright.config.ts.
 
