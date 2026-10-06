@@ -363,27 +363,26 @@ def check_skin(doc, nodes):
     ):
         return "the skin joints must be node indices"
     names = [nodes[j].get("name") for j in joints]
-    if sorted(names) != sorted(RIG):
+    if sorted(map(str, names)) != sorted(RIG):
         return "the skin joints must be exactly %s, found %s" % (
             ", ".join(RIG),
             ", ".join(str(n) for n in names),
         )
 
+    # Keyed by node index: another node with a joint's name cannot hide its parent.
     parent_of = {}
-    for node in nodes:
+    for index, node in enumerate(nodes):
         children = node.get("children", [])
         if not isinstance(children, list):
             return "a node's children must be a list"
         for child in children:
-            if isinstance(child, int) and 0 <= child < len(nodes):
-                parent_of[nodes[child].get("name")] = node.get("name")
-    for joint, parent in RIG.items():
-        if parent_of.get(joint) != parent:
-            return "joint %s must be a child of %s, found %s" % (
-                joint,
-                parent,
-                parent_of.get(joint),
-            )
+            if isinstance(child, int) and not isinstance(child, bool):
+                parent_of[child] = index
+    for joint_node in joints:
+        joint = nodes[joint_node]["name"]
+        parent = nodes[parent_of[joint_node]].get("name") if joint_node in parent_of else None
+        if parent != RIG[joint]:
+            return "joint %s must be a child of %s, found %s" % (joint, RIG[joint], parent)
 
     matrices = accessor_of(doc, skin.get("inverseBindMatrices"))
     if (
@@ -431,16 +430,22 @@ def check_clip(doc, nodes, joints, animation):
             return "clip %s: channel path %r must be rotation or translation" % (name, path)
         paths.add((nodes[node]["name"], path))
         sampler = channel.get("sampler")
-        if not isinstance(sampler, int) or isinstance(sampler, bool) or not 0 <= sampler < len(samplers):
+        if (
+            not isinstance(sampler, int)
+            or isinstance(sampler, bool)
+            or not 0 <= sampler < len(samplers)
+        ):
             return "clip %s: a channel's sampler index is out of range" % name
     for joint in RIG:
         if (joint, "rotation") not in paths:
             return "clip %s: joint %s has no rotation channel" % (name, joint)
     if ("Hips", "translation") not in paths:
         return "clip %s: Hips has no translation channel" % name
-    inputs = {s.get("input") for s in samplers if isinstance(s, dict)}
+    inputs = {
+        s["input"] for s in samplers if isinstance(s, dict) and isinstance(s.get("input"), int)
+    }
     if len(inputs) > 1:
-        return "clip %s: every sampler must share one input accessor, so every channel has the same key times" % name
+        return "clip %s: every sampler must share one input accessor (the same key times)" % name
     for sampler in samplers:
         if not isinstance(sampler, dict) or sampler.get("interpolation") != "LINEAR":
             return "clip %s: every sampler must be LINEAR" % name

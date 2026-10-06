@@ -429,6 +429,17 @@ class RigRuleTests(ValidatorCase):
 
         self.rejects(mutate, "Arm_L")
 
+    def test_a_node_with_a_joint_name_cannot_hide_a_wrong_parent(self):
+        def mutate(d):
+            arm = joint_index(d, "Arm_L")
+            node_named(d, "Spine")["children"].remove(arm)
+            node_named(d, "Hips")["children"].append(arm)
+            # A decoy that is not a joint, with the joint's name, under the right parent.
+            d["nodes"].append({"name": "Arm_L"})
+            node_named(d, "Spine")["children"].append(len(d["nodes"]) - 1)
+
+        self.rejects(mutate, "Arm_L")
+
     def test_rejects_hips_that_is_not_under_rig(self):
         def mutate(d):
             node_named(d, "Rig")["children"].remove(joint_index(d, "Hips"))
@@ -561,6 +572,10 @@ class RigRuleTests(ValidatorCase):
             "no accessors": lambda d: d.pop("accessors"),
             "animation is not an object": lambda d: d["animations"].__setitem__(0, 7),
             "no meshes": lambda d: d.pop("meshes"),
+            "a joint node without a name": lambda d: node_named(d, "Spine").pop("name"),
+            "a sampler input that is a list": lambda d: d["animations"][0]["samplers"][0].update(
+                input=[4]
+            ),
         }.items():
             doc = rigged_champion_doc()
             mutate(doc)
