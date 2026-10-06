@@ -42,7 +42,7 @@ export function steerTowardInto(
   const dy = target.y - position.y;
   distanceInto(measure, target, position);
   const distance = measure.metres;
-  // `distance - distance === 0` is Number.isFinite without its call, which Maglev boxes (bot.ts).
+  // `distance - distance === 0` is Number.isFinite without its call, which Maglev boxed (bot.ts:aim).
   if (!(distance - distance === 0) || distance <= arrivalRadius) {
     out.moveX = 0;
     out.moveY = 0;

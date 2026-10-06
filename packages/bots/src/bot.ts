@@ -229,9 +229,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   let advanceTargetId = -1;
   let grid: NavGrid | undefined;
   let gridArena: GameState['arena'] | undefined;
-  // The aim error of the last draw, in a field: V8's Maglev tier boxes (16 B) every number it
-  // writes to a variable of this closure.
-  const aimError = { u: 0.5 };
+  // The aim error of the last draw, in a field: V8's Maglev tier boxed (16 B) every number
+  // written to a variable of this closure, in the engines measured (see aim below).
+  const aimError = { aimU: 0.5 };
   let aimAge = 0;
   // Per slot (in SLOTS order), the consecutive thinks the acted target was in sight and in reach
   // of the ability the slot would cast. Allocated once; see casting.ts.
@@ -380,8 +380,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
    * turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the
    * same operations in the same order (the tests compare the two bit for bit): a call with a
    * double argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite
-   * tests are `x - x === 0`, true for a finite x only: Maglev calls `Number.isFinite` with its
-   * argument boxed, one allocation a think.
+   * tests are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8
+   * 14.6 (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation
+   * a think. No committed test checks that again (see bots.md, Allocation, In the browser).
    */
   function aim(
     me: ChampionState,
@@ -389,8 +390,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     kit: KitDef | undefined,
     pressed: boolean,
   ): void {
-    if (aimAge === 0) aimError.u = (2 * rng.next() - 1) * tier.maxU;
-    const u = aimError.u;
+    if (aimAge === 0) aimError.aimU = (2 * rng.next() - 1) * tier.maxU;
+    const u = aimError.aimU;
     aimAge = (aimAge + 1) % AIM_ERROR_HOLD;
 
     // The speed the aim leads with: the first projectile of the ability winding up, or else of

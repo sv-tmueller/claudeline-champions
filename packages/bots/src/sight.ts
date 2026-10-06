@@ -291,9 +291,8 @@ export function nearestSightCellIn(
       const distance = (cx - p.x) * (cx - p.x) + (cy - p.y) * (cy - p.y);
       // Strict, and the scan runs in index order, so a tie keeps the lower index.
       if (distance >= bestDistance) continue;
-      // The clear shot sweep runs last: it is the costly filter.
-      scratch.from.x = cx;
-      scratch.from.y = cy;
+      // The clear shot sweep runs last: it is the costly filter. `scratch.from` holds the cell
+      // centre, written above for the distance.
       scratch.clearance = scratch.standClearance;
       if (!clearShotWith(state, scratch.from, target, scratch)) continue;
       best = index;
