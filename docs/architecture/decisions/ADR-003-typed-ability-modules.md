@@ -18,11 +18,17 @@ DSL to maintain for a single authoring team.
 
 ## Consequences
 
-- The type checker validates every ability.
+- The type checker validates every ability. Superseded 2026-10-05 by the last
+  bullet ([batch #53 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996621415)): the
+  type checker checks the contract and the code; `validateKit` and the roster
+  tests check the data.
 - Kits may only use the toolkit primitives. New primitives are added to the
   toolkit through the design doc first, then the sim. See
   [simulation](../simulation.md).
-- There is no interpreter or ability file format to maintain.
+- There is no interpreter or ability file format to maintain. Superseded
+  2026-10-05 by the last bullet ([batch #53 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996621415)):
+  kit data has a file format (`data/kits/<id>.json`), but there is still no
+  ability language or interpreter.
 - Kits are typed plain data (`KitDef` in `kit.ts`), stored in the state and run by a
   `switch` over a closed effect union in `cast.ts` (batch #32 decision 4, #43). The
   union is the toolkit, not an ability language: it has no expressions, references,
