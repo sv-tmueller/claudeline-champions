@@ -6,7 +6,7 @@ import { orFail, watchProblems } from './support';
 // with an ally Quillon more and an enemy Quillon more, five bots. The clock is paused and the
 // test runs it in window-sized steps at the probe viewport, reading the hooks
 // between steps only, so a slow machine changes the time the test takes and
-// never what it sees. Every bots change moves the ticks of the round, so every
+// never what it sees. Any bots change can move the ticks of the round, so every
 // wait here is a tick budget and no assertion names an exact tick.
 interface Hooks {
   tick: number;
