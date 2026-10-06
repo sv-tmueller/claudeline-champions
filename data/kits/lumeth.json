@@ -1,0 +1,171 @@
+{
+  "id": "lumeth",
+  "maxHealth": 120,
+  "moveSpeed": 5.5,
+  "support": true,
+  "ex": ["M2", "R"],
+  "slots": {
+    "M1": {
+      "cooldownTicks": 36,
+      "windupTicks": 6,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 20,
+          "radius": 0.35,
+          "lifetimeTicks": 36,
+          "pierce": false,
+          "effects": [{ "type": "damage", "amount": 10 }],
+          "allyEffects": [{ "type": "heal", "amount": 10 }]
+        }
+      ]
+    },
+    "M2": {
+      "cooldownTicks": 300,
+      "windupTicks": 18,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 16,
+          "radius": 0.5,
+          "lifetimeTicks": 38,
+          "pierce": false,
+          "effects": [],
+          "allyEffects": [
+            { "type": "heal", "amount": 14 },
+            { "type": "applyStatus", "status": { "type": "hot", "perPulse": 2, "ticks": 180 } }
+          ]
+        }
+      ],
+      "ex": {
+        "windupTicks": 18,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "projectile",
+            "speed": 16,
+            "radius": 0.5,
+            "lifetimeTicks": 38,
+            "pierce": false,
+            "effects": [],
+            "allyEffects": [
+              { "type": "heal", "amount": 22 },
+              { "type": "applyStatus", "status": { "type": "hot", "perPulse": 3, "ticks": 240 } }
+            ]
+          }
+        ]
+      }
+    },
+    "SPACE": {
+      "cooldownTicks": 480,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "dash", "distance": 4, "ticks": 12, "then": [] },
+        { "type": "applyStatus", "status": { "type": "haste", "percent": 30, "ticks": 60 } }
+      ]
+    },
+    "Q": {
+      "cooldownTicks": 780,
+      "windupTicks": 30,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "aim", "range": 9 },
+          "radius": 1.5,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 8 },
+            { "type": "applyStatus", "status": { "type": "root", "ticks": 90 } }
+          ]
+        }
+      ]
+    },
+    "E": {
+      "cooldownTicks": 540,
+      "windupTicks": 12,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 3,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 12 },
+            { "type": "knockback", "distance": 2, "ticks": 8, "direction": "away" }
+          ]
+        }
+      ]
+    },
+    "R": {
+      "cooldownTicks": 720,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 5,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "allies",
+          "effects": [{ "type": "shield", "absorb": 30, "ticks": 240 }]
+        }
+      ],
+      "ex": {
+        "windupTicks": 0,
+        "movement": "free",
+        "effects": [
+          {
+            "type": "area",
+            "placement": { "type": "self" },
+            "radius": 5,
+            "durationTicks": 1,
+            "intervalTicks": 1,
+            "targets": "allies",
+            "effects": [
+              { "type": "shield", "absorb": 45, "ticks": 300 },
+              { "type": "applyStatus", "status": { "type": "haste", "percent": 20, "ticks": 120 } }
+            ]
+          }
+        ]
+      }
+    },
+    "F": {
+      "cooldownTicks": 600,
+      "windupTicks": 36,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 5,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "allies",
+          "effects": [
+            { "type": "heal", "amount": 30 },
+            { "type": "applyStatus", "status": { "type": "hot", "perPulse": 5, "ticks": 180 } }
+          ]
+        },
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 5,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [{ "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 120 } }]
+        }
+      ]
+    }
+  }
+}

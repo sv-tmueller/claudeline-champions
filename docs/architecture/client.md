@@ -80,12 +80,20 @@ later platform layer can pass its own arguments instead.
 
 - `?champion=<id>`: the champion the human plays. It must be an id with a loaded
   kit; anything else reads as the first kit in roster order (Hargrim).
-- `?difficulty=easy|normal|hard`: the tier of all three bots. Anything else
+- `?difficulty=easy|normal|hard`: the tier of every bot. Anything else
   reads as normal.
 - `?arena=<id>`: the arena of the match, an id with a loaded definition (arena01
   and arena02); anything else reads as arena01, or as the first loaded id when
   arena01 is missing. The sandbox ignores it and always plays arena01, since the
   walk spec and the heap probe stand on its coordinates.
+- `?teamsize=2|3`: the team size of the match, 2v2 or 3v3. Only the exact
+  string `3` reads as 3; anything else (empty, `4`, `3v3`, `03`) reads as 2,
+  and so does the sandbox, whose roster is four champions. The address asks and
+  the arena decides: `playableTeamSize(asked, arena)` in `match-setup.ts` gives
+  3 only when both teams of the arena list three spawns, and 2 otherwise, so an
+  arena file with two spawns a team (legal, arenas.md section 3) plays 2v2 and
+  the sim's missing spawn error never reaches the page. Both shipped arenas
+  have three.
 - `?scene=sandbox`: the dev-only scene of the heap probe and the walk spec,
   honoured only when `import.meta.env.DEV` is true. A production build has one
   scene. The sandbox roster and its read of the address are still in the
@@ -107,10 +115,10 @@ sorted by id, and `arenaById` in `arenas.ts` hands the chosen one to
 `createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the id, so
 `arena02.glb` loads with no change in `models.ts`. Of the pure modules, `launch`
 takes the kit ids and the arena ids, `match-setup` takes the kit list and the
-arena, and `result-dom` and `menu-dom` take ids and `{ id, name }` pairs (`bot-driver`,
-`models` and `roster` take none of them), so the unit tests load the files
-statically instead: `tsconfig.tools.json` has `types: ["node"]` and rejects
-`import.meta.glob`.
+arena, and `result-dom` and `menu-dom` take ids and `{ id, name, spawns }`
+records (`bot-driver`, `models` and `roster` take none of them), so the unit
+tests load the files statically instead: `tsconfig.tools.json` has `types:
+["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
 sim's constant, 3):
@@ -118,16 +126,22 @@ sim's constant, 3):
 - Champion 0 is the human, the local pick, on team A. It stays champion 0, so
   the first team A spawn, (-12, 2) on arena01 and (-11, 2) on arena02, and the
   e2e coordinates hold.
-- Champion 1 is the ally bot, the other of Quillon and Hargrim (Quillon, or
-  Hargrim when the pick is Quillon).
-- Champions 2 and 3 are the enemy bots, Hargrim and Quillon, on team B.
-- All four have kits. The local team is always A, so the score reads local
-  against enemy.
+- Team B is one row of `ENEMY_ROSTER` by team size: Hargrim and Quillon in a
+  2v2, Hargrim and two Quillons in a 3v3. Team A is the pick plus that row
+  without the pick's own entry, or without its first entry when the pick is not
+  in the row. So the 2v2 ally is the other of Quillon and Hargrim (Quillon for
+  Hargrim, Skerrow and Lumeth, Hargrim for Quillon), and in a 3v3 the Hargrim
+  pick has two Quillon allies, which is the bots package's headless `config3v3`
+  (`packages/bots/test/headless-kits.test.ts`, mirrored as a literal in
+  `match-setup.test.ts`, since the client cannot import a bots test).
+- Every champion has a kit. The bots are champions 1 to 2n-1 for n a side:
+  three in a 2v2 and five in a 3v3. The local team is always A, so the score
+  reads local against enemy.
 - The sandbox is the old roster (Hargrim and Quillon against Lumeth and Skerrow)
   with match flow and exactly the Hargrim and Quillon kits, named in the code, so
   a later kit file never changes it. Champions 0 to 2 stand and champion 3 is a
   bot without a kit, which deals no damage. It is the heap probe's steady-state
-  scene, since a match of three bots is never in one (see the frame path below);
+  scene, since a match of bots is never in one (see the frame path below);
   the live match is the probe's second scene.
 
 The bots run in the main thread, through `bot-driver.ts`. `createBotDriver(ids,
@@ -175,17 +189,18 @@ sim steps first and the views read its state afterwards.
 - Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's position
   in centimetres), `data-f0` (its facing in radians, three decimals),
   `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
-  `data-rings`, `data-bar0` to `data-bar3` (a champion's fill percent, "x" for a
-  hidden bar), `data-overlay`, `data-debugShots`, `data-phase` (the sim's phase
-  string: warmup, round, roundEnd or matchEnd), `data-round` and the readiness
-  flags `data-rendered` and `data-arena`. The e2e specs read them and pace
-  themselves by `data-tick`. A per-tick hook is written only when its value
-  changes, with `setAttribute` and text from the tables of `hook-text.ts`
-  (integers, signed centimetres, facing in milliradians, percents) and
-  `flashTexts` in `feedback.ts`, all made once at startup, so a change write
-  builds no string. A table falls back to the formatter past its range. A position
-  is two hooks and a bar is one hook per champion because a combined "x,y" or
-  "a,b,c,d" text cannot come from a table.
+  `data-rings`, `data-bar0` to `data-bar3`, or to `data-bar5` in a 3v3 (a
+  champion's fill percent, "x" for a hidden bar), `data-overlay`,
+  `data-debugShots`, `data-phase` (the sim's phase string: warmup, round,
+  roundEnd or matchEnd), `data-round` and the readiness flags `data-rendered`
+  and `data-arena`. The e2e specs read them and pace themselves by `data-tick`.
+  A per-tick hook is written only when its value changes, with `setAttribute`
+  and text from the tables of `hook-text.ts` (integers, signed centimetres,
+  facing in milliradians, percents) and `flashTexts` in `feedback.ts`, all made
+  once at startup, so a change write builds no string. A table falls back to
+  the formatter past its range. A position is two hooks and a bar is one hook
+  per champion because a combined "x,y" or "a,b,c,d" text cannot come from a
+  table.
 
 The frame path allocates nothing in steady state: views are pooled, text comes
 from tables and is written only on a change, and the numbers a frame carries
@@ -274,25 +289,37 @@ reached `roundsToWin`) and the final score, local first, written once. The panel
 holds the select, built by `buildSelect` in `result-dom.ts`, which the menu
 builds again for its own select view. The champion row has one entry per roster id
 in roster order. An id with a loaded kit is a link to
-`?champion=<id>&difficulty=<current>&arena=<current>` (`data-available="true"`);
+`?champion=<id>&difficulty=<current>&arena=<current>&teamsize=<asked>`
+(`data-available="true"`);
 following it reloads the page, so the kill feed, the views and the bots start
 fresh and the tick never goes back to 0 within a page. A roster champion without
 a kit file is greyed (`data-available="false"`) until its file exists. The arena
 row has one link per loaded arena in id order, labelled with `ArenaDef.name`, to
-`?champion=<current>&difficulty=<current>&arena=<id>` (`data-arena-id`), and the
-arena being played carries `data-current="true"`. There is no pre-match screen. Only
-the visible panel takes pointer events; the HUD takes none.
+`?champion=<current>&difficulty=<current>&arena=<id>&teamsize=<asked>`
+(`data-arena-id`), and the arena being played carries `data-current="true"`.
+The team row (`data-part="team-select"`, label "Teams") has a 2v2 and a 3v3
+entry (`data-team-size`, from `teamEntries`) linking to the same address with
+their own size, and the size being played carries `data-current="true"`. Every
+link writes `teamsize`, 2 included, so the address stays the whole setup; the
+champion and arena links keep the size the address asked for, which on an arena
+that cannot play 3v3 is not the size played. That arena's 3v3 entry is greyed
+(`data-available="false"`, no link, as for a champion without a kit) and 2v2 is
+the current one. There is no pre-match screen. Only the visible panel takes
+pointer events; the HUD takes none.
 
 `e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
-`/?timescale=100` (see Launch and match), once per arena (arena02 on
-`/?arena=arena02&timescale=100`), with the human idle: a 16 ms frame runs 96 ticks,
-so a match of 3000 to 5000 ticks is some 30 to 55 frames at 5 frames a read, where
-without the scale it would be thousands of frames. It reads the panel hidden until
-`data-phase` is `matchEnd`, then the title, the score (equal to the HUD's), the
-select, takes `result.png` and follows the Quillon link, which keeps the arena. The
-headless integration tests (`match-setup.test.ts`: one round to win and three on
-arena01, three on arena02) give the tick budget of each arena, and the result
-screen's unit tests the Victory and Defeat cases that the idle human cannot reach.
+`/?timescale=100` (see Launch and match), once per arena and team size (arena02
+on `/?arena=arena02&timescale=100`, a 3v3 with `teamsize=3` in the address),
+with the human idle: a 16 ms frame runs 96 ticks, so a match of 3000 to 11 000
+ticks is some 30 to 115 frames at 5 frames a read, where without the scale it
+would be thousands of frames. It reads the panel hidden until `data-phase` is
+`matchEnd`, then the title, the score (equal to the HUD's), the select, takes
+`result.png` and follows the Quillon link, which keeps the arena and the team
+size (a 3v3 has `data-bar5` after the reload). The headless integration tests
+(`match-setup.test.ts`: one round to win and three on arena01, three on
+arena02, and a 3v3 on each) give the tick budget of each row, and the result
+screen's unit tests the Victory and Defeat cases that the idle human cannot
+reach.
 
 `Hud.update` runs once per stepping frame, after all of that frame's sim steps.
 It compares integers and booleans held in cache fields with the new values and
@@ -346,10 +373,12 @@ the key of a capture) and a plain DOM click on each button.
   `draw` and the hook writers as they are: nothing in the menu runs per frame, and
   its DOM is written only on events. The heap probes never open it.
 - **Resume** is Escape again or the button. **Restart** is `location.reload()`: the
-  address is the setup (champion, difficulty, arena and the dev time scale), and the
-  tick still never goes back to 0 within a page. **Back to select** shows the
-  menu's own select view, the champion and arena links of the result panel built by
-  `buildSelect`, with the match still paused; a pick follows a link and reloads.
+  address is the setup (champion, difficulty, arena, team size and the dev time
+  scale), and the tick still never goes back to 0 within a page. **Back to
+  select** (the button reads "Champion, arena and teams") shows the menu's own
+  select view, the champion, arena and team links of the result panel built by
+  `buildSelect`, with the match still paused; a pick follows a link and
+  reloads.
 - **Views.** The panel carries `data-visible` and `data-view` (`main`, `select` or
   `keys`), the sections are `data-section`, and the buttons carry `data-action`
   (`resume`, `restart`, `select`, `keys`, `back`, `reset`). The panel always opens

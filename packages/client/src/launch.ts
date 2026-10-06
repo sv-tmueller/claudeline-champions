@@ -8,7 +8,7 @@ export type SceneName = 'match' | 'sandbox';
 
 /** What the page address asks for. */
 export interface Launch {
-  /** `match` is the 2v2 against bots. `sandbox` is the dev-only scene of the e2e specs. */
+  /** `match` is the 2v2 or 3v3 against bots. `sandbox` is the dev-only scene of the e2e specs. */
   scene: SceneName;
   /** The champion the human plays: an id with a loaded kit. */
   champion: string;
@@ -16,6 +16,8 @@ export interface Launch {
   difficulty: Difficulty;
   /** The arena of the match: an id with a loaded definition. The sandbox always plays arena01. */
   arena: string;
+  /** The team size the address asks for. The sandbox always asks 2; an arena may still play 2v2 (`playableTeamSize`). */
+  teamSize: 2 | 3;
 }
 
 /** The arena the page plays when the address names none that exists. */
@@ -31,6 +33,8 @@ const DEFAULT_ARENA = 'arena01';
  * sandbox ignores it. The arena is the id the query names if it is loaded,
  * else arena01, else the first loaded id; the sandbox ignores it too, since
  * the walk spec and the heap probe stand on the coordinates of arena01.
+ * The team size is 3 only for the exact string "3", else 2, and the sandbox
+ * (a four-champion roster) reads 2.
  */
 export function parseLaunch(
   search: string,
@@ -47,5 +51,6 @@ export function parseLaunch(
   const fallbackArena = arenaIds.includes(DEFAULT_ARENA) ? DEFAULT_ARENA : (arenaIds[0] ?? DEFAULT_ARENA);
   const askedArena = params.get('arena') ?? '';
   const arena = !sandbox && arenaIds.includes(askedArena) ? askedArena : fallbackArena;
-  return { scene: sandbox ? 'sandbox' : 'match', champion, difficulty, arena };
+  const teamSize = !sandbox && params.get('teamsize') === '3' ? 3 : 2;
+  return { scene: sandbox ? 'sandbox' : 'match', champion, difficulty, arena, teamSize };
 }

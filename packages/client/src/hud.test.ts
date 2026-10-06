@@ -25,18 +25,31 @@ interface Rig {
   };
 }
 
-function rig(): Rig {
+function rig(threeVThree = false): Rig {
   const state = createMatch(
-    {
-      teamSize: 2,
-      players: [
-        { championId: 'hargrim', team: 'A' },
-        { championId: 'quillon', team: 'A' },
-        { championId: 'lumeth', team: 'B' },
-        { championId: 'skerrow', team: 'B' },
-      ],
-      roundsToWin: 3,
-    },
+    threeVThree
+      ? {
+          teamSize: 3,
+          players: [
+            { championId: 'hargrim', team: 'A' },
+            { championId: 'quillon', team: 'A' },
+            { championId: 'quillon', team: 'A' },
+            { championId: 'hargrim', team: 'B' },
+            { championId: 'quillon', team: 'B' },
+            { championId: 'quillon', team: 'B' },
+          ],
+          roundsToWin: 3,
+        }
+      : {
+          teamSize: 2,
+          players: [
+            { championId: 'hargrim', team: 'A' },
+            { championId: 'quillon', team: 'A' },
+            { championId: 'lumeth', team: 'B' },
+            { championId: 'skerrow', team: 'B' },
+          ],
+          roundsToWin: 3,
+        },
     parseArenaDef(arena01Json),
     1,
     TEST_KITS,
@@ -518,5 +531,34 @@ describe('HUD kill feed', () => {
     hud.update(state);
     expect(elements.lines[0]?.killer.log).toEqual(['text=Ring', 'data-team=ring']);
     expect(elements.lines[0]?.victim.log).toEqual(['text=Quillon', 'data-team=ally']);
+  });
+});
+
+describe('HUD kill feed of a 3v3', () => {
+  it('names all six champions with their sides', () => {
+    const { hud, state, feed, elements } = rig(true);
+    state.tick = 100;
+    // Ids 0 to 2 are allies of the human, 3 to 5 enemies. The five lines cover ids 0 to 4.
+    feed.push(100, 3, 0);
+    feed.push(100, 4, 1);
+    feed.push(100, 5, 2);
+    feed.push(100, 0, 3);
+    feed.push(100, 1, 4);
+    hud.update(state);
+    const names = (): unknown[] =>
+      elements.lines.map((line) => [line.killer.log.slice(-2), line.victim.log.slice(-2)]);
+    expect(names()).toEqual([
+      [['text=Hargrim', 'data-team=enemy'], ['text=Hargrim', 'data-team=ally']],
+      [['text=Quillon', 'data-team=enemy'], ['text=Quillon', 'data-team=ally']],
+      [['text=Quillon', 'data-team=enemy'], ['text=Quillon', 'data-team=ally']],
+      [['text=Hargrim', 'data-team=ally'], ['text=Hargrim', 'data-team=enemy']],
+      [['text=Quillon', 'data-team=ally'], ['text=Quillon', 'data-team=enemy']],
+    ]);
+    // A sixth death pushes the oldest out and names the last two ids, 2 as killer and 5 as victim.
+    feed.push(100, 2, 5);
+    hud.update(state);
+    expect(elements.lines[4]?.killer.log.slice(-2)).toEqual(['text=Quillon', 'data-team=ally']);
+    expect(elements.lines[4]?.victim.log.slice(-2)).toEqual(['text=Quillon', 'data-team=enemy']);
+    expect(elements.lines[0]?.killer.log.slice(-2)).toEqual(['text=Quillon', 'data-team=enemy']);
   });
 });

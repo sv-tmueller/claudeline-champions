@@ -12,6 +12,7 @@ describe('parseLaunch', () => {
       champion: 'hargrim',
       difficulty: 'normal',
       arena: 'arena01',
+      teamSize: 2,
     });
   });
 
@@ -89,7 +90,35 @@ describe('parseLaunch: the arena', () => {
       champion: 'quillon',
       difficulty: 'hard',
       arena: 'arena02',
+      teamSize: 2,
     });
+  });
+});
+
+describe('parseLaunch: the team size', () => {
+  it('reads ?teamsize=3 as 3 and ?teamsize=2 as 2', () => {
+    expect(parseLaunch('?teamsize=3', KITS, ARENAS, false).teamSize).toBe(3);
+    expect(parseLaunch('?teamsize=2', KITS, ARENAS, false).teamSize).toBe(2);
+  });
+
+  it('reads any other value as 2', () => {
+    for (const bad of ['', '4', '1', '0', '3v3', '03', '3.0', ' 3', 'constructor', '__proto__']) {
+      expect(parseLaunch(`?teamsize=${bad}`, KITS, ARENAS, false).teamSize, bad).toBe(2);
+    }
+  });
+
+  it('keeps the team size next to the other parameters', () => {
+    expect(parseLaunch('?champion=quillon&difficulty=hard&arena=arena02&teamsize=3', KITS, ARENAS, false)).toEqual({
+      scene: 'match',
+      champion: 'quillon',
+      difficulty: 'hard',
+      arena: 'arena02',
+      teamSize: 3,
+    });
+  });
+
+  it('reads 2 in the sandbox whatever the address asks, because its roster is four champions', () => {
+    expect(parseLaunch('?scene=sandbox&teamsize=3', KITS, ARENAS, true).teamSize).toBe(2);
   });
 });
 

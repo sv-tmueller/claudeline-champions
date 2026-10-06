@@ -30,6 +30,24 @@ const SANDBOX_PLAYERS: readonly PlayerConfig[] = [
 const SANDBOX_KIT_IDS = ['hargrim', 'quillon'];
 const SANDBOX_BOT_IDS: readonly number[] = [3];
 
+// Team B of each size, in champion order. Team A is team B with the pick in place of its
+// own entry, or of the first entry when the pick is not in the row. The 3v3 of the Hargrim
+// pick is the headless 3v3 of the bots package (hargrim and two quillons a side). The pick
+// stays champion 0, first on team A.
+const ENEMY_ROSTER: Readonly<Record<2 | 3, readonly string[]>> = {
+  2: ['hargrim', 'quillon'],
+  3: ['hargrim', 'quillon', 'quillon'],
+};
+
+/**
+ * The team size the match plays: the asked 3 only on an arena with three spawns on both
+ * teams, else 2. The sim throws when a spawn is missing, so an arena file with two spawns a
+ * team (legal for an arena, arenas.md section 3) plays 2v2 and never reaches the throw.
+ */
+export function playableTeamSize(asked: 2 | 3, arena: Pick<ArenaDef, 'spawns'>): 2 | 3 {
+  return asked === 3 && arena.spawns.teamA.length >= 3 && arena.spawns.teamB.length >= 3 ? 3 : 2;
+}
+
 function kitById(kits: readonly KitDef[], id: string): KitDef {
   const kit = kits.find((candidate) => candidate.id === id);
   if (!kit) throw new Error(`the sandbox needs the kit "${id}", which is not loaded`);
@@ -37,10 +55,10 @@ function kitById(kits: readonly KitDef[], id: string): KitDef {
 }
 
 /**
- * The match the page starts. Champion 0 is the pick of the launch on team A,
- * champion 1 is its ally bot (the other of Hargrim and Quillon) and champions 2 and
- * 3 are the enemy bots, Hargrim and Quillon. The local team is always A. All
- * four need a kit. The scene `sandbox` is the dev-only scene of the heap probe
+ * The match the page starts, 2v2 or 3v3 (`playableTeamSize`). Champion 0 is the pick
+ * of the launch on team A, the next champions of team A are its ally bots and the
+ * champions of team B are the enemy bots, by `ENEMY_ROSTER`. The local team is always
+ * A. Every champion needs a kit. The scene `sandbox` is the dev-only scene of the heap probe
  * and the walk spec: the old four-champion roster with the two kits and one bot.
  * Both run the match flow, `roundsToWin` rounds to win.
  */
@@ -55,13 +73,15 @@ export function createLocalMatch(
     const state = createMatch({ teamSize: 2, players: [...SANDBOX_PLAYERS], roundsToWin }, arena, LOCAL_SEED, sandboxKits);
     return { state, botIds: SANDBOX_BOT_IDS };
   }
-  const ally = launch.champion === 'quillon' ? 'hargrim' : 'quillon';
+  const teamSize = playableTeamSize(launch.teamSize, arena);
+  const enemies = ENEMY_ROSTER[teamSize];
+  const own = enemies.indexOf(launch.champion);
+  const allies = enemies.filter((_, index) => index !== (own < 0 ? 0 : own));
   const players: PlayerConfig[] = [
     { championId: launch.champion, team: 'A' },
-    { championId: ally, team: 'A' },
-    { championId: 'hargrim', team: 'B' },
-    { championId: 'quillon', team: 'B' },
+    ...allies.map((championId): PlayerConfig => ({ championId, team: 'A' })),
+    ...enemies.map((championId): PlayerConfig => ({ championId, team: 'B' })),
   ];
-  const state = createMatch({ teamSize: 2, players, roundsToWin }, arena, LOCAL_SEED, kits);
-  return { state, botIds: [1, 2, 3] };
+  const state = createMatch({ teamSize, players, roundsToWin }, arena, LOCAL_SEED, kits);
+  return { state, botIds: Array.from({ length: 2 * teamSize - 1 }, (_, index) => index + 1) };
 }
