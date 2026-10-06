@@ -99,13 +99,16 @@ def triangle_count(doc):
     return total
 
 
-def material_name(doc, primitive):
-    """The material's name, or None when the primitive has no valid material."""
+def material_index_in_range(doc, primitive):
     index = primitive.get("material")
-    materials = doc.get("materials", [])
-    if not isinstance(index, int) or not 0 <= index < len(materials):
+    return isinstance(index, int) and 0 <= index < len(doc.get("materials", []))
+
+
+def material_name(doc, primitive):
+    """The material's name, or None when the material or its name is missing."""
+    if not material_index_in_range(doc, primitive):
         return None
-    return materials[index].get("name")
+    return doc["materials"][primitive["material"]].get("name")
 
 
 def srgb8(linear):
@@ -160,11 +163,14 @@ def contract_problems(doc, bin_chunk):
 
     ys, radii, accent_xs = [], [], []
     for primitive in primitives(doc):
+        name = material_name(doc, primitive)
         if "material" not in primitive:
             problems.append("a primitive has no material")
-        elif material_name(doc, primitive) is None:
+        elif not material_index_in_range(doc, primitive):
             problems.append("a primitive's material index out of range")
-        is_accent = material_name(doc, primitive) == "accent"
+        elif not isinstance(name, str):
+            problems.append("a primitive's material has no name")
+        is_accent = name == "accent"
         for x, y, z in positions(doc, bin_chunk, primitive):
             ys.append(y)
             radii.append(math.sqrt(x * x + z * z))
@@ -282,6 +288,13 @@ class ContractCheckTests(unittest.TestCase):
     def test_rejects_a_dangling_material_index(self):
         primitives(self.doc)[0]["material"] = 7
         self.assertProblem("material index out of range")
+
+    def test_names_a_material_without_a_name_as_unnamed_not_out_of_range(self):
+        accent = next(m for m in self.doc["materials"] if m["name"] == "accent")
+        del accent["name"]
+        problems = contract_problems(self.doc, self.bin)
+        self.assertTrue(any("material has no name" in q for q in problems), problems)
+        self.assertFalse(any("index out of range" in q for q in problems), problems)
 
     def test_rejects_a_primitive_without_a_material(self):
         del primitives(self.doc)[0]["material"]

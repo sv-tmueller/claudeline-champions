@@ -1,13 +1,15 @@
 // Oracles for match flow, for the rounds fixture: a check of the match state alone and a watcher
 // that compares each step with the state before it. They deliberately do not import
 // `src/flow.ts` or the match constants: every number is written out again here (180 ticks of
-// warmup and pause, a 5400 tick round, a 1800 tick shrink, 18 m to 3 m), so a rule that drifts in
-// the source cannot also drift in its own oracle.
+// warmup, 180 of pause, a 5400 tick round, a 1800 tick shrink, the 10 / 60 ring charge), so a rule
+// that drifts in the source cannot also drift in its own oracle. The ring radii are the exception:
+// they come from `state.arena`.
 import { checksum } from '../src/index';
 import type { ChampionState, GameState, MatchState, SimEvent } from '../src/index';
 import { checkAbilityInvariants, checkInvariants, checkStatusInvariants, findNegativeZero } from './helpers';
 
 const PHASES = ['warmup', 'round', 'roundEnd', 'matchEnd'];
+const WARMUP = 180;
 const PAUSE = 180;
 const ROUND = 5400;
 const SHRINK = 1800;
@@ -50,7 +52,7 @@ export function checkMatchInvariants(state: GameState): string[] {
 
   if (m.phase === 'warmup') {
     if (m.round !== 0) bad(`round ${m.round} in warmup`);
-    if (m.phaseTicks > PAUSE - 1) bad(`warmup phaseTicks ${m.phaseTicks}`);
+    if (m.phaseTicks > WARMUP - 1) bad(`warmup phaseTicks ${m.phaseTicks}`);
     if (m.score.A !== 0 || m.score.B !== 0) bad('score in warmup');
     if (state.tick !== m.phaseTicks) bad('warmup is not the first phase');
   }
@@ -171,7 +173,7 @@ export class RoundWatcher {
         break;
       case 'warmup>round': {
         const e = only('roundStarted');
-        this.check(prev.phaseTicks === PAUSE - 1, `warmup ended at phaseTicks ${prev.phaseTicks}`, state);
+        this.check(prev.phaseTicks === WARMUP - 1, `warmup ended at phaseTicks ${prev.phaseTicks}`, state);
         this.check(e?.type === 'roundStarted' && e.round === 1 && next.round === 1, 'round 1 did not start', state);
         reset = true;
         break;
@@ -286,6 +288,7 @@ export class RoundWatcher {
       if (e.type === 'death' && e.sourceId !== -1) deathsByOthers.add(e.targetId);
     }
     let ringHealth: number[] | null = null;
+    const ringAfter = new Map<number, number>();
     const ringHits = new Map<number, number>();
     state.events.forEach((e) => {
       if (e.type === 'damage' || e.type === 'heal') {
@@ -296,6 +299,7 @@ export class RoundWatcher {
         if (e.type === 'damage' && e.sourceId === -1) {
           this.check(!ringHits.has(e.targetId), `champion ${e.targetId} hit by the ring twice`, state);
           ringHits.set(e.targetId, e.amount);
+          ringAfter.set(e.targetId, e.health);
           ringHealth ??= [];
           ringHealth[e.targetId] = was;
         }
@@ -326,7 +330,14 @@ export class RoundWatcher {
       }
       const have = ringHealth?.[c.id] ?? (running[c.id] as number);
       const want = Math.min(have, 10 / 60);
-      this.check(hit !== undefined && Math.abs(hit - want) <= NEAR, `champion ${c.id} took ${String(hit)} from the ring, expected ${want}`, state);
+      // applyDamage with ignoreShields computes the health after exactly this, so no NEAR there.
+      const after = ringAfter.get(c.id);
+      const exact = after === have - want;
+      this.check(
+        hit !== undefined && Math.abs(hit - want) <= NEAR && exact,
+        `champion ${c.id} took ${String(hit)} from the ring, expected ${want}, health ${String(after)} after it, expected ${have - want}`,
+        state,
+      );
     });
   }
 }

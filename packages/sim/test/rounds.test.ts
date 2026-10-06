@@ -415,6 +415,21 @@ describe('the round oracles', () => {
     }
   });
 
+  it('flag a ring charge that is off by less than 1e-9', () => {
+    const state = at(8100);
+    const watcher = new RoundWatcher();
+    watcher.beforeStep(state);
+    step(state, inputsByTick[8100] as (PlayerInput | undefined)[]);
+    const hit = state.events.find((e) => e.type === 'damage' && e.sourceId === -1);
+    if (hit?.type !== 'damage') throw new Error('no ring damage at tick 8100');
+    expect(watcher.problems).toEqual([]);
+    hit.health -= 1e-12;
+    hit.amount += 1e-12;
+    state.champions[hit.targetId]!.health -= 1e-12;
+    watcher.afterStep(state);
+    expect(watcher.problems.some((p) => p.includes('from the ring'))).toBe(true);
+  });
+
   it('accept a clean step and flag a wrong round number', () => {
     const state = at(1365);
     const watcher = new RoundWatcher();

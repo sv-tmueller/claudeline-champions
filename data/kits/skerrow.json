@@ -1,0 +1,145 @@
+{
+  "id": "skerrow",
+  "maxHealth": 130,
+  "moveSpeed": 5.5,
+  "support": false,
+  "ex": ["SPACE", "E"],
+  "slots": {
+    "M1": {
+      "cooldownTicks": 24,
+      "windupTicks": 6,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "meleeArc",
+          "radius": 2,
+          "cosHalfAngle": 0.7071067812,
+          "effects": [{ "type": "damage", "amount": 9 }]
+        }
+      ]
+    },
+    "M2": {
+      "cooldownTicks": 180,
+      "windupTicks": 6,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 24,
+          "radius": 0.2,
+          "lifetimeTicks": 25,
+          "pierce": false,
+          "effects": [
+            { "type": "damage", "amount": 12 },
+            { "type": "applyStatus", "status": { "type": "slow", "percent": 20, "ticks": 60 } }
+          ]
+        }
+      ]
+    },
+    "SPACE": {
+      "cooldownTicks": 360,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "dash", "distance": 6, "ticks": 12, "then": [] },
+        { "type": "applyStatus", "status": { "type": "haste", "percent": 20, "ticks": 90 } }
+      ],
+      "ex": {
+        "windupTicks": 0,
+        "movement": "free",
+        "effects": [
+          {
+            "type": "dash",
+            "distance": 8,
+            "ticks": 12,
+            "then": [
+              {
+                "type": "meleeArc",
+                "radius": 2,
+                "cosHalfAngle": 0.7071067812,
+                "effects": [{ "type": "damage", "amount": 14 }]
+              }
+            ]
+          },
+          { "type": "applyStatus", "status": { "type": "haste", "percent": 30, "ticks": 120 } }
+        ]
+      }
+    },
+    "Q": {
+      "cooldownTicks": 720,
+      "windupTicks": 12,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 20,
+          "radius": 0.3,
+          "lifetimeTicks": 33,
+          "pierce": false,
+          "effects": [
+            { "type": "damage", "amount": 8 },
+            { "type": "applyStatus", "status": { "type": "silence", "ticks": 90 } }
+          ]
+        }
+      ]
+    },
+    "E": {
+      "cooldownTicks": 420,
+      "windupTicks": 15,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "meleeArc",
+          "radius": 2.5,
+          "cosHalfAngle": 0.7071067812,
+          "effects": [
+            { "type": "damage", "amount": 20 },
+            { "type": "applyStatus", "status": { "type": "dot", "perPulse": 4, "ticks": 120 } }
+          ]
+        }
+      ],
+      "ex": {
+        "windupTicks": 15,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "meleeArc",
+            "radius": 2.5,
+            "cosHalfAngle": 0.7071067812,
+            "effects": [
+              { "type": "damage", "amount": 28 },
+              { "type": "applyStatus", "status": { "type": "dot", "perPulse": 6, "ticks": 120 } }
+            ]
+          }
+        ]
+      }
+    },
+    "R": {
+      "cooldownTicks": 960,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "teleport", "range": 5, "fixed": false },
+        { "type": "applyStatus", "status": { "type": "invulnerable", "ticks": 30 } }
+      ]
+    },
+    "F": {
+      "cooldownTicks": 600,
+      "windupTicks": 18,
+      "movement": "locked",
+      "effects": [
+        { "type": "teleport", "range": 8, "fixed": false },
+        {
+          "type": "meleeArc",
+          "radius": 2.5,
+          "cosHalfAngle": -1,
+          "effects": [
+            { "type": "damage", "amount": 40 },
+            { "type": "applyStatus", "status": { "type": "stun", "ticks": 30 } },
+            { "type": "applyStatus", "status": { "type": "silence", "ticks": 120 } }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -53,6 +53,16 @@ The commands and file list are in `tools/blender/README.md`.
 - Obstacle models use a different flat material for blocking and non-blocking
   obstacles, so a viewer can see which obstacles stop projectiles.
 - The visuals come from the same JSON as the collision.
+- Both arenas, `arena01` and `arena02`, have a committed glb and a case in
+  `test_export_determinism.py`, and `ArenaCoverageTests` fails if an arena glb,
+  an arena definition or a case is missing. The walls sit at x = +-15 and
+  y = +-10 in both. `arena02` needed no generator change: `gen_arena.py` is
+  driven by the JSON.
+- The client loads only `arena01` until the arena select (batch 8). `arena02.glb`
+  ships in the build and nothing loads it yet.
+- `test_arena_principles.py` checks every arena definition against the
+  [arena principles](../design/arenas.md). `arena01` is grandfathered for two
+  deviations, and the test pins them.
 
 ### Champion model
 
