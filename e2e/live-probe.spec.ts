@@ -22,14 +22,15 @@ import { orFail, watchProblems } from './support';
 // loads and never runs a frame, so the ticks are the hook's alone.
 //
 // The scene is measured late, in the first round that begins after
-// WARM_UP_TICKS, with no pointer and no profiler before it. A live match does
-// not give the engine time before its first death (tick 449 on normal bots of f7e10f0):
-// the counted code reads 16 to 81 KB per window in the first 200 ticks and 3 to
-// 6 KB up to tick 720, the heap numbers of unoptimized code, and is clean only
-// after about 2100 ticks (see testing.md). The pointer is never moved, because
-// `sampleAim` allocates about 2.5 KB per window whenever a pointer exists
-// (issue #87), so the aim stays at its start, (-11, 2) m, and the human walks off
-// the line y = 2 to make its facing change.
+// WARM_UP_TICKS, with no profiler before it. A live match does not give the
+// engine time before its first death (tick 449 on normal bots of f7e10f0): the
+// counted code reads 16 to 81 KB per window in the first 200 ticks and 3 to 6 KB
+// up to tick 720, the heap numbers of unoptimized code, and is clean only after
+// about 2100 ticks (see testing.md). A pointer is present from the first read and
+// moves before every window (see POINTERS), so `sampleAim` and the camera module
+// run on every frame of every window: the aim sampling used to allocate about
+// 2.5 KB per window whenever a pointer existed (issue #87), and the live scene is
+// the one that measures it.
 interface Hooks {
   tick: number;
   phase: string;
@@ -59,17 +60,20 @@ const WARM_UP_TICKS = 2100;
 const WARM_UP_BUDGET_TICKS = 9100;
 // Plain windows of the round before the measured ones, so that the measured windows
 // hold the round's first projectiles and hits, the event paths this scene exists to
-// cover. Measured on 8d80073 over 17 windows of round 3 (begun by tick 2879): the
-// first projectile spawns in window 5 (ticks 3029 to 3059, 150 ticks into the windows
-// of the round), the first hit lands in window 6, then 1 to 4 projectiles are live and
-// 1 to 3 hits land per window to the end of the run (tick 3389). The first death of the
-// round is read at tick 3509. The lead is a count of windows, not a tick, because
+// cover. Measured on bc1d6f1 with the moving pointer of POINTERS (3 runs of 17
+// windows of round 3, begun by tick 2879; the aim changes the human's own M1 and its
+// facing from round 1 on, so the round-3 figures of the no-pointer runs of 8d80073 were
+// re-derived): the first projectile spawns in window 5 (ticks 3029 to 3059, 150 ticks
+// into the windows of the round), the first hit lands in window 6, then 1 to 4
+// projectiles are live and 1 to 3 hits land per window to the end of the run (tick
+// 3389). The first death of the round is read at tick 3539 (3509 without the pointer).
+// The lead is a count of windows, not a tick, because
 // windows are the unit the spec runs in; a bots change moves the first projectile, and
 // the assertion that the measured windows hold one fails then, so re-measure.
 const EVENT_LEAD_WINDOWS = 5;
 // The windows measured, after the lead: windows 5 to 9 of round 3, ticks 3029 to 3179.
 // The median of the five is the asserted figure, as in the sandbox (see testing.md).
-// The last of them ends 330 ticks before the first death of the round.
+// The last of them ends 360 ticks before the first death of the round.
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
@@ -119,6 +123,24 @@ function changes(before: Hooks, after: Hooks): string {
 // under the cast.
 const WALK = [['KeyW', 'KeyD'], ['KeyA'], ['KeyD']] as const;
 
+// The pointer, in CSS pixels of the 320x180 probe viewport. One of these two pixels
+// is set before every window, alternating, so the human's aim changes between windows
+// and `main.ts:sampleAim` samples a pointer that moved. They are derived like the
+// ground points of walk.spec.ts, 'faces the mouse cursor' (the client's own raycast,
+// fitted camera of arena01 at 320x180: project the ground point, round the pixel,
+// cast it back):
+//   (63, 39) -> ground (-14.05, 9.02) m, north-west, sin facing > 0
+//   (45, 97) -> ground (-13.98, -1.04) m, south-west, sin facing < 0
+// Both lie west of the walk (x from -11 to -8, y of about 3.9 m), 4 to 6 m to the
+// side of the human, so |sin f0| stays over 0.5 and Hargrim's M1 arc points away from
+// the enemies, which come from the east. `side` is the sign of sin f0 that a window
+// started with the point must end with.
+const POINTERS = [
+  { x: 63, y: 39, side: 1 },
+  { x: 45, y: 97, side: -1 },
+] as const;
+type PointerPoint = (typeof POINTERS)[number];
+
 /**
  * Drives the windows. A window that starts in the warmup, the round end or the
  * match end walks nowhere, since the human is locked or dead. A release and the
@@ -129,7 +151,16 @@ function createDriver(page: Page, cdp: CDPSession) {
   let held: readonly string[] = [];
   let round = '';
   let roundWindows = 0;
+  let windows = 0;
+  let pointer: PointerPoint = POINTERS[0];
   async function press(hooks: Hooks): Promise<void> {
+    // The pointer moves first, in the page, as the keys do: the dispatch runs the
+    // client's window listener before the call returns, so the window that follows
+    // samples it. The real mouse is walk.spec.ts's.
+    pointer = POINTERS[windows++ % POINTERS.length] as PointerPoint;
+    await page.evaluate(({ x, y }) => {
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y }));
+    }, pointer);
     if (hooks.round !== round) {
       round = hooks.round;
       roundWindows = 0;
@@ -144,6 +175,10 @@ function createDriver(page: Page, cdp: CDPSession) {
     held = keys;
   }
   return {
+    /** The pointer point set before the latest window. */
+    get pointer(): PointerPoint {
+      return pointer;
+    },
     /** One window with no profiler, from a read. */
     async run(hooks: Hooks): Promise<void> {
       await press(hooks);
@@ -168,7 +203,7 @@ test('the live match: the writes of a changing match allocate under the limit', 
     await page.goto('/');
     await orFail(page.waitForSelector('canvas[data-arena][data-tick]'), failed);
     const cdp = await openProbe(page);
-    // M1 is held to the end. The pointer never moves.
+    // M1 is held to the end.
     await page.mouse.down();
     const driver = createDriver(page, cdp);
 
@@ -196,8 +231,11 @@ test('the live match: the writes of a changing match allocate under the limit', 
     // The measured windows. Every read is kept, for the end assertions.
     const reads: Hooks[] = [hooks];
     const windows: Allocations[] = [];
+    // The pointer point each measured window started with.
+    const sides: number[] = [];
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
       windows.push(await driver.measure(hooks));
+      sides.push(driver.pointer.side);
       hooks = await readHooks(page);
       console.log(
         `heap probe live window ${window}: tick ${hooks.tick}, ${changes(reads[reads.length - 1] as Hooks, hooks)}`,
@@ -227,10 +265,15 @@ test('the live match: the writes of a changing match allocate under the limit', 
       expect(after.p0x, `p0x across measured window ${i - 1}`).not.toBe(before.p0x);
       expect(after.f0, `f0 across measured window ${i - 1}`).not.toBe(before.f0);
     }
-    // The aim is off the line of motion, so the facing changes with the walk.
-    for (const read of reads.slice(1)) {
-      expect(Math.abs(Math.sin(Number(read.f0))), `the facing ${read.f0} at tick ${read.tick}`).toBeGreaterThan(0.5);
-    }
+    // The aim is off the line of motion, so the facing changes with the walk, and it
+    // followed the pointer of each window: the side of the window's point is the sign
+    // of sin f0 at the read that ends it, so `sampleAim` took the moved pointer in
+    // every measured window.
+    reads.slice(1).forEach((read, index) => {
+      const sin = Math.sin(Number(read.f0));
+      expect(Math.abs(sin), `the facing ${read.f0} at tick ${read.tick}`).toBeGreaterThan(0.5);
+      expect(Math.sign(sin), `the side of the facing ${read.f0} at tick ${read.tick}, pointer side ${sides[index]}`).toBe(sides[index]);
+    });
     // M1 cast: its icon is on cooldown in at least one read.
     expect(reads.some((read) => read.m1Ready === 'false'), 'M1 never went on cooldown, so no cast ran').toBe(true);
     const lastTick = hooks.tick;
