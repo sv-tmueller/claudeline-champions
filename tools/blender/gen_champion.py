@@ -57,9 +57,10 @@ FPS = 30
 # The poses are constants in armature space: an Euler XYZ turn in degrees about
 # a bone's head, and for Hips also a move in metres. A positive turn about Y
 # swings a hanging limb backward, and a positive turn about X lifts a left limb
-# outward. Nothing is random and nothing reads a clock. The top of every model
-# stays at or under 1.90 m: Hips moves at most 0.03 m up, and in Cast the arms
-# stay at or below horizontal. test_champion_models.py checks it.
+# outward. Nothing is random and nothing reads a clock. At every key the top of
+# the model is at or under 1.90 m (Hips moves at most 0.03 m up, and in Cast the
+# arms stay at or below horizontal) and no vertex is below the floor (the Hips
+# drops below). test_champion_models.py checks both at every key.
 
 
 def pose(turns=None, move=(0.0, 0.0, 0.0)):
@@ -69,22 +70,54 @@ def pose(turns=None, move=(0.0, 0.0, 0.0)):
     return key
 
 
-RUN_A = pose({"Spine": (0, 10, 0), "Arm_L": (0, -40, 0), "Arm_R": (0, 40, 0), "Leg_L": (0, 35, 0), "Leg_R": (0, -35, 0)})
-RUN_PASS = pose({"Spine": (0, 10, 0)}, move=(0.0, 0.0, 0.03))
-RUN_B = pose({"Spine": (0, 10, 0), "Arm_L": (0, 40, 0), "Arm_R": (0, -40, 0), "Leg_L": (0, -35, 0), "Leg_R": (0, 35, 0)})
+# Run. A leg of 0.8 m and a 0.09 m half width, turned 35 degrees about the hip,
+# has its lowest corner 0.8 - (0.8 cos 35 + 0.09 sin 35) = 0.093 m above the
+# floor, so the contact keys drop Hips by 0.093 m and the feet plant. The legs
+# are straight at the passing keys and Hips is at rest.
+RUN_DROP = (0.0, 0.0, -0.093)
+RUN_A = pose(
+    {
+        "Spine": (0, 10, 0),
+        "Arm_L": (0, -40, 0),
+        "Arm_R": (0, 40, 0),
+        "Leg_L": (0, 35, 0),
+        "Leg_R": (0, -35, 0),
+    },
+    move=RUN_DROP,
+)
+RUN_PASS = pose({"Spine": (0, 10, 0)})
+RUN_B = pose(
+    {
+        "Spine": (0, 10, 0),
+        "Arm_L": (0, 40, 0),
+        "Arm_R": (0, -40, 0),
+        "Leg_L": (0, -35, 0),
+        "Leg_R": (0, 35, 0),
+    },
+    move=RUN_DROP,
+)
+
+# Death. Hips turns about Y and drops so the lowest leg corner just reaches the
+# floor at key 10 (0.8 - (0.8 cos 30 + 0.09 sin 30) = 0.062 m) and at key 20 (the
+# same at 70 degrees, 0.442 m, rounded down to 0.44). At key 30 the body lies on
+# its back.
+DEATH_FALL = {10: (0, -30, 0), 20: (0, -70, 0), 30: (0, -85, 0)}
+DEATH_ARMS = {10: 20, 20: 40, 30: 40}
+DEATH_DROP = {10: -0.062, 20: -0.44, 30: -0.6}
+
+
+def death_pose(key):
+    arms = {"Arm_L": (DEATH_ARMS[key], 0, 0), "Arm_R": (-DEATH_ARMS[key], 0, 0)}
+    return pose({"Hips": DEATH_FALL[key], **arms}, move=(0.0, 0.0, DEATH_DROP[key]))
+
+
+IDLE_BREATH = pose(
+    {"Spine": (0, 2, 0), "Arm_L": (3, 0, 0), "Arm_R": (-3, 0, 0)}, move=(0.0, 0.0, 0.01)
+)
 
 # (name, frames, loops, {frame: key}). The frames are the clip length at 30 fps.
 CLIPS = (
-    (
-        "Idle",
-        60,
-        True,
-        {
-            0: pose(),
-            30: pose({"Spine": (0, 2, 0), "Arm_L": (3, 0, 0), "Arm_R": (-3, 0, 0)}, move=(0.0, 0.0, 0.01)),
-            60: pose(),
-        },
-    ),
+    ("Idle", 60, True, {0: pose(), 30: IDLE_BREATH, 60: pose()}),
     ("Run", 20, True, {0: RUN_A, 5: RUN_PASS, 10: RUN_B, 15: RUN_PASS, 20: RUN_A}),
     (
         "Cast",
@@ -101,12 +134,7 @@ CLIPS = (
         "Death",
         30,
         False,
-        {
-            0: pose(),
-            10: pose({"Hips": (0, -30, 0), "Arm_L": (20, 0, 0), "Arm_R": (-20, 0, 0)}, move=(0.0, 0.0, -0.2)),
-            20: pose({"Hips": (0, -70, 0), "Arm_L": (40, 0, 0), "Arm_R": (-40, 0, 0)}, move=(0.0, 0.0, -0.5)),
-            30: pose({"Hips": (0, -85, 0), "Arm_L": (40, 0, 0), "Arm_R": (-40, 0, 0)}, move=(0.0, 0.0, -0.6)),
-        },
+        {0: pose(), 10: death_pose(10), 20: death_pose(20), 30: death_pose(30)},
     ),
 )
 

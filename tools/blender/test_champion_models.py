@@ -34,6 +34,18 @@ FOOT_TOLERANCE = 1e-4
 MATRIX_TOLERANCE = 1e-5
 WEIGHT_TOLERANCE = 1e-6
 TOP_TOLERANCE = 1e-6
+# A pose may put a vertex this far below the floor (0.1 mm) and no further.
+FLOOR_TOLERANCE = 1e-4
+KEY_TIME_TOLERANCE = 1e-4
+FPS = 30
+# The key frames of each clip. assets.md's Clips table lists the same frames,
+# and a test fails if they drift apart.
+KEY_FRAMES = {
+    "Idle": (0, 30, 60),
+    "Run": (0, 5, 10, 15, 20),
+    "Cast": (0, 5, 9, 15),
+    "Death": (0, 10, 20, 30),
+}
 
 JOINTS = ("Hips", "Spine", "Arm_L", "Arm_R", "Leg_L", "Leg_R")
 NODE_COUNT = 8  # the six joints, Champion and Rig
@@ -246,7 +258,9 @@ def layout_problems(doc):
                 problems.append("the Rig node must not have %s" % key)
         children = sorted(nodes[c].get("name") for c in rig.get("children", []))
         if children != ["Champion", "Hips"]:
-            problems.append("the Rig node's children must be Hips and Champion, found %r" % children)
+            problems.append(
+                "the Rig node's children must be Hips and Champion, found %r" % children
+            )
     scenes = doc.get("scenes", [])
     rig_index = nodes.index(rig) if rig is not None else None
     if doc.get("scene") != 0 or len(scenes) != 1 or scenes[0].get("nodes") != [rig_index]:
@@ -272,55 +286,98 @@ def skinned_vertices(doc, bin_chunk):
     return vertices
 
 
+def bind_problems(doc, joints, inverse):
+    """Every joint's rest world matrix times its inverse bind matrix is the identity."""
+    problems = []
+    rest = world_matrices(doc, {})
+    for joint, ibm in zip(joints, inverse):
+        product = mat_mul(rest[joint], ibm)
+        off = max(abs(product[r][c] - identity()[r][c]) for r in range(4) for c in range(4))
+        if off > MATRIX_TOLERANCE:
+            name = doc["nodes"][joint]["name"]
+            problems.append("bind pose of %s differs from the rest pose" % name)
+    return problems
+
+
+def weight_problems(vertices, joint_count):
+    """Every vertex is rigid: one joint at weight 1.0, the others at 0."""
+    for _, indices, weights in vertices:
+        ones = [w for w in weights if abs(w - 1.0) <= WEIGHT_TOLERANCE]
+        zeros = [w for w in weights if abs(w) <= WEIGHT_TOLERANCE]
+        if len(ones) != 1 or len(zeros) != 3 or any(i >= joint_count for i in indices):
+            return ["every vertex must be rigid on one joint at weight 1.0"]
+    return []
+
+
+def clip_times(doc, bin_chunk, animation):
+    """The clip's key times, or None when its samplers do not share one input."""
+    inputs = {s["input"] for s in animation["samplers"]}
+    if len(inputs) != 1:
+        return None
+    return [t for (t,) in read_accessor(doc, bin_chunk, inputs.pop())]
+
+
+def clip_problems(doc, bin_chunk, joints, inverse, vertices):
+    """The key times against the table, then the posed top and floor at every key."""
+    problems = []
+    for animation in doc["animations"]:
+        name = animation["name"]
+        times = clip_times(doc, bin_chunk, animation)
+        if times is None:
+            problems.append("clip %s: the samplers must share one input accessor" % name)
+            continue
+        wanted = [frame / FPS for frame in KEY_FRAMES[name]]
+        if len(times) != len(wanted) or any(
+            abs(t - w) > KEY_TIME_TOLERANCE for t, w in zip(times, wanted)
+        ):
+            problems.append(
+                "clip %s: key times %s differ from the table frames %s / %d"
+                % (name, [round(t, 4) for t in times], list(KEY_FRAMES[name]), FPS)
+            )
+            continue
+        values = {}
+        for channel in animation["channels"]:
+            sampler = animation["samplers"][channel["sampler"]]
+            target = channel["target"]
+            values[(target["node"], target["path"])] = read_accessor(
+                doc, bin_chunk, sampler["output"]
+            )
+        for key in range(len(times)):
+            pose = {}
+            for (node, path), outputs in values.items():
+                t, r, s = pose.get(node, node_trs(doc["nodes"][node]))
+                if path == "translation":
+                    pose[node] = (outputs[key], r, s)
+                else:
+                    pose[node] = (t, outputs[key], s)
+            world = world_matrices(doc, pose)
+            skin_matrices = [mat_mul(world[j], ibm) for j, ibm in zip(joints, inverse)]
+            heights = [posed_y(skin_matrices, v) for v in vertices]
+            if max(heights) > MAX_TOP + TOP_TOLERANCE:
+                problems.append(
+                    "posed top is %.4f m in %s at key %d, the limit is %.2f m"
+                    % (max(heights), name, key, MAX_TOP)
+                )
+            if min(heights) < -FLOOR_TOLERANCE:
+                problems.append(
+                    "posed floor is %.4f m in %s at key %d, no vertex may be below 0"
+                    % (min(heights), name, key)
+                )
+    return problems
+
+
 def rig_problems(doc, bin_chunk):
-    """The joints, the bind pose, the weights and the posed top of every clip."""
+    """The joints, the bind pose, the weights and every clip's keys, top and floor."""
     skin = doc["skins"][0]
     joints = skin["joints"]
     if sorted(doc["nodes"][j]["name"] for j in joints) != sorted(JOINTS):
         return ["the skin joints must be %s" % ", ".join(JOINTS)]
-    problems = []
     inverse = [column_major(m) for m in read_accessor(doc, bin_chunk, skin["inverseBindMatrices"])]
-    rest = world_matrices(doc, {})
-    for joint, ibm in zip(joints, inverse):
-        product = mat_mul(rest[joint], ibm)
-        if any(abs(product[r][c] - identity()[r][c]) > MATRIX_TOLERANCE for r in range(4) for c in range(4)):
-            problems.append("bind pose of %s differs from the rest pose" % doc["nodes"][joint]["name"])
-
     vertices = skinned_vertices(doc, bin_chunk)
-    for _, indices, weights in vertices:
-        ones = [w for w in weights if abs(w - 1.0) <= WEIGHT_TOLERANCE]
-        zeros = [w for w in weights if abs(w) <= WEIGHT_TOLERANCE]
-        if len(ones) != 1 or len(zeros) != 3 or any(i >= len(joints) for i in indices):
-            problems.append("every vertex must be rigid on one joint at weight 1.0")
-            break
+    problems = bind_problems(doc, joints, inverse) + weight_problems(vertices, len(joints))
     if problems:
         return problems
-
-    for animation in doc["animations"]:
-        values = {}
-        keys = None
-        for channel in animation["channels"]:
-            sampler = animation["samplers"][channel["sampler"]]
-            times = read_accessor(doc, bin_chunk, sampler["input"])
-            if keys is not None and len(times) != keys:
-                return problems + ["clip %s has channels with different key counts" % animation["name"]]
-            keys = len(times)
-            target = channel["target"]
-            values[(target["node"], target["path"])] = read_accessor(doc, bin_chunk, sampler["output"])
-        for key in range(keys or 0):
-            pose = {}
-            for (node, path), outputs in values.items():
-                t, r, s = pose.get(node, node_trs(doc["nodes"][node]))
-                pose[node] = (outputs[key], r, s) if path == "translation" else (t, outputs[key], s)
-            world = world_matrices(doc, pose)
-            skin_matrices = [mat_mul(world[j], ibm) for j, ibm in zip(joints, inverse)]
-            top = max(posed_y(skin_matrices, v) for v in vertices)
-            if top > MAX_TOP + TOP_TOLERANCE:
-                problems.append(
-                    "posed top is %.4f m in %s at key %d, the limit is %.2f m"
-                    % (top, animation["name"], key, MAX_TOP)
-                )
-    return problems
+    return clip_problems(doc, bin_chunk, joints, inverse, vertices)
 
 
 def posed_y(skin_matrices, vertex):
@@ -456,6 +513,20 @@ class CommittedChampionTests(unittest.TestCase):
                     )
 
 
+class KeyFrameTableTests(unittest.TestCase):
+    def test_key_frames_match_the_clips_table_in_assets_md(self):
+        text = (REPO / "docs" / "architecture" / "assets.md").read_text()
+        lines = text.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.startswith("| Clip | Frames |"))
+        rows = []
+        for line in lines[start + 2 :]:
+            if not line.startswith("|"):
+                break
+            rows.append([cell.strip().strip("`") for cell in line.strip("| ").split("|")])
+        table = {row[0]: tuple(int(k) for k in row[3].split(",")) for row in rows}
+        self.assertEqual(table, KEY_FRAMES)
+
+
 class ContractCheckTests(unittest.TestCase):
     """Each check must be able to fail, so a broken model cannot pass in CI."""
 
@@ -530,7 +601,8 @@ class ContractCheckTests(unittest.TestCase):
         struct.pack_into("<4B", self.bin, accessor_offset(self.doc, joints), 9, 0, 0, 0)
         self.assertProblem("rigid")
 
-    def test_rejects_a_pose_that_lifts_the_top_above_the_limit(self):
+    def move_run_hips(self, dy):
+        """Move the second key of the Run clip's Hips translation by dy (glTF y)."""
         run = next(a for a in self.doc["animations"] if a["name"] == "Run")
         hips = next(i for i, n in enumerate(self.doc["nodes"]) if n["name"] == "Hips")
         channel = next(
@@ -538,10 +610,33 @@ class ContractCheckTests(unittest.TestCase):
         )
         output = run["samplers"][channel["sampler"]]["output"]
         offset = accessor_offset(self.doc, output)
-        # Lift the second key of the Hips translation by 1 m (the y component).
         x, y, z = struct.unpack_from("<3f", self.bin, offset + 12)
-        struct.pack_into("<3f", self.bin, offset + 12, x, y + 1.0, z)
+        struct.pack_into("<3f", self.bin, offset + 12, x, y + dy, z)
+
+    def test_rejects_a_pose_that_lifts_the_top_above_the_limit(self):
+        self.move_run_hips(1.0)
         self.assertProblem("posed top")
+
+    def test_rejects_a_pose_that_sinks_a_vertex_below_the_floor(self):
+        self.move_run_hips(-1.0)
+        self.assertProblem("posed floor")
+
+    def test_rejects_a_joint_that_is_renamed(self):
+        node_named(self.doc, "Spine")["name"] = "Torso"
+        self.assertProblem("skin joints must be")
+
+    def test_rejects_key_times_that_differ_from_the_table(self):
+        cast = next(a for a in self.doc["animations"] if a["name"] == "Cast")
+        offset = accessor_offset(self.doc, cast["samplers"][0]["input"])
+        # Key 2 moves from frame 9 to frame 10, for every channel at once.
+        struct.pack_into("<f", self.bin, offset + 8, 10 / 30)
+        self.assertProblem("key times")
+
+    def test_rejects_samplers_that_do_not_share_one_input(self):
+        cast = next(a for a in self.doc["animations"] if a["name"] == "Cast")
+        self.doc["accessors"].append(dict(self.doc["accessors"][cast["samplers"][0]["input"]]))
+        cast["samplers"][1]["input"] = len(self.doc["accessors"]) - 1
+        self.assertProblem("share one input")
 
     def test_rejects_a_vertex_outside_the_ground_radius(self):
         set_vertex(self.doc, self.bin, body_primitive(self.doc), 0, (0.6, 1.0, 0.0))

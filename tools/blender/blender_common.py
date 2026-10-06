@@ -171,11 +171,12 @@ def key_clip(rig, name, frames, key_poses, loops):
 def export_glb(out, rigged=False):
     """Write a glb. Arenas pass `rigged=False`, which keeps their exact flags.
 
-    A rigged export sets every skin and animation flag by name, so a changed
-    default in a later Blender cannot move the bytes without a diff here. It
-    writes the keys as authored (`export_force_sampling=False`): sampling
-    writes every frame of every channel and would push the models over the
-    size budget.
+    A rigged export sets by name every skin and animation flag of Blender
+    5.2.1's exporter that bears on the output (morph and image flags aside, as
+    the models have none), so a changed default in a later Blender cannot move
+    the bytes without a diff here. It writes the keys as authored
+    (`export_force_sampling=False`): sampling writes every frame of every
+    channel and would push the models over the size budget.
     """
     path = os.path.abspath(out)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -213,6 +214,25 @@ def export_glb(out, rigged=False):
             export_current_frame=False,
             export_influence_nb=4,
             export_all_influences=False,
+            # The rest of the animation flags, at their Blender 5.2 defaults
+            # except the first. Optimising would drop keyframes it thinks are
+            # duplicates, which the key counts in the validator forbid.
+            export_optimize_animation_size=False,
+            export_optimize_animation_keep_anim_armature=True,
+            export_optimize_animation_keep_anim_object=False,
+            export_optimize_disable_viewport=False,
+            export_frame_step=1,
+            export_sampling_interpolation_fallback="LINEAR",
+            export_negative_frame="SLIDE",
+            export_merge_animation="ACTION",
+            export_nla_strips=True,
+            export_nla_strips_merged_animation_name="Animation",
+            export_extra_animations=False,
+            export_action_filter=False,
+            export_anim_scene_split_object=True,
+            export_hierarchy_flatten_objs=False,
+            export_pointer_animation=False,
+            export_convert_animation_pointer=False,
         )
     result = bpy.ops.export_scene.gltf(**flags)
     if result != {"FINISHED"}:

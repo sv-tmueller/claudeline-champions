@@ -114,8 +114,12 @@ The scene rate is 30 fps. Every clip keys the rotation of all six bones and the
 translation of `Hips` at each listed frame, all with LINEAR interpolation.
 The last key of a looping clip equals its first. The pose values are constants
 in `gen_champion.py`, with nothing random and nothing time-based, and no pose
-puts a model above 1.90 m. The validator checks the names, the key counts and
-the length.
+puts a model above 1.90 m or any vertex below the floor (by more than 0.1 mm).
+In `Run` the contact keys (0, 10, 20) drop `Hips` so the feet plant, and the
+passing keys leave it at rest. The validator checks the names, the key counts
+and the length. The contract tests read the shared key times from the BIN and
+compare them with the Keys column, and check the posed top and floor at every
+key.
 
 | Clip | Frames | Seconds | Keys | Plays |
 |------|--------|---------|------|-------|
@@ -129,9 +133,14 @@ the length.
 ### Export
 
 The exporter writes the keys as authored, not sampled at every frame, which
-keeps each file near 46 KB at most. Every skin and animation flag is set by
-name in `blender_common.export_glb(out, rigged=True)`, so a changed default in
-a later Blender cannot move the bytes unseen. Arenas call it with
+keeps each file near 46 KB at most. Every skin and animation flag of the
+exporter that bears on the output is set by name in
+`blender_common.export_glb(out, rigged=True)`, so a changed default in a later
+Blender cannot move the bytes unseen. That includes
+`export_optimize_animation_size`, which is off so the exporter never drops a
+key it takes for a duplicate, and the other animation flags at their 5.2
+defaults (frame step, the sampling fallback, negative frames, NLA, merge and
+pointer options). Pinning them left the bytes unchanged. Arenas call it with
 `rigged=False` and keep exactly the flags they had.
 
 Blender's exporter falls back to baking a channel when its components differ

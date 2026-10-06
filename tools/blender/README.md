@@ -114,9 +114,12 @@ not vertical.
   in `docs/architecture/assets.md`, which the validator's constants must match.
   The pose values are constant tables in `gen_champion.py`.
 - The export writes the keys as authored, so each file stays near 46 KB at
-  most. `export_glb(out, rigged=True)` sets every skin and animation flag by
-  name; arenas keep their flags. Python's `keyframe_insert` ignores the
-  interpolation preference, so `key_clip` sets each key to LINEAR.
+  most. `export_glb(out, rigged=True)` sets by name every skin and animation
+  flag of the exporter that bears on the output. That includes
+  `export_optimize_animation_size` (off, so no key is dropped as a duplicate)
+  and the other animation flags at their 5.2 defaults. Arenas keep their flags.
+  Python's `keyframe_insert` ignores the interpolation preference, so
+  `key_clip` sets each key to LINEAR.
 - The top of every model is at most 1.90 m, because the health bar starts
   above 1.97 m, and the ground radius is at most 0.50 m. Each file is at most
   48 KiB and 600 triangles.
@@ -162,7 +165,11 @@ reported as that file's FAIL line, and the remaining files still run.
   samplers that share one input with the table's key count, a minimum of 0 and
   a maximum of frames / 30 within 1e-4. A key moved to another frame makes the
   exporter write a second input, and a dropped key makes it bake the channel,
-  so both fail.
+  so both fail. `test_champion_models.py` also reads the shared input times
+  from the BIN chunk and compares them with the frames of the Clips table
+  divided by 30, within 1e-4, so moving a key for every channel at once fails
+  too. It checks the top (at most 1.90 m) and the floor (no vertex below 0, with
+  a tolerance of 0.1 mm) at every key of every clip.
 - The arena JSON must match spec 8.1 key for key, with positive sizes, 2 to 3
   spawns per team, obstacles and spawns (a 0.5 m circle) inside the playable
   rectangle, no spawn touching an obstacle, `startRadius > endRadius > 0`, and
