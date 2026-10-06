@@ -1,4 +1,6 @@
 import arena01Json from '../../../data/arenas/arena01.json';
+import hargrimJson from '../../../data/kits/hargrim.json';
+import quillonJson from '../../../data/kits/quillon.json';
 import {
   Button,
   CHAMPION_RADIUS,
@@ -27,6 +29,14 @@ import { findPath } from '../src/path';
 import { profileFor } from '../src/profile';
 
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
+
+/**
+ * The shipped Hargrim and Quillon kits from `data/kits`, for `createMatch`, which validates them.
+ * The JSON is a plain object tree, so the cast is the one the sim's roster test makes.
+ */
+export function jsonKits(): KitDef[] {
+  return [hargrimJson, quillonJson].map((kit) => structuredClone(kit) as unknown as KitDef);
+}
 
 function validAxis(v: number): boolean {
   return (v === 1 || v === -1 || v === 0) && !Object.is(v, -0);
@@ -204,6 +214,19 @@ export interface MatchRun {
 export interface RunOptions {
   config?: MatchConfig;
   kits?: readonly KitDef[];
+  /** Replaces `createBot`, for a test that drives the run with its own bots. */
+  makeBot?: (id: number, tier: Difficulty, seed: number) => Bot;
+}
+
+/** A copy of an input: a bot owns its returned record and overwrites it on its next think. */
+export function copyInput(input: PlayerInput): PlayerInput {
+  return {
+    moveX: input.moveX,
+    moveY: input.moveY,
+    aimX: input.aimX,
+    aimY: input.aimY,
+    buttons: input.buttons,
+  };
 }
 
 export function createRun(
@@ -217,7 +240,7 @@ export function createRun(
     const seed = botSeeds[c.id];
     const tier = tiers[c.id];
     if (seed === undefined || tier === undefined) throw new Error(`no seed or tier for ${c.id}`);
-    return createBot(c.id, tier, seed);
+    return (options.makeBot ?? createBot)(c.id, tier, seed);
   });
   const inputs: PlayerInput[][] = [];
   return {
@@ -225,7 +248,7 @@ export function createRun(
     bots,
     inputs,
     advance(): PlayerInput[] {
-      const tickInputs = bots.map((bot) => bot.think(state));
+      const tickInputs = bots.map((bot) => copyInput(bot.think(state)));
       step(state, tickInputs);
       inputs.push(tickInputs);
       return tickInputs;
@@ -262,20 +285,63 @@ export function ownSpawnOf(state: GameState, c: ChampionState): Point | undefine
   return spawn === undefined ? undefined : { x: spawn[0], y: spawn[1] };
 }
 
-/** True when the intent in `acted` is a stand that bots.md documents. */
+/**
+ * The sum of health over maximum health of the alive champions of a team, in id order. An
+ * independent oracle for the team sum of the deadlock rule: it does not import src/bot.
+ */
+function healthSum(state: GameState, team: ChampionState['team']): number {
+  let sum = 0;
+  for (const c of state.champions) if (c.alive && c.team === team) sum += c.health / c.maxHealth;
+  return sum;
+}
+
+/** True when the team of `c` is ahead: more health summed over its alive champions than the enemy's. */
+export function teamAheadOracle(state: GameState, c: ChampionState): boolean {
+  const own = healthSum(state, c.team);
+  const enemy = healthSum(state, c.team === 'A' ? 'B' : 'A');
+  return own > enemy;
+}
+
+/** True when some alive enemy of `c` is within `rangeMax` of it with a clear shot of 0.5 m. */
+export function enemyInReachOracle(state: GameState, c: ChampionState, rangeMax: number): boolean {
+  for (const enemy of state.champions) {
+    if (!enemy.alive || enemy.team === c.team) continue;
+    if (Math.hypot(c.x - enemy.x, c.y - enemy.y) > rangeMax) continue;
+    if (clearShotOracle(state, c, enemy, CHAMPION_RADIUS)) return true;
+  }
+  return false;
+}
+
+/**
+ * True when the intent in `acted` is a stand that bots.md documents. A retreating bot holds at its
+ * own spawn only while its team is ahead or an enemy is in its reach: otherwise the rule of the
+ * bot says advance, and a stand there is a stall. A retreating bot that stands in reach of its
+ * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts.
+ */
 export function holding(
   state: GameState,
   c: ChampionState,
   acted: { intent: Intent; targetId: number },
 ): boolean {
+  const { rangeMin, rangeMax } = profileFor(c.championId, kitOf(state, c));
   if (acted.intent === 'retreat') {
+    const target = state.champions[acted.targetId];
+    if (
+      target !== undefined &&
+      target.alive &&
+      target.team !== c.team &&
+      Math.hypot(c.x - target.x, c.y - target.y) <= rangeMax &&
+      clearShotOracle(state, c, target, CHAMPION_RADIUS)
+    ) {
+      return true;
+    }
     const spawn = ownSpawnOf(state, c);
-    return spawn !== undefined && Math.hypot(c.x - spawn.x, c.y - spawn.y) <= 0.5;
+    const atSpawn = spawn !== undefined && Math.hypot(c.x - spawn.x, c.y - spawn.y) <= 0.5;
+    return atSpawn && (teamAheadOracle(state, c) || enemyInReachOracle(state, c, rangeMax));
   }
   const target = state.champions[acted.targetId];
   if (target === undefined || !target.alive || target.team === c.team) return false;
   const d = Math.hypot(c.x - target.x, c.y - target.y);
-  const { rangeMin, rangeMax } = profileFor(c.championId, kitOf(state, c));
   // A stand needs a clear shot of the width of a champion, not only a line of sight.
   const clear = () => clearShotOracle(state, c, target, CHAMPION_RADIUS);
   if (acted.intent === 'engage') return d <= rangeMax && clear();

@@ -13,7 +13,7 @@ import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, clearShotOracle, config2v2 } from './helpers';
+import { arena01, clearShotOracle, config2v2, configMirror, jsonKits } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const STEP = 5.5 / 60;
@@ -107,17 +107,17 @@ describe('think output', () => {
     expect(bot.inspect()).toEqual({ intent: 'idle', targetId: -1 });
   });
 
-  it('returns a fresh valid input every tick', () => {
+  it("returns a valid input every tick, always the bot's own record", () => {
     const state = setup();
     kill(state, 1, 3);
     const bots = new Map([[0, createBot(0, 'hard', 3)]]);
     const bot = bots.get(0);
     if (!bot) throw new Error('no bot');
-    const seen = new Set<PlayerInput>();
+    let own: PlayerInput | undefined;
     for (let i = 0; i < 300; i++) {
       const input = bot.think(state);
-      expect(seen.has(input)).toBe(false);
-      seen.add(input);
+      own ??= input;
+      expect(input).toBe(own);
       expect(Object.is(input.moveX, 0) || input.moveX === 1 || input.moveX === -1).toBe(true);
       expect(Object.is(input.moveY, 0) || input.moveY === 1 || input.moveY === -1).toBe(true);
       expect(Object.is(input.moveX, -0)).toBe(false);
@@ -583,7 +583,9 @@ describe('kite corner and line of sight', () => {
 describe('retreat', () => {
   it('walks to its own spawn away from the target and stops there', () => {
     const state = setup(arena01);
-    kill(state, 1, 3);
+    // A teammate at full health keeps the team ahead (1.2 against 1), so the bot retreats. Alone, at
+    // 0.2 against 1 and out of reach, it would advance: that is the deadlock rule, deadlock.test.ts.
+    kill(state, 3);
     const me = put(state, 0, -6, 3);
     const target = put(state, 2, 0, 3);
     me.health = 0.2 * me.maxHealth;
@@ -660,6 +662,90 @@ describe('aim lead', () => {
     // The lead is well ahead of the target, not at its current position.
     expect(Math.hypot(input.aimX / 100 - target.x, input.aimY / 100 - target.y)).toBeGreaterThan(1);
     expect(input.aimY).toBeGreaterThan(100);
+  });
+
+  // `think` writes the lead and the error turn out over locals (an allocation-free form). This
+  // replays the aim of a few thousand frozen states, drawn from a seed, with the chain of aim.ts
+  // that the form replaced: the bot's first aim draw replayed from its seed, then `leadPoint`,
+  // `rotateByHalfTangent` and `roundAim`. The states cover a target walking at the shooter and
+  // away from it, one at least as fast as the projectile, a zero offset, and the projectile
+  // speeds of the shipped kits through a cast in its windup (the speed of the winding-up ability
+  // is the one the aim leads with), and no cast (the nominal speed).
+  it('matches the reference chain on random frozen states, to the centimetre', () => {
+    const rng = createRng(20241005);
+    const kits = jsonKits();
+    const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
+    const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, speeds: new Set<number>() };
+    let checked = 0;
+    for (let i = 0; i < 4000; i++) {
+      const state = createMatch(configMirror(), open, 1, jsonKits());
+      const botId = i % 2;
+      const enemyId = 2 + (Math.floor(i / 2) % 2);
+      for (const id of [0, 1, 2, 3]) if (id !== botId && id !== enemyId) kill(state, id);
+      const me = put(state, botId, (rng.next() - 0.5) * 20, (rng.next() - 0.5) * 12);
+      const target = ch(state, enemyId);
+      const zero = i % 17 === 0;
+      target.x = zero ? me.x : me.x + (rng.next() - 0.5) * 24;
+      target.y = zero ? me.y : me.y + (rng.next() - 0.5) * 16;
+      const speedOfTarget = rng.next() * 30;
+      const heading = rng.next() * 2 * Math.PI;
+      target.vx = Math.cos(heading) * speedOfTarget;
+      target.vy = Math.sin(heading) * speedOfTarget;
+
+      // Half the states have a cast winding up, which sets the speed the aim leads with.
+      let speed = NOMINAL_PROJECTILE_SPEED;
+      if (i % 2 === 1) {
+        const slot = slots[Math.floor(rng.next() * slots.length)] as (typeof slots)[number];
+        const kit = kits.find((k) => k.id === me.championId);
+        const base = kit?.slots[slot];
+        const variant = base?.ex !== undefined && rng.next() < 0.5;
+        const spec = variant ? base?.ex : base;
+        const first = spec?.effects[0];
+        if (first !== undefined && first.type === 'projectile') speed = first.speed;
+        me.cast = { castId: 1, slot, ex: variant, windupTicks: 30, windupLeft: 10 };
+      }
+
+      // The edges of the lead, on a line with the shooter, in three variants: a target that stands
+      // still (b is 0), one closing at exactly the speed of the projectile (a is 0), and one
+      // receding along the line at the speed of the projectile less a billionth (a is about -1e-6
+      // and b is positive, where the two forms of the root differ by ten metres of aim).
+      if (i % 13 === 0 && !zero) {
+        const variant = Math.floor(i / 13) % 3;
+        const away = target.x > me.x ? 1 : -1;
+        target.y = me.y;
+        target.vy = 0;
+        target.vx = variant === 0 ? 0 : variant === 1 ? -away * speed : away * speed * (1 - 1e-9);
+      }
+
+      const seed = 1 + Math.floor(rng.next() * 1e6);
+      const bot = createBot(botId, 'hard', seed);
+      const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+      expect(bot.inspect().targetId, `state ${i}`).toBe(enemyId);
+
+      const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
+      const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, speed);
+      const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+      const expected = [roundAim(me.x + turned.x), roundAim(me.y + turned.y)];
+      expect([input.aimX, input.aimY], `state ${i}, speed ${speed}, seed ${seed}`).toEqual(expected);
+      checked++;
+
+      const dx = target.x - me.x;
+      const dy = target.y - me.y;
+      const b = 2 * (dx * target.vx + dy * target.vy);
+      if (dx === 0 && dy === 0) seen.zero++;
+      else if (target.vx * target.vx + target.vy * target.vy >= speed * speed) seen.fast++;
+      else if (b < 0) seen.approach++;
+      else seen.retreat++;
+      seen.speeds.add(speed);
+    }
+    expect(checked).toBe(4000);
+    // Every branch of the lead is reached, many times.
+    expect(seen.approach).toBeGreaterThan(300);
+    expect(seen.retreat).toBeGreaterThan(300);
+    expect(seen.fast).toBeGreaterThan(300);
+    expect(seen.zero).toBeGreaterThan(100);
+    // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25.
+    for (const speed of [12, 14, 20, 22, 25]) expect([...seen.speeds], `speed ${speed}`).toContain(speed);
   });
 });
 
@@ -800,10 +886,10 @@ describe('finisher', () => {
     ch(state, 3).health = 0.15 * ch(state, 3).maxHealth;
     put(state, 2, me.x, 5);
     put(state, 3, me.x, -5);
-    expect(intentAfterDelay(state).targetId).toBe(2);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'kite', targetId: 2 });
     put(state, 2, me.x, -5);
     put(state, 3, me.x, 5);
-    expect(intentAfterDelay(state).targetId).toBe(2);
+    expect(intentAfterDelay(state)).toEqual({ intent: 'kite', targetId: 2 });
   });
 
   it('does not take a dead enemy as the finisher, and retreats from the live one', () => {
@@ -817,5 +903,101 @@ describe('finisher', () => {
 
   it('kites a finisher that is closer than rangeMin', () => {
     expect(intentAfterDelay(duelAt(0.15, 2).state)).toEqual({ intent: 'kite', targetId: 2 });
+  });
+
+  /**
+   * The bot retreats at 20 percent, takes the finisher at `distance`, then regains health to
+   * `health` while the enemy leaves reach (and is healthy, so no finisher qualifies). Returns the
+   * intents acted on after the finisher think and after the enemy has left.
+   */
+  function afterFinisherLeaves(distance: number, health: number) {
+    const { state, me, enemy } = duelAt(0.1, distance);
+    const bot = createBot(1, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    const during = bot.inspect();
+    me.health = health * me.maxHealth;
+    enemy.x = me.x + 20;
+    enemy.health = enemy.maxHealth;
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    return { during, after: bot.inspect() };
+  }
+
+  it('does not resume the retreat in the band after an engage finisher', () => {
+    expect(afterFinisherLeaves(8, 0.32)).toEqual({
+      during: { intent: 'engage', targetId: 2 },
+      after: { intent: 'engage', targetId: 2 },
+    });
+  });
+
+  it('resumes the retreat in the band after a kite finisher', () => {
+    // At 5 m the retreat score tops the kite score at 20 percent, so the finisher is reached.
+    expect(afterFinisherLeaves(5, 0.32)).toEqual({
+      during: { intent: 'kite', targetId: 2 },
+      after: { intent: 'retreat', targetId: 2 },
+    });
+  });
+});
+
+describe('the returned input', () => {
+  /** Champion 0 of the 2v2 against champion 2, 6 m east on open ground. */
+  function duel(): GameState {
+    const state = setup();
+    kill(state, 1, 3);
+    put(state, 0, -3, 0);
+    put(state, 2, 3, 0);
+    return state;
+  }
+
+  it("is the bot's own record: the next think overwrites it, whatever the path", () => {
+    const state = duel();
+    const bot = createBot(0, 'hard', 1);
+    expect(bot.think(state)).toBe(bot.think(state));
+    // The dead path.
+    ch(state, 0).alive = false;
+    expect(bot.think(state)).toBe(bot.think(state));
+    ch(state, 0).alive = true;
+    // The idle path: no enemy is alive.
+    kill(state, 2);
+    expect(bot.think(state)).toBe(bot.think(state));
+  });
+
+  it('is a record per bot', () => {
+    const state = setup();
+    expect(createBot(0, 'hard', 1).think(state)).not.toBe(createBot(0, 'hard', 1).think(state));
+  });
+
+  it('is written in every field again on each think, on the acting path and on the dead path', () => {
+    const state = duel();
+    const bot = createBot(0, 'hard', 1);
+    // Past the reaction delay the bot acts: it engages and walks toward its target 6 m away.
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
+    const input = bot.think(state);
+    const expected = { ...input };
+    expect(input.moveX, 'it walks east').toBe(1);
+    // A caller that writes garbage into the record does not corrupt the next think.
+    (input as { moveX: number }).moveX = -1;
+    (input as { moveY: number }).moveY = 1;
+    input.aimX = 123456;
+    input.aimY = -98765;
+    input.buttons = 77;
+    expect(bot.think(state)).toEqual(expected);
+    ch(state, 0).alive = false;
+    ch(state, 0).aimX = 321;
+    ch(state, 0).aimY = -654;
+    input.aimX = 5;
+    input.buttons = 9;
+    expect(bot.think(state)).toEqual({ moveX: 0, moveY: 0, aimX: 321, aimY: -654, buttons: 0 });
+  });
+
+  it('is not what inspect returns: inspect is a fresh copy every time', () => {
+    const state = duel();
+    const bot = createBot(0, 'hard', 1);
+    thinkTimes(bot, state, TIERS.hard.delay + 1);
+    const a = bot.inspect();
+    expect(bot.inspect()).not.toBe(a);
+    expect(bot.inspect()).toEqual(a);
+    (a as { intent: string }).intent = 'idle';
+    expect(bot.inspect().intent).toBe('engage');
   });
 });

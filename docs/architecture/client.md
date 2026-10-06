@@ -87,9 +87,10 @@ The bots run in the main thread, through `bot-driver.ts`. `createBotDriver(ids,
 difficulty, seed)` makes one bot per driven id with the seed `seed * 100 + id`
 (the local seed is 1), and `think(state, inputs)` writes `inputs[id]` for each
 before `step` in every tick. The human's entry is the shared input object and
-is left alone. The glue is one indexed loop over a list built once. The bots
-package itself allocates on every think, by its API (a fresh `PlayerInput`, a
-decision record per think), which a later bots package addresses.
+is left alone. The glue is one indexed loop over a list built once. A bot's
+`think` allocates nothing in the steady state and returns the bot's own
+`PlayerInput`, which its next think overwrites; `step` copies it, so the driver
+writes the bot's record into `inputs` as it is.
 
 Each champion has its own model: `championModelUrl(id)` in `models.ts` gives
 `models/champions/<id>.glb` for a roster id and the placeholder for any other

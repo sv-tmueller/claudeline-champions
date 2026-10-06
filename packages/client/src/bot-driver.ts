@@ -5,8 +5,8 @@ import type { GameState, PlayerInput } from '@claudeline/sim';
 export interface BotDriver {
   /**
    * Call once per tick, before `step`: writes `inputs[id]` for every driven id
-   * and touches no other entry. Each bot returns a fresh input object (the bots
-   * allocate on every think, by their API), which the sim copies in `step`.
+   * and touches no other entry. Each bot returns its own record, which its next
+   * think overwrites (by the bots' API), and the sim copies it in `step`.
    */
   think(state: GameState, inputs: (PlayerInput | undefined)[]): void;
 }

@@ -18,7 +18,7 @@ import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import { createRng } from '../src/rng';
 import { arena01, clearShotOracle } from './helpers';
-import { boltAbility, boltSlot, quietAbility, quietKit, quillonKit } from './kits';
+import { boltAbility, boltSlot, quietAbility, quietKit, quietSlot, quillonKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 
@@ -636,5 +636,120 @@ describe('aim speed', () => {
     let input: PlayerInput | undefined;
     for (let i = 0; i <= tier.delay; i++) input = bot.think(state);
     expect(input).toMatchObject(expectedAim(me, target, NOMINAL_PROJECTILE_SPEED));
+  });
+});
+
+describe('the kit cache', () => {
+  // Quillon with an M1 that is the only slot with a band: 21 m/s for 40 ticks reaches 14 m and
+  // for 20 ticks 7 m.
+  const m1Kit = (lifetimeTicks: number): KitDef =>
+    quietKit('quillon', { M1: boltSlot(21, lifetimeTicks, { cooldownTicks: 30 }) });
+
+  /** Quillon (id 1) 9 m from champion 2, its only enemy, in a match with this kit. */
+  function nineMetres(kit: KitDef): GameState {
+    const state = createMatch(QUILLON, open, 1, [kit]);
+    kill(state, 0, 3);
+    put(state, 1, -3, 0);
+    put(state, 2, 6, 0);
+    return state;
+  }
+
+  it('reads the band of the kit of the match the bot is in, not the first one it saw', () => {
+    const bot = createBot(1, 'hard', 1);
+    expect(firstPress(bot, nineMetres(m1Kit(40)), 60), 'the long M1 reaches 9 m').not.toBeNull();
+    const short = nineMetres(m1Kit(20));
+    for (let i = 0; i < 60; i++) expect(bot.think(short).buttons, `short, think ${i}`).toBe(0);
+    expect(firstPress(bot, nineMetres(m1Kit(40)), 60), 'the long M1 again').not.toBeNull();
+  });
+
+  it('reads the profile of the champion the bot is in, when neither match has a kit', () => {
+    const asQuillon = createMatch(QUILLON, open, 1);
+    kill(asQuillon, 0, 3);
+    put(asQuillon, 1, -3, 0);
+    put(asQuillon, 2, 0, 0);
+    const bot = createBot(1, 'hard', 1);
+    for (let i = 0; i < TIERS.hard.delay + 1; i++) bot.think(asQuillon);
+    // Quillon is 3 m from its enemy: closer than rangeMin 6, so it kites.
+    expect(bot.inspect().intent).toBe('kite');
+
+    const asHargrim = createMatch(
+      {
+        teamSize: 2,
+        players: [
+          { championId: 'dummy', team: 'A' },
+          { championId: 'hargrim', team: 'A' },
+          { championId: 'dummy', team: 'B' },
+          { championId: 'dummy', team: 'B' },
+        ],
+      },
+      open,
+      1,
+    );
+    kill(asHargrim, 0, 3);
+    put(asHargrim, 1, -3, 0);
+    put(asHargrim, 2, 0, 0);
+    for (let i = 0; i < TIERS.hard.delay + 1; i++) bot.think(asHargrim);
+    // Hargrim never kites: it stands 3 m from its enemy.
+    expect(bot.inspect().intent).toBe('engage');
+  });
+});
+
+describe('energy reserve for the ultimate', () => {
+  // Hold the EX variants while F is ready, has a reach band and the energy is at least 75, so the
+  // bar can reach the 100 that F costs. An EX press spends 25, which is why the line is at 75.
+  const THINKS = TIERS.hard.delay + TIERS.hard.castDelay + ENOUGH;
+  const F_INDEX = 6;
+  const bolt = () => boltAbility(20, 30);
+
+  interface Scene {
+    energy: number;
+    /** The cooldown of F, in ticks; at most 1 counts as ready. */
+    fCooldown?: number;
+    /** Whether F has a reach band. */
+    fBand?: boolean;
+    /** The lifetime of the base M2 bolt, in ticks; its reach is 20 x lifetime / 60. */
+    baseLifetime?: number;
+  }
+
+  /** What the tester presses 5 m from its enemy with an M2 that has an EX variant: null for nothing. */
+  function pressOf(scene: Scene): number | null {
+    const kit = quietKit('tester', {
+      M2: boltSlot(20, scene.baseLifetime ?? 30, { ex: bolt() }),
+      F: scene.fBand === false ? quietSlot() : boltSlot(20, 30, { cooldownTicks: 600 }),
+    });
+    const state = duel(kit);
+    const me = ch(state, 0);
+    me.energy = scene.energy;
+    me.cooldowns[F_INDEX] = scene.fCooldown ?? 0;
+    return firstPress(createBot(0, 'hard', 1), state, THINKS)?.input.buttons ?? null;
+  }
+
+  it('holds the EX variant at 75 energy with F ready, and spends it at 74', () => {
+    expect(pressOf({ energy: 74 })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 75 })).toBe(Button.M2);
+    expect(pressOf({ energy: 99 })).toBe(Button.M2);
+  });
+
+  it('spends the EX variant at 80 energy when F is on cooldown, and holds it when F is ready at 1 tick', () => {
+    expect(pressOf({ energy: 80, fCooldown: 2 })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 80, fCooldown: 1 })).toBe(Button.M2);
+    expect(pressOf({ energy: 80, fCooldown: 0 })).toBe(Button.M2);
+  });
+
+  it('spends the EX variant at 80 energy when F has no reach band: an ultimate that reaches only allies', () => {
+    expect(pressOf({ energy: 80, fBand: false })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 80, fBand: false, fCooldown: 600 })).toBe(Button.M2 | Button.SHIFT);
+  });
+
+  it('presses F itself at 100 energy', () => {
+    expect(pressOf({ energy: 100 })).toBe(Button.F);
+  });
+
+  it('takes the reach of the base ability while the EX variant is held, and of the EX variant when it is spent', () => {
+    // The base M2 reaches 5 m (15 ticks), so a target 5 m away is outside its margin of 1 m; the
+    // EX variant reaches 10 m.
+    expect(pressOf({ energy: 74, baseLifetime: 15 })).toBe(Button.M2 | Button.SHIFT);
+    expect(pressOf({ energy: 80, baseLifetime: 15 })).toBeNull();
+    expect(pressOf({ energy: 80, baseLifetime: 15, fCooldown: 2 })).toBe(Button.M2 | Button.SHIFT);
   });
 });

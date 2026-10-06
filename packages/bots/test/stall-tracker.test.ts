@@ -5,6 +5,11 @@ import type { Bot } from '../src/bot';
 import type { Intent } from '../src/intent';
 import { arena01, config2v2, createStallTracker, ownSpawnOf } from './helpers';
 
+function setHealth(state: GameState, id: number, fraction: number): void {
+  const c = ch(state, id);
+  c.health = fraction * c.maxHealth;
+}
+
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
 const OBSERVES = 10;
 const ZERO: PlayerInput = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0 };
@@ -57,13 +62,73 @@ describe('createStallTracker', () => {
     expect(worstAfter(state, bots, zeros())).toBe(10);
   });
 
-  it('does not count a retreating bot that stands at its own spawn', () => {
+  // A retreating bot that stands at its own spawn is holding only when the rule of the bot says so:
+  // its team is ahead, or an enemy is in its reach (within rangeMax with a clear shot of 0.5 m).
+  // Otherwise the bot should be advancing, and the stand is a stall.
+  it('does not count a retreating bot that stands at its own spawn while its team is ahead', () => {
     const state = duel(0);
     const spawn = ownSpawnOf(state, ch(state, 0));
     if (spawn === undefined) throw new Error('no spawn');
     place(state, 0, spawn.x, spawn.y);
     place(state, 2, 0, 0);
+    // 1 against 0.5: ahead.
+    setHealth(state, 2, 0.5);
     const bots = [stub('retreat', 2)];
+    expect(worstAfter(state, bots, zeros())).toBe(0);
+  });
+
+  it('counts a retreating bot that stands at its own spawn while its team is not ahead and nothing is in reach: 10 of 10', () => {
+    const state = duel(0);
+    const spawn = ownSpawnOf(state, ch(state, 0));
+    if (spawn === undefined) throw new Error('no spawn');
+    place(state, 0, spawn.x, spawn.y);
+    place(state, 2, 0, 0);
+    // 1 against 1 is a tie, which is not ahead; the enemy is 12 m away and the bot reaches 3 m.
+    const bots = [stub('retreat', 2)];
+    expect(worstAfter(state, bots, zeros())).toBe(10);
+  });
+
+  it('does not count a retreating bot at its spawn while an enemy is in its reach with a clear shot', () => {
+    const state = duel(0);
+    const spawn = ownSpawnOf(state, ch(state, 0));
+    if (spawn === undefined) throw new Error('no spawn');
+    place(state, 0, spawn.x, spawn.y);
+    place(state, 2, spawn.x + 2.5, spawn.y);
+    const bots = [stub('retreat', 2)];
+    expect(worstAfter(state, bots, zeros())).toBe(0);
+  });
+
+  it('does not count a retreating bot at its spawn while an enemy other than its target is in reach', () => {
+    const state = duel(0);
+    ch(state, 3).alive = true;
+    const spawn = ownSpawnOf(state, ch(state, 0));
+    if (spawn === undefined) throw new Error('no spawn');
+    place(state, 0, spawn.x, spawn.y);
+    place(state, 2, 0, 0);
+    place(state, 3, spawn.x + 2.5, spawn.y);
+    const bots = [stub('retreat', 2)];
+    expect(worstAfter(state, bots, zeros())).toBe(0);
+  });
+
+  it('counts a retreating bot at its spawn when the enemy in range has no clear shot: 10 of 10', () => {
+    // arena01: Quillon (id 1, reaches 13 m) at its spawn (-12, -2) and Lumeth at (-4, 2), 8.9 m away
+    // with the box at (-8, 0) in the way.
+    const state = createMatch(config2v2(), arena01, 1);
+    for (const dead of [0, 3]) ch(state, dead).alive = false;
+    const spawn = ownSpawnOf(state, ch(state, 1));
+    if (spawn === undefined) throw new Error('no spawn');
+    place(state, 1, spawn.x, spawn.y);
+    place(state, 2, -4, 2);
+    const bots = [stub('idle', -1), stub('retreat', 2)];
+    expect(worstAfter(state, bots, zeros())).toBe(10);
+  });
+
+  it('does not count a retreating bot that stands in reach of its target with a clear shot, away from its spawn', () => {
+    // The latched stand: it advanced, it is in reach, and it casts. Quillon 8 m from Lumeth.
+    const state = duel(1);
+    place(state, 1, -4, 0);
+    place(state, 2, 4, 0);
+    const bots = [stub('idle', -1), stub('retreat', 2)];
     expect(worstAfter(state, bots, zeros())).toBe(0);
   });
 

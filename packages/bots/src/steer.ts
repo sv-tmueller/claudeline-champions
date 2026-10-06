@@ -1,5 +1,6 @@
 import type { MoveAxis } from '@claudeline/sim';
 import type { Vec2 } from './grid';
+import { hypot2 } from './hypot';
 
 export interface MoveCommand {
   moveX: MoveAxis;
@@ -23,13 +24,28 @@ export function steerToward(
   target: Vec2,
   arrivalRadius: number = ARRIVAL_RADIUS,
 ): MoveCommand {
+  const out: MoveCommand = { moveX: 0, moveY: 0 };
+  steerTowardInto(out, position, target, arrivalRadius);
+  return out;
+}
+
+/** `steerToward` written into `out` field by field, for the think path. */
+export function steerTowardInto(
+  out: MoveCommand,
+  position: Vec2,
+  target: Vec2,
+  arrivalRadius: number = ARRIVAL_RADIUS,
+): void {
   const dx = target.x - position.x;
   const dy = target.y - position.y;
-  const distance = Math.hypot(dx, dy);
-  if (!Number.isFinite(distance) || distance <= arrivalRadius) return { moveX: 0, moveY: 0 };
+  const distance = hypot2(dx, dy);
+  if (!Number.isFinite(distance) || distance <= arrivalRadius) {
+    out.moveX = 0;
+    out.moveY = 0;
+    return;
+  }
   const ax = Math.abs(dx);
   const ay = Math.abs(dy);
-  const moveX: MoveAxis = ax >= SECTOR * ay ? (dx > 0 ? 1 : -1) : 0;
-  const moveY: MoveAxis = ay >= SECTOR * ax ? (dy > 0 ? 1 : -1) : 0;
-  return { moveX, moveY };
+  out.moveX = ax >= SECTOR * ay ? (dx > 0 ? 1 : -1) : 0;
+  out.moveY = ay >= SECTOR * ax ? (dy > 0 ? 1 : -1) : 0;
 }

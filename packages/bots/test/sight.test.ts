@@ -3,7 +3,15 @@ import { createMatch, hasLineOfSight } from '@claudeline/sim';
 import type { ArenaDef, GameState } from '@claudeline/sim';
 import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
 import type { NavGrid, Vec2 } from '../src/grid';
-import { SIGHT_CLEARANCE, SIGHT_RADIUS, clearShot, nearestSightCell } from '../src/sight';
+import { createRng } from '../src/rng';
+import {
+  SIGHT_CLEARANCE,
+  SIGHT_RADIUS,
+  clearShot,
+  createSightScratch,
+  lineOfSight,
+  nearestSightCell,
+} from '../src/sight';
 import { arena01, clearShotOracle, config2v2 } from './helpers';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -257,5 +265,95 @@ describe('nearestSightCell', () => {
       expect(() => nearestSightCell(grid, state, p, target, 6, 13), `${p.x}, ${p.y}`).not.toThrow();
       expect(nearestSightCell(grid, state, p, target, 6, 13), `${p.x}, ${p.y}`).toBe(-1);
     }
+  });
+});
+
+describe('lineOfSight', () => {
+  // `hasLineOfSight` of the sim allocates about 128 B per call on arena01 (it boxes the double each
+  // sweep returns), so the think path has its own copy of the test, in booleans and locals. It
+  // must give the sim's answer on every segment.
+  const mixed: ArenaDef = {
+    ...arena01,
+    id: 'mixed',
+    obstacles: [
+      { type: 'circle', x: 1, y: 1, r: 1, height: 2, blocksProjectiles: true },
+      { type: 'rect', x: -4, y: 2, w: 3, h: 1, height: 2, blocksProjectiles: true },
+      { type: 'rect', x: 4, y: -2, w: 1, h: 4, height: 2, blocksProjectiles: false },
+      { type: 'circle', x: -3, y: -3, r: 0.5, height: 2, blocksProjectiles: false },
+      { type: 'rect', x: 0, y: -5, w: 6, h: 0.5, height: 2, blocksProjectiles: true },
+    ],
+  };
+
+  function agree(state: GameState, from: Vec2, to: Vec2): void {
+    expect(lineOfSight(state, from, to), `(${from.x}, ${from.y}) to (${to.x}, ${to.y})`).toBe(
+      hasLineOfSight(state, from, to),
+    );
+  }
+
+  it('gives the sim answer on random segments, blocked and clear, on both arenas', () => {
+    const rng = createRng(7);
+    let blocked = 0;
+    let clear = 0;
+    for (const arena of [arena01, mixed, open]) {
+      const state = stateOf(arena);
+      for (let i = 0; i < 20000; i++) {
+        const from = { x: (rng.next() - 0.5) * 28, y: (rng.next() - 0.5) * 18 };
+        const to = { x: (rng.next() - 0.5) * 28, y: (rng.next() - 0.5) * 18 };
+        agree(state, from, to);
+        if (hasLineOfSight(state, from, to)) clear++;
+        else blocked++;
+      }
+    }
+    // Both outcomes are common, so a copy that always said yes or no would fail.
+    expect(blocked).toBeGreaterThan(5000);
+    expect(clear).toBeGreaterThan(5000);
+  });
+
+  it('gives the sim answer on axis-aligned, zero-length and touching segments', () => {
+    const state = stateOf(arena01);
+    const coordinates = [-2, -1.5, -0.5, 0, 0.5, 1.5, 2, 5];
+    for (const fx of coordinates) {
+      for (const fy of coordinates) {
+        for (const tx of coordinates) {
+          for (const ty of coordinates) agree(state, { x: fx, y: fy }, { x: tx, y: ty });
+        }
+      }
+    }
+    // Tangent to the pillar (radius 1.5) and to the top of the box at (-8, 0), which is 1.5 high.
+    agree(state, { x: -5, y: 1.5 }, { x: 5, y: 1.5 });
+    agree(state, { x: -5, y: -1.5 }, { x: 5, y: -1.5 });
+    agree(state, { x: -9, y: 1.5 }, { x: -7, y: 1.5 });
+    agree(state, { x: -8.5, y: 1.5 }, { x: -8.5, y: 3 });
+    // Along the four edges of the box at (-8, 0), 1 m by 3 m: left, right, bottom.
+    agree(state, { x: -8.5, y: -3 }, { x: -8.5, y: 3 });
+    agree(state, { x: -7.5, y: -3 }, { x: -7.5, y: 3 });
+    agree(state, { x: -10, y: -1.5 }, { x: -6, y: -1.5 });
+    // A start inside an obstacle.
+    agree(state, { x: 0, y: 0 }, { x: 5, y: 0 });
+  });
+
+  it('skips an obstacle that does not block projectiles', () => {
+    const state = stateOf(arena01);
+    // The low wall at (-6, 5) does not block projectiles.
+    expect(lineOfSight(state, { x: -9, y: 5 }, { x: -3, y: 5 })).toBe(true);
+    expect(lineOfSight(state, { x: -5, y: 0 }, { x: 5, y: 0 })).toBe(false);
+  });
+});
+
+describe('the obstacle table of a scratch', () => {
+  it('follows the arena of the state it is given, and rebuilds for another arena object', () => {
+    const scratch = createSightScratch();
+    const pillar = stateOf(arena01);
+    const empty = stateOf(open);
+    const from = { x: -5, y: 0 };
+    const to = { x: 5, y: 0 };
+    expect(lineOfSight(pillar, from, to, scratch)).toBe(false);
+    expect(lineOfSight(empty, from, to, scratch)).toBe(true);
+    expect(lineOfSight(pillar, from, to, scratch)).toBe(false);
+    // The same arena values in a new object: a clone of the state is a new arena object.
+    const copy = stateOf({ ...arena01, obstacles: arena01.obstacles.map((o) => ({ ...o })) });
+    expect(lineOfSight(copy, from, to, scratch)).toBe(false);
+    expect(clearShot(empty, from, to, 0.5, scratch)).toBe(true);
+    expect(clearShot(pillar, from, to, 0.5, scratch)).toBe(false);
   });
 });

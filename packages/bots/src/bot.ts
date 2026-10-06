@@ -1,25 +1,44 @@
 import { SLOTS } from '@claudeline/sim';
 import type { ChampionState, GameState, KitDef, PlayerInput } from '@claudeline/sim';
-import { NOMINAL_PROJECTILE_SPEED, leadPoint, roundAim, rotateByHalfTangent } from './aim';
-import { abilityFor, buttonsOf, chooseCast, findKit, projectileSpeed, updateRuns } from './casting';
+import { NOMINAL_PROJECTILE_SPEED } from './aim';
+import {
+  abilityFor,
+  buttonsOf,
+  chooseCast,
+  createKitCache,
+  findKit,
+  refreshKitCache,
+  updateRuns,
+} from './casting';
 import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
-import { createFollower, followPath } from './follow';
+import { createFollower, followPathInto } from './follow';
 import { segmentClear } from './geometry';
-import { buildNavGrid, cellCenter, cellIndexAt } from './grid';
+import { buildNavGrid, cellCenterInto, cellIndexAt } from './grid';
 import type { NavGrid, Vec2 } from './grid';
-import { chooseIntent, scoreIntents } from './intent';
-import type { Intent, ScoredIntent } from './intent';
-import { profileFor } from './profile';
+import { createMeasure, distanceInto } from './hypot';
+import type { Measure } from './hypot';
+import { chooseIntent, scoreIntentsInto } from './intent';
+import type { Intent, ScoredIntent, Scores } from './intent';
 import type { BotProfile } from './profile';
 import { createRng } from './rng';
-import { SIGHT_CLEARANCE, clearShot, nearestSightCell } from './sight';
-import { steerToward } from './steer';
+import {
+  SIGHT_CLEARANCE,
+  SIGHT_RADIUS,
+  clearShot,
+  createSightScratch,
+  nearestSightCellIn,
+} from './sight';
+import type { SightScratch } from './sight';
+import { steerTowardInto } from './steer';
 import type { MoveCommand } from './steer';
 
 export interface Bot {
-  /** Call once per tick, before `step`. Never mutates the state. */
+  /**
+   * Call once per tick, before `step`. Never mutates the state. Returns the bot's own record,
+   * which its next `think` overwrites: a caller that keeps the input longer copies it.
+   */
   think(state: GameState): PlayerInput;
   /** The intent and target the bot is acting on now, as a fresh copy. For tests and tools. */
   inspect(): { intent: Intent; targetId: number };
@@ -44,22 +63,25 @@ function fail(problem: string): never {
   throw new Error(`Invalid bot: ${problem}`);
 }
 
-function distanceBetween(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
 function enemyAlive(state: GameState, me: ChampionState, id: number): ChampionState | undefined {
   const c = id >= 0 ? state.champions[id] : undefined;
   return c !== undefined && c.alive && c.team !== me.team ? c : undefined;
 }
 
 /** Keep the current target unless another enemy is more than the margin nearer. */
-function chooseTarget(state: GameState, me: ChampionState, currentId: number): number {
+function chooseTarget(
+  state: GameState,
+  me: ChampionState,
+  currentId: number,
+  dist: Measure,
+): number {
   let nearest: ChampionState | undefined;
   let nearestDistance = Infinity;
-  for (const c of state.champions) {
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
     if (!c.alive || c.team === me.team) continue;
-    const d = distanceBetween(me, c);
+    distanceInto(dist, me, c);
+    const d = dist.metres;
     if (d < nearestDistance) {
       nearest = c;
       nearestDistance = d;
@@ -67,8 +89,9 @@ function chooseTarget(state: GameState, me: ChampionState, currentId: number): n
   }
   if (nearest === undefined) return -1;
   const current = enemyAlive(state, me, currentId);
-  if (current !== undefined && distanceBetween(me, current) - nearestDistance <= TARGET_SWITCH_MARGIN) {
-    return current.id;
+  if (current !== undefined) {
+    distanceInto(dist, me, current);
+    if (dist.metres - nearestDistance <= TARGET_SWITCH_MARGIN) return current.id;
   }
   return nearest.id;
 }
@@ -81,27 +104,75 @@ function finisher(
   state: GameState,
   me: ChampionState,
   profile: BotProfile,
-  health: number,
+  sight: SightScratch,
+  dist: Measure,
 ): ChampionState | undefined {
+  const health = me.health / me.maxHealth;
   let best: ChampionState | undefined;
   let bestDistance = Infinity;
-  for (const c of state.champions) {
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
     if (!c.alive || c.team === me.team || c.health / c.maxHealth > health) continue;
-    const d = distanceBetween(me, c);
+    distanceInto(dist, me, c);
+    const d = dist.metres;
     if (d > profile.rangeMax || d >= bestDistance) continue;
-    if (!clearShot(state, me, c, SIGHT_CLEARANCE)) continue;
+    if (!clearShot(state, me, c, SIGHT_CLEARANCE, sight)) continue;
     best = c;
     bestDistance = d;
   }
   return best;
 }
 
-/** The spawn point of the bot's slot: its rank among its teammates by id, as createMatch places them. */
-function ownSpawn(state: GameState, me: ChampionState): Vec2 | undefined {
+/**
+ * Whether the bot's team is ahead: the sum of health over maximum health of its alive champions,
+ * the bot included, is more than the same sum of the enemy's alive champions. Summed in id order,
+ * so the result is the same on every platform; equal sums are not ahead.
+ */
+function teamAhead(state: GameState, me: ChampionState): boolean {
+  let own = 0;
+  let enemy = 0;
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (!c.alive) continue;
+    if (c.team === me.team) own += c.health / c.maxHealth;
+    else enemy += c.health / c.maxHealth;
+  }
+  return own > enemy;
+}
+
+/** Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. */
+function enemyInReach(
+  state: GameState,
+  me: ChampionState,
+  profile: BotProfile,
+  sight: SightScratch,
+  dist: Measure,
+): boolean {
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (!c.alive || c.team === me.team) continue;
+    distanceInto(dist, me, c);
+    if (dist.metres > profile.rangeMax) continue;
+    if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) return true;
+  }
+  return false;
+}
+
+/**
+ * The spawn point of the bot's slot, written into `out`: its rank among its teammates by id, as
+ * createMatch places them. False, with `out` untouched, when the arena has no such spawn.
+ */
+function ownSpawnInto(out: Vec2, state: GameState, me: ChampionState): boolean {
   let slot = 0;
-  for (const c of state.champions) if (c.team === me.team && c.id < me.id) slot++;
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (c.team === me.team && c.id < me.id) slot++;
+  }
   const spawn = (me.team === 'A' ? state.arena.spawns.teamA : state.arena.spawns.teamB)[slot];
-  return spawn === undefined ? undefined : { x: spawn[0], y: spawn[1] };
+  if (spawn === undefined) return false;
+  out.x = spawn[0];
+  out.y = spawn[1];
+  return true;
 }
 
 /** True when the grid cell holding p is free, the cell the path follower would plan to. */
@@ -110,32 +181,53 @@ function cellFree(grid: NavGrid, p: Vec2): boolean {
   return cell >= 0 && grid.blocked[cell] === false;
 }
 
-/** Turns the unit vector by 45 degrees (sign 1 or -1) with exact constants, no trigonometry. */
-function turn45(v: Vec2, sign: 1 | -1): Vec2 {
-  const c = Math.SQRT1_2;
-  const s = sign * Math.SQRT1_2;
-  return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
-}
-
 /**
  * The first of straight away, +45, -45, +90, -90 degrees whose point 1 m off lies in a free grid
- * cell and is reached by a clear straight segment. Null when all five fail: the bot is cornered.
+ * cell and is reached by a clear straight segment: the move toward it is written into `out` and
+ * the result is true. False when all five fail: the bot is cornered. `point` is scratch. The 45
+ * degree turns use exact constants, no trigonometry.
  */
-function kiteStep(grid: NavGrid, me: ChampionState, target: ChampionState): MoveCommand | null {
-  const d = distanceBetween(me, target);
-  const away: Vec2 = d === 0 ? { x: 1, y: 0 } : { x: (me.x - target.x) / d, y: (me.y - target.y) / d };
-  const directions: Vec2[] = [
-    away,
-    turn45(away, 1),
-    turn45(away, -1),
-    { x: -away.y, y: away.x },
-    { x: away.y, y: -away.x },
-  ];
-  for (const dir of directions) {
-    const p = { x: me.x + dir.x * KITE_STEP, y: me.y + dir.y * KITE_STEP };
-    if (cellFree(grid, p) && segmentClear(grid, me, p)) return steerToward(me, p);
+function kiteStepInto(
+  out: MoveCommand,
+  point: Vec2,
+  grid: NavGrid,
+  me: ChampionState,
+  target: ChampionState,
+  dist: Measure,
+): boolean {
+  distanceInto(dist, me, target);
+  const d = dist.metres;
+  const awayX = d === 0 ? 1 : (me.x - target.x) / d;
+  const awayY = d === 0 ? 0 : (me.y - target.y) / d;
+  const c = Math.SQRT1_2;
+  for (let k = 0; k < 5; k++) {
+    let dirX: number;
+    let dirY: number;
+    if (k === 0) {
+      dirX = awayX;
+      dirY = awayY;
+    } else if (k === 1) {
+      dirX = awayX * c - awayY * c;
+      dirY = awayX * c + awayY * c;
+    } else if (k === 2) {
+      const s = -Math.SQRT1_2;
+      dirX = awayX * c - awayY * s;
+      dirY = awayX * s + awayY * c;
+    } else if (k === 3) {
+      dirX = -awayY;
+      dirY = awayX;
+    } else {
+      dirX = awayY;
+      dirY = -awayX;
+    }
+    point.x = me.x + dirX * KITE_STEP;
+    point.y = me.y + dirY * KITE_STEP;
+    if (cellFree(grid, point) && segmentClear(grid, me, point)) {
+      steerTowardInto(out, me, point);
+      return true;
+    }
   }
-  return null;
+  return false;
 }
 
 export function createBot(playerId: number, difficulty: Difficulty, seed: number): Bot {
@@ -147,12 +239,29 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
 
   const tier = TIERS[difficulty];
   const rng = createRng(seed >>> 0);
+  // Every record a think reads or writes is made here, once, and rewritten field by field: the
+  // steady state allocates nothing (packages/bots/test/allocation.test.ts). A plan, a fresh
+  // follower after a goal or intent change, and `inspect()` allocate by design. Fields that hold
+  // doubles start as doubles (0.5), as the sim's geometry does, so no field changes
+  // representation and boxes a number.
+  //
   // The delay line: what was decided `delay` thinks ago is what the bot acts on now.
   const ring: Decision[] = [];
   for (let i = 0; i < tier.delay; i++) ring.push({ intent: 'idle', targetId: -1 });
   let ringIndex = 0;
-  let decided: Decision = { intent: 'engage', targetId: -1 };
-  let lastActed: Decision = { intent: 'idle', targetId: -1 };
+  const decided: Decision = { intent: 'engage', targetId: -1 };
+  const acted: Decision = { intent: 'idle', targetId: -1 };
+  const lastActed: Decision = { intent: 'idle', targetId: -1 };
+  const scores: Scores = { engage: 0.5, kite: 0.5, retreat: 0.5 };
+  const command: MoveCommand = { moveX: 0, moveY: 0 };
+  const choice: CastChoice = { slot: 'M1', ex: false };
+  const input: PlayerInput = { moveX: 0, moveY: 0, aimX: 0.5, aimY: 0.5, buttons: 0 };
+  const sight: SightScratch = createSightScratch();
+  const spawnPoint: Vec2 = { x: 0.5, y: 0.5 };
+  const goalPoint: Vec2 = { x: 0.5, y: 0.5 };
+  const stepPoint: Vec2 = { x: 0.5, y: 0.5 };
+  const kitCache = createKitCache();
+  const dist = createMeasure();
   let follower = createFollower();
   // The kind of goal the follower served on the previous think and on this one. Null after a
   // think that did not call followPath, so a follower never carries a plan across a gap.
@@ -163,9 +272,14 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   // kite candidate, the step back into the corner blocks all five again, and the bot dithers.
   let wasEscaping = false;
   let escaping = false;
+  // True while a retreating bot advances on its target instead of walking to its spawn (see the
+  // retreat case of `move`), and the target it advances on. Cleared when the acted intent is not
+  // retreat, when the acted target is another one, when the team gets ahead and when the bot dies.
+  let advancing = false;
+  let advanceTargetId = -1;
   let grid: NavGrid | undefined;
   let gridArena: GameState['arena'] | undefined;
-  let aimU = 0;
+  let aimU = 0.5;
   let aimAge = 0;
   // Per slot (in SLOTS order), the consecutive thinks the acted target was in sight and in reach
   // of the ability the slot would cast. Allocated once; see casting.ts.
@@ -181,116 +295,196 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   }
 
   function decide(state: GameState, me: ChampionState, profile: BotProfile): void {
-    const targetId = chooseTarget(state, me, decided.targetId);
+    const targetId = chooseTarget(state, me, decided.targetId, dist);
     const target = state.champions[targetId];
     if (targetId < 0 || target === undefined) {
-      decided = { intent: 'idle', targetId: -1 };
+      decided.intent = 'idle';
+      decided.targetId = -1;
       return;
     }
     const current: ScoredIntent = decided.intent === 'idle' ? 'engage' : decided.intent;
-    const health = me.health / me.maxHealth;
-    const scores = scoreIntents(distanceBetween(me, target), health, profile.rangeMin);
+    distanceInto(dist, me, target);
+    scoreIntentsInto(scores, dist, me, profile);
     const intent = chooseIntent(current, scores);
     if (intent === 'retreat') {
       // A finisher: an enemy in reach with a clear shot and no more health than the bot has. The
       // bot does not retreat from it: it engages or kites it instead, and it is the target.
-      const weak = finisher(state, me, profile, health);
+      const weak = finisher(state, me, profile, sight, dist);
       if (weak !== undefined) {
-        const against = scoreIntents(distanceBetween(me, weak), health, profile.rangeMin);
-        against.retreat = 0;
-        decided = {
-          intent: chooseIntent(current === 'retreat' ? 'engage' : current, against),
-          targetId: weak.id,
-        };
+        distanceInto(dist, me, weak);
+        scoreIntentsInto(scores, dist, me, profile);
+        scores.retreat = 0;
+        decided.intent = chooseIntent(current === 'retreat' ? 'engage' : current, scores);
+        decided.targetId = weak.id;
         return;
       }
     }
-    decided = { intent, targetId };
+    decided.intent = intent;
+    decided.targetId = targetId;
   }
 
   /** Path following with a fresh follower when the goal kind differs from the previous think's. */
-  function follow(kind: FollowGoal, g: NavGrid, me: ChampionState, goal: Vec2): MoveCommand {
+  function follow(kind: FollowGoal, g: NavGrid, me: ChampionState, goal: Vec2): void {
     if (kind !== previousGoal) follower = createFollower();
     currentGoal = kind;
-    return followPath(g, follower, me, goal);
+    followPathInto(command, g, follower, me, goal);
   }
 
-  function move(
+  function stand(): void {
+    command.moveX = 0;
+    command.moveY = 0;
+  }
+
+  /**
+   * The sight logic of a bot that wants a shot at its target, the one a kite uses beyond rangeMin:
+   * stand while the target has a clear shot (and, with `requireRange`, is within rangeMax), else
+   * walk to the nearest cell that has one at a distance in [rangeMin, rangeMax], else along the
+   * path to the target, which ends in line of sight. Reads the distance to the target from `dist`.
+   */
+  function seekShot(
     state: GameState,
+    g: NavGrid,
     me: ChampionState,
-    acted: Decision,
+    target: ChampionState,
     profile: BotProfile,
-  ): MoveCommand {
+    requireRange: boolean,
+  ): void {
+    if (
+      (!requireRange || dist.metres <= profile.rangeMax) &&
+      clearShot(state, me, target, SIGHT_CLEARANCE, sight)
+    ) {
+      return stand();
+    }
+    sight.rangeMin = profile.rangeMin;
+    sight.rangeMax = profile.rangeMax;
+    const cell = nearestSightCellIn(g, state, me, target, SIGHT_RADIUS, sight);
+    if (cell < 0) return follow('target', g, me, target);
+    cellCenterInto(goalPoint, g, cell);
+    return follow('sight', g, me, goalPoint);
+  }
+
+  /** The move of the acted intent, written into `command`. */
+  function move(state: GameState, me: ChampionState, profile: BotProfile): void {
+    if (acted.intent !== 'retreat') advancing = false;
     const target = enemyAlive(state, me, acted.targetId);
-    if (acted.intent === 'idle' || target === undefined) return { moveX: 0, moveY: 0 };
-    const d = distanceBetween(me, target);
+    if (acted.intent === 'idle' || target === undefined) return stand();
+    distanceInto(dist, me, target);
+    const d = dist.metres;
     const g = navGrid(state);
     switch (acted.intent) {
       case 'engage':
-        if (d <= profile.rangeMax && clearShot(state, me, target, SIGHT_CLEARANCE)) {
-          return { moveX: 0, moveY: 0 };
+        if (d <= profile.rangeMax && clearShot(state, me, target, SIGHT_CLEARANCE, sight)) {
+          return stand();
         }
         return follow('target', g, me, target);
       case 'kite': {
         if (d < profile.rangeMin) {
-          if (!wasEscaping) {
-            const stepAway = kiteStep(g, me, target);
-            if (stepAway !== null) return stepAway;
-          }
+          if (!wasEscaping && kiteStepInto(command, stepPoint, g, me, target, dist)) return;
           // Cornered: leave along the path to the own spawn. The escape counts only while the
           // path gives a move: at the spawn, or with no path, the bot stands for this think and
           // tries the kite steps again on the next.
-          const spawn = ownSpawn(state, me);
-          if (spawn === undefined) return { moveX: 0, moveY: 0 };
-          const leave = follow('spawn', g, me, spawn);
-          escaping = leave.moveX !== 0 || leave.moveY !== 0;
-          return leave;
+          if (!ownSpawnInto(spawnPoint, state, me)) return stand();
+          follow('spawn', g, me, spawnPoint);
+          escaping = command.moveX !== 0 || command.moveY !== 0;
+          return;
         }
-        if (clearShot(state, me, target, SIGHT_CLEARANCE)) return { moveX: 0, moveY: 0 };
-        const cell = nearestSightCell(g, state, me, target, profile.rangeMin, profile.rangeMax);
-        return cell >= 0
-          ? follow('sight', g, me, cellCenter(g, cell))
-          : follow('target', g, me, target);
+        return seekShot(state, g, me, target, profile, false);
       }
       case 'retreat': {
-        const spawn = ownSpawn(state, me);
-        return spawn === undefined ? { moveX: 0, moveY: 0 } : follow('spawn', g, me, spawn);
+        // The deadlock rule: a retreating bot advances on its target when no enemy is in its reach
+        // and its team is not ahead. Without it every champion of a match at low health walks to
+        // its spawn and stands there for good. The advance is latched: once begun it goes on, and
+        // it stands in reach to cast, until the intent leaves retreat, the target changes or the
+        // team gets ahead. Without the latch a bot at the edge of its reach steps back out of it,
+        // so its cast run starts over on every other think and nothing lands.
+        const ahead = teamAhead(state, me);
+        if (advancing && (acted.targetId !== advanceTargetId || ahead)) advancing = false;
+        if (!advancing && !ahead && !enemyInReach(state, me, profile, sight, dist)) {
+          advancing = true;
+          advanceTargetId = acted.targetId;
+        }
+        if (advancing) {
+          // enemyInReach measured other enemies: measure the target again.
+          distanceInto(dist, me, target);
+          return seekShot(state, g, me, target, profile, true);
+        }
+        if (!ownSpawnInto(spawnPoint, state, me)) return stand();
+        return follow('spawn', g, me, spawnPoint);
       }
     }
   }
 
+  /**
+   * Writes the aim into `input`; the one rng draw of a think is here. The lead and the error
+   * turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the
+   * same operations in the same order (the tests compare the two bit for bit): a call with a
+   * double argument that V8 does not inline boxes it, and the aim made a dozen of them.
+   */
   function aim(
     me: ChampionState,
     target: ChampionState,
-    speed: number,
-  ): { aimX: number; aimY: number } {
+    kit: KitDef | undefined,
+    pressed: boolean,
+  ): void {
     if (aimAge === 0) aimU = (2 * rng.next() - 1) * tier.maxU;
     aimAge = (aimAge + 1) % AIM_ERROR_HOLD;
-    const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, speed);
-    const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, aimU);
-    const aimX = roundAim(me.x + turned.x);
-    const aimY = roundAim(me.y + turned.y);
-    return Number.isFinite(aimX) && Number.isFinite(aimY)
-      ? { aimX, aimY }
-      : { aimX: me.aimX, aimY: me.aimY };
-  }
 
-  /**
-   * The speed the aim leads with: the first projectile of the ability winding up, or else of the
-   * one pressed on this think, or else the nominal speed.
-   */
-  function aimSpeed(kit: KitDef | undefined, me: ChampionState, choice: CastChoice | null): number {
+    // The speed the aim leads with: the first projectile of the ability winding up, or else of
+    // the one pressed on this think, or else the nominal speed.
+    let speed = NOMINAL_PROJECTILE_SPEED;
     if (kit !== undefined) {
       const spec =
         me.cast !== null
           ? abilityFor(kit, me.cast.slot, me.cast.ex)
-          : choice !== null
+          : pressed
             ? abilityFor(kit, choice.slot, choice.ex)
             : undefined;
-      const speed = spec === undefined ? undefined : projectileSpeed(spec);
-      if (speed !== undefined) return speed;
+      if (spec !== undefined) {
+        for (let i = 0; i < spec.effects.length; i++) {
+          const effect = spec.effects[i];
+          if (effect !== undefined && effect.type === 'projectile') {
+            speed = effect.speed;
+            break;
+          }
+        }
+      }
     }
-    return NOMINAL_PROJECTILE_SPEED;
+
+    // leadPoint: the time a projectile of this speed needs to meet the target.
+    const dx = target.x - me.x;
+    const dy = target.y - me.y;
+    const vx = target.vx;
+    const vy = target.vy;
+    const a = vx * vx + vy * vy - speed * speed;
+    const b = 2 * (dx * vx + dy * vy);
+    const c = dx * dx + dy * dy;
+    let leadX = target.x;
+    let leadY = target.y;
+    if (!(c === 0 || !(a < 0))) {
+      const root = Math.sqrt(b * b - 4 * a * c);
+      const t = b >= 0 ? (b + root) / (-2 * a) : (2 * c) / (root - b);
+      if (Number.isFinite(t) && t > 0) {
+        leadX = target.x + vx * t;
+        leadY = target.y + vy * t;
+      }
+    }
+
+    // rotateByHalfTangent: the vector to the lead point turns by 2 atan(u).
+    const k = 1 + aimU * aimU;
+    const cos = (1 - aimU * aimU) / k;
+    const sin = (2 * aimU) / k;
+    const lx = leadX - me.x;
+    const ly = leadY - me.y;
+    // roundAim: whole centimetres, and the `+ 0` turns -0 into 0.
+    const aimX = Math.round((me.x + (lx * cos - ly * sin)) * 100) + 0;
+    const aimY = Math.round((me.y + (lx * sin + ly * cos)) * 100) + 0;
+    if (Number.isFinite(aimX) && Number.isFinite(aimY)) {
+      input.aimX = aimX;
+      input.aimY = aimY;
+    } else {
+      input.aimX = me.aimX;
+      input.aimY = me.aimY;
+    }
   }
 
   return {
@@ -302,53 +496,60 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       const me = state.champions[playerId];
       if (me === undefined) return fail(`no champion ${playerId} in the state`);
       if (!me.alive) {
+        advancing = false;
         runs.fill(0);
-        return { moveX: 0, moveY: 0, aimX: me.aimX, aimY: me.aimY, buttons: 0 };
+        input.moveX = 0;
+        input.moveY = 0;
+        input.aimX = me.aimX;
+        input.aimY = me.aimY;
+        input.buttons = 0;
+        return input;
       }
 
       const kit = findKit(state, me.championId);
-      const profile = profileFor(me.championId, kit);
+      refreshKitCache(kitCache, kit, me.championId);
+      const profile = kitCache.profile;
       decide(state, me, profile);
 
-      const delayed = ring[ringIndex];
-      ring[ringIndex] = { intent: decided.intent, targetId: decided.targetId };
+      const slot = ring[ringIndex] as Decision;
+      acted.intent = slot.intent;
+      acted.targetId = slot.targetId;
+      slot.intent = decided.intent;
+      slot.targetId = decided.targetId;
       ringIndex = (ringIndex + 1) % tier.delay;
-      let acted: Decision = delayed ?? { intent: 'idle', targetId: -1 };
 
       const target = enemyAlive(state, me, acted.targetId);
-      if (target === undefined) acted = { intent: 'idle', targetId: -1 };
+      if (target === undefined) {
+        acted.intent = 'idle';
+        acted.targetId = -1;
+      }
       if (acted.intent !== lastActed.intent || acted.targetId !== lastActed.targetId) {
         follower = createFollower();
       }
       if (acted.targetId !== lastActed.targetId) runs.fill(0);
-      lastActed = acted;
+      lastActed.intent = acted.intent;
+      lastActed.targetId = acted.targetId;
 
-      const command = move(state, me, acted, profile);
+      move(state, me, profile);
+      input.moveX = command.moveX;
+      input.moveY = command.moveY;
       if (acted.intent === 'idle' || target === undefined) {
         runs.fill(0);
-        return {
-          moveX: command.moveX,
-          moveY: command.moveY,
-          aimX: me.aimX,
-          aimY: me.aimY,
-          buttons: 0,
-        };
+        input.aimX = me.aimX;
+        input.aimY = me.aimY;
+        input.buttons = 0;
+        return input;
       }
-      let choice: CastChoice | null = null;
+      let pressed = false;
       if (kit !== undefined) {
-        updateRuns(runs, state, kit, me, target);
-        choice = chooseCast(runs, tier.castDelay, kit, me);
+        updateRuns(runs, state, kitCache, me, target, sight, dist);
+        pressed = chooseCast(choice, runs, tier.castDelay, kit, kitCache, me);
       } else {
         runs.fill(0);
       }
-      const { aimX, aimY } = aim(me, target, aimSpeed(kit, me, choice));
-      return {
-        moveX: command.moveX,
-        moveY: command.moveY,
-        aimX,
-        aimY,
-        buttons: choice === null ? 0 : buttonsOf(choice),
-      };
+      aim(me, target, kit, pressed);
+      input.buttons = pressed ? buttonsOf(choice) : 0;
+      return input;
     },
 
     inspect(): { intent: Intent; targetId: number } {

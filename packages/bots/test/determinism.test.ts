@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checksum } from '@claudeline/sim';
 import type { Difficulty } from '../src/difficulty';
-import { configMirror, createRun, runMatch } from './helpers';
+import { configMirror, createRun, jsonKits, runMatch } from './helpers';
 import { hargrimKit, quillonKit } from './kits';
 
 // No fixture and no checksum literal: bot output is only promised to be repeatable in one
@@ -15,6 +15,9 @@ describe('bot determinism within one process', () => {
     const a = runMatch(SEEDS, TIERS, TICKS);
     const b = runMatch(SEEDS, TIERS, TICKS);
     expect(a.inputs).toHaveLength(TICKS);
+    // One record per bot per tick: a stream of aliases would compare a few objects with themselves.
+    expect(new Set(a.inputs.flat()).size).toBe(TICKS * 4);
+    expect(new Set(b.inputs.flat()).size).toBe(TICKS * 4);
     expect(b.inputs).toEqual(a.inputs);
     expect(checksum(b.state)).toBe(checksum(a.state));
   });
@@ -62,6 +65,8 @@ describe('bot determinism within one process, with kits', () => {
     const a = kitRun(SEEDS, TIERS, TICKS);
     const b = kitRun(SEEDS, TIERS, TICKS);
     expect(a.inputs).toHaveLength(TICKS);
+    expect(new Set(a.inputs.flat()).size).toBe(TICKS * 4);
+    expect(new Set(b.inputs.flat()).size).toBe(TICKS * 4);
     expect(b.inputs).toEqual(a.inputs);
     expect(checksum(b.state)).toBe(checksum(a.state));
   });
@@ -95,6 +100,49 @@ describe('bot determinism within one process, with kits', () => {
     // No ability of these kits draws from the sim's generator, and the bots never read it.
     const a = kitRun(SEEDS, TIERS, 1200, 7);
     const b = kitRun(SEEDS, TIERS, 1200, 99);
+    expect(b.inputs).toEqual(a.inputs);
+  });
+});
+
+describe('bot determinism within one process, with the shipped kits', () => {
+  const options = () => ({ config: configMirror(), kits: jsonKits() });
+  const jsonRun = (seeds: number[], tiers: Difficulty[], ticks: number, matchSeed = 7) =>
+    runMatch(seeds, tiers, ticks, undefined, undefined, matchSeed, options());
+
+  it('gives the same input stream, buttons included, and final checksum for the same seeds', () => {
+    const a = jsonRun(SEEDS, TIERS, TICKS);
+    const b = jsonRun(SEEDS, TIERS, TICKS);
+    expect(a.inputs).toHaveLength(TICKS);
+    expect(new Set(a.inputs.flat()).size).toBe(TICKS * 4);
+    expect(b.inputs).toEqual(a.inputs);
+    expect(checksum(b.state)).toBe(checksum(a.state));
+    const presses = a.inputs.flat().filter((input) => input.buttons !== 0).length;
+    expect(presses, 'the comparison presses buttons').toBeGreaterThan(0);
+  });
+
+  it('is not disturbed by a match on the test kits stepped in between', () => {
+    const alone = jsonRun(SEEDS, TIERS, TICKS);
+    const otherSeeds = [5, 6, 7, 8];
+    const otherTiers: Difficulty[] = ['hard', 'hard', 'easy', 'easy'];
+    const testKits = () => ({ config: configMirror(), kits: [hargrimKit(), quillonKit()] });
+    const otherAlone = runMatch(otherSeeds, otherTiers, TICKS, undefined, undefined, 7, testKits());
+
+    // The two matches are stepped in turn, and the same two bot objects of each stay in their match.
+    const first = createRun(SEEDS, TIERS, 7, options());
+    const second = createRun(otherSeeds, otherTiers, 7, testKits());
+    for (let t = 0; t < TICKS; t++) {
+      first.advance();
+      second.advance();
+    }
+    expect(first.inputs).toEqual(alone.inputs);
+    expect(second.inputs).toEqual(otherAlone.inputs);
+    expect(checksum(first.state)).toBe(checksum(alone.state));
+    expect(checksum(second.state)).toBe(checksum(otherAlone.state));
+  });
+
+  it('does not depend on the match seed through the bot itself', () => {
+    const a = jsonRun(SEEDS, TIERS, 1200, 7);
+    const b = jsonRun(SEEDS, TIERS, 1200, 99);
     expect(b.inputs).toEqual(a.inputs);
   });
 });

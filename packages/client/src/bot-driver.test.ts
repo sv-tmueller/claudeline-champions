@@ -14,6 +14,19 @@ function setup() {
   return { state, botIds, inputs };
 }
 
+/** True when `root` reaches `target` through any chain of properties, arrays included. */
+function holdsReference(root: object, target: object): boolean {
+  const seen = new Set<object>();
+  const walk = (value: unknown): boolean => {
+    if (typeof value !== 'object' || value === null) return false;
+    if (value === target) return true;
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return Object.values(value).some(walk);
+  };
+  return walk(root);
+}
+
 describe('bot driver', () => {
   it('writes the input of every driven id and leaves the others alone', () => {
     const { state, botIds, inputs } = setup();
@@ -30,13 +43,23 @@ describe('bot driver', () => {
     expect(inputs.map((input) => input !== undefined)).toEqual([false, false, true, false]);
   });
 
-  it('writes a fresh input object on every call, since the bot returns one', () => {
+  it("writes the bot's own record on every call, which step copies", () => {
     const { state, botIds, inputs } = setup();
     const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
     driver.think(state, inputs);
     const first = inputs[1];
+    expect(first).toBeDefined();
+    // The bots reuse one record each and overwrite it on their next think.
     driver.think(state, inputs);
-    expect(inputs[1]).not.toBe(first);
+    expect(inputs[1]).toBe(first);
+    // step copies what it reads: the state keeps no reference to the record the driver wrote, so
+    // the bot may overwrite it. A walk over the whole state finds none, and the same walk finds one
+    // when a field is made to hold the record, so it is not vacuous.
+    if (first === undefined) throw new Error('no input');
+    step(state, inputs);
+    expect(holdsReference(state, first), 'state after step').toBe(false);
+    const probe = { ...state, kept: first };
+    expect(holdsReference(probe, first), 'control: a state that keeps it').toBe(true);
   });
 
   // The reference bots are made the way the driver says it makes them: one
