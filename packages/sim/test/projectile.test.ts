@@ -636,6 +636,32 @@ describe('a projectile with allyEffects', () => {
     expect(champion(enemyFirst, 1).health).toBe(100);
   });
 
+  it('stops at the first champion of either team when both are inside one sweep (T4c)', () => {
+    // 120 m/s is 2 m per tick: from x = -5 the contacts at -3.9 and -3.1 are in the first sweep.
+    const allyFirst = line();
+    place(allyFirst, 1, -3.2, 0);
+    place(allyFirst, 2, -2.4, 0);
+    spawnProjectile(allyFirst, bolt({ speed: 120 }));
+    step(allyFirst, []);
+    expect(allyFirst.projectiles).toHaveLength(0);
+    expect(allyFirst.events.map((e) => e.type)).toEqual(['projectileHit', 'projectileExpired']);
+    expect(ofType(allyFirst.events, 'projectileHit').map((h) => h.targetId)).toEqual([1]);
+    expect(ofType(allyFirst.events, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+    expect(champion(allyFirst, 2).health).toBe(120);
+
+    const enemyFirst = line();
+    place(enemyFirst, 2, -3.2, 0);
+    place(enemyFirst, 1, -2.4, 0);
+    champion(enemyFirst, 1).health = 100;
+    spawnProjectile(enemyFirst, bolt({ speed: 120 }));
+    step(enemyFirst, []);
+    expect(enemyFirst.projectiles).toHaveLength(0);
+    expect(ofType(enemyFirst.events, 'projectileHit').map((h) => h.targetId)).toEqual([2]);
+    expect(ofType(enemyFirst.events, 'projectileExpired').map((e) => e.reason)).toEqual(['hit']);
+    expect(champion(enemyFirst, 2).health).toBe(110);
+    expect(champion(enemyFirst, 1).health).toBe(100);
+  });
+
   it('touches an ally and an enemy once each with pierce, in contact order (T5)', () => {
     const allyThenEnemy = line();
     place(allyThenEnemy, 1, -2, 0);
