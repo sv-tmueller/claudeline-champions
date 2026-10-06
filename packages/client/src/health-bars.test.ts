@@ -29,6 +29,25 @@ function four(): ChampionState[] {
   ).champions;
 }
 
+/** The six champions of a fresh 3v3, ids 0 to 2 on team A and 3 to 5 on team B. */
+function six(): ChampionState[] {
+  return createMatch(
+    {
+      teamSize: 3,
+      players: [
+        { championId: 'hargrim', team: 'A' },
+        { championId: 'quillon', team: 'A' },
+        { championId: 'quillon', team: 'A' },
+        { championId: 'hargrim', team: 'B' },
+        { championId: 'quillon', team: 'B' },
+        { championId: 'quillon', team: 'B' },
+      ],
+    },
+    parseArenaDef(arena01Json),
+    1,
+  ).champions;
+}
+
 function poses(champions: readonly ChampionState[]): Pose[] {
   return champions.map((c) => ({ x: c.x, y: c.y, facing: 0 }));
 }
@@ -169,5 +188,50 @@ describe('health bars', () => {
     (champions[0] as ChampionState).health = 60;
     expect(bars.update(champions, poses(champions))).toBe(true);
     expect(bars.update(champions, poses(champions))).toBe(false);
+  });
+});
+
+describe('health bars of a 3v3', () => {
+  it('makes a back and a fill sprite for each of the six champions', () => {
+    expect(sprites(createHealthBars(six(), 'A').group)).toHaveLength(12);
+  });
+
+  it('colours ids 0 to 2 green and 3 to 5 red for team A, and the other way round for team B', () => {
+    const bars = createHealthBars(six(), 'A');
+    expect([0, 1, 2, 3, 4, 5].map((id) => hex(fillOf(bars.group, id)))).toEqual([
+      ALLY_BAR_COLOUR,
+      ALLY_BAR_COLOUR,
+      ALLY_BAR_COLOUR,
+      ENEMY_BAR_COLOUR,
+      ENEMY_BAR_COLOUR,
+      ENEMY_BAR_COLOUR,
+    ]);
+    const flipped = createHealthBars(six(), 'B');
+    expect([0, 1, 2, 3, 4, 5].map((id) => hex(fillOf(flipped.group, id)))).toEqual([
+      ENEMY_BAR_COLOUR,
+      ENEMY_BAR_COLOUR,
+      ENEMY_BAR_COLOUR,
+      ALLY_BAR_COLOUR,
+      ALLY_BAR_COLOUR,
+      ALLY_BAR_COLOUR,
+    ]);
+  });
+
+  it('reports the percent and the change of ids 4 and 5', () => {
+    const champions = six();
+    const bars = createHealthBars(champions, 'A');
+    bars.update(champions, poses(champions));
+    expect([0, 1, 2, 3, 4, 5].map((id) => bars.percent(id))).toEqual([100, 100, 100, 100, 100, 100]);
+    expect([0, 1, 2, 3, 4, 5].map((id) => bars.changed(id))).toEqual([true, true, true, true, true, true]);
+    const fifth = champions[4] as ChampionState;
+    fifth.health = fifth.maxHealth / 2;
+    const sixth = champions[5] as ChampionState;
+    sixth.health = 0;
+    sixth.alive = false;
+    bars.update(champions, poses(champions));
+    expect([0, 1, 2, 3, 4, 5].map((id) => bars.percent(id))).toEqual([100, 100, 100, 100, 50, -1]);
+    expect([0, 1, 2, 3, 4, 5].map((id) => bars.changed(id))).toEqual([false, false, false, false, true, true]);
+    expect(fillOf(bars.group, 5).visible).toBe(false);
+    expect(fillOf(bars.group, 4).scale.x).toBeCloseTo(BAR_WIDTH * 0.5, 12);
   });
 });

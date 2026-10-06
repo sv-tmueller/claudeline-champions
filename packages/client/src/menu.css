@@ -71,7 +71,8 @@
 
 #menu button,
 #menu [data-champion],
-#menu [data-arena-id] {
+#menu [data-arena-id],
+#menu [data-team-size] {
   padding: calc(var(--menu-u) * 0.6) calc(var(--menu-u) * 1.2);
   border: calc(var(--menu-u) * 0.15) solid var(--menu-text);
   border-radius: calc(var(--menu-u) * 0.5);
@@ -92,18 +93,21 @@
 }
 
 #menu [data-part='select'],
-#menu [data-part='arena-select'] {
+#menu [data-part='arena-select'],
+#menu [data-part='team-select'] {
   display: flex;
   gap: calc(var(--menu-u) * 1.5);
 }
 
-#menu [data-champion][data-available='false'] {
+#menu [data-champion][data-available='false'],
+#menu [data-team-size][data-available='false'] {
   opacity: 0.35;
   cursor: default;
 }
 
-/* The arena being played: a heavier border, since a colour would break the palette. */
-#menu [data-arena-id][data-current='true'] {
+/* The arena and the team size being played: a heavier border, since a colour would break the palette. */
+#menu [data-arena-id][data-current='true'],
+#menu [data-team-size][data-current='true'] {
   border-width: calc(var(--menu-u) * 0.4);
 }
 

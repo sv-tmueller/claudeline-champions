@@ -8,8 +8,8 @@ import { TEST_KITS } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
 
-function setup() {
-  const { state, botIds } = createLocalMatch({ scene: 'match', champion: 'hargrim', difficulty: 'normal', arena: 'arena01' }, arena, TEST_KITS);
+function setup(teamSize: 2 | 3 = 2) {
+  const { state, botIds } = createLocalMatch({ scene: 'match', champion: 'hargrim', difficulty: 'normal', arena: 'arena01', teamSize }, arena, TEST_KITS);
   const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
   return { state, botIds, inputs };
 }
@@ -35,6 +35,18 @@ describe('bot driver', () => {
     createBotDriver(botIds, 'normal', LOCAL_SEED).think(state, inputs);
     expect(inputs[0]).toBe(human);
     for (const id of botIds) expect(inputs[id], `bot ${id}`).toBeDefined();
+  });
+
+  it('drives the five bots of a 3v3 and leaves the human alone', () => {
+    const { state, botIds, inputs } = setup(3);
+    const human: PlayerInput = { moveX: 1, moveY: 0, aimX: 5, aimY: 6, buttons: 0 };
+    inputs[0] = human;
+    createBotDriver(botIds, 'normal', LOCAL_SEED).think(state, inputs);
+    expect(state.champions).toHaveLength(6);
+    expect(inputs[0]).toBe(human);
+    expect(botIds).toEqual([1, 2, 3, 4, 5]);
+    for (let id = 1; id <= 5; id++) expect(inputs[id], `bot ${id}`).toBeDefined();
+    expect(inputs).toHaveLength(6);
   });
 
   it('writes only the ids it was given', () => {

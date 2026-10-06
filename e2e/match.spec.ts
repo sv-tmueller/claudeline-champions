@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { orFail, watchProblems } from './support';
 
 // The default match: the local Hargrim and an ally Quillon against an enemy
-// Hargrim and Quillon, all three bots on normal. The clock is paused and the
+// Hargrim and Quillon, all three bots on normal. The 3v3 rows play the same round
+// with an ally Quillon more and an enemy Quillon more, five bots. The clock is paused and the
 // test runs it in window-sized steps at the probe viewport, reading the hooks
 // between steps only, so a slow machine changes the time the test takes and
 // never what it sees. Bot output differs between platforms, so every wait here
@@ -16,7 +17,10 @@ interface Hooks {
   y: number;
   projectiles: number;
   hits: number;
+  /** One per champion, as many as the match has. */
   bars: string[];
+  /** Whether the canvas has a bar hook beyond the match's champions. */
+  extraBar: boolean;
   timer: string;
   resultVisible: string | null;
 }
@@ -56,7 +60,8 @@ async function readHooks(page: Page): Promise<Hooks> {
       y: Number(d['p0y']),
       projectiles: Number(d['projectiles']),
       hits: Number(d['hits']),
-      bars: [0, 1, 2, 3].map((id) => d[`bar${id}`] ?? ''),
+      bars: [0, 1, 2, 3, 4, 5].filter((id) => d[`bar${id}`] !== undefined).map((id) => d[`bar${id}`] ?? ''),
+      extraBar: d['bar6'] !== undefined,
       timer: document.querySelector('[data-hud="round-timer"]')?.textContent ?? '',
       resultVisible: document.querySelector('[data-result="panel"]')?.getAttribute('data-visible') ?? null,
     };
@@ -98,19 +103,29 @@ async function runUntil(
   }
 }
 
-// The same round on each arena. The arena02 row proves the bots and the sim play it from the
-// address, not only that the page loads it: its first death is a tick budget like arena01's.
-const ARENAS = [
-  { id: 'arena01', address: '/', picture: 'match.png' },
-  { id: 'arena02', address: '/?arena=arena02', picture: 'match-arena02.png' },
+// The same round on each arena and each team size. The arena02 row proves the bots and the sim play it
+// from the address, not only that the page loads it: its first death is a tick budget like arena01's.
+// The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on 9612bff, the
+// same figures as the log lines of these rows. They are logged and never asserted: the 2v2 rows assert
+// budgets only too, and every bots change moves them. arena01 267 and 301, arena02 275 and 307. The budgets stay 600 and 1800.
+const ROWS = [
+  { id: 'arena01', size: 2, address: '/', picture: 'match.png' },
+  { id: 'arena02', size: 2, address: '/?arena=arena02', picture: 'match-arena02.png' },
+  { id: 'arena01', size: 3, address: '/?teamsize=3', picture: 'match-3v3.png', projectile: 267, hit: 301 },
+  { id: 'arena02', size: 3, address: '/?arena=arena02&teamsize=3', picture: 'match-3v3-arena02.png', projectile: 275, hit: 307 },
 ] as const;
 
-for (const arena of ARENAS) {
-  test(`plays the first round of a match against bots on ${arena.id}`, async ({ page }, testInfo) => {
+for (const arena of ROWS) {
+  const title =
+    arena.size === 2
+      ? `plays the first round of a match against bots on ${arena.id}`
+      : `plays the first round of a 3v3 match against bots on ${arena.id}`;
+  test(title, async ({ page }, testInfo) => {
     test.setTimeout(TEST_TIMEOUT_MS);
     const { problems, failed } = watchProblems(page);
 
     try {
+      const startedAt = Date.now();
       await page.clock.install({ time: 0 });
       await page.goto(arena.address);
       await orFail(page.waitForSelector(`canvas[data-arena="${arena.id}"][data-tick]`), failed);
@@ -121,6 +136,9 @@ for (const arena of ARENAS) {
       let hooks = await runUntil(page, 'the round phase', ROUND_BUDGET_TICKS, (h) => h.phase === 'round');
       expect(hooks.round).toBe('1');
       expect(hooks.resultVisible).toBe('false');
+      // A bar hook per champion: four in a 2v2, six in a 3v3, and no more.
+      expect(hooks.bars, `the bars of the ${arena.size}v${arena.size}`).toEqual(Array(2 * arena.size).fill('100'));
+      expect(hooks.extraBar).toBe(false);
 
       // Input reaches the champion: D moves it east.
       const before = await readHooks(page);
@@ -139,13 +157,16 @@ for (const arena of ARENAS) {
         PROJECTILE_BUDGET_TICKS - (hooks.tick - WARMUP_TICKS),
         (h) => h.projectiles > 0 || h.hits > 0,
       );
+      if (arena.size === 3) console.log(`first projectile on ${arena.id} 3v3: tick ${hooks.tick}, headless ${arena.projectile}`);
       hooks = await runUntil(
         page,
         'a hit or a bar below 100',
         HIT_BUDGET_TICKS - (hooks.tick - WARMUP_TICKS),
         (h) => h.hits > 0 || h.bars.some((bar) => bar !== '100'),
       );
-      console.log(`first hit on ${arena.id}: tick ${hooks.tick}`);
+      console.log(
+        `first hit on ${arena.id}${arena.size === 3 ? ' 3v3' : ''}: tick ${hooks.tick}${arena.size === 3 ? `, headless ${arena.hit}` : ''}, ${Date.now() - startedAt} ms`,
+      );
 
       // The result panel stays hidden until the match ends.
       expectTimerFollowsTick(hooks);

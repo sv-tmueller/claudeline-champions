@@ -45,14 +45,28 @@ const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
 // picture (the enemy bars, the HUD text) is in the picture without the edge too.
 const RED: ColourRange = { min: [140, 30, 30], max: [255, 100, 100] };
 const TEST_TIMEOUT_MS = 60_000;
-// The match test runs once per arena. `query` leads the address and ends in `&` when it is not
-// empty. The budgets of arena01 are the two constants above. arena02 has its own headless run
+// The match test runs once per arena and team size. `query` leads the address and ends in `&` when it
+// is not empty. The budgets of arena01 are the two constants above. arena02 has its own headless run
 // (match-setup.test.ts, ARENA02_END_TICK) and its budget is built the same way: that tick plus
 // two more rounds of about 1000 each and one round to sudden death of about 7000, rounded up to
 // 1000 (13 000 ticks), and frames = ceil(13 000 / 96) + 25 = 161.
-const ARENAS = [
-  { id: 'arena01', query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
-  { id: 'arena02', query: 'arena=arena02&', budgetTicks: 13_000, budgetFrames: 161 },
+// The 3v3 rows have their own headless runs (match-setup.test.ts, ARENA01_3V3_END_TICK and
+// ARENA02_3V3_END_TICK) and the same formula with a longer round, since the longest non-sudden 3v3
+// round measured is 1557 ticks, rounded to 1600: end tick + 2 * 1600 + 7000, rounded up to 1000.
+//   arena01: 10 631 + 3200 + 7000 = 20 831, so 21 000 ticks; frames = ceil(21 000 / 96) + 25 = 244.
+//   arena02:  7 119 + 3200 + 7000 = 17 319, so 18 000 ticks; frames = ceil(18 000 / 96) + 25 = 213.
+// The headless runs end in a Victory 3 : 1 on arena01 (round 4, one sudden-death round) and a Defeat
+// 2 : 3 on arena02 (round 5). The rows read the result off the page and log it next to those
+// figures. The exact outcome is not pinned: the 2v2 rows derive it from the score the same way, and
+// every bots change moves it. The headless match-setup tests log the end tick and fail once a match
+// passes its budget. Each row logs its wall time, and a row over 40 s gets its own
+// test.setTimeout. None does: the 3v3 rows ran in 0.7 s here (the runner's frame costs
+// about ten times more, so about 7 s), under the 60 s default.
+const ROWS = [
+  { id: 'arena01', size: 2, query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
+  { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 13_000, budgetFrames: 161 },
+  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 21_000, budgetFrames: 244, expected: 'Victory 3 : 1 at about tick 10 631' },
+  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 18_000, budgetFrames: 213, expected: 'Defeat 2 : 3 at about tick 7119' },
 ] as const;
 
 interface Hooks {
@@ -66,6 +80,8 @@ interface Hooks {
   title: string;
   resultScore: string;
   entries: { champion: string | null; available: string | null; href: string | null; tag: string }[];
+  /** `data-bar0` to `data-bar6` that exist on the canvas, as the ids. */
+  barIds: number[];
   ring: {
     visible: string | null;
     counting: string | null;
@@ -99,6 +115,7 @@ async function readHooks(page: Page): Promise<Hooks> {
         href: entry.getAttribute('href'),
         tag: entry.tagName,
       })),
+      barIds: [0, 1, 2, 3, 4, 5, 6].filter((id) => d[`bar${id}`] !== undefined),
       ring: {
         visible: ring?.getAttribute('data-visible') ?? null,
         counting: ring?.getAttribute('data-counting') ?? null,
@@ -158,8 +175,12 @@ async function runUntil(
   }
 }
 
-for (const arena of ARENAS) {
-  test(`plays the default match on ${arena.id} to the result screen and relaunches from its select`, async ({ page }, testInfo) => {
+for (const arena of ROWS) {
+  const title =
+    arena.size === 2
+      ? `plays the default match on ${arena.id} to the result screen and relaunches from its select`
+      : `plays the 3v3 match on ${arena.id} to the result screen and relaunches from its select`;
+  test(title, async ({ page }, testInfo) => {
     test.setTimeout(TEST_TIMEOUT_MS);
     const { problems, failed } = watchProblems(page);
 
@@ -189,15 +210,19 @@ for (const arena of ARENAS) {
       expect(Math.max(local, other)).toBe(hooks.firstTo);
       expect(hooks.round, 'every won round was played').toBeGreaterThanOrEqual(local + other);
       console.log(
-        `match end on ${arena.id}: tick ${hooks.tick}, score ${hooks.score}, ${frames} frames, ${Date.now() - startedAt} ms`,
+        `match end on ${arena.id} ${arena.size}v${arena.size}: tick ${hooks.tick}, score ${hooks.score}, ${hooks.title}, ${frames} frames, ${Date.now() - startedAt} ms${'expected' in arena ? `, headless ${arena.expected}` : ''}`,
       );
+      // One bar hook per champion, and no more.
+      expect(hooks.barIds, 'the bar hooks').toEqual(Array.from({ length: 2 * arena.size }, (_, id) => id));
 
       // The select: the roster in order, a link per champion with a kit and no link for the rest.
       expect(hooks.entries.map((entry) => entry.champion)).toEqual(ROSTER);
       for (const entry of hooks.entries) {
         if (entry.available === 'true') {
           expect(entry.tag, entry.champion ?? '').toBe('A');
-          expect(entry.href, entry.champion ?? '').toBe(`?champion=${entry.champion}&difficulty=normal&arena=${arena.id}`);
+          expect(entry.href, entry.champion ?? '').toBe(
+            `?champion=${entry.champion}&difficulty=normal&arena=${arena.id}&teamsize=${arena.size}`,
+          );
         } else {
           expect(entry.available, entry.champion ?? '').toBe('false');
           expect(entry.href, entry.champion ?? '').toBeNull();
@@ -211,12 +236,18 @@ for (const arena of ARENAS) {
       await runFrames(page, 2);
       await page.screenshot({ path: testInfo.outputPath('result.png') });
 
-      // Following a link reloads the page as that champion: Quillon has 120 health, and
-      // the new match starts with the panel hidden.
+      // Following a link reloads the page as that champion on the same arena and team size:
+      // Quillon has 120 health, the new match has the same number of bars, and it starts with
+      // the panel hidden.
       await page.locator('[data-result="panel"] [data-champion="quillon"]').click();
       await orFail(page.waitForSelector(`canvas[data-arena="${arena.id}"][data-tick]`), failed);
       const reloaded = await readHooks(page);
       expect(reloaded.panelVisible).toBe('false');
+      expect(page.url()).toContain(`teamsize=${arena.size}`);
+      await orFail(page.waitForSelector(`canvas[data-bar${2 * arena.size - 1}]`), failed);
+      expect((await readHooks(page)).barIds, 'the bars after the reload').toEqual(
+        Array.from({ length: 2 * arena.size }, (_, id) => id),
+      );
       expect(await page.locator('[data-hud="health-bar"] [data-part="health-text"]').textContent()).toBe('120 / 120');
       expect(reloaded.phase).not.toBe('matchEnd');
     } finally {
