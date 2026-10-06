@@ -14,16 +14,12 @@ import type { CDPSession, Page } from '@playwright/test';
 // and every function in main.ts (stepSim, sampleAim, draw and the hook writers). The
 // HUD builder, hud-dom.ts, the result panel's builder, result-dom.ts, and the setup
 // modules run once at startup and are not counted.
-// The bots package is not counted either, and its bytes are logged as the sixth
-// figure of the probe line. A live match leaves the bots' steady state in any
-// window by design (a new plan, a fresh path follower after an intent change, the
-// aim point boxed every 15 thinks), and bot output differs between platforms, so
-// counting it would tie the browser limit to decisions the runner makes
-// differently. The think has its own gate, allocation.test.ts in the bots
-// package. Its files get the prefix bots/ in `summarise`, as the sim's get sim/,
-// so a bots file such as bot.ts never matches a client entry. Bytes of an
-// inlined callee land on its caller, so bots bytes inlined into the glue still
-// show in bot-driver.ts or stepSim, which are counted.
+// The bots package is not in COMBAT_CODE: its bytes are the sixth figure of the probe
+// line, and the live scene bounds them apart (LIVE_BOTS_LIMIT_BYTES below). Its files
+// get the prefix bots/ in `summarise`, as the sim's get sim/, so a bots file such as
+// bot.ts never matches a client entry. Bytes of an inlined callee land on its caller,
+// so bots bytes inlined into the glue still show in bot-driver.ts or stepSim, which are
+// counted.
 // The measured windows run through the client's dev-only hook, window.__runProbeFrames
 // (frameMany in main.ts), which calls frame directly. No frame of a measured
 // window runs through three's animation callback or the fake clock's
@@ -107,6 +103,25 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 600;
 // the earlier 12, so it is not a live gate; 892 to 944 B against 600 B on the
 // sandbox). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
+// The live match's bots limit: 9600 B, its own literal (the bots stay out of
+// COMBAT_CODE), on the median of the five measured windows' own bots figures, not on the
+// bots figure of the window that is the median by counted bytes. On bc1d6f1 the bots read
+// a median window of 39 to 44 KB over 15 local attempts and 52 and 40 KB on the runner
+// (windows from 25 to 132 KB): the plan search's garbage (about 53 KB a plan) and the
+// calls V8's Maglev tier boxes (Number.isFinite, hypot2), see bots.md, Allocation. With
+// both fixed (#93) the median window read 3.2 to 3.7 KB over 15 local attempts on the
+// rebased head (3.5 to 4.0 KB over 15 on 04be0f9), 3588, 3912 and 3756 B on the runner
+// (run 37457728094, 04be0f9), and 6.4 KB once, in a tester's attempt, where
+// `sight.ts:lineOfSight` read 2732 B in the median window: one interpreted call after a
+// deopt, counted as clean by decision 12 of #91. The limit is 50 percent above that
+// largest median (6.4 KB) and under a quarter of the smallest revert median (38.9 KB, so
+// 9.7 KB). Reverting the plan search and the Maglev fixes (`packages/bots/src` as on
+// bc1d6f1) reads medians of 38.9 to 43.4 KB and fails 9 of 9 local attempts (3 batches of
+// 3). It does not catch one reverted Maglev fix alone: `bot.ts:aim` adds about 1.2 KB, the
+// distance of `steerTowardInto` and the finite test of `cellIndexAt` up to 5 KB a window
+// together, and the median window stays under 9.6 KB then. A runner median above 9600 B
+// reopens the limit. See bots.md and testing.md.
+export const LIVE_BOTS_LIMIT_BYTES = 9600;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains
@@ -131,7 +146,7 @@ export interface Allocations {
   /** Bytes outside the sweep files of the sim, for the sanity floor. */
   outsideSweep: number;
   combat: number;
-  /** Bytes in the bots package. Logged, not counted: the think has its own gate (allocation.test.ts). */
+  /** Bytes in the bots package. Not in `combat`: the live scene bounds them apart (LIVE_BOTS_LIMIT_BYTES). */
   bots: number;
   /** Bytes in three's onAnimationFrame. Logged, not counted: no measured frame runs through it. */
   onAnimationFrame: number;

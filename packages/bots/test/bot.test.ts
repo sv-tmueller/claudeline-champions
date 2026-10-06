@@ -108,6 +108,37 @@ describe('think output', () => {
     expect(bot.inspect()).toEqual({ intent: 'idle', targetId: -1 });
   });
 
+  it('keeps the stored aim when the aim overflows to infinity, not only when it is not a number', () => {
+    const state = setup();
+    kill(state, 1, 3);
+    const me = ch(state, 0);
+    me.aimX = 321;
+    me.aimY = -654;
+    // 1e308 m is a finite distance, and its aim in centimetres overflows.
+    put(state, 2, 1e308, 3);
+    const bot = createBot(0, 'hard', 1);
+    const input = thinkTimes(bot, state, TIERS.hard.delay + 5);
+    expect(bot.inspect().targetId).toBe(2);
+    expect({ aimX: input.aimX, aimY: input.aimY }).toEqual({ aimX: 321, aimY: -654 });
+  });
+
+  it('aims at a target 1e200 m away although the time to meet it is infinite', () => {
+    const state = setup();
+    kill(state, 1, 3);
+    const me = ch(state, 0);
+    me.aimX = 321;
+    me.aimY = -654;
+    // The squared distance overflows, so the time to meet a target standing still is +Infinity:
+    // the lead is not used, and the aim is the target's own position, which is still finite.
+    put(state, 2, 1e200, 3);
+    const bot = createBot(0, 'hard', 1);
+    const input = thinkTimes(bot, state, TIERS.hard.delay + 5);
+    expect(bot.inspect().targetId).toBe(2);
+    expect(Number.isFinite(input.aimX), `aimX ${input.aimX}`).toBe(true);
+    expect(Number.isFinite(input.aimY), `aimY ${input.aimY}`).toBe(true);
+    expect(input.aimX).toBeGreaterThan(1e201);
+  });
+
   it("returns a valid input every tick, always the bot's own record", () => {
     const state = setup();
     kill(state, 1, 3);

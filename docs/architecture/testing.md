@@ -203,11 +203,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   after a measured window, and the sign of sin f0 at each of those reads equal
   to the side of the pointer point that window started with (that proves the aim
   followed the pointer through `sampleAim` in every window), M1 on cooldown in
-  at least one read, then the sanity floor and the limit. After them the windows
-  run on to the first death of the round, which must come at least 60 ticks
-  after the last measured window. Logged, not asserted: per window, the
-  projectiles, hits and bars that changed. `combat.spec.ts` has no pointer: F4
-  fires at the default aim.
+  at least one read, then the sanity floor, the limit and the bots bound. After
+  them the windows run on to the first death of the round, which must come at
+  least 60 ticks after the last measured window. Logged, not asserted: per
+  window, the projectiles, hits and bars that changed. `combat.spec.ts` has no
+  pointer: F4 fires at the default aim.
 - Why the live scene is measured in round 3. A live match gives the engine no
   time before its first death (tick 449 on the normal bots of f7e10f0, 719 on
   easy): from tick 0 the counted code read 16 to 81 KB per window, and 3 to 6 KB
@@ -249,31 +249,40 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   state before the next window. The live scene's keys go the same way between
   windows. The hook is behind `import.meta.env.DEV`, like F4; see the dist grep
   in [client](client.md).
-- The counted code is the `COMBAT_CODE` pattern: the combat render modules, the
-  pose and overlay helpers, the loop clock, the input sampler, the pointer aim
-  (`camera.ts`), the HUD writer and its views, the kill feed, the champion
-  names, the result screen's writer (`result-screen.ts`), the text tables of the
-  hooks and the HUD (`hook-text.ts`), the client's bot-driving glue
+- The counted code is the `COMBAT_CODE` pattern: the combat render modules,
+  the pose and overlay helpers, the loop clock, the input sampler, the pointer
+  aim (`camera.ts`), the HUD writer and its views, the kill feed, the champion
+  names, the result screen's writer (`result-screen.ts`), the text tables of
+  the hooks and the HUD (`hook-text.ts`), the client's bot-driving glue
   (`bot-driver.ts`) and everything in `main.ts`, including the hook's
-  `frameMany`. Three's `onAnimationFrame` is logged and not counted: no frame of
-  a measured window runs through it. A new module on the frame path goes into
-  the pattern. The bots package is not counted, and its bytes are logged as the
-  sixth figure of the probe line. A live match leaves the bots' steady state in
-  any window by design (a new plan, a fresh path follower after an intent
-  change, the aim point boxed every 15 thinks), and bot output differs between
-  platforms, so counting it would tie the browser limit to decisions the runner
-  makes differently; the think has its own gate, the 128 B bound of
-  `allocation.test.ts`. The bytes in a browser window were: 2.4 to 2.8 KB per
-  window in the sandbox, 117 to 700 KB per window in the live scene's measured
-  windows on the runner (in `bot.ts:aim`, `path.ts:searchCells`,
-  `follow.ts:splitPath`, `sight.ts` and `casting.ts:updateRuns`), and megabytes
-  in the first windows after a round starts (the plan of each bot). That is a
-  carry for the bots package, not an assertion. `summarise` gives the bots'
-  files the prefix `bots/`, as it gives the sim's `sim/`, so a bots file such as
-  `bot.ts` never matches a client entry. Bytes of an inlined callee land on its
-  caller: V8 inlines `frame` and its callees into `frameMany`, so their bytes
-  show on it, and bots bytes inlined into the glue show in `bot-driver.ts` or
-  `stepSim`.
+  `frameMany`. Three's `onAnimationFrame` is logged and not counted: no frame
+  of a measured window runs through it. A new module on the frame path goes
+  into the pattern. The bots package is not counted, and its bytes are the
+  sixth figure of the probe line; the live scene bounds them apart: the median
+  of the five measured windows' bots figures (not the bots figure of the
+  window that is the median by counted bytes) must be at most
+  `LIVE_BOTS_LIMIT_BYTES`, 9600 B (`heap-probe.ts` has the figures, and
+  bots.md, Allocation, In the browser, the causes). The bytes in a browser
+  window were: 0.7 to 1.2 KB per window in the sandbox (`bot.ts:move` and
+  `rng.ts:next` of its one bot, not asserted), and in the live scene's
+  measured windows on bc1d6f1 25 to 131 KB per window on the runner, a median
+  window of 52 and 40 KB in two jobs (39 to 44 KB over 15 local attempts): the
+  garbage of the plan search, about 53 KB a plan, and the calls V8's Maglev
+  tier boxes, `Number.isFinite` and `hypot2` among them (bots.md). After the
+  fixes of #93 the median window reads 3.2 to 4.0 KB locally (windows of about
+  6.1, 10.8, 2.6, 3.7 and 1.6 KB) and 3588, 3912 and 3756 B in the three
+  runner jobs on 04be0f9. The limit is 50 percent above the largest median,
+  6.4 KB (a tester's attempt where one interpreted call of `lineOfSight` read
+  2.7 KB, counted as clean), and under a quarter of the smallest median with
+  the fixes reverted (38.9 KB), which fails the bound in every attempt (9 of 9
+  local). It does not catch one reverted fix alone (`aim`'s 1.2 KB leaves the
+  median under 9.6 KB). The windows after a round starts are not asserted:
+  megabytes before the fixes, 0.04 to 0.72 MB in the first window of a round
+  after them, locally (bots.md). `summarise` gives the bots' files the prefix
+  `bots/`, as it gives the sim's `sim/`, so a bots file such as `bot.ts` never
+  matches a client entry. Bytes of an inlined callee land on its caller: V8
+  inlines `frame` and its callees into `frameMany`, so their bytes show on it,
+  and bots bytes inlined into the glue show in `bot-driver.ts` or `stepSim`.
 - A blind mode, seen locally only. In some local attempts every counted function
   read 0 B, `frameMany` included (which otherwise reads 252 to 588 B per window,
   one boxed number per frame), and a mutation read no mutation-sized figure: 13

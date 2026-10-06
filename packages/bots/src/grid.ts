@@ -106,9 +106,12 @@ export function buildNavGrid(arena: ArenaDef, cellSize: number = NAV_CELL_SIZE):
   return { ...grid, blocked, shapes: obstacleShapes(grid.obstacles) };
 }
 
-/** The cell containing p, or -1 when p is non-finite or outside the grid. */
+/**
+ * The cell containing p, or -1 when p is non-finite or outside the grid. The finite tests are
+ * `x - x === 0`, true for a finite x only: Maglev boxes the argument of `Number.isFinite`.
+ */
 export function cellIndexAt(grid: NavGrid, p: Vec2): number {
-  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return -1;
+  if (!(p.x - p.x === 0) || !(p.y - p.y === 0)) return -1;
   const col = Math.floor((p.x - grid.originX) / grid.cellSize);
   const row = Math.floor((p.y - grid.originY) / grid.cellSize);
   if (col < 0 || col >= grid.cols || row < 0 || row >= grid.rows) return -1;

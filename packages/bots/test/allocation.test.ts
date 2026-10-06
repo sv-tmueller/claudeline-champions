@@ -3,7 +3,13 @@ import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
+import { createFollower, followPathInto } from '../src/follow';
+import type { PathFollower } from '../src/follow';
+import { pointBlocked } from '../src/geometry';
+import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
+import type { NavGrid, Vec2 } from '../src/grid';
 import type { Intent } from '../src/intent';
+import type { MoveCommand } from '../src/steer';
 import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './helpers';
 
 /*
@@ -57,9 +63,20 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
- * A plan (A star, the path split, the fallback search), a fresh follower after a goal or intent
- * change, and `inspect()` allocate by design and are outside the steady state: the scenes never
- * plan inside the measured median (a plan runs every 30th think at most).
+ * A plan, a fresh follower after a goal or intent change, and `inspect()` allocate by design and
+ * are outside the steady state: the scenes never plan inside the measured median (a plan runs
+ * every 30th think at most). The plan search allocates only the path it returns, which the plan
+ * check below bounds.
+ *
+ * This check sees only the optimizing tier a long warm-up reaches (Turbofan). A browser match
+ * runs the bots in V8's middle tier, Maglev, for thousands of ticks, and in the engines measured
+ * (the Chromium of Playwright 1.63, and V8 14.6 on Node 26 with --no-turbofan) a call with a
+ * double argument or result, Number.isFinite included, and a number written to a closure
+ * variable each box there (16 B): the live scene read 1.2 KB a window in bot.ts:aim from one such
+ * call. That was measured with a scratch config that is not part of this suite, and no committed
+ * test checks it again: Node 22, the CI's, has no Maglev by default, and its V8 12.4 does not
+ * reproduce the figures even with --maglev --no-turbofan (tens of KB a think, before and after
+ * alike). Only Node 26 and the Chromium of Playwright do. See bots.md, Allocation.
  */
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
 
@@ -68,6 +85,45 @@ const THINK_ALLOCATION_LIMIT_BYTES = 128;
  * counter moves. A measuring call alone reads 160 to 256 B, a real baseline step 2,272 to 4,048 B.
  */
 const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
+
+/**
+ * The most heap one plan step of the path follower may allocate, in bytes: the median over a
+ * spread of start and goal pairs across arena01 of the `heapUsed` delta around one
+ * `followPathInto` of a fresh follower (so a plan: `findPath`, the string pull, `splitPath`, the
+ * follower's goal and, at an end in a blocked cell, `nearestFreeCell`), minus the median of the
+ * same delta around nothing. Two spreads: clear (both ends in free cells) and fallback (both ends
+ * at legal points inside blocked cells); all 600 pairs of each plan. A plan is outside the steady
+ * state above (it runs every 30th think at most, and about every 6th while chasing a moving goal),
+ * but in a live match it was the bulk of the bots' bytes: the search allocated its tables, an
+ * object per open entry and two cell centres per edge test. The search now runs on scratch that
+ * outlives the call, and what a plan allocates is its output: the waypoints and the points of the
+ * split path, about 46 objects of 56 B for a path across the arena, in an array made at its final
+ * length. The limits sit close to the clean figure because the output is most of what a plan
+ * reads.
+ *
+ * Per plan, the three rounds as they read, macOS:
+ *   before (bc1d6f1, Node 22.23): clear 55980 to 56436, fallback 39288 to 39796
+ *   after, Node 22.23:            clear 2784 to 2800,   fallback 2072 to 2132
+ *   after, Node 26.7:             clear 2784,           fallback 1920 to 2064
+ * Before the split path was made at its final length the fallback spread read 2280 B on Node 22
+ * but 2904 to 3176 B on Node 26 (V8 14.6 grows an array and copies a spread differently), above
+ * what a per-segment mutation read on Node 22, so no one limit held on both.
+ *
+ * A fresh six-double object kept in a module variable, clear then fallback, lowest round (the
+ * same on Node 22 and Node 26 within 100 B): per edge test 44260 and 22792 B, per open push 25716
+ * and 14224, per point of `splitPath` 7320 and 4920, per segment of `splitPath` 3200 and 2400, per
+ * cell of `nearestFreeCell` 19636 (fallback; the clear spread never calls it). These go red on both
+ * majors. Two mutations are at the edge and not guarded. Per call of `plan`, `findPath` or
+ * `pullString`: 2952 clear, 2 B over the limit on both majors (clean 2800 on Node 22, 2784 on
+ * Node 26), 2232 fallback. Per call of `nearestFreeCell`: 336 B on a fallback plan (it is called at
+ * both ends), red on Node 22 (2400 to 2408 B, clean 2072 to 2132) and at the limit on Node 26
+ * (2400 B in one run, 2256 B in another, clean 1920 to 2064), invisible on clear. The fallback
+ * limit stays 2300 B: 2200 B would leave Node 22's clean fallback a margin of 3 percent. A smaller
+ * object per plan, or a typed array per search, is not measured here and is the limit of this
+ * check, as a two-double point is for the think bound.
+ */
+const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
+const PLAN_FALLBACK_LIMIT_BYTES = 2300;
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -299,6 +355,80 @@ describe('think allocation', () => {
     ).toEqual([]);
     // think never mutates the state.
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
+  });
+
+  it("allocates only the path it plans, across arena01: the follower's whole plan step", () => {
+    const grid: NavGrid = buildNavGrid(arena01);
+    const free: number[] = [];
+    // Legal points inside blocked cells (the cell centre is blocked, the point is not): a bot can
+    // stand there, and `nearestFreeCell` searches the cells around it.
+    const inBlocked: Vec2[] = [];
+    for (let i = 0; i < grid.blocked.length; i++) {
+      if (grid.blocked[i] === false) {
+        free.push(i);
+        continue;
+      }
+      const c = cellCenter(grid, i);
+      for (const [dx, dy] of [[0.2, 0.2], [-0.2, 0.2], [-0.2, -0.2], [0.2, -0.2]] as const) {
+        const p = { x: c.x + dx, y: c.y + dy };
+        if (cellIndexAt(grid, p) === i && !pointBlocked(grid, p)) {
+          inBlocked.push(p);
+          break;
+        }
+      }
+    }
+    // Two fixed spreads of pairs, made before the measured calls so the test allocates nothing in
+    // them. Clear: both ends in free cells. Fallback: both ends in blocked cells, so the plan
+    // searches for a free cell at each end.
+    const spread = (cells: number[], a: number, b: number): Vec2[] => {
+      const points: Vec2[] = [];
+      for (let i = 0; i < WINDOW; i++) points.push(cellCenter(grid, cells[(i * a + b) % cells.length] as number));
+      return points;
+    };
+    const spreadOf = (points: Vec2[], a: number, b: number): Vec2[] => {
+      const out: Vec2[] = [];
+      for (let i = 0; i < WINDOW; i++) out.push(points[(i * a + b) % points.length] as Vec2);
+      return out;
+    };
+    const clear = { from: spread(free, 211, 7), to: spread(free, 389, 101), name: 'clear' };
+    const fallback = { from: spreadOf(inBlocked, 31, 3), to: spreadOf(inBlocked, 53, 17), name: 'fallback' };
+    const out: MoveCommand = { moveX: 0, moveY: 0 };
+    const figures: Record<string, number[]> = {};
+    for (const set of [clear, fallback]) {
+      const followers: PathFollower[] = [];
+      const plan = (i: number): void =>
+        followPathInto(out, grid, followers[i] as PathFollower, set.from[i] as Vec2, set.to[i] as Vec2);
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < WINDOW; i++) followers[i] = createFollower();
+        for (let i = 0; i < WINDOW; i++) plan(i);
+      }
+      const rounds: number[] = [];
+      for (let round = 0; round < ROUNDS; round++) {
+        for (let i = 0; i < WINDOW; i++) followers[i] = createFollower();
+        let planned = 0;
+        for (let i = 0; i < WINDOW; i++) {
+          const before = heap();
+          plan(i);
+          deltas[i] = heap() - before;
+          if ((followers[i] as PathFollower).points.length > 0) planned++;
+        }
+        // A plan that found nothing would read low and prove nothing: every pair of both spreads
+        // plans (the fallback ones through a free cell at each end), as 600 of 600 do.
+        if (set === clear) expect(planned, 'clear pairs with no points').toBe(WINDOW);
+        else expect(planned, 'fallback pairs with points').toBe(WINDOW);
+        rounds.push(median(deltas, WINDOW) - emptyPairMedian());
+      }
+      figures[set.name] = rounds;
+    }
+    const lines = Object.entries(figures).map(([name, rounds]) => `${name} ${rounds.map((f) => Math.round(f)).join(', ')}`);
+    console.log(`plan allocation, the follower's plan step over ${WINDOW} pairs: ${lines.join('; ')} B per plan`);
+    for (const [name, rounds] of Object.entries(figures)) {
+      const limit = name === 'clear' ? PLAN_ALLOCATION_LIMIT_BYTES : PLAN_FALLBACK_LIMIT_BYTES;
+      expect(
+        Math.min(...rounds),
+        `lowest round of the median bytes per ${name} plan: ${rounds.map(Math.round).join(', ')}`,
+      ).toBeLessThan(limit);
+    }
   });
 
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {

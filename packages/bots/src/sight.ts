@@ -1,6 +1,7 @@
 import { CHAMPION_RADIUS } from '@claudeline/sim';
 import type { GameState, Obstacle } from '@claudeline/sim';
-import { hypot2 } from './hypot';
+import { createMeasure, distanceInto } from './hypot';
+import type { Measure } from './hypot';
 import { cellIndexAt } from './grid';
 import type { NavGrid, Vec2 } from './grid';
 
@@ -31,6 +32,7 @@ export interface SightScratch {
   /** The arena `table` was built from, an identity check like the navigation grid's arena. */
   arena: GameState['arena'] | undefined;
   table: Float64Array;
+  measure: Measure;
 }
 
 /** Points that start as doubles, as the sim's geometry does, so no field changes representation. */
@@ -45,6 +47,7 @@ export function createSightScratch(): SightScratch {
     standClearance: SIGHT_CLEARANCE,
     arena: undefined,
     table: new Float64Array(0),
+    measure: createMeasure(),
   };
 }
 
@@ -200,7 +203,8 @@ export function clearShotWith(
 ): boolean {
   if (!lineOfSight(state, from, to, scratch)) return false;
   const clearance = scratch.clearance;
-  const length = hypot2(to.x - from.x, to.y - from.y);
+  distanceInto(scratch.measure, to, from);
+  const length = scratch.measure.metres;
   if (!(length > 0) || !(clearance > 0)) return true;
   const px = (-(to.y - from.y) / length) * clearance;
   const py = ((to.x - from.x) / length) * clearance;
@@ -279,14 +283,16 @@ export function nearestSightCellIn(
       if (index === home || grid.blocked[index] !== false) continue;
       const cx = grid.originX + (col + 0.5) * grid.cellSize;
       const cy = grid.originY + (row + 0.5) * grid.cellSize;
-      const toTarget = hypot2(cx - target.x, cy - target.y);
+      scratch.from.x = cx;
+      scratch.from.y = cy;
+      distanceInto(scratch.measure, scratch.from, target);
+      const toTarget = scratch.measure.metres;
       if (toTarget < rangeMin || toTarget > rangeMax) continue;
       const distance = (cx - p.x) * (cx - p.x) + (cy - p.y) * (cy - p.y);
       // Strict, and the scan runs in index order, so a tie keeps the lower index.
       if (distance >= bestDistance) continue;
-      // The clear shot sweep runs last: it is the costly filter.
-      scratch.from.x = cx;
-      scratch.from.y = cy;
+      // The clear shot sweep runs last: it is the costly filter. `scratch.from` holds the cell
+      // centre, written above for the distance.
       scratch.clearance = scratch.standClearance;
       if (!clearShotWith(state, scratch.from, target, scratch)) continue;
       best = index;
