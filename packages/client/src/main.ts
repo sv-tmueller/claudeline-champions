@@ -9,6 +9,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { arenaById } from './arenas';
 import { createBotDriver } from './bot-driver';
 import {
@@ -364,7 +365,8 @@ async function loadModels(): Promise<void> {
   for (const champion of state.champions) {
     const gltf = championGltfs[urls.indexOf(championModelUrl(champion.championId))];
     if (!gltf) throw new Error(`no model loaded for ${champion.championId}`);
-    champions.add(gltf.scene.clone());
+    // SkeletonUtils.clone gives each view its own skeleton; Object3D.clone shares one.
+    champions.add(cloneSkinned(gltf.scene));
   }
   looks = createChampionLooks(champions.children);
 }

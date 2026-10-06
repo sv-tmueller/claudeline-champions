@@ -157,7 +157,9 @@ Each champion has its own model: `championModelUrl(id)` in `models.ts` gives
 `models/champions/<id>.glb` for a roster id and the placeholder for any other
 id. The fallback goes by the id list and not by a failed load, since a 404 is a
 console error and the e2e specs treat that as a failure. `loadModels` loads each
-distinct URL once and clones one view per champion in id order.
+distinct URL once and clones one view per champion in id order, with
+SkeletonUtils' `clone`: a plain `Object3D.clone` of a rigged model shares the
+source skeleton, so every view would draw at the arena origin.
 
 ## Camera
 
@@ -168,7 +170,8 @@ fits the viewport with margin. No rotation, no zoom in v1.
 
 Arena model and champion models loaded from glTF under `assets/models/`.
 Projectiles and areas are simple meshes. Effects start as meshes and
-billboards. Animations come from glTF clips once rigs exist. See
+billboards. The champion models are rigged with four clips (Idle, Run, Cast,
+Death) that nothing plays yet; the animation state machine is batch 10. See
 [assets](assets.md).
 
 The combat view is made of small modules that `main.ts` wires together. The
