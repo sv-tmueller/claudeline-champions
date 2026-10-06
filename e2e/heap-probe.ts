@@ -60,6 +60,8 @@ const SWEEP_FILES = /^sim\/(projectile|geometry|area)\.ts:/;
 // BotDriver.think call (1148 to 1396 B) and a template string per
 // ResultScreen.update call (1592 to 1704 B). See testing.md.
 export const COMBAT_ALLOCATION_LIMIT_BYTES = 640;
+// The live match's limit, provisional until the local attempts are in.
+export const LIVE_ALLOCATION_LIMIT_BYTES = 900;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains
