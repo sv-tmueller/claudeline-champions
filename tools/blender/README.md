@@ -169,7 +169,8 @@ reported as that file's FAIL line, and the remaining files still run.
   from the BIN chunk and compares them with the frames of the Clips table
   divided by 30, within 1e-4, so moving a key for every channel at once fails
   too. It checks the top (at most 1.90 m) and the floor (no vertex below 0, with
-  a tolerance of 0.1 mm) at every key of every clip.
+  a tolerance of 0.1 mm) at every key of every clip, and samples 20 steps in
+  each key interval, where the floor may dip to -0.04 m.
 - The arena JSON must match spec 8.1 key for key, with positive sizes, 2 to 3
   spawns per team, obstacles and spawns (a 0.5 m circle) inside the playable
   rectangle, no spawn touching an obstacle, `startRadius > endRadius > 0`, and

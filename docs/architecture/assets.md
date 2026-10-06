@@ -114,12 +114,17 @@ The scene rate is 30 fps. Every clip keys the rotation of all six bones and the
 translation of `Hips` at each listed frame, all with LINEAR interpolation.
 The last key of a looping clip equals its first. The pose values are constants
 in `gen_champion.py`, with nothing random and nothing time-based, and no pose
-puts a model above 1.90 m or any vertex below the floor (by more than 0.1 mm).
-In `Run` the contact keys (0, 10, 20) drop `Hips` so the feet plant, and the
-passing keys leave it at rest. The validator checks the names, the key counts
-and the length. The contract tests read the shared key times from the BIN and
-compare them with the Keys column, and check the posed top and floor at every
-key.
+puts a model above 1.90 m or any vertex below the floor (by more than 0.1 mm)
+at a key. In `Run` the contact keys (0, 10, 20) drop `Hips` so the feet plant,
+and the passing keys leave it at rest. Between keys the top holds, but the
+floor dips by up to 0.04 m (0.0365 m in `Run`, 0.0343 m in `Death`), because
+the client's interpolation slerps the leg turn while it lerps the `Hips` drop.
+The animation work in batch 10 may rework the poses to remove that. The
+validator checks the names, the key counts and the length. The contract tests
+read the shared key times from the BIN and compare them with the Keys column,
+check the posed top and floor at every key, and sample 20 steps in each key
+interval (slerp for rotations, lerp for translations) against a floor of
+-0.04 m and the same top.
 
 | Clip | Frames | Seconds | Keys | Plays |
 |------|--------|---------|------|-------|

@@ -58,9 +58,13 @@ FPS = 30
 # a bone's head, and for Hips also a move in metres. A positive turn about Y
 # swings a hanging limb backward, and a positive turn about X lifts a left limb
 # outward. Nothing is random and nothing reads a clock. At every key the top of
-# the model is at or under 1.90 m (Hips moves at most 0.03 m up, and in Cast the
-# arms stay at or below horizontal) and no vertex is below the floor (the Hips
-# drops below). test_champion_models.py checks both at every key.
+# the model is at or under 1.90 m (Hips rises at most 0.01 m, in Idle, and in
+# Cast the arms stay at or below horizontal) and no vertex is below the floor
+# (Run drops Hips 0.093 m at the contact keys, Death drops it further).
+# test_champion_models.py checks both at every key. Between keys the top holds
+# too, but the floor dips by up to 0.04 m (0.0365 m in Run, 0.0343 m in Death),
+# because three slerps the leg turn while it lerps the Hips drop. The animation
+# work in batch 10 may rework the poses to remove it.
 
 
 def pose(turns=None, move=(0.0, 0.0, 0.0)):

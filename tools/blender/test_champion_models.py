@@ -14,6 +14,8 @@ import struct
 import unittest
 from pathlib import Path
 
+from test_validate_glb import table_rows
+
 REPO = Path(__file__).resolve().parents[2]
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 ARENA_GLB = REPO / "assets" / "models" / "arenas" / "arena01.glb"
@@ -38,6 +40,12 @@ TOP_TOLERANCE = 1e-6
 FLOOR_TOLERANCE = 1e-4
 KEY_TIME_TOLERANCE = 1e-4
 FPS = 30
+# Between two keys three interpolates a rotation with slerp and a translation
+# with lerp, and the leg turn and the Hips drop do not stay in step, so the
+# lowest vertex dips below the floor. The keys are held to FLOOR_TOLERANCE, the
+# interior samples to this. The animation work in batch 10 may rework the poses.
+SAMPLE_STEPS = 20
+SAMPLED_FLOOR = -0.04
 # The key frames of each clip. assets.md's Clips table lists the same frames,
 # and a test fails if they drift apart.
 KEY_FRAMES = {
@@ -317,6 +325,78 @@ def clip_times(doc, bin_chunk, animation):
     return [t for (t,) in read_accessor(doc, bin_chunk, inputs.pop())]
 
 
+def slerp(a, b, t):
+    """Quaternion (x, y, z, w) interpolation along the short arc, as three does."""
+    if t == 0:
+        return tuple(a)
+    dot = sum(p * q for p, q in zip(a, b))
+    if dot < 0:
+        b, dot = tuple(-q for q in b), -dot
+    if dot > 0.9995:
+        mixed = [p + t * (q - p) for p, q in zip(a, b)]
+    else:
+        theta = math.acos(dot)
+        wa = math.sin((1 - t) * theta) / math.sin(theta)
+        wb = math.sin(t * theta) / math.sin(theta)
+        mixed = [wa * p + wb * q for p, q in zip(a, b)]
+    length = math.sqrt(sum(c * c for c in mixed))
+    return tuple(c / length for c in mixed)
+
+
+def lerp(a, b, t):
+    return tuple(p + t * (q - p) for p, q in zip(a, b))
+
+
+def clip_values(doc, bin_chunk, animation):
+    """The animated output per (node, path): one value per key."""
+    values = {}
+    for channel in animation["channels"]:
+        sampler = animation["samplers"][channel["sampler"]]
+        target = channel["target"]
+        values[(target["node"], target["path"])] = read_accessor(
+            doc, bin_chunk, sampler["output"]
+        )
+    return values
+
+
+def pose_between(doc, values, key, fraction):
+    """The pose a fraction of the way from `key` to the next key."""
+    pose = {}
+    for (node, path), outputs in values.items():
+        t, r, s = pose.get(node, node_trs(doc["nodes"][node]))
+        after = outputs[min(key + 1, len(outputs) - 1)]
+        if path == "translation":
+            pose[node] = (lerp(outputs[key], after, fraction), r, s)
+        else:
+            pose[node] = (t, slerp(outputs[key], after, fraction), s)
+    return pose
+
+
+def pose_extremes(doc, joints, inverse, vertices, pose):
+    """The lowest and the highest skinned vertex height in a pose."""
+    world = world_matrices(doc, pose)
+    skin_matrices = [mat_mul(world[j], ibm) for j, ibm in zip(joints, inverse)]
+    heights = [posed_y(skin_matrices, v) for v in vertices]
+    return min(heights), max(heights)
+
+
+def sampled_extremes(doc, joints, inverse, vertices, values, keys):
+    """The lowest and highest height over the interior samples of every key interval.
+
+    Returns (low, low_at, high) where `low_at` is the (key, fraction) of the low.
+    """
+    low, low_at, high = math.inf, None, -math.inf
+    for key in range(keys - 1):
+        for step in range(1, SAMPLE_STEPS):
+            fraction = step / SAMPLE_STEPS
+            pose = pose_between(doc, values, key, fraction)
+            bottom, top = pose_extremes(doc, joints, inverse, vertices, pose)
+            if bottom < low:
+                low, low_at = bottom, (key, fraction)
+            high = max(high, top)
+    return low, low_at, high
+
+
 def clip_problems(doc, bin_chunk, joints, inverse, vertices):
     """The key times against the table, then the posed top and floor at every key."""
     problems = []
@@ -335,34 +415,31 @@ def clip_problems(doc, bin_chunk, joints, inverse, vertices):
                 % (name, [round(t, 4) for t in times], list(KEY_FRAMES[name]), FPS)
             )
             continue
-        values = {}
-        for channel in animation["channels"]:
-            sampler = animation["samplers"][channel["sampler"]]
-            target = channel["target"]
-            values[(target["node"], target["path"])] = read_accessor(
-                doc, bin_chunk, sampler["output"]
-            )
+        values = clip_values(doc, bin_chunk, animation)
         for key in range(len(times)):
-            pose = {}
-            for (node, path), outputs in values.items():
-                t, r, s = pose.get(node, node_trs(doc["nodes"][node]))
-                if path == "translation":
-                    pose[node] = (outputs[key], r, s)
-                else:
-                    pose[node] = (t, outputs[key], s)
-            world = world_matrices(doc, pose)
-            skin_matrices = [mat_mul(world[j], ibm) for j, ibm in zip(joints, inverse)]
-            heights = [posed_y(skin_matrices, v) for v in vertices]
-            if max(heights) > MAX_TOP + TOP_TOLERANCE:
+            pose = pose_between(doc, values, key, 0)
+            low, high = pose_extremes(doc, joints, inverse, vertices, pose)
+            if high > MAX_TOP + TOP_TOLERANCE:
                 problems.append(
                     "posed top is %.4f m in %s at key %d, the limit is %.2f m"
-                    % (max(heights), name, key, MAX_TOP)
+                    % (high, name, key, MAX_TOP)
                 )
-            if min(heights) < -FLOOR_TOLERANCE:
+            if low < -FLOOR_TOLERANCE:
                 problems.append(
                     "posed floor is %.4f m in %s at key %d, no vertex may be below 0"
-                    % (min(heights), name, key)
+                    % (low, name, key)
                 )
+        low, low_at, high = sampled_extremes(doc, joints, inverse, vertices, values, len(times))
+        if low < SAMPLED_FLOOR:
+            problems.append(
+                "sampled floor is %.4f m in %s after key %d (%.2f of the way), "
+                "the limit is %.2f m" % (low, name, low_at[0], low_at[1], SAMPLED_FLOOR)
+            )
+        if high > MAX_TOP + TOP_TOLERANCE:
+            problems.append(
+                "sampled top is %.4f m in %s between keys, the limit is %.2f m"
+                % (high, name, MAX_TOP)
+            )
     return problems
 
 
@@ -516,13 +593,7 @@ class CommittedChampionTests(unittest.TestCase):
 class KeyFrameTableTests(unittest.TestCase):
     def test_key_frames_match_the_clips_table_in_assets_md(self):
         text = (REPO / "docs" / "architecture" / "assets.md").read_text()
-        lines = text.splitlines()
-        start = next(i for i, line in enumerate(lines) if line.startswith("| Clip | Frames |"))
-        rows = []
-        for line in lines[start + 2 :]:
-            if not line.startswith("|"):
-                break
-            rows.append([cell.strip().strip("`") for cell in line.strip("| ").split("|")])
+        rows = table_rows(text, "| Clip | Frames |")
         table = {row[0]: tuple(int(k) for k in row[3].split(",")) for row in rows}
         self.assertEqual(table, KEY_FRAMES)
 
@@ -620,6 +691,45 @@ class ContractCheckTests(unittest.TestCase):
     def test_rejects_a_pose_that_sinks_a_vertex_below_the_floor(self):
         self.move_run_hips(-1.0)
         self.assertProblem("posed floor")
+
+    def test_rejects_a_pose_that_sinks_below_the_sampled_floor(self):
+        self.move_run_hips(-1.0)
+        self.assertProblem("sampled floor")
+
+    def test_rejects_a_pose_that_lifts_above_the_sampled_top(self):
+        self.move_run_hips(1.0)
+        self.assertProblem("sampled top")
+
+    def test_the_sampling_sees_the_dip_between_keys_that_the_keys_do_not(self):
+        doc, bin_chunk = load(CHAMPIONS_DIR / "placeholder.glb")
+        skin = doc["skins"][0]
+        joints = skin["joints"]
+        matrices = read_accessor(doc, bin_chunk, skin["inverseBindMatrices"])
+        inverse = [column_major(m) for m in matrices]
+        vertices = skinned_vertices(doc, bin_chunk)
+        run =next(a for a in doc["animations"] if a["name"] == "Run")
+        values = clip_values(doc, bin_chunk, run)
+        key_lows = [
+            pose_extremes(doc, joints, inverse, vertices, pose_between(doc, values, k, 0))[0]
+            for k in range(5)
+        ]
+        low, _, _ = sampled_extremes(doc, joints, inverse, vertices, values, 5)
+        self.assertLess(low, min(key_lows) - 0.01)
+        self.assertGreaterEqual(low, SAMPLED_FLOOR)
+
+    def test_slerp_takes_the_short_arc_and_the_midpoint_of_a_quarter_turn(self):
+        quarter = (0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4))
+        half = slerp((0.0, 0.0, 0.0, 1.0), quarter, 0.5)
+        self.assertAlmostEqual(half[1], math.sin(math.pi / 8), places=6)
+        self.assertAlmostEqual(half[3], math.cos(math.pi / 8), places=6)
+        # A quarter of the way, slerp and a normalised lerp differ in the third decimal.
+        early = slerp((0.0, 0.0, 0.0, 1.0), quarter, 0.25)
+        self.assertAlmostEqual(early[1], math.sin(math.pi / 16), places=6)
+        flipped = tuple(-c for c in quarter)
+        self.assertEqual(
+            [round(c, 6) for c in slerp((0.0, 0.0, 0.0, 1.0), flipped, 0.5)],
+            [round(c, 6) for c in half],
+        )
 
     def test_rejects_a_joint_that_is_renamed(self):
         node_named(self.doc, "Spine")["name"] = "Torso"
