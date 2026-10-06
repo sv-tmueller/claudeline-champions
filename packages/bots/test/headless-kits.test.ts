@@ -12,10 +12,13 @@ import {
   configSkerrow,
   createRun,
   createStallTracker,
+  createTeleportTally,
   jsonKits,
   kitOf,
+  tallyTeleports,
   validInput,
 } from './helpers';
+import type { TeleportTally } from './helpers';
 import { hargrimKit, quillonKit } from './kits';
 
 const TICKS = 3600;
@@ -325,9 +328,11 @@ interface Played {
   ultimates: number[];
   /** A champion that had a cast fire killed an enemy. */
   killed: boolean;
-  /** The escape teleports of the run (pressed with a landing), and how many were blocked. */
-  teleports: number;
-  blockedTeleports: number;
+  /**
+   * The teleports of the run: the escape teleports (pressed with a landing) and every other one
+   * (Reaper's Dance), each with how many the sim blocked.
+   */
+  tally: TeleportTally;
   /** The tick on which a team had no champion alive, or -1. */
   eliminatedAt: number;
   /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
@@ -349,8 +354,7 @@ function play(set: KitSet, run: MatchRun): Played {
   const ultimates = state.champions.map(() => 0);
   const fired = new Set<number>();
   let killed = false;
-  let teleports = 0;
-  let blockedTeleports = 0;
+  const tally = createTeleportTally();
   let eliminatedAt = -1;
   let firstLunge = -1;
   let firstDeath = -1;
@@ -387,20 +391,24 @@ function play(set: KitSet, run: MatchRun): Played {
         `tick ${tick} champion ${press.id} pressed ${press.slot}${press.ex ? ' with SHIFT' : ''} and the sim started nothing: ${press.gates}`,
       ).toBe(true);
     }
-    for (const press of pending) {
-      if (press.landing === null) continue;
-      const event = state.events.find((e) => e.type === 'teleport' && e.championId === press.id);
-      if (event === undefined || event.type !== 'teleport') continue;
-      // Only the escape teleports count: Reaper's Dance teleports after an 18 tick windup and may
-      // be blocked legitimately, so it is not part of this pin.
-      teleports++;
-      if (event.blocked) blockedTeleports++;
+    // Only the escape teleports are pinned to a landing and to never being blocked: Reaper's Dance
+    // teleports after an 18 tick windup, aimed at where the target is when it fires, and may be
+    // blocked legitimately, so the tally counts it apart.
+    const escapes = pending.filter((press) => press.landing !== null);
+    const found = tallyTeleports(
+      tally,
+      state.events,
+      escapes.map((press) => press.id),
+    );
+    escapes.forEach((press, n) => {
+      const event = found[n];
+      if (event === undefined || press.landing === null) return;
       // The sim puts the champion where the oracle found the first landing.
       expect([event.toX, event.toY], `tick ${tick} champion ${press.id} teleport`).toEqual([
         press.landing.x,
         press.landing.y,
       ]);
-    }
+    });
     for (const e of state.events) {
       if (e.type === 'castStarted') {
         if (e.slot === 'SPACE' && state.champions[e.championId]?.championId === 'skerrow') {
@@ -426,7 +434,7 @@ function play(set: KitSet, run: MatchRun): Played {
     expect(Number.isFinite(checksum(state))).toBe(true);
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; teleports ${teleports}; eliminated ${eliminatedAt}; first Lunge ${firstLunge}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
@@ -434,8 +442,7 @@ function play(set: KitSet, run: MatchRun): Played {
     exStarted,
     ultimates,
     killed,
-    teleports,
-    blockedTeleports,
+    tally,
     eliminatedAt,
     firstLunge,
     summary,
@@ -463,7 +470,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
       `no EX cast: ${played.summary}`,
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
-    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expectNoStall(played);
   }, 30_000);
 
@@ -482,7 +489,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
       `no F cast: ${played.summary}`,
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
-    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expectNoStall(played);
   }, 30_000);
 });
@@ -500,7 +507,27 @@ describe('a headless match with Skerrow on the shipped kits', () => {
     expect(played.eliminatedAt, played.summary).toBeGreaterThan(0);
     expect(played.eliminatedAt, played.summary).toBeLessThanOrEqual(TICKS);
     expect(played.firstLunge, `Skerrow started no Lunge: ${played.summary}`).toBeGreaterThanOrEqual(0);
-    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
+  }, 30_000);
+
+  // The same match with a start edit that makes Reaper's Dance reachable: Skerrow at 100 energy and
+  // both enemies at 40 health, the damage F does, so the hold lets it go. It runs the whole play
+  // loop, so the oracle's Skerrow F row (the hold, the band, the clear shot, the gates) runs on a
+  // real press. One run: a miss after a change to the bots, the sim or the Node version is governed
+  // by batch #53 decision 8.3; the fallback is Skerrow against a Quillon at 40 health, the other
+  // two champions dead, 9 m apart.
+  it("Skerrow starts Reaper's Dance at a target at 40 health, and no escape teleport is blocked", () => {
+    const run = createRun(SEEDS, NORMAL, 7, { config: configSkerrow(), kits: set.kits() });
+    const skerrow = run.state.champions[0] as ChampionState;
+    skerrow.energy = 100;
+    for (const id of [2, 3]) (run.state.champions[id] as ChampionState).health = 40;
+    const played = play(set, run);
+    expect(played.ultimates[0], played.summary).toBeGreaterThan(0);
+    expect(played.tally.others, played.summary).toBeGreaterThan(0);
+    expect(played.tally.escapes, played.summary).toBe(2);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expect(played.state.tick).toBe(TICKS);
     expectNoStall(played);
   }, 30_000);
