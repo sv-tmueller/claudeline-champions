@@ -92,24 +92,32 @@ const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
  * `followPathInto` of a fresh follower (so a plan: `findPath`, the string pull, `splitPath`, the
  * follower's goal and, at an end in a blocked cell, `nearestFreeCell`), minus the median of the
  * same delta around nothing. Two spreads: clear (both ends in free cells) and fallback (both ends
- * at legal points inside blocked cells). A plan is outside the steady state above (it runs every
- * 30th think at most, and about every 6th while chasing a moving goal), but in a live match it was
- * the bulk of the bots' bytes: the search allocated its tables, an object per open entry and two
- * cell centres per edge test. The search now runs on scratch that outlives the call, and what a
- * plan allocates is its output: the waypoints and the points of the split path, about 46 objects
- * of 56 B for a path across the arena, which is why the limits sit above 3 KB. They sit between
- * the figure before the change and the figure after it, close to the latter.
+ * at legal points inside blocked cells); all 600 pairs of each plan. A plan is outside the steady
+ * state above (it runs every 30th think at most, and about every 6th while chasing a moving goal),
+ * but in a live match it was the bulk of the bots' bytes: the search allocated its tables, an
+ * object per open entry and two cell centres per edge test. The search now runs on scratch that
+ * outlives the call, and what a plan allocates is its output: the waypoints and the points of the
+ * split path, about 46 objects of 56 B for a path across the arena, in an array made at its final
+ * length. The limits sit close to the clean figure because the output is most of what a plan
+ * reads.
  *
- * Per plan, macOS, Node 22, three rounds: clear 55980 to 56340 B before (bc1d6f1), 3128 to 3144 B
- * after; fallback 39288 to 39796 B before, 2280 to 2288 B after. A fresh six-double object kept in
- * a module variable goes over the limit alone per edge test (clear 44488 B), per open push
- * (26056 B), per point of `splitPath` (7600 B), per cell of `nearestFreeCell` (fallback 20436 B)
- * and per segment of `splitPath` (clear 3448 B, fallback 2808 B). It stays under the limit per
- * call of `plan`, `findPath` and `pullString` (clear 3232 B, fallback 2448 B), and per call of
- * `nearestFreeCell` it is 56 B over the fallback limit (2616 B) and invisible on the clear spread.
- * A typed array per search is not seen either. The limits are close to the clean figures because
- * the output is most of what a plan reads: a fresh object per path or per call is the documented
- * limit of this check, the way a two-double point is for the think bound.
+ * Per plan, the three rounds as they read, macOS:
+ *   before (bc1d6f1, Node 22.23): clear 55980 to 56436, fallback 39288 to 39796
+ *   after, Node 22.23:            clear 2784 to 2800,   fallback 2072 to 2132
+ *   after, Node 26.7:             clear 2784,           fallback 1920 to 2064
+ * Before the split path was made at its final length the fallback spread read 2280 B on Node 22
+ * but 2904 to 3176 B on Node 26 (V8 14.6 grows an array and copies a spread differently), above
+ * what a per-segment mutation read on Node 22, so no one limit held on both.
+ *
+ * A fresh six-double object kept in a module variable, clear then fallback, lowest round (the
+ * same on Node 22 and Node 26 within 100 B): per edge test 44260 and 22792 B, per open push 25716
+ * and 14224, per point of `splitPath` 7320 and 4920, per segment of `splitPath` 3200 and 2400,
+ * per cell of `nearestFreeCell` 19636 (fallback; the clear spread never calls it), per call of
+ * `nearestFreeCell` 2400 (fallback; invisible on clear), per call of `plan`, `findPath` or
+ * `pullString` 2952 clear (2 B over the limit, so a fresh object per plan sits at the edge) and
+ * 2232 fallback. All go red against these limits on both. A smaller object per plan, or a typed
+ * array per search, is not measured here and is the limit of this check, as a two-double point
+ * is for the think bound.
  */
 const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
 const PLAN_FALLBACK_LIMIT_BYTES = 2300;

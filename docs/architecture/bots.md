@@ -475,13 +475,13 @@ neither is tier timing:
   V8 14.6 on Node 26) Maglev does not inline a call with a double argument or
   result, and calls `Number.isFinite` with its argument boxed: one 16 B box
   per call. Node 22's V8 12.4 does not reproduce it (`--maglev --no-turbofan`
-  reads tens of KB a think before and after alike), and no committed test checks
-  it again. That was `bot.ts:aim` at 1.2
-  KB a window (a `Number.isFinite` per think, and the `aimU` store), the
-  distance of `steerTowardInto` with the finite test of `cellIndexAt` at about
-  5 KB together, and `clearShotWith` with `needsPlan` at about 1.5 KB. The
-  finite tests are `x - x === 0` now, the distances go through `distanceInto`,
-  and `segmentClear` has `hypot2` written out. The same scenes run Maglev-only
+  reads tens of KB a think before and after alike), and no committed test
+  checks it again. That was `bot.ts:aim` at 1.2 KB a window (a
+  `Number.isFinite` per think, and the `aimU` store), the distance of
+  `steerTowardInto` with the finite test of `cellIndexAt` at about 5 KB
+  together, and `clearShotWith` with `needsPlan` at about 1.5 KB. The finite
+  tests are `x - x === 0` now, the distances go through `distanceInto`, and
+  `segmentClear` has `hypot2` written out. The same scenes run Maglev-only
   (Node 26, `--no-turbofan`) read 18 B a think in `aim` and up to 54 KB in a
   scene that plans; after the change every scene that does not plan reads 2 B
   there, the rng draw.
@@ -509,17 +509,19 @@ tests run in the interpreter), of round 2 1.5 MB before and 40 KB after, of
 round 3 1.1 MB before and 0.11 MB after, and the fifth window of a round 0.2
 MB before and under 0.15 MB after (round 3: 8 KB).
 
-One kind of byte is not bounded by the code: an optimized function that
+One kind of byte is probably not in the code: an optimized function that
 deoptimizes in a window runs its next call or calls in the interpreter.
 `sight.ts:lineOfSight` read 2.7 KB in one window of one local attempt (a
 median window of 6.4 KB, window 3) and 1.7 KB in one window of a runner
-attempt (window 1), and 0 B in the other 100 or so attempts: in a micro-run
-(Node 26) one interpreted call of it reads 1.1 to 3.1 KB, and the trace shows
-its one first-time deopt per run (`Insufficient type feedback for binary
-operation`, a branch of the sweep that no earlier shot took) at tick 299 and
-`clearShotWith` deoptimizing on `wrong map`. A late first-time branch costs
-one such call and nothing in the code can remove it, so the live bound has to
-tolerate one such event in the median window.
+attempt (window 1), and 0 B in the other 100 or so attempts. The cause is
+inferred, not traced: one interpreted call of it reads 1.1 to 3.1 KB in a
+micro-run (Node 26), the size of both events, and the trace shows a first-time
+deopt of it once per run (`Insufficient type feedback for binary operation`,
+tick 299) and `clearShotWith` deoptimizing on `wrong map`; no late deopt of it
+was caught in 25 traced and 72 live attempts. If it is a branch of the sweep
+that no earlier shot took, first taken late, V8's feedback decides it, and
+this document knows no change that removes it. Either way the live bound has
+to tolerate one such event in the median window.
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
@@ -697,21 +699,26 @@ A plan check in the same file reads the median `heapUsed` delta around one
 plan step of the path follower, `followPathInto` on a fresh follower (the
 search, the string pull, `splitPath`, the goal copy and, at an end in a
 blocked cell, `nearestFreeCell`), over 600 start and goal pairs spread across
-arena 1, minus the empty pair, on two spreads: clear (both ends in free cells,
-every one a route) and fallback (both ends at legal points inside blocked
-cells). The lowest of three rounds must be under 3300 B (clear) and 2560 B
-(fallback). Before the scratch the search read 55980 to 56340 B (clear) and
-39288 to 39796 B (fallback) per plan; it now reads 3128 to 3144 B and 2280 to
-2288 B, which is the output: about 46 objects of 56 B for a path across the
-arena. A fresh six-double object kept in a module variable goes over the limit
-per edge test (44488 B), per open push (26056 B), per point of `splitPath`
-(7600 B), per cell of `nearestFreeCell` (20436 B on the fallback spread) and
-per segment of `splitPath` (3448 B clear). It stays under per call of `plan`,
-`findPath` or `pullString` (3232 B clear), per call of `nearestFreeCell` it
-reads 2616 B on the fallback spread (56 B over) and nothing on the clear one,
-and one typed array per search is not seen either: the limits sit close to the
-clean figure because the output is most of what a plan reads, and a fresh
-object per path is the limit of this check, as a two-double point is for the
+arena 1, minus the empty pair, on two spreads: clear (both ends in free cells)
+and fallback (both ends at legal points inside blocked cells); all 600 pairs
+of each plan. The lowest of three rounds must be under 2950 B (clear) and 2300
+B (fallback). Before the scratch the search read 55980 to 56436 B (clear) and
+39288 to 39796 B (fallback) per plan on Node 22. It now reads, as the rounds
+read: clear 2784 to 2800 B on Node 22 and 2784 B on Node 26, fallback 2072 to
+2132 B on Node 22 and 1920 to 2064 B on Node 26. That is the output, about 46
+objects of 56 B for a path across the arena, in an array made at its final
+length: while `splitPath` grew its array by push and the fallback copied it
+with a spread, Node 26 (V8 14.6) read 2904 to 3176 B on the fallback spread
+against 2280 B on Node 22, and no one limit held on both. A fresh six-double
+object kept in a module variable goes over the limit on both Node majors
+(lowest round, clear and fallback, within 100 B between them) per edge test
+(44260 and 22792 B), per open push (25716 and 14224 B), per point of
+`splitPath` (7320 and 4920 B), per segment of `splitPath` (3200 and 2400 B),
+per cell of `nearestFreeCell` (19636 B, fallback), per call of
+`nearestFreeCell` (2400 B fallback, invisible on clear) and per call of
+`plan`, `findPath` or `pullString` (2952 B clear, 2 B over: the edge of what
+the check sees). A smaller object per plan or a typed array per search is not
+measured and is the limit of this check, as a two-double point is for the
 think bound. The steady-state scenes cannot see what only Maglev boxes (see
 Allocation, In the browser). A fresh six-double object kept in a module
 variable at each rewritten site of the think (`steerTowardInto`,
