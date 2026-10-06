@@ -188,10 +188,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const tier = TIERS[difficulty];
   const rng = createRng(seed >>> 0);
   // Every record a think reads or writes is made here, once, and rewritten field by field: the
-  // steady state allocates nothing (packages/bots/test/allocation.test.ts). A plan (its
-  // path only), a fresh follower after a goal or intent change, and `inspect()` allocate by design. Fields that hold
-  // doubles start as doubles (0.5), as the sim's geometry does, so no field changes
-  // representation and boxes a number.
+  // steady state allocates nothing (packages/bots/test/allocation.test.ts). A plan (its path
+  // only), a fresh follower after a goal or intent change, and `inspect()` allocate by design.
+  // Fields that hold doubles start as doubles (0.5), as the sim's geometry does, so no field
+  // changes representation and boxes a number.
   //
   // The delay line: what was decided `delay` thinks ago is what the bot acts on now.
   const ring: Decision[] = [];
@@ -229,7 +229,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   let advanceTargetId = -1;
   let grid: NavGrid | undefined;
   let gridArena: GameState['arena'] | undefined;
-  let aimU = 0.5;
+  // The aim error of the last draw, in a field: V8's Maglev tier boxes (16 B) every number it
+  // writes to a variable of this closure.
+  const aimError = { u: 0.5 };
   let aimAge = 0;
   // Per slot (in SLOTS order), the consecutive thinks the acted target was in sight and in reach
   // of the ability the slot would cast. Allocated once; see casting.ts.
@@ -377,7 +379,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
    * Writes the aim into `input`; the one rng draw of a think is here. The lead and the error
    * turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the
    * same operations in the same order (the tests compare the two bit for bit): a call with a
-   * double argument that V8 does not inline boxes it, and the aim made a dozen of them.
+   * double argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite
+   * tests are `x - x === 0`, true for a finite x only: Maglev calls `Number.isFinite` with its
+   * argument boxed, one allocation a think.
    */
   function aim(
     me: ChampionState,
@@ -385,7 +389,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     kit: KitDef | undefined,
     pressed: boolean,
   ): void {
-    if (aimAge === 0) aimU = (2 * rng.next() - 1) * tier.maxU;
+    if (aimAge === 0) aimError.u = (2 * rng.next() - 1) * tier.maxU;
+    const u = aimError.u;
     aimAge = (aimAge + 1) % AIM_ERROR_HOLD;
 
     // The speed the aim leads with: the first projectile of the ability winding up, or else of
@@ -422,22 +427,22 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     if (!(c === 0 || !(a < 0))) {
       const root = Math.sqrt(b * b - 4 * a * c);
       const t = b >= 0 ? (b + root) / (-2 * a) : (2 * c) / (root - b);
-      if (Number.isFinite(t) && t > 0) {
+      if (t - t === 0 && t > 0) {
         leadX = target.x + vx * t;
         leadY = target.y + vy * t;
       }
     }
 
     // rotateByHalfTangent: the vector to the lead point turns by 2 atan(u).
-    const k = 1 + aimU * aimU;
-    const cos = (1 - aimU * aimU) / k;
-    const sin = (2 * aimU) / k;
+    const k = 1 + u * u;
+    const cos = (1 - u * u) / k;
+    const sin = (2 * u) / k;
     const lx = leadX - me.x;
     const ly = leadY - me.y;
     // roundAim: whole centimetres, and the `+ 0` turns -0 into 0.
     const aimX = Math.round((me.x + (lx * cos - ly * sin)) * 100) + 0;
     const aimY = Math.round((me.y + (lx * sin + ly * cos)) * 100) + 0;
-    if (Number.isFinite(aimX) && Number.isFinite(aimY)) {
+    if (aimX - aimX === 0 && aimY - aimY === 0) {
       input.aimX = aimX;
       input.aimY = aimY;
     } else {

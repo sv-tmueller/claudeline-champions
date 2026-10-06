@@ -96,6 +96,20 @@ describe('steerToward', () => {
       moveY: 0,
     });
     expect(steerToward({ x: Number.NaN, y: 0 }, { x: 5, y: 5 })).toEqual({ moveX: 0, moveY: 0 });
+    // Every infinity and the mixes of them, so the finite test cannot be a NaN test alone.
+    const inf = Number.POSITIVE_INFINITY;
+    for (const [px, py, tx, ty] of [
+      [0, 0, -inf, 0],
+      [0, 0, 0, -inf],
+      [inf, 0, inf, 5],
+      [0, -inf, 3, -inf],
+      [-inf, inf, inf, -inf],
+    ] as const) {
+      expect(steerToward({ x: px, y: py }, { x: tx, y: ty }), `${px},${py} to ${tx},${ty}`).toEqual({
+        moveX: 0,
+        moveY: 0,
+      });
+    }
   });
 
   it('keeps the arrival radius above one tick of walking so a bot cannot overshoot forever', () => {

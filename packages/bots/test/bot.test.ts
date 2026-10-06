@@ -108,6 +108,20 @@ describe('think output', () => {
     expect(bot.inspect()).toEqual({ intent: 'idle', targetId: -1 });
   });
 
+  it('keeps the stored aim when the aim overflows to infinity, not only when it is not a number', () => {
+    const state = setup();
+    kill(state, 1, 3);
+    const me = ch(state, 0);
+    me.aimX = 321;
+    me.aimY = -654;
+    // 1e308 m is a finite distance, and its aim in centimetres overflows.
+    put(state, 2, 1e308, 3);
+    const bot = createBot(0, 'hard', 1);
+    const input = thinkTimes(bot, state, TIERS.hard.delay + 5);
+    expect(bot.inspect().targetId).toBe(2);
+    expect({ aimX: input.aimX, aimY: input.aimY }).toEqual({ aimX: 321, aimY: -654 });
+  });
+
   it("returns a valid input every tick, always the bot's own record", () => {
     const state = setup();
     kill(state, 1, 3);

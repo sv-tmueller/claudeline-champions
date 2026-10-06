@@ -64,6 +64,14 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * are outside the steady state: the scenes never plan inside the measured median (a plan runs
  * every 30th think at most). The plan search allocates only the path it returns, which the plan
  * check below bounds.
+ *
+ * This check sees only the optimizing tier a long warm-up reaches (Turbofan), which inlines what
+ * V8's middle tier, Maglev, does not. A browser match runs the bots in Maglev for thousands of
+ * ticks, and there a call with a double argument or result, Number.isFinite included, and a
+ * number written to a closure variable each box (16 B): the live scene read 1.2 KB a window in
+ * bot.ts:aim from one such call. The same scenes run Maglev-only on Node 26 (V8 14.6, Maglev on
+ * by default) with --no-turbofan, through a scratch config that is not part of this suite: Node
+ * 22, the CI's, has no Maglev by default. See bots.md, Allocation.
  */
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
 

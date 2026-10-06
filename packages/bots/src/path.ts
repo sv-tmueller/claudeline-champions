@@ -142,7 +142,13 @@ function openPop(s: SearchScratch): boolean {
 }
 
 /** The octile distance from (col, row) to the goal cell, written into `pushH`. */
-function heuristic(s: SearchScratch, col: number, row: number, goalCol: number, goalRow: number): void {
+function heuristic(
+  s: SearchScratch,
+  col: number,
+  row: number,
+  goalCol: number,
+  goalRow: number,
+): void {
   const dx = Math.abs(col - goalCol);
   const dy = Math.abs(row - goalRow);
   s.pushH = dx + dy + (Math.SQRT2 - 2) * Math.min(dx, dy);

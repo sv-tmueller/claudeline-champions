@@ -1,6 +1,8 @@
 import type { MoveAxis } from '@claudeline/sim';
 import type { Vec2 } from './grid';
-import { hypot2 } from './hypot';
+import { createMeasure, distanceInto } from './hypot';
+
+const measure = createMeasure();
 
 export interface MoveCommand {
   moveX: MoveAxis;
@@ -38,8 +40,10 @@ export function steerTowardInto(
 ): void {
   const dx = target.x - position.x;
   const dy = target.y - position.y;
-  const distance = hypot2(dx, dy);
-  if (!Number.isFinite(distance) || distance <= arrivalRadius) {
+  distanceInto(measure, target, position);
+  const distance = measure.metres;
+  // `distance - distance === 0` is Number.isFinite without its call, which Maglev boxes (bot.ts).
+  if (!(distance - distance === 0) || distance <= arrivalRadius) {
     out.moveX = 0;
     out.moveY = 0;
     return;

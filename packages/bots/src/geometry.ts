@@ -112,11 +112,11 @@ function segmentHitsBox(a: Vec2, b: Vec2, shapes: readonly number[], at: number)
  *
  * This runs on the think path and allocates nothing: every distance is a local, no helper takes
  * or returns a double (V8 boxes those at a call it does not inline), every number comes from
- * `grid.shapes`, and every distance comes from one `hypot2` call site. An obstacle is blocked
- * when the segment is within its limit of some probe point: a circle has one, its centre; a
- * rectangle has six, the two ends of the segment (their distance to the box) and its four
- * corners (their distance to the segment), unless the segment goes through the box, which is
- * distance 0.
+ * `grid.shapes`, and every distance is `hypot2` written out at one site below. An obstacle is
+ * blocked when the segment is within its limit of some probe point: a circle has one, its
+ * centre; a rectangle has six, the two ends of the segment (their distance to the box) and its
+ * four corners (their distance to the segment), unless the segment goes through the box, which
+ * is distance 0.
  */
 export function segmentClear(grid: NavGrid, p: Vec2, q: Vec2): boolean {
   if (!insideShrunkBoundary(grid, p)) return false;
@@ -163,7 +163,20 @@ export function segmentClear(grid: NavGrid, p: Vec2, q: Vec2): boolean {
           ey = py - (p.y + t * dy);
         }
       }
-      if (hypot2(ex, ey) < limit) return false;
+      // hypot2 of hypot.ts written out, the same operations in the same order: Maglev does not
+      // inline the call, and a call boxes its two arguments and its result.
+      const hx = Math.abs(ex);
+      const hy = Math.abs(ey);
+      const hm = hx > hy ? hx : hy;
+      let hd: number;
+      if (!(hm > 0 && hm < Infinity && hx === hx && hy === hy)) {
+        hd = hx === Infinity || hy === Infinity ? Infinity : hx + hy;
+      } else {
+        const nx = hx / hm;
+        const ny = hy / hm;
+        hd = Math.sqrt(nx * nx + ny * ny) * hm;
+      }
+      if (hd < limit) return false;
     }
   }
   return true;

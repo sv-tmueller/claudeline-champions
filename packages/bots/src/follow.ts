@@ -1,10 +1,14 @@
 import { segmentClear } from './geometry';
-import { cellCenter, cellIndexAt } from './grid';
+import { cellCenter, cellCenterInto, cellIndexAt } from './grid';
 import type { NavGrid, Vec2 } from './grid';
-import { hypot2 } from './hypot';
+import { createMeasure, distanceInto } from './hypot';
 import { findPath } from './path';
 import { steerTowardInto } from './steer';
 import type { MoveCommand } from './steer';
+
+// What the checks of the follower use instead of allocating: a distance, and a cell centre.
+const measure = createMeasure();
+const cell: Vec2 = { x: 0.5, y: 0.5 };
 
 /** Ticks after which the follower plans again even when nothing changed. */
 export const REPLAN_INTERVAL = 30;
@@ -51,11 +55,11 @@ export function nearestFreeCell(
     for (let col = colMin; col <= colMax; col++) {
       const index = row * grid.cols + col;
       if (grid.blocked[index] !== false) continue;
-      const c = cellCenter(grid, index);
-      const distance = (c.x - p.x) * (c.x - p.x) + (c.y - p.y) * (c.y - p.y);
+      cellCenterInto(cell, grid, index);
+      const distance = (cell.x - p.x) * (cell.x - p.x) + (cell.y - p.y) * (cell.y - p.y);
       // Strict, and the scan runs in index order, so a tie keeps the lower index.
       if (distance >= bestDistance) continue;
-      if (!segmentClear(grid, p, c)) continue;
+      if (!segmentClear(grid, p, cell)) continue;
       best = index;
       bestDistance = distance;
     }
@@ -73,7 +77,8 @@ function splitPath(grid: NavGrid, path: readonly Vec2[]): Vec2[] {
     const a = path[i - 1];
     const b = path[i];
     if (a === undefined || b === undefined) continue;
-    const count = Math.max(1, Math.ceil(hypot2(b.x - a.x, b.y - a.y) / grid.cellSize));
+    distanceInto(measure, b, a);
+    const count = Math.max(1, Math.ceil(measure.metres / grid.cellSize));
     for (let k = 1; k <= count; k++) {
       points.push({ x: a.x + ((b.x - a.x) * k) / count, y: a.y + ((b.y - a.y) * k) / count });
     }
@@ -121,7 +126,8 @@ function needsPlan(grid: NavGrid, follower: PathFollower, position: Vec2, goal: 
   if (follower.goal === null) return true;
   if (follower.age >= REPLAN_INTERVAL) return true;
   if (follower.age < REPLAN_MIN_AGE) return false;
-  if (hypot2(goal.x - follower.goal.x, goal.y - follower.goal.y) > grid.cellSize) return true;
+  distanceInto(measure, goal, follower.goal);
+  if (measure.metres > grid.cellSize) return true;
   const next = follower.points[follower.index];
   return next !== undefined && !segmentClear(grid, position, next);
 }
