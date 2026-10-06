@@ -60,16 +60,16 @@ const WARM_UP_TICKS = 2100;
 const WARM_UP_BUDGET_TICKS = 9100;
 // Plain windows of the round before the measured ones, so that the measured windows
 // hold the round's first projectiles and hits, the event paths this scene exists to
-// cover. Measured on bc1d6f1 with the moving pointer of POINTERS (3 runs of 17
-// windows of round 3, begun by tick 2879; the aim changes the human's own M1 and its
-// facing from round 1 on, so the round-3 figures of the no-pointer runs of 8d80073 were
-// re-derived): the first projectile spawns in window 5 (ticks 3029 to 3059, 150 ticks
-// into the windows of the round), the first hit lands in window 6, then 1 to 4
-// projectiles are live and 1 to 3 hits land per window to the end of the run (tick
-// 3389). The first death of the round is read at tick 3539 (3509 without the pointer).
-// The lead is a count of windows, not a tick, because
-// windows are the unit the spec runs in; a bots change moves the first projectile, and
-// the assertion that the measured windows hold one fails then, so re-measure.
+// cover. Measured on 1670d1b with the moving pointer of POINTERS (3 runs of 17
+// windows of round 3, begun by tick 2879; the aim changes the human's own M1 and
+// its facing from round 1 on, so the round-3 figures of the no-pointer runs of
+// 8d80073 were re-derived): the first projectile spawns in window 5 (ticks 3029 to
+// 3059, 150 ticks into the windows of the round), the first hit lands in window 6,
+// then 1 to 4 projectiles are live and 1 to 3 hits land per window to the end of
+// the run (tick 3389). The first death of the round is read at tick 3539 (3509
+// without the pointer). The lead is a count of windows, not a tick, because windows
+// are the unit the spec runs in; a bots change moves the first projectile, and the
+// assertion that the measured windows hold one fails then, so re-measure.
 const EVENT_LEAD_WINDOWS = 5;
 // The windows measured, after the lead: windows 5 to 9 of round 3, ticks 3029 to 3179.
 // The median of the five is the asserted figure, as in the sandbox (see testing.md).

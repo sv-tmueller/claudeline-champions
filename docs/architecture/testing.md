@@ -154,11 +154,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   the pointer aim with real changes. The clock is paused before the page loads
   and never runs a frame, so the first read is tick 0 and every tick is the
   hook's. The warm-up is plain windows with no profiler from tick 0 to the first
-  round that begins after tick 2100 (round 3, begun by tick 2879 on bc1d6f1 on
+  round that begins after tick 2100 (round 3, begun by tick 2879 on 1670d1b on
   every run so far: the bots are deterministic), then 5 plain windows of the
   round (the lead, 150 ticks), then the next 5 windows are measured, ticks 3029
   to 3179. The lead is derived from three 17-window runs of round 3 with the
-  pointer on bc1d6f1, all three identical: the first projectile spawns in window
+  pointer on 1670d1b, all three identical: the first projectile spawns in window
   5 (ticks 3029 to 3059), the first hit lands in window 6, and then 1 to 4
   projectiles are live and 1 to 3 hits land per window to the end of the run
   (tick 3389), with the first death of the round read at tick 3539. The pointer
@@ -289,9 +289,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
 - The asserted figure is the median of the five measured windows, in both
   scenes, and a window's figure is its counted bytes (see the retries bullet
   above for why). Window 0 of the sandbox holds the first-frame acquire of the
-  volley's eight views and reads 636 to 1068 B counted in every attempt (59
-  attempts: the 24 runner lines of the isolation and 35 local; the acquire is
-  336 to 660 B of it), which the median ignores; the live scene's windows hold
+  volley's eight views and reads 636 to 1068 B counted in every attempt (74
+  attempts: the 24 runner lines of the isolation, 35 local and the 15 of
+  1670d1b; the acquire is 336 to 660 B of it), which the median ignores; the live scene's windows hold
   the round's first projectiles, the first hit and the rings: the event paths
   (`entity-views.ts:acquire`, `feedback.ts:routeEvents`,
   `impact-rings.ts:spawn`) cost 24 to 330 B in a window, with one-off spikes of
@@ -366,7 +366,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   literal, a template string built on every `Hud.update` call, an escaping array
   built on every `BotDriver.think` call, a template string built on every
   `ResultScreen.update` call and the canvas rect asked from the DOM on every
-  `sampleAim` call. The first one fails every attempt on both scenes, `draw`
+  `sampleAim` call. The first seven fail every attempt on both scenes, `draw`
   among them since the exclusion is gone. Each line keeps its object reachable
   through `globalThis` (the compiler removes an unused one: the lesson of #72).
   The median of five, as bytes per attempt over 3 attempts, plus the line, both

@@ -8,12 +8,12 @@ import type { CDPSession, Page } from '@playwright/test';
 
 // The functions whose allocations the heap probe counts: every combat render
 // module, the pose and overlay helpers that run each frame, the loop clock, the
-// input sampler, the pointer aim (camera.ts), the HUD writer with its views and the kill feed, the text tables
-// of the hooks and the HUD (hook-text.ts), the champion names, the result screen's
-// writer, the client's bot-driving glue (bot-driver.ts) and every function in
-// main.ts (stepSim, sampleAim, draw and the hook writers). The HUD builder,
-// hud-dom.ts, the result panel's builder, result-dom.ts, and the setup modules run
-// once at startup and are not counted.
+// input sampler, the pointer aim (camera.ts), the HUD writer with its views and the
+// kill feed, the text tables of the hooks and the HUD (hook-text.ts), the champion
+// names, the result screen's writer, the client's bot-driving glue (bot-driver.ts)
+// and every function in main.ts (stepSim, sampleAim, draw and the hook writers). The
+// HUD builder, hud-dom.ts, the result panel's builder, result-dom.ts, and the setup
+// modules run once at startup and are not counted.
 // The bots package is not counted either, and its bytes are logged as the sixth
 // figure of the probe line. A live match leaves the bots' steady state in any
 // window by design (a new plan, a fresh path follower after an intent change, the

@@ -30,9 +30,14 @@ copies the canvas's client rect into an object once per resize
 `setSize`), because `getBoundingClientRect` makes a new `DOMRect` on every
 call, and `groundAimFromPointer` casts the pointer's ray through that copy and
 writes the ground point into a scratch record (`aimHit`), returning only
-whether the ray hit the plane. The rule for the frame path is that no raw
-double crosses a call: objects go in and fields are read out, since a double
-passed to a call that V8 does not inline is boxed. The copy assumes the canvas
+whether the ray hit the plane. For the aim sampling and the entity drawing the
+rule is that no raw double crosses a call: objects go in and fields are read
+out, since a double passed to a call that V8 does not inline is boxed. It is not
+a rule of the whole frame path: `main.ts:draw` still passes raw doubles through
+`view.position.set`, the `rotation.y` setter and `alpha` into its calls, and the
+hook's `frameMany` boxes one timestamp per frame (9 to 18 B, see
+[testing](testing.md)). `draw` reads 0 B in the probe because that path is hot,
+and the probe's mutations catch a regression there. The copy assumes the canvas
 fills `#app`, so only a resize moves its rect; a layout change without a resize
 event would leave it stale. The mapping itself is unchanged, and
 `camera.test.ts` keeps the two functions it replaced as an oracle, compared to
