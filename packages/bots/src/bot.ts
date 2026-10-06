@@ -382,7 +382,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
    * double argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite
    * tests are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8
    * 14.6 (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation
-   * a think. No committed test checks that again (see bots.md, Allocation, In the browser).
+   * a think; Node 22's V8 12.4 does not reproduce that. No committed test checks it again (see
+   * bots.md, Allocation, In the browser).
    */
   function aim(
     me: ChampionState,

@@ -474,7 +474,9 @@ neither is tier timing:
   the windows. In the engines measured (the Chromium of Playwright 1.63, and
   V8 14.6 on Node 26) Maglev does not inline a call with a double argument or
   result, and calls `Number.isFinite` with its argument boxed: one 16 B box
-  per call. No committed test checks that again. That was `bot.ts:aim` at 1.2
+  per call. Node 22's V8 12.4 does not reproduce it (`--maglev --no-turbofan`
+  reads tens of KB a think before and after alike), and no committed test checks
+  it again. That was `bot.ts:aim` at 1.2
   KB a window (a `Number.isFinite` per think, and the `aimU` store), the
   distance of `steerTowardInto` with the finite test of `cellIndexAt` at about
   5 KB together, and `clearShotWith` with `needsPlan` at about 1.5 KB. The
@@ -485,7 +487,8 @@ neither is tier timing:
   there, the rng draw.
 
 Not the cause: an unoptimized `aim` (Ignition, `--no-turbofan --no-maglev`)
-boxes about 755 B a think, 68 KB a window, and the live one read 13 B; a deopt
+boxes about 755 B a think in `aim` itself (the whole think reads 44 KB a think
+there), 68 KB a window for `aim` alone, and the live one read 13 B; a deopt
 loop on live feedback (none of those functions deoptimized in the windows, and
 `--no-concurrent-recompilation` left `aim` at 1.0 to 1.3 KB). The deopts the
 trace does show are three's `needsUpdate` and code a GC clears (`embedded weak
@@ -505,6 +508,18 @@ of bots bytes before and 0.72 MB after (cold code: the first plans and shot
 tests run in the interpreter), of round 2 1.5 MB before and 40 KB after, of
 round 3 1.1 MB before and 0.11 MB after, and the fifth window of a round 0.2
 MB before and under 0.15 MB after (round 3: 8 KB).
+
+One kind of byte is not bounded by the code: an optimized function that
+deoptimizes in a window runs its next call or calls in the interpreter.
+`sight.ts:lineOfSight` read 2.7 KB in one window of one local attempt (a
+median window of 6.4 KB, window 3) and 1.7 KB in one window of a runner
+attempt (window 1), and 0 B in the other 100 or so attempts: in a micro-run
+(Node 26) one interpreted call of it reads 1.1 to 3.1 KB, and the trace shows
+its one first-time deopt per run (`Insufficient type feedback for binary
+operation`, a branch of the sweep that no earlier shot took) at tick 299 and
+`clearShotWith` deoptimizing on `wrong map`. A late first-time branch costs
+one such call and nothing in the code can remove it, so the live bound has to
+tolerate one such event in the median window.
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
@@ -679,17 +694,29 @@ copy every input a bot returns, and a guard counts one distinct record per bot p
 stream of aliases would compare a few objects with themselves.
 
 A plan check in the same file reads the median `heapUsed` delta around one
-`findPath` over 600 start and goal pairs spread across arena 1 (every pair has
-a route), minus the empty pair, and the lowest of three rounds must be under
-640 B. The search before the scratch read 53112 to 53168 B per plan; it now
-reads 400 to 416 B, the waypoints it returns. A fresh object kept in a module
-variable per edge test (18112 B), per open push (11316 B) or per line of walk
-(1948 B), and three fresh tables per search (952 B), each go over the limit;
-one fresh typed array per search (584 B) does not. The steady-state scenes
-cannot see what only Maglev boxes (see Allocation, In the browser). A fresh
-six-double object kept in a module variable at each rewritten site
-(`steerTowardInto`, `cellIndexAt`, `clearShotWith`, `needsPlan`, `aim`,
-`segmentClear`) reads 168 B or more in the scenes that reach it.
+plan step of the path follower, `followPathInto` on a fresh follower (the
+search, the string pull, `splitPath`, the goal copy and, at an end in a
+blocked cell, `nearestFreeCell`), over 600 start and goal pairs spread across
+arena 1, minus the empty pair, on two spreads: clear (both ends in free cells,
+every one a route) and fallback (both ends at legal points inside blocked
+cells). The lowest of three rounds must be under 3300 B (clear) and 2560 B
+(fallback). Before the scratch the search read 55980 to 56340 B (clear) and
+39288 to 39796 B (fallback) per plan; it now reads 3128 to 3144 B and 2280 to
+2288 B, which is the output: about 46 objects of 56 B for a path across the
+arena. A fresh six-double object kept in a module variable goes over the limit
+per edge test (44488 B), per open push (26056 B), per point of `splitPath`
+(7600 B), per cell of `nearestFreeCell` (20436 B on the fallback spread) and
+per segment of `splitPath` (3448 B clear). It stays under per call of `plan`,
+`findPath` or `pullString` (3232 B clear), per call of `nearestFreeCell` it
+reads 2616 B on the fallback spread (56 B over) and nothing on the clear one,
+and one typed array per search is not seen either: the limits sit close to the
+clean figure because the output is most of what a plan reads, and a fresh
+object per path is the limit of this check, as a two-double point is for the
+think bound. The steady-state scenes cannot see what only Maglev boxes (see
+Allocation, In the browser). A fresh six-double object kept in a module
+variable at each rewritten site of the think (`steerTowardInto`,
+`cellIndexAt`, `clearShotWith`, `needsPlan`, `aim`, `segmentClear`) reads 168
+B or more in the scenes that reach it.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the
