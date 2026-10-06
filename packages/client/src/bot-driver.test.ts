@@ -9,7 +9,7 @@ import { TEST_KITS } from './test-kits';
 const arena = parseArenaDef(arena01Json);
 
 function setup() {
-  const { state, botIds } = createLocalMatch({ scene: 'match', champion: 'hargrim', difficulty: 'normal', arena: 'arena01' }, arena, TEST_KITS);
+  const { state, botIds } = createLocalMatch({ scene: 'match', champion: 'hargrim', difficulty: 'normal', arena: 'arena01', teamSize: 2 }, arena, TEST_KITS);
   const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
   return { state, botIds, inputs };
 }

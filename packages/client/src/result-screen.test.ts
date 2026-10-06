@@ -78,7 +78,7 @@ describe('result screen', () => {
 describe('a match played to its result', () => {
   it('ends with the panel visible, written once', { timeout: 60_000 }, () => {
     const { state, botIds } = createLocalMatch(
-      { scene: 'match', champion: 'hargrim', difficulty: 'normal', arena: 'arena01' },
+      { scene: 'match', champion: 'hargrim', difficulty: 'normal', arena: 'arena01', teamSize: 2 },
       parseArenaDef(arena01Json),
       TEST_KITS,
       1,

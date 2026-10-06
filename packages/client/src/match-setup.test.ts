@@ -13,7 +13,7 @@ const arena02 = parseArenaDef(arena02Json);
 const MATCH_END_BUDGET_TICKS = 15_000;
 
 function launch(champion: string, scene: Launch['scene'] = 'match'): Launch {
-  return { scene, champion, difficulty: 'normal', arena: 'arena01' };
+  return { scene, champion, difficulty: 'normal', arena: 'arena01', teamSize: 2 };
 }
 
 describe('createLocalMatch', () => {
