@@ -94,10 +94,19 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [Simulation](simulation.md#kit-contract-and-registration).
 - The heap probe runs through the dev-only counted frame hook on two scenes,
   asserting the median of five windows: 600 B for the sandbox and 780 B for the
-  live match:
+  live match, both by the limit rule (about 100 B above the largest clean
+  median, below the smallest mutation the scene gates), and 12 000 B for the
+  bots' bytes in the live match (50 percent above the largest clean median):
   [batch #53 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
-  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236).
-  Recorded in [Testing](testing.md#the-heap-probe).
+  [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236),
+  [batch #91 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6014685854),
+  [batch #91 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6014761763),
+  [batch #91 decision 7](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015519796),
+  [batch #91 decision 12](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6019121228),
+  [batch #91 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6020995527),
+  [its addendum](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6021485382).
+  Recorded in [Testing](testing.md#the-heap-probe) and
+  [Bots](bots.md#in-the-browser).
 - arena01's two deviations are grandfathered:
   [batch #63 decision 14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).
   Recorded in [the arena design](../design/arenas.md#8-the-arenas) and pinned
@@ -113,6 +122,18 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   files over IPC without a signature change, and only those two are built:
   [batch #80 decision 15](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012436842).
   Recorded in [Client](client.md#platform-interface).
+- One rig and four clips for every champion model, the placeholder included,
+  checked by the validator against the tables, the floor bounded between keys:
+  [batch #91 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015246696),
+  [batch #91 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015774432),
+  [batch #91 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6019098915).
+  Recorded in [Assets](assets.md#rig) and its [clips](assets.md#clips).
+- The address is the whole setup, the team size included: every select link
+  writes `teamsize`, 2 too, and the arena decides what plays
+  (`playableTeamSize`):
+  [batch #91 decision 5](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015194380).
+  Recorded in [Client](client.md#launch-and-match) and its
+  [select](client.md#result-screen-and-champion-select).
 
 Planning:
 
