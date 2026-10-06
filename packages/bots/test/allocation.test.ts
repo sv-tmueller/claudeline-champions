@@ -3,7 +3,10 @@ import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
+import { buildNavGrid, cellCenter } from '../src/grid';
+import type { NavGrid, Vec2 } from '../src/grid';
 import type { Intent } from '../src/intent';
+import { findPath } from '../src/path';
 import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './helpers';
 
 /*
@@ -57,9 +60,10 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
- * A plan (A star, the path split, the fallback search), a fresh follower after a goal or intent
- * change, and `inspect()` allocate by design and are outside the steady state: the scenes never
- * plan inside the measured median (a plan runs every 30th think at most).
+ * A plan, a fresh follower after a goal or intent change, and `inspect()` allocate by design and
+ * are outside the steady state: the scenes never plan inside the measured median (a plan runs
+ * every 30th think at most). The plan search allocates only the path it returns, which the plan
+ * check below bounds.
  */
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
 
@@ -68,6 +72,24 @@ const THINK_ALLOCATION_LIMIT_BYTES = 128;
  * counter moves. A measuring call alone reads 160 to 256 B, a real baseline step 2,272 to 4,048 B.
  */
 const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
+
+/**
+ * The most heap one plan search may allocate, in bytes: the median over a spread of start and goal
+ * pairs across arena01 of the `heapUsed` delta around one `findPath`, minus the median of the same
+ * delta around nothing. A plan is outside the steady state above (it runs every 30th think at
+ * most, and about every 6th while chasing a moving goal), but in a live match it was the bulk of
+ * the bots' bytes: the search allocated its tables, an object per open entry and two cell centres
+ * per edge test. The search now runs on scratch that outlives the call, and only its output is
+ * allocated: the waypoints `findPath` returns. The limit sits between the figure of the search
+ * before that change and the figure after it.
+ *
+ * Per plan, macOS, Node 22, three rounds: 53112 to 53168 B before (bc1d6f1), 400 to 416 B after.
+ * The mutations that put a cost back each go over the limit alone: a fresh object kept in a module
+ * variable per edge test reads 18112 B, one per open push 11316 B, one per line of walk of the
+ * string pull 1948 B, and three fresh typed arrays per search (the tables the old search made)
+ * 952 B. It cannot see one typed array per search (584 B) or one small object.
+ */
+const PLAN_ALLOCATION_LIMIT_BYTES = 640;
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -299,6 +321,40 @@ describe('think allocation', () => {
     ).toEqual([]);
     // think never mutates the state.
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
+  });
+
+  it('allocates only the path it returns when it plans, across arena01', () => {
+    const grid: NavGrid = buildNavGrid(arena01);
+    const free: number[] = [];
+    for (let i = 0; i < grid.blocked.length; i++) if (grid.blocked[i] === false) free.push(i);
+    // A fixed spread of pairs, made before the measured calls so the test allocates nothing in them.
+    const from: Vec2[] = [];
+    const to: Vec2[] = [];
+    for (let i = 0; i < WINDOW; i++) {
+      from.push(cellCenter(grid, free[(i * 211 + 7) % free.length] as number));
+      to.push(cellCenter(grid, free[(i * 389 + 101) % free.length] as number));
+    }
+    for (let pass = 0; pass < 3; pass++) for (let i = 0; i < WINDOW; i++) findPath(grid, from[i] as Vec2, to[i] as Vec2);
+    let best = Infinity;
+    const figures: number[] = [];
+    for (let round = 0; round < ROUNDS; round++) {
+      let waypoints = 0;
+      for (let i = 0; i < WINDOW; i++) {
+        const before = heap();
+        const path = findPath(grid, from[i] as Vec2, to[i] as Vec2);
+        deltas[i] = heap() - before;
+        waypoints += path.length;
+      }
+      // Every pair is a route: a search that found nothing would read low and prove nothing.
+      expect(waypoints, 'waypoints over the pairs').toBeGreaterThanOrEqual(WINDOW);
+      const figure = median(deltas, WINDOW) - emptyPairMedian();
+      figures.push(figure);
+      best = Math.min(best, figure);
+    }
+    console.log(`plan allocation, findPath over ${WINDOW} pairs: ${figures.map((f) => Math.round(f)).join(', ')} B per plan`);
+    expect(best, `lowest round of the median bytes per plan: ${figures.map(Math.round).join(', ')}`).toBeLessThan(
+      PLAN_ALLOCATION_LIMIT_BYTES,
+    );
   });
 
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {

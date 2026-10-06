@@ -143,7 +143,8 @@ export function followPath(
 
 /**
  * `followPath` written into `out`, which also serves as the scratch of the steering tests. The
- * steady state (no plan) allocates nothing: a plan, with its search and its split path, does.
+ * steady state (no plan) allocates nothing: a plan allocates its path, the search itself runs on
+ * scratch (see path.ts).
  */
 export function followPathInto(
   out: MoveCommand,

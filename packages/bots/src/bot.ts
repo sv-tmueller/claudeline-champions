@@ -188,8 +188,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const tier = TIERS[difficulty];
   const rng = createRng(seed >>> 0);
   // Every record a think reads or writes is made here, once, and rewritten field by field: the
-  // steady state allocates nothing (packages/bots/test/allocation.test.ts). A plan, a fresh
-  // follower after a goal or intent change, and `inspect()` allocate by design. Fields that hold
+  // steady state allocates nothing (packages/bots/test/allocation.test.ts). A plan (its
+  // path only), a fresh follower after a goal or intent change, and `inspect()` allocate by design. Fields that hold
   // doubles start as doubles (0.5), as the sim's geometry does, so no field changes
   // representation and boxes a number.
   //
