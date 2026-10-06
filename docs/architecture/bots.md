@@ -412,9 +412,10 @@ makes that true, and what stays outside it:
 - The cache of the rules is typed arrays and double fields too: per slot `hasOpen`, `openMin`,
   `openMax`, `motion` (Int8), `isEscape`, `escapeRange`, `escapeFixed`, and `escapeOrder` (Int8
   ended by -1), and `lowHealth` (a double field) with `holdF`. They are filled on a rebuild only.
-  The cues of a think (`dot`, `escape`, `reserve`, `fOk`) are fields of one object, the landing is
-  a record of eight doubles, and the kite points, the cornered test's move and the landing are
-  scratch the bot owns: the landing search and the cornered test allocate nothing.
+  The cues of a think (`dot`, `escapeThink`, `reserve`, `fOk`) are fields of one object, the
+  landing is a record of seven doubles and a boolean, and the kite points, the cornered test's
+  move and the landing are scratch the bot owns: the landing search and the cornered test allocate
+  nothing.
 - `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32 B per
   call, so a bot that measures a dozen distances allocated 400 B for them. A test
   compares it, bit for bit, with `Math.hypot`. That test pins the `Math.hypot` of current
@@ -529,10 +530,10 @@ match replays exactly from its input stream.
   a fixed 3600 ticks.
 - Local steering around champions and projectiles, dodging and ally logic.
 - The Lumeth profile, abilities that land on allies or on the caster that no rule presses
-  (Hargrim Q), and the rest of the roster's bot sketches: Skerrow waiting at 6 to 8 m for the opening, "Quiet Dart first if an escape is ready"
-  (the slot order already presses Q before SPACE, so no rule is needed for it), a target choice by
-  lowest health (the target is the nearest enemy), per-slot finishers (the one finisher is the
-  rule above), dodging and ally logic.
+  (Hargrim Q), and the rest of the roster's bot sketches: Skerrow waiting at 6 to 8 m for the
+  opening, "Quiet Dart first if an escape is ready" (the slot order already presses Q before
+  SPACE, so no rule is needed for it), a target choice by lowest health (the target is the nearest
+  enemy), and per-slot finishers (the one finisher is the rule above).
 
 ## Testing
 
@@ -557,8 +558,8 @@ of the state, checked with `hasLineOfSight` and the clearance of the cell centre
 press must be that landing's and the sim must put the champion on it, and Hush Ward is pressed
 only when Skip is not ready or has no landing. The ultimate of Skerrow passes only for a target at
 40 health or less, or one the oracle finds cornered by its own walk of the five points. Every
-teleport of the runs must be reported unblocked. The
-run must end with a death from a cast, every champion must start a cast, and one cast must
+escape teleport of the runs (a press with a landing, not Reaper's Dance) must be reported
+unblocked. The run must end with a death from a cast, every champion must start a cast, and one cast must
 be an EX. The seeds are 101 to 104, the match seed 7 and the tiers easy, normal, hard,
 normal; they are pinned, and a miss after a change to the bots, the sim or the Node
 version is governed by batch #53 decision 8.3. The ultimate has its own pinned run: the 2v2
