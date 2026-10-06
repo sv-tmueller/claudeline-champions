@@ -61,7 +61,8 @@ port 5173, which Playwright starts itself.
   in a 3v3), a projectile and a hit within tick budgets, the timer and the
   hidden result panel. It asserts budgets only, never an exact tick, since bot
   output differs between platforms. The 3v3 rows log the headless ticks next
-  to the ones they read (projectile 267 and 275, hit 301 and 307, on 9612bff).
+  to the ones they read (projectile 267 and 275, hit 301 and 307, the same on
+  9612bff and on 57dd52f: the dash hold of #98 moves none of them).
 - `match-end.spec.ts`: tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run 96
   ticks each, read every 5 frames at 320x180. One plays the default match with an
@@ -69,17 +70,18 @@ port 5173, which Playwright starts itself.
   (`/?arena=arena02&timescale=100` for arena02) and team size (`teamsize=3`
   for the 3v3 rows), within a budget of ticks and frames per row: 15 000 and
   182 on arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5184 in the e2e and
-  5117 in a headless run, on 8d80073), 13 000 and 161 on arena02, and 21 000
-  and 244 on the 3v3 of arena01 (it ends at tick 10 631 headless and 10 944 in
-  the e2e, a Victory 3 : 1) and 18 000 and 213 on the 3v3 of arena02 (tick 7119
-  headless and 7584 in the e2e, a Defeat 2 : 3). A headless run through the
-  client's setup and driver gives each row's tick, in
-  `match-setup.test.ts`. The budget is that tick plus two rounds of about 1000
-  and one round to sudden death of about 7000, rounded up to 1000, and the
-  frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their rows
-  use 1600 for a round (the longest measured is 1557). Each row logs its wall
-  time, and a row over 40 s gets its own timeout. The test follows the Quillon
-  link of the result panel, which keeps the arena and the team size.
+  5053 in a headless run, on 57dd52f), 14 000 and 171 on arena02 (tick 4198
+  headless and 4224 in the e2e, a Defeat 0 : 3), and 23 000 and 265 on the 3v3
+  of arena01 (it ends at tick 12 431 headless and 12 864 in the e2e, a Defeat
+  2 : 3) and 18 000 and 213 on the 3v3 of arena02 (tick 7125 headless and 7584
+  in the e2e, a Defeat 2 : 3). A headless run through the client's setup and
+  driver gives each row's tick, in `match-setup.test.ts`. The budget is that
+  tick plus two rounds of about 1000 and one round to sudden death of about
+  7000, rounded up to 1000, and the frames are ceil(ticks / 96) + 25. The 3v3
+  rounds run longer, so their rows use 1600 for a round (the longest measured is
+  1557). Each row logs its wall time, and a row over 40 s gets its own timeout.
+  The test follows the Quillon link of the result panel, which keeps the arena
+  and the team size.
   The other plays the sandbox to the red edge: the ring warning hidden until 600
   ticks before the ring, the countdown, the radius text equal to the sim's within
   0.1 m and falling, and the red edge (`ring.png`, counted as red pixels against a
@@ -167,20 +169,20 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   the pointer aim with real changes. The clock is paused before the page loads
   and never runs a frame, so the first read is tick 0 and every tick is the
   hook's. The warm-up is plain windows with no profiler from tick 0 to the first
-  round that begins after tick 2100 (round 3, begun by tick 2879 on 1670d1b on
-  every run so far: the bots are deterministic), then 5 plain windows of the
-  round (the lead, 150 ticks), then the next 5 windows are measured, ticks 3029
-  to 3179. The lead is derived from three 17-window runs of round 3 with the
-  pointer on 1670d1b, all three identical: the first projectile spawns in window
-  5 (ticks 3029 to 3059), the first hit lands in window 6, and then 1 to 4
-  projectiles are live and 1 to 3 hits land per window to the end of the run
-  (tick 3389), with the first death of the round read at tick 3539. The pointer
-  moves the human's own aim from round 1 on, and only the first death moved (it
-  was read at 3509 without a pointer, on 8d80073), so the margin after the last
-  measured window is 360 ticks (the floor is 60). The human walks W and D in the
-  first window, then A and D in turn at y of about 3.9 m, west of the block at x
-  = -8, with M1 held; Hargrim's M1 windup is `slowed`, so the walk goes on under
-  the cast.
+  round that begins after tick 2100 (round 3, begun by tick 2609 on 57dd52f on
+  every run so far: the bots are deterministic), then 4 plain windows of the
+  round (the lead, 120 ticks), then the next 5 windows are measured, ticks 2729
+  to 2879. The lead is derived from three 17-window runs of round 3 with the
+  pointer on 57dd52f, all three identical: the first projectile spawns in window
+  4 (ticks 2729 to 2759), the first hits land in window 6 (five at once), and
+  then 1 to 2 hits land per window and 0 to 3 projectiles are live at the reads
+  to the end of the run (tick 3119), with the first death of the round read at
+  tick 3419. Before the dash hold of #98 the round began by tick 2879, the first
+  projectile spawned in window 5 (lead 5, windows 3029 to 3179) and the first
+  death was read at 3539. The margin after the last measured window is 540 ticks
+  (the floor is 60). The human walks W and D in the first window, then A and D
+  in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
+  Hargrim's M1 windup is `slowed`, so the walk goes on under the cast.
 - The live scene's pointer. Before every window of the run, from the first read
   (the warm-up, the lead, the measured windows and the run-on), a synthetic
   `mousemove` is dispatched on `window` through `page.evaluate`. The page runs
@@ -261,7 +263,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   sixth figure of the probe line; the live scene bounds them apart: the median
   of the five measured windows' bots figures (not the bots figure of the
   window that is the median by counted bytes) must be at most
-  `LIVE_BOTS_LIMIT_BYTES`, 9600 B (`heap-probe.ts` has the figures, and
+  `LIVE_BOTS_LIMIT_BYTES`, 12 000 B (`heap-probe.ts` has the figures, and
   bots.md, Allocation, In the browser, the causes). The bytes in a browser
   window were: 0.7 to 1.2 KB per window in the sandbox (`bot.ts:move` and
   `rng.ts:next` of its one bot, not asserted), and in the live scene's
@@ -269,14 +271,19 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   window of 52 and 40 KB in two jobs (39 to 44 KB over 15 local attempts): the
   garbage of the plan search, about 53 KB a plan, and the calls V8's Maglev
   tier boxes, `Number.isFinite` and `hypot2` among them (bots.md). After the
-  fixes of #93 the median window reads 3.2 to 4.0 KB locally (windows of about
+  fixes of #93 the median window read 3.2 to 4.0 KB locally (windows of about
   6.1, 10.8, 2.6, 3.7 and 1.6 KB) and 3588, 3912 and 3756 B in the three
-  runner jobs on 04be0f9. The limit is 50 percent above the largest median,
-  6.4 KB (a tester's attempt where one interpreted call of `lineOfSight` read
-  2.7 KB, counted as clean), and under a quarter of the smallest median with
-  the fixes reverted (38.9 KB), which fails the bound in every attempt (9 of 9
-  local). It does not catch one reverted fix alone (`aim`'s 1.2 KB leaves the
-  median under 9.6 KB). The windows after a round starts are not asserted:
+  runner jobs on 04be0f9, on windows 5 to 9 of round 3. The dash hold of #98
+  moved the measured windows to windows 4 to 8 of a round 3 that begins at tick
+  2609, and there the median window reads 6404 to 7996 B over 15 local attempts
+  6952, 7348 and 7200 B in three runner jobs on 4ea802d and up to 7568 B in the
+  tester's twelve attempts (main's bots read 5744 to 6416 B there). The limit
+  is 50 percent above the largest clean median of the three, 7996 B, a local
+  one (11 994, rounded up to 100), and it is also under a quarter of the
+  smallest median with the fixes reverted (61.9 KB on these windows, 38.9 KB on
+  the old ones), which fails the bound in every attempt (3 of 3 local, 9 of 9
+  before). It does not catch one reverted fix alone (`aim`'s 1.2 KB leaves the
+  median under 12 KB). The windows after a round starts are not asserted:
   megabytes before the fixes, 0.04 to 0.72 MB in the first window of a round
   after them, locally (bots.md). `summarise` gives the bots' files the prefix
   `bots/`, as it gives the sim's `sim/`, so a bots file such as `bot.ts` never

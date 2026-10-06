@@ -104,3 +104,56 @@ describe('Lunge, the dash opener of Skerrow', () => {
     expect(pressOf(sceneOf('skerrow', 9, { ...SPACE_ONLY, energy: 24 }))).toBeNull();
   });
 });
+
+describe('Quiet Dart, the opener of Skerrow on a target with an escape ready', () => {
+  // Q and M2 are both bolts in reach at 9 m (the kit band less the margin is 10 and 9 m), and Q is
+  // first in the walk: M2 is pressed exactly when Q is held back. The target's escapes are the
+  // slots of its own rule (Skip then Hush Ward for Quillon, Iron Hide for Hargrim), ready at a
+  // cooldown of 1 or less.
+  const BOLTS = { ready: ['Q', 'M2'] } as const;
+  const quillon = (options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('skerrow', 9, { ...BOLTS, enemyId: 'quillon', ...options });
+
+  it('presses Q at a Quillon with Skip ready', () => {
+    expect(pressOf(quillon({ enemyReady: ['SPACE'] }))).toBe('Q');
+  });
+
+  it('presses Q at a Quillon with only Hush Ward ready: any escape of its rule counts', () => {
+    expect(pressOf(quillon({ enemyReady: ['R'] }))).toBe('Q');
+  });
+
+  it('presses M2, not Q, at a Quillon with Skip and Hush Ward cooling down', () => {
+    expect(pressOf(quillon({ enemyReady: [] }))).toBe('M2');
+  });
+
+  it('counts an escape ready at a cooldown of 1 and not at 2', () => {
+    expect(pressOf(quillon({ enemyReady: [], enemyCooldown: { SPACE: 1 } }))).toBe('Q');
+    expect(pressOf(quillon({ enemyReady: [], enemyCooldown: { SPACE: 2 } }))).toBe('M2');
+  });
+
+  it('presses M2 at a silenced Quillon, though Skip is ready', () => {
+    expect(pressOf(quillon({ enemyReady: ['SPACE'], enemyStatus: 'silence' }))).toBe('M2');
+  });
+
+  it('presses M2 at a stunned Quillon, though Skip is ready', () => {
+    expect(pressOf(quillon({ enemyReady: ['SPACE'], enemyStatus: 'stun' }))).toBe('M2');
+  });
+
+  it('presses Q at a Hargrim with Iron Hide ready, and M2 with it cooling down', () => {
+    const hargrim = (options: Parameters<typeof sceneOf>[2] = {}) =>
+      sceneOf('skerrow', 9, { ...BOLTS, enemyId: 'hargrim', ...options });
+    expect(pressOf(hargrim({ enemyReady: ['R'] }))).toBe('Q');
+    expect(pressOf(hargrim({ enemyReady: [] }))).toBe('M2');
+  });
+
+  it('presses M2 at a champion with no rule, though every slot of it is ready', () => {
+    expect(pressOf(sceneOf('skerrow', 9, BOLTS))).toBe('M2');
+    expect(pressOf(sceneOf('skerrow', 9, { ...BOLTS, enemyId: 'lumeth' }))).toBe('M2');
+  });
+
+  it('does not press Q beyond its band whatever the target has ready', () => {
+    expect(pressOf(quillon({ enemyReady: ['SPACE'], ready: ['Q'] }))).toBe('Q');
+    const far = sceneOf('skerrow', 10.05, { ready: ['Q'], enemyId: 'quillon', enemyReady: ['SPACE'] });
+    expect(pressOf(far)).toBeNull();
+  });
+});

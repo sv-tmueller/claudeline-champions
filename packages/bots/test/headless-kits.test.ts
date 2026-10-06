@@ -12,10 +12,13 @@ import {
   configSkerrow,
   createRun,
   createStallTracker,
+  createTeleportTally,
   jsonKits,
   kitOf,
+  tallyTeleports,
   validInput,
 } from './helpers';
+import type { TeleportTally } from './helpers';
 import { hargrimKit, quillonKit } from './kits';
 
 const TICKS = 3600;
@@ -46,13 +49,15 @@ function config3v3(): MatchConfig {
  * A band of centre distances. A row without `margin` is a kit band, tested with the 1 m range
  * margin off its top; an opener row (see bots.md, Openers and escapes) is the literal band with
  * `margin: 0`. `motion` is the condition of an opener: the target walks away from the champion or
- * toward it, by the sign of (target - champion) . target velocity.
+ * toward it, by the sign of (target - champion) . target velocity. `needs` is the other one.
  */
 interface Band {
   min: number;
   max: number;
   margin?: number;
   motion?: 'away' | 'closing';
+  /** Quiet Dart: the target has an escape ready, see `escapeReady`. */
+  needs?: 'escapeReady';
 }
 
 // The oracle's own band and clearance tables, one per kit set, written out from the kit files
@@ -81,6 +86,20 @@ const ESCAPES: Record<string, EscapeRow> = {
   // Vanish Step: a 5 m teleport that is not fixed (the shipped Skerrow kit only).
   'skerrow:R': { slot: 'R', teleport: 5, after: null },
 };
+
+/**
+ * Whether the target has a way out, by the escape rows above: one of its escape slots has a
+ * cooldown of at most 1 and it is neither stunned nor silenced. Written here from the rows, not
+ * from the rules of src.
+ */
+function escapeReady(target: ChampionState): boolean {
+  if (target.statuses.some((st) => st.type === 'stun' || st.type === 'silence')) return false;
+  return Object.entries(ESCAPES).some(
+    ([key, row]) =>
+      key.startsWith(`${target.championId}:`) &&
+      (target.cooldowns[SLOTS.indexOf(row.slot)] ?? Infinity) <= 1,
+  );
+}
 
 /**
  * The ultimates the bot holds for a low or cornered target: the key and the health at or below
@@ -117,7 +136,7 @@ const SKERROW_BANDS: Record<string, Band> = {
   'skerrow:M2': { min: 0, max: (24 * 25) / 60 },
   'skerrow:SPACE': { min: 5, max: 6, margin: 0 },
   'skerrow:SPACE:ex': { min: 0, max: 10.5 },
-  'skerrow:Q': { min: 0, max: (20 * 33) / 60 },
+  'skerrow:Q': { min: 0, max: (20 * 33) / 60, needs: 'escapeReady' },
   'skerrow:E': { min: 0, max: 3 },
   'skerrow:E:ex': { min: 0, max: 3 },
   'skerrow:F': { min: 0, max: 11 },
@@ -188,7 +207,7 @@ const KIT_SETS: KitSet[] = [
     },
   },
 ];
-/** The pressed abilities that hold a dash, which a root skips. */
+/** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
   'hargrim:SPACE:ex',
@@ -285,6 +304,9 @@ function pressProblems(
       const dot = (target.x - c.x) * target.vx + (target.y - c.y) * target.vy;
       if (band.motion === 'away' && !(dot > 0)) problems.push(`target not moving away: dot ${dot}`);
       if (band.motion === 'closing' && !(dot < 0)) problems.push(`target not closing: dot ${dot}`);
+      if (band.needs === 'escapeReady' && !escapeReady(target)) {
+        problems.push(`${key} pressed at a target with no escape ready`);
+      }
     }
   }
   if (cooldown > 1) problems.push(`cooldown ${cooldown} above 1`);
@@ -292,6 +314,10 @@ function pressProblems(
   if (c.energy < cost) problems.push(`energy ${c.energy} below ${cost}`);
   if (hasStatus(c, 'stun') || hasStatus(c, 'silence')) problems.push('stunned or silenced');
   if (hasStatus(c, 'root') && DASHES.has(key)) problems.push('rooted and the ability holds a dash');
+  // The dash hold: on an escape think (the trigger of the escape rows) no dash is pressed.
+  if (target !== undefined && DASHES.has(key) && triggerProblems(c, target, acted.intent).length === 0) {
+    problems.push(`${key} is a dash pressed on an escape think (${acted.intent})`);
+  }
   if (c.cast !== null && c.cast.windupLeft !== 1) problems.push(`windupLeft ${c.cast.windupLeft}`);
   return { problems, key, gates, landing };
 }
@@ -325,9 +351,13 @@ interface Played {
   ultimates: number[];
   /** A champion that had a cast fire killed an enemy. */
   killed: boolean;
-  /** The escape teleports of the run (pressed with a landing), and how many were blocked. */
-  teleports: number;
-  blockedTeleports: number;
+  /**
+   * The teleports of the run: the escape teleports (pressed with a landing) and every other one
+   * (Reaper's Dance), each with how many the sim blocked.
+   */
+  tally: TeleportTally;
+  /** The champion of each teleport the tally counted apart, in order: who cast Reaper's Dance. */
+  otherTeleporters: number[];
   /** The tick on which a team had no champion alive, or -1. */
   eliminatedAt: number;
   /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
@@ -349,8 +379,8 @@ function play(set: KitSet, run: MatchRun): Played {
   const ultimates = state.champions.map(() => 0);
   const fired = new Set<number>();
   let killed = false;
-  let teleports = 0;
-  let blockedTeleports = 0;
+  const tally = createTeleportTally();
+  const otherTeleporters: number[] = [];
   let eliminatedAt = -1;
   let firstLunge = -1;
   let firstDeath = -1;
@@ -387,20 +417,27 @@ function play(set: KitSet, run: MatchRun): Played {
         `tick ${tick} champion ${press.id} pressed ${press.slot}${press.ex ? ' with SHIFT' : ''} and the sim started nothing: ${press.gates}`,
       ).toBe(true);
     }
-    for (const press of pending) {
-      if (press.landing === null) continue;
-      const event = state.events.find((e) => e.type === 'teleport' && e.championId === press.id);
-      if (event === undefined || event.type !== 'teleport') continue;
-      // Only the escape teleports count: Reaper's Dance teleports after an 18 tick windup and may
-      // be blocked legitimately, so it is not part of this pin.
-      teleports++;
-      if (event.blocked) blockedTeleports++;
+    // Only the escape teleports are pinned to a landing and to never being blocked: Reaper's Dance
+    // teleports after an 18 tick windup, aimed at where the target is when it fires, and may be
+    // blocked legitimately, so the tally counts it apart.
+    const escapes = pending.filter((press) => press.landing !== null);
+    const found = tallyTeleports(
+      tally,
+      state.events,
+      escapes.map((press) => press.id),
+    );
+    for (const e of state.events) {
+      if (e.type === 'teleport' && !found.includes(e)) otherTeleporters.push(e.championId);
+    }
+    escapes.forEach((press, n) => {
+      const event = found[n];
+      if (event === undefined || press.landing === null) return;
       // The sim puts the champion where the oracle found the first landing.
       expect([event.toX, event.toY], `tick ${tick} champion ${press.id} teleport`).toEqual([
         press.landing.x,
         press.landing.y,
       ]);
-    }
+    });
     for (const e of state.events) {
       if (e.type === 'castStarted') {
         if (e.slot === 'SPACE' && state.champions[e.championId]?.championId === 'skerrow') {
@@ -426,7 +463,7 @@ function play(set: KitSet, run: MatchRun): Played {
     expect(Number.isFinite(checksum(state))).toBe(true);
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; teleports ${teleports}; eliminated ${eliminatedAt}; first Lunge ${firstLunge}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
@@ -434,8 +471,8 @@ function play(set: KitSet, run: MatchRun): Played {
     exStarted,
     ultimates,
     killed,
-    teleports,
-    blockedTeleports,
+    tally,
+    otherTeleporters,
     eliminatedAt,
     firstLunge,
     summary,
@@ -463,7 +500,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
       `no EX cast: ${played.summary}`,
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
-    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expectNoStall(played);
   }, 30_000);
 
@@ -482,7 +519,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
       `no F cast: ${played.summary}`,
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
-    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expectNoStall(played);
   }, 30_000);
 });
@@ -500,7 +537,29 @@ describe('a headless match with Skerrow on the shipped kits', () => {
     expect(played.eliminatedAt, played.summary).toBeGreaterThan(0);
     expect(played.eliminatedAt, played.summary).toBeLessThanOrEqual(TICKS);
     expect(played.firstLunge, `Skerrow started no Lunge: ${played.summary}`).toBeGreaterThanOrEqual(0);
-    expect(played.blockedTeleports, played.summary).toBe(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
+  }, 30_000);
+
+  // The same match with a start edit that makes Reaper's Dance reachable: Skerrow at 100 energy and
+  // both enemies at 40 health, the damage F does, so the hold lets it go. It runs the whole play
+  // loop, so the oracle's Skerrow F row (the hold, the band, the clear shot, the gates) runs on a
+  // real press. One run: a miss after a change to the bots, the sim or the Node version is governed
+  // by batch #53 decision 8.3; the fallback is Skerrow against a Quillon at 40 health, the other
+  // two champions dead, 9 m apart.
+  it("Skerrow starts Reaper's Dance at a target at 40 health, and no escape teleport is blocked", () => {
+    const run = createRun(SEEDS, NORMAL, 7, { config: configSkerrow(), kits: set.kits() });
+    const skerrow = run.state.champions[0] as ChampionState;
+    skerrow.energy = 100;
+    for (const id of [2, 3]) (run.state.champions[id] as ChampionState).health = 40;
+    const played = play(set, run);
+    expect(played.ultimates[0], played.summary).toBeGreaterThan(0);
+    // The teleport counted apart is Skerrow's own (champion 0): Reaper's Dance, not another's.
+    expect(played.tally.others, played.summary).toBeGreaterThan(0);
+    expect(played.otherTeleporters, played.summary).toEqual(Array(played.tally.others).fill(0));
+    expect(played.tally.escapes, played.summary).toBe(2);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expect(played.state.tick).toBe(TICKS);
     expectNoStall(played);
   }, 30_000);
@@ -591,10 +650,11 @@ describe('the band and clearance tables of the shipped kits', () => {
     }
     for (const key of ['M2', 'Q']) {
       const bolt = projectile(slotOf('skerrow', key));
-      expect(shipped.bands[`skerrow:${key}`], key).toEqual({
-        min: 0,
-        max: (bolt.speed * bolt.lifetimeTicks) / 60,
-      });
+      // Quiet Dart is an opener: the kit band less the margin, at a target with an escape ready.
+      const reach = { min: 0, max: (bolt.speed * bolt.lifetimeTicks) / 60 };
+      expect(shipped.bands[`skerrow:${key}`], key).toEqual(
+        key === 'Q' ? { ...reach, needs: 'escapeReady' } : reach,
+      );
       expect(shipped.clearances[`skerrow:${key}`], key).toBe(bolt.radius);
     }
     // Lunge: the base dash gives [D - 1, D] with no margin; the EX dash its distance plus its arc.

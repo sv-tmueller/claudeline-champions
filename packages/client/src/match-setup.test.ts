@@ -268,11 +268,12 @@ describe('a match of bots from setup to the result', () => {
 
 // The tick budget of the arena02 row of e2e/match-end.spec.ts: the end tick of this match
 // when the budget was set, plus two rounds of about 1000 ticks and one sudden-death round
-// of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86; every bots
-// change moves it, the console line above reports the current one, and a match that ends
-// past the budget fails here before the e2e does.
-const ARENA02_END_TICK = 3474;
-const ARENA02_BUDGET_TICKS = 13_000;
+// of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86 and is 4198 on
+// those of #98 (the dash hold shortened the first two rounds of the live match, and lengthened
+// this one); every bots change moves it, the console line above reports the current one, and a
+// match that ends past the budget fails here before the e2e does.
+const ARENA02_END_TICK = 4198;
+const ARENA02_BUDGET_TICKS = 14_000;
 
 describe('a match of bots on arena02', () => {
   it('ends the match to 3 rounds with a winner on 3 within the budget of the e2e', { timeout: 60_000 }, () => {
@@ -305,16 +306,17 @@ describe('playableTeamSize', () => {
 });
 
 // The tick budgets of the 3v3 rows of e2e/match-end.spec.ts: the end tick of the match when the
-// budget was set (measured through this setup and the client's bot driver on 9612bff), plus two
-// rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is 1600, the
-// longest non-sudden 3v3 round measured (1557 ticks), where the 2v2 rows assume 1000. arena01:
-// ceil((10631 + 2 * 1600 + 7000) / 1000) * 1000 = 21000. arena02: ceil((7119 + 2 * 1600 + 7000) /
-// 1000) * 1000 = 18000. Every bots change moves the end tick, the console line reports the
-// current one, and a match that ends past the budget fails here before the e2e does.
+// budget was set (measured through this setup and the client's bot driver on 57dd52f, the bots of
+// #98; 10631 and 7119 on 9612bff), plus two rounds and one sudden-death round of about 7000,
+// rounded up to 1000. The round term is 1600, the longest non-sudden 3v3 round measured (1557
+// ticks, arena02, on both), where the 2v2 rows assume 1000. arena01: ceil((12431 + 2 * 1600 +
+// 7000) / 1000) * 1000 = 23000. arena02: ceil((7125 + 2 * 1600 + 7000) / 1000) * 1000 = 18000.
+// Every bots change moves the end tick, the console line reports the current one, and a match
+// that ends past the budget fails here before the e2e does.
 const THREE_V_THREE_ROUND_TICKS = 1600;
-const ARENA01_3V3_END_TICK = 10_631;
-const ARENA01_3V3_BUDGET_TICKS = 21_000;
-const ARENA02_3V3_END_TICK = 7119;
+const ARENA01_3V3_END_TICK = 12_431;
+const ARENA01_3V3_BUDGET_TICKS = 23_000;
+const ARENA02_3V3_END_TICK = 7125;
 const ARENA02_3V3_BUDGET_TICKS = 18_000;
 
 describe('a 3v3 match of bots from setup to the result', () => {

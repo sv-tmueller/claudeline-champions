@@ -76,6 +76,27 @@ export interface KitCache {
    * -1 walking toward it, 0 anything. An EX press has no such condition.
    */
   motion: Int8Array;
+  /**
+   * 1 when the opener of the slot needs a target with an escape ready (`OpenerRule.when`); an EX
+   * press has no such condition. `anyEscapeCondition` is true when some slot has one, so a think
+   * works the cue out only for a champion that reads it.
+   */
+  needsEscape: Uint8Array;
+  anyEscapeCondition: boolean;
+  /**
+   * The wait of the champion (see `WaitRule`): the slot index in `waitSlot[0]`, -1 for none, and
+   * in `waitBand` the band's two ends and the most ticks of cooldown. Typed arrays, so a double
+   * is read without boxing.
+   */
+  waitSlot: Int8Array;
+  waitBand: Float64Array;
+  /**
+   * 1 when the base ability of the slot starts with a dash (its first effect), and the same for the
+   * EX variant of an EX slot of the kit (listed in `kit.ex`, has a variant, is not F), whether or
+   * not the variant has a reach band. An escape think presses neither (see `chooseCast`).
+   */
+  baseDash: Uint8Array;
+  exDash: Uint8Array;
   /** The slots of the escape rule in priority order, as indices into SLOTS, ended by -1. */
   escapeOrder: Int8Array;
   /** 1 when the slot is in `escapeOrder`. */
@@ -122,6 +143,11 @@ export interface CastCues {
    * before `updateRuns`. Not the cornered kiter's latch `escaping` of bot.ts.
    */
   escapeThink: boolean;
+  /**
+   * Whether the acted target has a way out (see `targetEscapeReady`). Only worked out when the
+   * champion has an opener that reads it (`KitCache.anyEscapeCondition`), else false.
+   */
+  escapeReady: boolean;
 }
 
 export function createCastCues(kite: KiteScratch): CastCues {
@@ -132,6 +158,7 @@ export function createCastCues(kite: KiteScratch): CastCues {
     kite,
     corner: { moveX: 0, moveY: 0 },
     escapeThink: false,
+    escapeReady: false,
   };
 }
 
@@ -153,6 +180,12 @@ export function createKitCache(): KitCache {
     openMin: new Float64Array(SLOTS.length),
     openMax: new Float64Array(SLOTS.length),
     motion: new Int8Array(SLOTS.length),
+    needsEscape: new Uint8Array(SLOTS.length),
+    anyEscapeCondition: false,
+    waitSlot: new Int8Array(1).fill(-1),
+    waitBand: new Float64Array(3),
+    baseDash: new Uint8Array(SLOTS.length),
+    exDash: new Uint8Array(SLOTS.length),
     escapeOrder: new Int8Array(SLOTS.length).fill(-1),
     isEscape: new Uint8Array(SLOTS.length),
     escapeRange: new Float64Array(SLOTS.length),
@@ -181,6 +214,9 @@ export function refreshKitCache(
     cache.hasEx[i] = 0;
     cache.hasOpen[i] = 0;
     cache.motion[i] = 0;
+    cache.needsEscape[i] = 0;
+    cache.baseDash[i] = 0;
+    cache.exDash[i] = 0;
     cache.isEscape[i] = 0;
     cache.escapeRange[i] = 0;
     cache.escapeFixed[i] = 0;
@@ -194,8 +230,10 @@ export function refreshKitCache(
       cache.baseMax[i] = base.max;
     }
     cache.baseClearance[i] = clearanceOf(spec);
+    cache.baseDash[i] = startsWithDash(spec) ? 1 : 0;
     const variant = spec.ex;
     if (variant !== undefined && slot !== 'F' && kit.ex.includes(slot)) {
+      cache.exDash[i] = startsWithDash(variant) ? 1 : 0;
       const band = abilityReach(variant);
       if (band !== null) {
         cache.hasEx[i] = 1;
@@ -205,15 +243,27 @@ export function refreshKitCache(
       cache.exClearance[i] = clearanceOf(variant);
     }
   }
+  cache.anyEscapeCondition = false;
   for (const opener of rules.openers) {
     if (kit === undefined) break;
     const i = SLOTS.indexOf(opener.slot);
     cache.motion[i] = opener.motion === 'away' ? 1 : opener.motion === 'closing' ? -1 : 0;
+    if (opener.when === 'escapeReady') {
+      cache.needsEscape[i] = 1;
+      cache.anyEscapeCondition = true;
+    }
     const band = opener.band === 'dash' ? dashBand(kit.slots[opener.slot]) : opener.band;
     if (band === null) continue;
     cache.hasOpen[i] = 1;
     cache.openMin[i] = band[0];
     cache.openMax[i] = band[1];
+  }
+  cache.waitSlot[0] = -1;
+  if (kit !== undefined && rules.wait !== null) {
+    cache.waitSlot[0] = SLOTS.indexOf(rules.wait.slot);
+    cache.waitBand[0] = rules.wait.band[0];
+    cache.waitBand[1] = rules.wait.band[1];
+    cache.waitBand[2] = rules.wait.maxTicks;
   }
   cache.holdF = kit !== undefined && rules.holdF;
   cache.lowHealth = kit !== undefined && rules.holdF ? damageIn(kit.slots.F.effects) : 0;
@@ -264,6 +314,12 @@ export function dashBand(spec: AbilitySpec): readonly [number, number] | null {
   return [first.distance - 1, first.distance];
 }
 
+/** Whether the first effect of an ability is a dash: the champion is carried along its aim. */
+function startsWithDash(spec: AbilitySpec): boolean {
+  const first = spec.effects[0];
+  return first !== undefined && first.type === 'dash';
+}
+
 export function hasStatus(me: ChampionState, type: StatusType): boolean {
   for (let i = 0; i < me.statuses.length; i++) {
     if ((me.statuses[i] as { type: StatusType }).type === type) return true;
@@ -274,6 +330,41 @@ export function hasStatus(me: ChampionState, type: StatusType): boolean {
 export function hasDash(ability: AbilitySpec): boolean {
   for (let i = 0; i < ability.effects.length; i++) {
     if ((ability.effects[i] as { type: string }).type === 'dash') return true;
+  }
+  return false;
+}
+
+/**
+ * Whether the bot waits for its opener: the target is `dist.metres` away (a measure, not a number:
+ * a double passed to a call that V8 does not inline is boxed), inside the band of the wait rule,
+ * and the cooldown of the rule's slot is at least 2 (at 1 or 0 the slot casts) and at most the
+ * rule's `maxTicks`. Always false for a champion with no wait. The caller adds the clear shot.
+ */
+export function waitsFor(cache: KitCache, me: ChampionState, dist: Measure): boolean {
+  const slot = cache.waitSlot[0] as number;
+  if (slot < 0) return false;
+  const d = dist.metres;
+  const cooldown = me.cooldowns[slot] as number;
+  return (
+    (cache.waitBand[0] as number) <= d &&
+    d <= (cache.waitBand[1] as number) &&
+    cooldown >= 2 &&
+    cooldown <= (cache.waitBand[2] as number)
+  );
+}
+
+/**
+ * Whether the target has a way out: one of the escapes of its own rule (`rulesFor` with the kit of
+ * its champion id, none for a champion without a rule) has a cooldown of at most 1, as the cast
+ * gate reads it, and the target is neither stunned nor silenced. A rooted target can still blink or
+ * shield. Allocates nothing: the escape list of a rule is shared and frozen.
+ */
+function targetEscapeReady(state: GameState, target: ChampionState): boolean {
+  if (hasStatus(target, 'stun') || hasStatus(target, 'silence')) return false;
+  const { escapes } = rulesFor(target.championId, findKit(state, target.championId));
+  for (let n = 0; n < escapes.length; n++) {
+    const i = SLOTS.indexOf(escapes[n] as Slot);
+    if ((target.cooldowns[i] as number) <= 1) return true;
   }
   return false;
 }
@@ -307,8 +398,9 @@ function exFor(cache: KitCache, index: number, me: ChampionState, cues: CastCues
 
 /**
  * Works the cues of a think out, from the acted target: the motion of the target, whether this is
- * an escape think, the energy reserve, and the clearance a stand needs. Run once per think, before
- * the move (the stand reads `sight.standClearance`) and before `updateRuns`.
+ * an escape think, whether the target has an escape ready, the energy reserve, and the clearance
+ * a stand needs. Run once per think, before the move (the stand reads `sight.standClearance`) and
+ * before `updateRuns`.
  *
  * The reserve: F holds the energy back, so the EX variants are not cast, while F is ready (its
  * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band (a support
@@ -327,6 +419,7 @@ export function computeCues(
   cache: KitCache,
   profile: BotProfile,
   intent: string,
+  state: GameState,
   me: ChampionState,
   target: ChampionState,
   sight: SightScratch,
@@ -338,6 +431,7 @@ export function computeCues(
   cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
   cues.escapeThink =
     (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
+  cues.escapeReady = cache.anyEscapeCondition && targetEscapeReady(state, target);
   // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
   // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
   cues.fOk =
@@ -413,6 +507,8 @@ export function updateRuns(
       const motion = cache.motion[i] as number;
       if (motion > 0 && !(cues.dot > 0)) inBand = false;
       if (motion < 0 && !(cues.dot < 0)) inBand = false;
+      // The target must have an escape ready (Quiet Dart).
+      if (cache.needsEscape[i] === 1 && !cues.escapeReady) inBand = false;
       if (i === F_INDEX && !cues.fOk) inBand = false;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
@@ -424,8 +520,10 @@ export function updateRuns(
  * Q, SPACE, M2, M1 (the sim's own order) whose run is over `castDelay` and that passes the sim's
  * gates: no windup in progress unless it fires on this tick (windupLeft 1), the cooldown at most 1
  * (it counts down first), the energy for the cost (100 for F, 25 for an EX variant), no stun or
- * silence, and no root for a dash. Run `updateRuns` first. `skip` is a bit mask of slot indices
- * the walk leaves out: the escape slots `chooseEscape` already tried (0 for none).
+ * silence, no root for a dash, and on an escape think no dash at all (the ability of the press,
+ * its EX variant when it would be cast, starts with one). Run `updateRuns` first. `skip` is a bit
+ * mask of slot indices the walk leaves out: the escape slots `chooseEscape` already tried (0 for
+ * none).
  */
 export function chooseCast(
   choice: CastChoice,
@@ -450,6 +548,8 @@ export function chooseCast(
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if (me.energy < cost) continue;
     if (rooted && hasDash(abilityFor(kit, slot, ex))) continue;
+    // The dash hold: an escape think leaves the target, and a dash would carry the champion to it.
+    if (cues.escapeThink && (ex ? cache.exDash[i] : cache.baseDash[i]) === 1) continue;
     choice.slot = slot;
     choice.ex = ex;
     return true;

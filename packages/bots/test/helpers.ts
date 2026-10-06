@@ -18,6 +18,7 @@ import type {
   KitDef,
   MatchConfig,
   PlayerInput,
+  SimEvent,
 } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
@@ -119,6 +120,57 @@ export function configSkerrow(): MatchConfig {
       { championId: 'quillon', team: 'B' },
     ],
   };
+}
+
+/** A teleport event of the sim. */
+export type TeleportEvent = Extract<SimEvent, { type: 'teleport' }>;
+
+/**
+ * The teleports of a run: the escape teleports (a press with a landing, see escape-oracle.ts) and
+ * every other teleport apart, each with how many the sim blocked. Reaper's Dance teleports after
+ * an 18 tick windup, aimed at where the target is when it fires, so a target that has stepped behind
+ * cover legitimately blocks it; an escape teleport goes where the bot found a landing and must not
+ * be blocked.
+ */
+export interface TeleportTally {
+  escapes: number;
+  blockedEscapes: number;
+  others: number;
+  blockedOthers: number;
+}
+
+export function createTeleportTally(): TeleportTally {
+  return { escapes: 0, blockedEscapes: 0, others: 0, blockedOthers: 0 };
+}
+
+/**
+ * Adds the teleport events of one step to `tally`. `escapers` are the ids of the champions that
+ * pressed an escape with a landing on the tick of that step: the last teleport event of each is
+ * its escape (a windup that fires on the same tick comes first in the step), and every other
+ * teleport event counts apart. Returns the escape event of each escaper, in order, undefined where
+ * the sim started no teleport for it (a death or a status ahead of it in the step).
+ */
+export function tallyTeleports(
+  tally: TeleportTally,
+  events: readonly SimEvent[],
+  escapers: readonly number[],
+): (TeleportEvent | undefined)[] {
+  const escapeEvents = escapers.map((id): TeleportEvent | undefined => {
+    let last: TeleportEvent | undefined;
+    for (const e of events) if (e.type === 'teleport' && e.championId === id) last = e;
+    return last;
+  });
+  for (const e of events) {
+    if (e.type !== 'teleport') continue;
+    if (escapeEvents.includes(e)) {
+      tally.escapes++;
+      if (e.blocked) tally.blockedEscapes++;
+    } else {
+      tally.others++;
+      if (e.blocked) tally.blockedOthers++;
+    }
+  }
+  return escapeEvents;
 }
 
 export interface Point {
@@ -329,10 +381,23 @@ export function enemyInReachOracle(state: GameState, c: ChampionState, rangeMax:
 }
 
 /**
+ * Skerrow's wait for Lunge, written from bots.md (Openers and escapes) and not from the rule of
+ * src: with her kit, an engaging Skerrow stands from 6 to 8 m (inclusive) while her SPACE has 2 to
+ * 90 ticks of cooldown left; at 1 or 0 Lunge is ready, and past 90 the wait is over. The stand also
+ * needs a clear shot, which `holding` tests.
+ */
+function waitsForLunge(state: GameState, c: ChampionState, d: number): boolean {
+  if (c.championId !== 'skerrow' || kitOf(state, c) === undefined) return false;
+  const cooldown = c.cooldowns[SLOTS.indexOf('SPACE')] ?? 0;
+  return d >= 6 && d <= 8 && cooldown >= 2 && cooldown <= 90;
+}
+
+/**
  * True when the intent in `acted` is a stand that bots.md documents. A retreating bot holds at its
  * own spawn only while its team is ahead or an enemy is in its reach: otherwise the rule of the
  * bot says advance, and a stand there is a stall. A retreating bot that stands in reach of its
- * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts.
+ * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts. An
+ * engaging bot holds in its range, and Skerrow in her wait for Lunge.
  */
 export function holding(
   state: GameState,
@@ -360,7 +425,9 @@ export function holding(
   const d = Math.hypot(c.x - target.x, c.y - target.y);
   // A stand needs a clear shot of the width of a champion, not only a line of sight.
   const clear = () => clearShotOracle(state, c, target, CHAMPION_RADIUS);
-  if (acted.intent === 'engage') return d <= rangeMax && clear();
+  if (acted.intent === 'engage') {
+    return (d <= rangeMax || waitsForLunge(state, c, d)) && clear();
+  }
   if (acted.intent === 'kite') return d >= rangeMin && d <= rangeMax && clear();
   return false;
 }

@@ -785,6 +785,38 @@ describe('aim lead', () => {
       expect([...seen.speeds], `speed ${speed}`).toContain(speed);
     }
   });
+
+  // The rounding of the inline form turns -0 into 0 without an integer test: `Math.round` of a
+  // value in [-0.5, 0) cm is -0, and the sim and the reference (`roundAim`) both read it as 0. An
+  // aim point 0.03 cm west of the origin (on the y axis, 7 m north) rounds to -0 on x and, mirrored,
+  // on y, so both axes are covered. The state is built so the error turn lands the aim there: the
+  // target is the aim point turned back by the same error.
+  it('rounds an aim point within half a centimetre below zero to 0, on both axes', () => {
+    const seed = 3;
+    const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
+    for (const [aimX, aimY] of [
+      [-0.0003, 7],
+      [7, -0.0003],
+    ] as const) {
+      const state = setup();
+      kill(state, 0, 3);
+      const me = put(state, 1, 0, 0);
+      // The target stands still, so the lead is the target and the aim is its turn by 2 atan(u).
+      const back = rotateByHalfTangent(aimX, aimY, -u);
+      const target = put(state, 2, back.x, back.y);
+      target.vx = 0;
+      target.vy = 0;
+      const bot = createBot(1, 'hard', seed);
+      const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+      const turned = rotateByHalfTangent(target.x - me.x, target.y - me.y, u);
+      // On the axis that is the zero, `Math.round` gives -0.
+      const rounded = [Math.round((me.x + turned.x) * 100), Math.round((me.y + turned.y) * 100)];
+      expect(rounded.some((r) => Object.is(r, -0)), `rounded ${rounded}`).toBe(true);
+      expect(Object.is(input.aimX, -0), `aimX ${input.aimX}`).toBe(false);
+      expect(Object.is(input.aimY, -0), `aimY ${input.aimY}`).toBe(false);
+      expect([input.aimX, input.aimY]).toEqual([roundAim(me.x + turned.x), roundAim(me.y + turned.y)]);
+    }
+  });
 });
 
 describe('aim error', () => {

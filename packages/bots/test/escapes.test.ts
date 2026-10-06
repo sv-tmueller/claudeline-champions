@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, createMatch, step } from '@claudeline/sim';
 import type {
+  AbilitySpec,
   ArenaDef,
   ChampionState,
   GameState,
+  KitDef,
   Obstacle,
   PlayerInput,
   SlotSpec,
@@ -96,6 +98,71 @@ describe('Vanish Step, the escape of Skerrow', () => {
   it('does not press R at a healthy Skerrow, nor beyond 6 m', () => {
     expect(pressOf(sceneOf('skerrow', 4, { ready: ['R'] }))).toBeNull();
     expect(pressOf(sceneOf('skerrow', 6.05, { ready: ['R'], health: 0.2 }))).toBeNull();
+  });
+});
+
+// A dash on an escape think carries the champion toward the target it is leaving: a cornered
+// Skerrow with Vanish Step cooling down used to Lunge into the Hargrim she was fleeing. On an
+// escape think no slot whose ability starts with a dash is pressed, base or EX, for every kit.
+describe('the dash hold on an escape think', () => {
+  it('does not press Lunge at a target 5.5 m away while Skerrow retreats with Vanish Step cooling down', () => {
+    const state = sceneOf('skerrow', 5.5, { ready: ['SPACE'], health: 0.2 });
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it('does not press the EX Lunge at a target 4 m away with 50 energy on a retreat', () => {
+    const state = sceneOf('skerrow', 4, { ready: ['SPACE'], health: 0.2, energy: 50 });
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it('does not press Rush at a target 4.5 m away while Hargrim retreats with Iron Hide cooling down', () => {
+    const state = sceneOf('hargrim', 4.5, { ready: ['SPACE'], health: 0.2 });
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it("does not press Hargrim's ultimate, a dash, on a retreat either", () => {
+    const state = sceneOf('hargrim', 4, { ready: ['F'], health: 0.2, energy: 100 });
+    expect(pressOf(state)).toBeNull();
+  });
+
+  // The hold reads the variant that would be cast: the shipped kits dash in both, so two edited
+  // kits tell the two flags apart.
+  it('reads the EX variant when it would be cast: an EX dash on a base that is no dash is held', () => {
+    const kits = jsonKits();
+    const hargrim = kits.find((k) => k.id === 'hargrim') as KitDef;
+    hargrim.slots.M2.ex = structuredClone(hargrim.slots.SPACE.ex) as AbilitySpec;
+    expect(pressOf(sceneOf('hargrim', 4, { kits, ready: ['M2'], health: 0.2, energy: 50 }))).toBeNull();
+    // Healthy, it is an ordinary press.
+    expect(pressOf(sceneOf('hargrim', 4, { kits, ready: ['M2'], energy: 50 }))).toBe('M2+SHIFT');
+  });
+
+  it('reads the base ability when it would be cast: a base dash is held with an EX arc, and the arc is not', () => {
+    const kits = jsonKits();
+    const skerrow = kits.find((k) => k.id === 'skerrow') as KitDef;
+    skerrow.slots.SPACE.ex = structuredClone(skerrow.slots.E.ex) as AbilitySpec;
+    // No energy: the base Lunge would be pressed at 5.5 m, and is held.
+    expect(pressOf(sceneOf('skerrow', 5.5, { kits, ready: ['SPACE'], health: 0.2 }))).toBeNull();
+    // 50 energy at 1.5 m: the EX variant is an arc, no dash, and it is pressed.
+    const arc = sceneOf('skerrow', 1.5, { kits, ready: ['SPACE'], health: 0.2, energy: 50 });
+    expect(pressOf(arc)).toBe('SPACE+SHIFT');
+  });
+
+  it('still presses the escape itself: Vanish Step first, with Lunge ready as well', () => {
+    const state = sceneOf('skerrow', 4, { ready: ['SPACE', 'R'], health: 0.2 });
+    expect(pressOf(state)).toBe('R');
+  });
+
+  it('still presses Lunge and the EX Lunge when the think is not an escape think', () => {
+    expect(pressOf(sceneOf('skerrow', 5.5, { ready: ['SPACE'] }))).toBe('SPACE');
+    expect(pressOf(sceneOf('skerrow', 4, { ready: ['SPACE'], energy: 50 }))).toBe('SPACE+SHIFT');
+    expect(pressOf(sceneOf('hargrim', 4.5, { ready: ['SPACE'] }))).toBe('SPACE');
+  });
+
+  it('presses a dash at a retreat with the target beyond 6 m, which is not an escape think', () => {
+    // 6.05 m: past the escape range, and a Lunge band of [5, 6] is out too, so use the EX Lunge
+    // (0 to 9.5 m) with energy: a retreat that is not an escape think does not hold the dash.
+    const state = sceneOf('skerrow', 6.05, { ready: ['SPACE'], health: 0.2, energy: 50 });
+    expect(pressOf(state)).toBe('SPACE+SHIFT');
   });
 });
 

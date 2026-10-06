@@ -105,9 +105,10 @@ async function runUntil(
 
 // The same round on each arena and each team size. The arena02 row proves the bots and the sim play it
 // from the address, not only that the page loads it: its first death is a tick budget like arena01's.
-// The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on 9612bff, the
+// The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on 57dd52f, the
 // same figures as the log lines of these rows. They are logged and never asserted: the 2v2 rows assert
-// budgets only too, and every bots change moves them. arena01 267 and 301, arena02 275 and 307. The budgets stay 600 and 1800.
+// budgets only too, and every bots change moves them. arena01 267 and 301, arena02 275 and 307, as on
+// 9612bff: the dash hold of #98 changes no first projectile or hit. The budgets stay 600 and 1800.
 const ROWS = [
   { id: 'arena01', size: 2, address: '/', picture: 'match.png' },
   { id: 'arena02', size: 2, address: '/?arena=arena02', picture: 'match-arena02.png' },
