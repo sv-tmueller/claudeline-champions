@@ -256,7 +256,7 @@ the visible panel takes pointer events; the HUD takes none.
 `e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
 `/?timescale=100` (see Launch and match), once per arena (arena02 on
 `/?arena=arena02&timescale=100`), with the human idle: a 16 ms frame runs 96 ticks,
-so a match of about 3000 ticks is some 30 to 35 frames at 5 frames a read, where
+so a match of 3000 to 5000 ticks is some 30 to 55 frames at 5 frames a read, where
 without the scale it would be thousands of frames. It reads the panel hidden until
 `data-phase` is `matchEnd`, then the title, the score (equal to the HUD's), the
 select, takes `result.png` and follows the Quillon link, which keeps the arena. The

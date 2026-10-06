@@ -163,9 +163,9 @@ describe('a match of bots from setup to the result', () => {
 
 // The tick budget of the arena02 row of e2e/match-end.spec.ts. Measured below as the
 // end tick of this match, plus two rounds of about 1000 ticks and one sudden-death
-// round of about 7000, rounded up to 1000. Tick 2642 on main's bots (every bots change moves it, and this test fails first).
-const ARENA02_END_TICK = 2642;
-const ARENA02_BUDGET_TICKS = 12_000;
+// round of about 7000, rounded up to 1000. Tick 3474 on main's bots (every bots change moves it, and this test fails first).
+const ARENA02_END_TICK = 3474;
+const ARENA02_BUDGET_TICKS = 13_000;
 
 describe('a match of bots on arena02', () => {
   it('ends the match to 3 rounds with a winner on 3, at the tick the e2e budget is built from', { timeout: 60_000 }, () => {

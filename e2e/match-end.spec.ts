@@ -43,14 +43,14 @@ const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
 // picture (the enemy bars, the HUD text) is in the picture without the edge too.
 const RED: ColourRange = { min: [140, 30, 30], max: [255, 100, 100] };
 const TEST_TIMEOUT_MS = 60_000;
-// The match test runs once per arena. `query` leads the address and ends in `&` when it is not empty.
-// arena02 has its own headless run (match-setup.test.ts, tick 2642 on main's bots), and its
-// budget is built the same way as arena01's: the measured tick, two more rounds of about 1000
-// and one round to sudden death of about 7000, rounded up to 1000, which is 12 000 as well.
-// The frame budget is ceil(12 000 / 96) + 25 = 150 for both.
+// The match test runs once per arena. `query` leads the address and ends in `&` when it is not
+// empty. The budgets of arena01 are the two constants above. arena02 has its own headless run
+// (match-setup.test.ts, tick 3474 on the bots of #86) and its budget is built the same way: the
+// measured tick, two more rounds of about 1000 each and one round to sudden death of about 7000,
+// 12 474 rounded up to 13 000 ticks, and frames = ceil(13 000 / 96) + 25 = 161.
 const ARENAS = [
-  { id: 'arena01', query: '' },
-  { id: 'arena02', query: 'arena=arena02&' },
+  { id: 'arena01', query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
+  { id: 'arena02', query: 'arena=arena02&', budgetTicks: 13_000, budgetFrames: 161 },
 ] as const;
 
 interface Hooks {
@@ -169,8 +169,8 @@ for (const arena of ARENAS) {
       const { hooks, frames } = await runUntil(
         page,
         'the match end',
-        MATCH_BUDGET_TICKS,
-        MATCH_BUDGET_FRAMES,
+        arena.budgetTicks,
+        arena.budgetFrames,
         (h) => h.phase === 'matchEnd',
         (h) => {
           if (h.phase !== 'matchEnd') expect(h.panelVisible, `the panel at tick ${h.tick}, phase ${h.phase}`).toBe('false');
