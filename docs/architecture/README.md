@@ -18,14 +18,41 @@ first.
   a human produces.
 - `client` maps keyboard and mouse to `PlayerInput`, steps the sim, and renders
   the result with Three.js and an HTML HUD.
-- Online, the same sim runs on the server (`server`, `protocol`). Clients send
-  their input stream. The server stays authoritative.
+- Online (milestone 6, not built yet), the same sim runs on the server
+  (`server`, `protocol`): clients send their input stream and the server stays
+  authoritative.
 - Arenas are JSON. The sim reads them for collision and Blender scripts read
   them to generate the committed `.glb` models.
 - Roster kits are JSON too, under `data/kits/<id>.json`: plain data that the
   sim's casting code runs and `validateKit` checks (see
   [ADR-003](decisions/ADR-003-typed-ability-modules.md)).
 - `npm run check` is the gate every package must pass.
+
+## Status on main
+
+- `sim`: the 60 Hz step with movement and collision; the effects toolkit
+  (projectiles, with ally effects since #84, areas, melee arcs, statuses,
+  forced motion); kits with casting, cooldowns, windups and energy; match flow
+  with rounds and the sudden-death ring, opt-in through `roundsToWin`; angles
+  through `dmath.ts`; the sweep's heap check in
+  `packages/sim/test/allocation.test.ts`.
+- `bots`: the navigation grid, A-star and the path follower; engage, kite and
+  retreat by utility with the finisher and deadlock rules; the clear-shot
+  test; casting from kit data with range profiles for all four roster ids; the
+  energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81);
+  aim leading and three tiers. A think allocates nothing in the steady state
+  (`packages/bots/test/allocation.test.ts`). No Lumeth rules yet.
+- `client`: one 2v2 against three bots, on arena01 only (`main.ts` imports
+  `arena01.json` only). `?champion=` picks any champion with a kit and
+  `?difficulty=` picks the tier. The HUD has the ring warning and the kill
+  feed, and the result screen has the champion select. Dev only:
+  `?scene=sandbox`, `?timescale=` and the `__runProbeFrames` hook. The heap
+  probe measures the sandbox scene. Not built: a pre-match screen, menus,
+  keybinding, audio, the arena select, the `Platform` interface.
+- Content: arena01 and arena02 (JSON and committed models); the Hargrim,
+  Quillon and Skerrow kits; placeholder models for the four roster ids. The
+  Lumeth kit is #70.
+- `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
 
 ## Index
 
