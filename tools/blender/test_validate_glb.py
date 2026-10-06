@@ -75,13 +75,78 @@ def arena_doc(arena, extra_nodes=(), drop=(), rename=None, animations=False):
     return doc
 
 
-def champion_doc(name="Champion"):
+# The rig and the clips, written out here on purpose: the validator's own
+# constants and the tables in assets.md must both agree with these.
+RIG_PARENTS = {
+    "Hips": "Rig",
+    "Spine": "Hips",
+    "Arm_L": "Spine",
+    "Arm_R": "Spine",
+    "Leg_L": "Hips",
+    "Leg_R": "Hips",
+}
+CLIP_TABLE = {"Idle": (60, 3), "Run": (20, 5), "Cast": (15, 4), "Death": (30, 4)}
+
+
+def rigged_champion_doc(name="Champion"):
+    """A glTF document shaped like what gen_champion.py exports, without data.
+
+    Nodes: the six joints, the skinned mesh `Champion` and `Rig`, whose
+    children are the mesh and Hips. Accessor 0 is the inverse bind matrices,
+    1 to 3 are the Champion primitive's attributes, and every clip adds one
+    input accessor, with a sampler per channel: a rotation for every joint and
+    a translation for Hips.
+    """
+    joints = list(RIG_PARENTS)
+    nodes = [{"name": joint} for joint in joints]
+    index = {joint: i for i, joint in enumerate(joints)}
+    for joint, parent in RIG_PARENTS.items():
+        if parent != "Rig":
+            nodes[index[parent]].setdefault("children", []).append(index[joint])
+    nodes.append({"name": name, "mesh": 0, "skin": 0})
+    nodes.append({"name": "Rig", "children": [len(nodes) - 1, index["Hips"]]})
+    accessors = [
+        {"componentType": 5126, "type": "MAT4", "count": len(joints)},
+        {"componentType": 5126, "type": "VEC3", "count": 8},
+        {"componentType": 5121, "type": "VEC4", "count": 8},
+        {"componentType": 5126, "type": "VEC4", "count": 8},
+    ]
+    animations = []
+    for clip, (frames, keys) in CLIP_TABLE.items():
+        accessors.append(
+            {
+                "componentType": 5126,
+                "type": "SCALAR",
+                "count": keys,
+                "min": [0],
+                "max": [frames / 30],
+            }
+        )
+        targets = [(index[j], "rotation") for j in joints] + [(index["Hips"], "translation")]
+        animations.append(
+            {
+                "name": clip,
+                "samplers": [
+                    {"input": len(accessors) - 1, "interpolation": "LINEAR", "output": 1}
+                    for _ in targets
+                ],
+                "channels": [
+                    {"sampler": i, "target": {"node": node, "path": path}}
+                    for i, (node, path) in enumerate(targets)
+                ],
+            }
+        )
     return {
         "asset": {"version": "2.0"},
         "scene": 0,
-        "scenes": [{"nodes": [0]}],
-        "nodes": [{"name": name, "mesh": 0}],
-        "meshes": [{"primitives": []}],
+        "scenes": [{"nodes": [len(nodes) - 1]}],
+        "nodes": nodes,
+        "meshes": [
+            {"primitives": [{"attributes": {"POSITION": 1, "JOINTS_0": 2, "WEIGHTS_0": 3}}]}
+        ],
+        "skins": [{"inverseBindMatrices": 0, "joints": [index[j] for j in joints]}],
+        "accessors": accessors,
+        "animations": animations,
     }
 
 
@@ -167,7 +232,7 @@ class StructureTests(ValidatorCase):
                 self.assertRejected(self.arena_glb(pack_glb(doc)), key)
 
     def test_rejects_unknown_category(self):
-        path = self.write("props", "crate.glb", pack_glb(champion_doc()))
+        path = self.write("props", "crate.glb", pack_glb(rigged_champion_doc()))
         self.assertRejected(path, "unknown category")
 
 
@@ -276,25 +341,291 @@ class ArenaNodeTests(ValidatorCase):
 
 
 class ChampionTests(ValidatorCase):
-    def test_champion_node_passes(self):
-        path = self.write("champions", "p.glb", pack_glb(champion_doc()))
+    def champion_glb(self, doc):
+        return self.write("champions", "p.glb", pack_glb(doc))
+
+    def test_rigged_champion_passes(self):
+        path = self.champion_glb(rigged_champion_doc())
         self.assertIsNone(validate_glb.validate_file(path))
 
     def test_rejects_champion_without_champion_node(self):
-        path = self.write("champions", "p.glb", pack_glb(champion_doc("Body")))
+        path = self.champion_glb(rigged_champion_doc("Body"))
         self.assertRejected(path, "Champion")
 
     def test_rejects_non_dict_node(self):
-        doc = champion_doc()
+        doc = rigged_champion_doc()
         doc["nodes"].insert(0, 5)
-        path = self.write("champions", "p.glb", pack_glb(doc))
-        self.assertRejected(path, "nodes[0] must be an object")
+        self.assertRejected(self.champion_glb(doc), "nodes[0] must be an object")
 
     def test_rejects_unhashable_node_name(self):
-        doc = champion_doc()
+        doc = rigged_champion_doc()
         doc["nodes"].insert(0, {"name": ["x"]})
-        path = self.write("champions", "p.glb", pack_glb(doc))
-        self.assertRejected(path, "nodes[0].name must be a string")
+        self.assertRejected(self.champion_glb(doc), "nodes[0].name must be a string")
+
+    def test_rejects_textures_and_images(self):
+        for key in ("textures", "images"):
+            doc = rigged_champion_doc()
+            doc[key] = [{}]
+            with self.subTest(key=key):
+                self.assertRejected(self.champion_glb(doc), key)
+
+    def test_arena_glbs_still_reject_skins_and_animations(self):
+        for key in ("skins", "animations"):
+            doc = arena_doc(load_arena())
+            doc[key] = rigged_champion_doc()[key]
+            with self.subTest(key=key):
+                self.assertRejected(self.arena_glb(pack_glb(doc)), key)
+
+
+def node_named(doc, name):
+    return next(n for n in doc["nodes"] if n["name"] == name)
+
+
+def joint_index(doc, name):
+    return doc["nodes"].index(node_named(doc, name))
+
+
+class RigRuleTests(ValidatorCase):
+    """One rejection per rule of the rig and the clips, against the synthetic document."""
+
+    def rejects(self, mutate, reason):
+        doc = rigged_champion_doc()
+        mutate(doc)
+        self.assertRejected(self.write("champions", "p.glb", pack_glb(doc)), reason)
+
+    def test_rejects_a_champion_without_a_skin(self):
+        self.rejects(lambda d: node_named(d, "Champion").pop("skin"), "skin")
+
+    def test_rejects_a_champion_without_a_mesh(self):
+        self.rejects(lambda d: node_named(d, "Champion").pop("mesh"), "mesh")
+
+    def test_rejects_two_skins(self):
+        self.rejects(lambda d: d["skins"].append(dict(d["skins"][0])), "exactly one skin")
+
+    def test_rejects_a_renamed_bone(self):
+        self.rejects(lambda d: node_named(d, "Spine").update(name="Torso"), "joints")
+
+    def test_rejects_a_missing_bone(self):
+        self.rejects(lambda d: d["skins"][0]["joints"].pop(), "joints")
+
+    def test_rejects_an_extra_bone(self):
+        def mutate(d):
+            d["nodes"].append({"name": "Tail"})
+            d["skins"][0]["joints"].append(len(d["nodes"]) - 1)
+
+        self.rejects(mutate, "joints")
+
+    def test_rejects_a_duplicate_joint(self):
+        def mutate(d):
+            joints = d["skins"][0]["joints"]
+            joints.append(joints[0])
+
+        self.rejects(mutate, "joints")
+
+    def test_rejects_a_bone_with_the_wrong_parent(self):
+        def mutate(d):
+            node_named(d, "Spine")["children"].remove(joint_index(d, "Arm_L"))
+            node_named(d, "Hips")["children"].append(joint_index(d, "Arm_L"))
+
+        self.rejects(mutate, "Arm_L")
+
+    def test_a_node_with_a_joint_name_cannot_hide_a_wrong_parent(self):
+        def mutate(d):
+            arm = joint_index(d, "Arm_L")
+            node_named(d, "Spine")["children"].remove(arm)
+            node_named(d, "Hips")["children"].append(arm)
+            # A decoy that is not a joint, with the joint's name, under the right parent.
+            d["nodes"].append({"name": "Arm_L"})
+            node_named(d, "Spine")["children"].append(len(d["nodes"]) - 1)
+
+        self.rejects(mutate, "Arm_L")
+
+    def test_rejects_hips_that_is_not_under_rig(self):
+        def mutate(d):
+            node_named(d, "Rig")["children"].remove(joint_index(d, "Hips"))
+
+        self.rejects(mutate, "Hips")
+
+    def test_rejects_a_skin_without_inverse_bind_matrices(self):
+        self.rejects(lambda d: d["skins"][0].pop("inverseBindMatrices"), "inverseBindMatrices")
+
+    def test_rejects_inverse_bind_matrices_of_the_wrong_count(self):
+        self.rejects(lambda d: d["accessors"][0].update(count=5), "inverseBindMatrices")
+
+    def test_rejects_inverse_bind_matrices_of_the_wrong_type(self):
+        self.rejects(lambda d: d["accessors"][0].update(type="MAT3"), "inverseBindMatrices")
+
+    def test_rejects_inverse_bind_matrices_that_are_not_float(self):
+        self.rejects(lambda d: d["accessors"][0].update(componentType=5123), "inverseBindMatrices")
+
+    def test_rejects_a_primitive_without_joints_or_weights(self):
+        for attribute in ("JOINTS_0", "WEIGHTS_0"):
+            with self.subTest(attribute=attribute):
+                self.rejects(
+                    lambda d: d["meshes"][0]["primitives"][0]["attributes"].pop(attribute),
+                    attribute,
+                )
+
+    def test_rejects_a_missing_clip(self):
+        self.rejects(lambda d: d["animations"].pop(), "animations")
+
+    def test_rejects_an_extra_clip(self):
+        def mutate(d):
+            d["animations"].append(dict(d["animations"][0], name="Dance"))
+
+        self.rejects(mutate, "animations")
+
+    def test_rejects_a_renamed_clip(self):
+        self.rejects(lambda d: d["animations"][1].update(name="Walk"), "animations")
+
+    def test_rejects_a_duplicate_clip(self):
+        self.rejects(lambda d: d["animations"].append(dict(d["animations"][0])), "animations")
+
+    def test_rejects_a_clip_one_frame_too_long(self):
+        def mutate(d):
+            run = next(a for a in d["animations"] if a["name"] == "Run")
+            accessor = d["accessors"][run["samplers"][0]["input"]]
+            accessor["max"] = [21 / 30]
+
+        self.rejects(mutate, "Run")
+
+    def test_rejects_a_clip_that_does_not_start_at_zero(self):
+        def mutate(d):
+            idle = next(a for a in d["animations"] if a["name"] == "Idle")
+            d["accessors"][idle["samplers"][0]["input"]]["min"] = [1 / 30]
+
+        self.rejects(mutate, "Idle")
+
+    def test_rejects_channels_that_do_not_share_their_key_times(self):
+        def mutate(d):
+            cast = next(a for a in d["animations"] if a["name"] == "Cast")
+            shifted = dict(d["accessors"][cast["samplers"][0]["input"]])
+            d["accessors"].append(shifted)
+            cast["samplers"][2]["input"] = len(d["accessors"]) - 1
+
+        self.rejects(mutate, "share")
+
+    def test_rejects_a_key_count_that_is_off(self):
+        def mutate(d):
+            cast = next(a for a in d["animations"] if a["name"] == "Cast")
+            d["accessors"][cast["samplers"][0]["input"]]["count"] = 3
+
+        self.rejects(mutate, "Cast")
+
+    def test_rejects_a_channel_that_targets_the_champion(self):
+        def mutate(d):
+            channel = d["animations"][0]["channels"][0]
+            channel["target"]["node"] = d["nodes"].index(node_named(d, "Champion"))
+
+        self.rejects(mutate, "joints")
+
+    def test_rejects_a_channel_that_scales(self):
+        def mutate(d):
+            d["animations"][0]["channels"][0]["target"]["path"] = "scale"
+
+        self.rejects(mutate, "path")
+
+    def test_rejects_cubic_spline_interpolation(self):
+        def mutate(d):
+            d["animations"][2]["samplers"][3]["interpolation"] = "CUBICSPLINE"
+
+        self.rejects(mutate, "LINEAR")
+
+    def test_rejects_step_interpolation(self):
+        def mutate(d):
+            d["animations"][2]["samplers"][3]["interpolation"] = "STEP"
+
+        self.rejects(mutate, "LINEAR")
+
+    def test_rejects_a_joint_without_a_rotation_channel(self):
+        def mutate(d):
+            arm = joint_index(d, "Arm_R")
+            for animation in d["animations"]:
+                animation["channels"] = [
+                    c
+                    for c in animation["channels"]
+                    if not (c["target"]["node"] == arm and c["target"]["path"] == "rotation")
+                ]
+
+        self.rejects(mutate, "Arm_R")
+
+    def test_rejects_hips_without_a_translation_channel(self):
+        def mutate(d):
+            hips = joint_index(d, "Hips")
+            d["animations"][3]["channels"] = [
+                c
+                for c in d["animations"][3]["channels"]
+                if not (c["target"]["node"] == hips and c["target"]["path"] == "translation")
+            ]
+
+        self.rejects(mutate, "translation")
+
+    def test_rejects_a_sampler_that_does_not_exist(self):
+        def mutate(d):
+            d["animations"][0]["channels"][0]["sampler"] = 99
+
+        self.rejects(mutate, "sampler")
+
+    def test_a_malformed_document_fails_with_a_reason_not_a_crash(self):
+        for label, mutate in {
+            "skins is not a list": lambda d: d.update(skins=5),
+            "no accessors": lambda d: d.pop("accessors"),
+            "animation is not an object": lambda d: d["animations"].__setitem__(0, 7),
+            "no meshes": lambda d: d.pop("meshes"),
+            "a joint node without a name": lambda d: node_named(d, "Spine").pop("name"),
+            "a sampler input that is a list": lambda d: d["animations"][0]["samplers"][0].update(
+                input=[4]
+            ),
+        }.items():
+            doc = rigged_champion_doc()
+            mutate(doc)
+            path = self.write("champions", "p.glb", pack_glb(doc))
+            with self.subTest(case=label):
+                message = validate_glb.validate_file(path)
+                self.assertIsNotNone(message)
+                self.assertNotIn("validator error", message)
+
+
+ASSETS_MD = REPO / "docs" / "architecture" / "assets.md"
+
+
+def table_rows(text, header):
+    """The cells of each body row of the markdown table whose header row starts with `header`."""
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(header))
+    rows = []
+    for line in lines[start + 2 :]:
+        if not line.startswith("|"):
+            break
+        rows.append([cell.strip().strip("`") for cell in line.strip().strip("|").split("|")])
+    return rows
+
+
+class ContractDriftTests(unittest.TestCase):
+    """assets.md's rig and clip tables and the validator's constants must agree."""
+
+    def setUp(self):
+        self.text = ASSETS_MD.read_text()
+
+    def test_the_rig_table_matches_the_validator_constant(self):
+        rows = table_rows(self.text, "| Bone | Parent |")
+        parents = {row[0]: row[1].replace("node ", "").strip("`") for row in rows}
+        self.assertEqual(parents, validate_glb.RIG)
+        self.assertEqual(list(parents), list(validate_glb.RIG))
+
+    def test_the_clip_table_matches_the_validator_constant(self):
+        rows = table_rows(self.text, "| Clip | Frames |")
+        clips = {row[0]: (int(row[1]), len(row[3].split(","))) for row in rows}
+        self.assertEqual(clips, validate_glb.CLIPS)
+        for row in rows:
+            self.assertAlmostEqual(float(row[2]), int(row[1]) / validate_glb.FPS, places=3)
+            keys = [int(k) for k in row[3].split(",")]
+            self.assertEqual((keys[0], keys[-1]), (0, int(row[1])))
+
+    def test_the_validator_constants_match_the_tests_literals(self):
+        self.assertEqual(validate_glb.RIG, RIG_PARENTS)
+        self.assertEqual(validate_glb.CLIPS, CLIP_TABLE)
+        self.assertEqual(validate_glb.FPS, 30)
 
 
 class ArenaJsonTests(unittest.TestCase):
@@ -521,7 +852,7 @@ class CommandLineTests(ValidatorCase):
 
     def test_exits_1_when_one_file_in_a_directory_fails(self):
         self.arena_glb(pack_glb(arena_doc(load_arena())))
-        self.write("champions", "bad.glb", pack_glb(champion_doc("Body")))
+        self.write("champions", "bad.glb", pack_glb(rigged_champion_doc("Body")))
         code, out = self.run_main([self.tmp])
         self.assertEqual(code, 1)
         self.assertIn("OK", out)
@@ -549,7 +880,7 @@ class CommandLineTests(ValidatorCase):
             ),
             "non-numeric translation": (set_translation, "translation must be"),
         }
-        good = self.write("champions", "good.glb", pack_glb(champion_doc()))
+        good = self.write("champions", "good.glb", pack_glb(rigged_champion_doc()))
         for label, (mutate, reason) in cases.items():
             with self.subTest(case=label):
                 bad = self.arena_glb(pack_glb(bad_doc(mutate)))
@@ -565,7 +896,7 @@ class CommandLineTests(ValidatorCase):
             raise RuntimeError("boom")
 
         arena = self.arena_glb(pack_glb(arena_doc(load_arena())))
-        good = self.write("champions", "good.glb", pack_glb(champion_doc()))
+        good = self.write("champions", "good.glb", pack_glb(rigged_champion_doc()))
         with mock.patch.dict(validate_glb.CATEGORY_RULES, {"arenas": boom}):
             code, out = self.run_main([arena, good])
         lines = out.splitlines()
