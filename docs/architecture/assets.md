@@ -9,13 +9,15 @@
 - `gen_arena.py --arena data/arenas/<id>.json --out assets/models/arenas/<id>.glb`
   builds floor, boundary walls and every obstacle from the arena definition.
 - `gen_champion.py --champion <id> --out assets/models/champions/<id>.glb`
-  builds a low-poly placeholder humanoid. Rigs and animation clips (`Idle`,
-  `Run`, `Attack`, `Cast`, `Hit`, `Death`) are added in milestone 5.
+  builds a low-poly rigged humanoid with four clips. The spec names six clips
+  (`Idle`, `Run`, `Attack`, `Cast`, `Hit`, `Death`); `Idle`, `Run`, `Cast` and
+  `Death` are built, and `Attack` and `Hit` come with the client animation
+  state machine in batch 10.
 - `validate_glb.py` uses only the Python standard library: checks the glb
-  magic and chunk layout, and that required node names are present. It also
-  checks the arena JSON that an arena model is built from (see
-  [Validator](#validator)). CI runs it on committed assets so Blender itself is
-  never needed in CI.
+  magic and chunk layout, that required node names are present, and a
+  champion's rig and clips. It also checks the arena JSON that an arena model
+  is built from (see [Validator](#validator)). CI runs it on committed assets
+  so Blender itself is never needed in CI.
 - Generated `.glb` files are committed. Regenerating is a local step.
 
 ## Node naming
@@ -73,21 +75,104 @@ The commands and file list are in `tools/blender/README.md`.
   `rotation.y = aimAngle` directly, so the front must stay on +X.
 - The origin is at the feet. The footprint stays inside a 0.5 m radius and the
   model is about 1.7 m tall.
-- Flat colours only, no rig and no animation until milestone 5.
+- Flat colours only. Every champion model is rigged and has four clips, and
+  the client plays none of them yet.
 - Each of the four roster ids has `champions/<id>.glb` with the placeholder's
-  node, origin, facing, body geometry and accent. They differ only in body
-  colour and one silhouette cue that stays below 1.9 m. `placeholder.glb` stays
-  the generic model. The ids, colours and cues are in
+  nodes, origin, facing, body geometry, rig, clips and accent. They differ only
+  in body colour and one silhouette cue that stays below 1.9 m.
+  `placeholder.glb` stays the generic model and has the same rig and clips, so
+  every champion id has them. The ids, colours and cues are in
   [`tools/blender/README.md`](../../tools/blender/README.md).
+- The scene lists one node, `Rig`. Its children are `Hips` and the skinned mesh
+  `Champion`, and neither `Rig` nor `Champion` has a translation, rotation or
+  scale. The rest pose is the static geometry, so the bind pose matches the
+  model drawn before the rig existed. A model with no clip playing shows its
+  bind pose: scale 1, facing +X, origin at the feet.
+- Every part is rigid: each vertex has weight 1.0 on one bone.
+- The client clones each model with SkeletonUtils' `clone`. `Object3D.clone`
+  shares the source skeleton, so every view of a rigged model would draw at the
+  arena origin.
+
+### Rig
+
+One rig for all five models, in Blender coordinates (Z up). Every bone has roll
+0 and is not connected to its parent. L is +Y, the champion's left when it
+faces +X. The validator checks the names and the parents.
+
+| Bone | Parent | Head | Tail | Carries (rigid, weight 1.0) |
+|------|--------|------|------|-----------------------------|
+| `Hips` | node `Rig` | (0, 0, 0.80) | (0, 0, 0.90) | nothing; the root that moves the whole body |
+| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo |
+| `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box |
+| `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade |
+| `Leg_L` | `Hips` | (0, 0.12, 0.80) | (0, 0.12, 0.00) | the left leg box |
+| `Leg_R` | `Hips` | (0, -0.12, 0.80) | (0, -0.12, 0.00) | the right leg box |
+
+### Clips
+
+The scene rate is 30 fps. Every clip keys the rotation of all six bones and the
+translation of `Hips` at each listed frame, all with LINEAR interpolation.
+The last key of a looping clip equals its first. The pose values are constants
+in `gen_champion.py`, with nothing random and nothing time-based, and no pose
+puts a model above 1.90 m. The validator checks the names, the key counts and
+the length.
+
+| Clip | Frames | Seconds | Keys | Plays |
+|------|--------|---------|------|-------|
+| `Idle` | 60 | 2.000 | 0, 30, 60 | loops |
+| `Run` | 20 | 0.667 | 0, 5, 10, 15, 20 | loops |
+| `Cast` | 15 | 0.500 | 0, 5, 9, 15 | once, from rest back to rest |
+| `Death` | 30 | 1.000 | 0, 10, 20, 30 | once, holds the last frame |
+
+`Run` is the movement clip. `Attack` and `Hit` are not built yet.
+
+### Export
+
+The exporter writes the keys as authored, not sampled at every frame, which
+keeps each file near 46 KB at most. Every skin and animation flag is set by
+name in `blender_common.export_glb(out, rigged=True)`, so a changed default in
+a later Blender cannot move the bytes unseen. Arenas call it with
+`rigged=False` and keep exactly the flags they had.
+
+Blender's exporter falls back to baking a channel when its components differ
+in key count, key times or interpolation, or when a bone has a constraint. The
+key scheme avoids all of these, and the validator's key-count and LINEAR checks
+catch a fallback. Blender 5 removed `action.fcurves`, and Python's
+`keyframe_insert` ignores the new-keyframe interpolation preference (the factory
+default is BEZIER, which exports as CUBICSPLINE), so `key_clip` sets each key
+to LINEAR itself.
+
+### Regenerating
+
+Only Blender 5.2.1 LTS may regenerate the committed models (`Blender --version`
+must print it). Regenerate each model into a scratch directory twice and `cmp`
+both runs against the committed file. `test_export_determinism.py` does this
+four times per model. Regenerate the arenas in place: `git status` must stay
+clean for them. Every champion file must stay under 48 KiB, and the budget does
+not move to make a model fit.
 
 ## Validator
 
-`validate_glb.py` checks structure and content. It fails on any glb that has
-`animations`, `skins`, `textures` or `images`, which enforces flat colours and
-no rigs until milestone 5.
+`validate_glb.py` checks structure and content. Every glb fails if it has
+`textures` or `images`, which enforces flat colours. An arena also fails if it
+has `animations` or `skins`.
 
 - The parent folder decides the rules. `arenas/<id>.glb` is checked against
-  `data/arenas/<id>.json`, and `champions/*.glb` needs a `Champion` node.
+  `data/arenas/<id>.json`. `champions/*.glb` needs the rig and the clips above:
+  - the `Champion` node has a mesh and a skin, and there is exactly one skin
+  - the joint names are exactly the six, once each, and every joint's parent
+    matches the rig table (`Hips` hangs from the node `Rig`)
+  - `inverseBindMatrices` is a FLOAT MAT4 accessor with one entry per joint
+  - every `Champion` primitive has `JOINTS_0` and `WEIGHTS_0`
+  - the animations are exactly the four clip names
+  - channels target the joints only, with the path rotation or translation;
+    every joint has a rotation channel and `Hips` has a translation channel
+  - every sampler of a clip shares one input accessor, so every channel has
+    the same key times
+  - every sampler is LINEAR, and the input accessor has the clip's key count,
+    a minimum of 0 and a maximum of frames / 30 within 1e-4
+- The two tables above and the validator's `RIG` and `CLIPS` constants are
+  checked against each other by a unit test, so they cannot drift.
 - For an arena, each `Obstacle_i` translation must be `(x_i, 0, -y_i)` within
   1e-4, so the model cannot drift from the collision data.
 - The validator also checks the arena JSON itself. It must match the shape in

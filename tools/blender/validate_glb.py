@@ -17,8 +17,30 @@ REPO = Path(__file__).resolve().parents[2]
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
-# Flat colours and no rig until milestone 5.
-FORBIDDEN_KEYS = ("animations", "skins", "textures", "images")
+# Flat colours everywhere. Arenas have no rig and no clips either, and a
+# champion's rig and clips are checked by check_champion.
+FORBIDDEN_KEYS = {
+    "arenas": ("animations", "skins", "textures", "images"),
+    "champions": ("textures", "images"),
+}
+
+# The champion rig and clips. docs/architecture/assets.md has the same two
+# tables, and a unit test fails if they drift apart. RIG maps each joint to its
+# parent in glTF order (Hips hangs from the node `Rig`). CLIPS maps each clip to
+# (length in frames, key count). The frame rate is 30.
+RIG = {
+    "Hips": "Rig",
+    "Spine": "Hips",
+    "Arm_L": "Spine",
+    "Arm_R": "Spine",
+    "Leg_L": "Hips",
+    "Leg_R": "Hips",
+}
+CLIPS = {"Idle": (60, 3), "Run": (20, 5), "Cast": (15, 4), "Death": (30, 4)}
+FPS = 30
+TIME_TOLERANCE = 1e-4
+
+FLOAT = 5126  # glTF componentType of a 32-bit float
 
 SPAWN_RADIUS = 0.5
 TRANSLATION_TOLERANCE = 1e-4
@@ -312,9 +334,159 @@ def check_nodes(doc):
     return None
 
 
-def check_champion(path, doc):
-    if "Champion" not in [n.get("name") for n in doc.get("nodes", [])]:
+def accessor_of(doc, index):
+    """The accessor at `index`, or None when the index or the entry is bad."""
+    accessors = doc.get("accessors")
+    if not isinstance(accessors, list) or not isinstance(index, int) or isinstance(index, bool):
+        return None
+    if not 0 <= index < len(accessors) or not isinstance(accessors[index], dict):
+        return None
+    return accessors[index]
+
+
+def check_skin(doc, nodes):
+    """Return a reason if the Champion skin does not match the RIG table."""
+    champion = next((n for n in nodes if n.get("name") == "Champion"), None)
+    if champion is None:
         return "no node named Champion"
+    if "mesh" not in champion:
+        return "the Champion node has no mesh"
+    if "skin" not in champion:
+        return "the Champion node has no skin"
+    skins = doc.get("skins")
+    if not isinstance(skins, list) or len(skins) != 1 or not isinstance(skins[0], dict):
+        return "expected exactly one skin"
+    skin = skins[0]
+    joints = skin.get("joints")
+    if not isinstance(joints, list) or not all(
+        isinstance(j, int) and not isinstance(j, bool) and 0 <= j < len(nodes) for j in joints
+    ):
+        return "the skin joints must be node indices"
+    names = [nodes[j].get("name") for j in joints]
+    if sorted(names) != sorted(RIG):
+        return "the skin joints must be exactly %s, found %s" % (
+            ", ".join(RIG),
+            ", ".join(str(n) for n in names),
+        )
+
+    parent_of = {}
+    for node in nodes:
+        children = node.get("children", [])
+        if not isinstance(children, list):
+            return "a node's children must be a list"
+        for child in children:
+            if isinstance(child, int) and 0 <= child < len(nodes):
+                parent_of[nodes[child].get("name")] = node.get("name")
+    for joint, parent in RIG.items():
+        if parent_of.get(joint) != parent:
+            return "joint %s must be a child of %s, found %s" % (
+                joint,
+                parent,
+                parent_of.get(joint),
+            )
+
+    matrices = accessor_of(doc, skin.get("inverseBindMatrices"))
+    if (
+        matrices is None
+        or matrices.get("componentType") != FLOAT
+        or matrices.get("type") != "MAT4"
+        or matrices.get("count") != len(RIG)
+    ):
+        return "the skin needs inverseBindMatrices as a FLOAT MAT4 accessor with %d entries" % (
+            len(RIG)
+        )
+
+    meshes = doc.get("meshes")
+    mesh = champion["mesh"]
+    if not isinstance(meshes, list) or not isinstance(mesh, int) or not 0 <= mesh < len(meshes):
+        return "the Champion mesh index is out of range"
+    primitives = meshes[mesh].get("primitives") if isinstance(meshes[mesh], dict) else None
+    if not isinstance(primitives, list) or not primitives:
+        return "the Champion mesh has no primitives"
+    for primitive in primitives:
+        attributes = primitive.get("attributes") if isinstance(primitive, dict) else None
+        if not isinstance(attributes, dict):
+            return "a Champion primitive has no attributes"
+        for attribute in ("JOINTS_0", "WEIGHTS_0"):
+            if attribute not in attributes:
+                return "a Champion primitive has no %s" % attribute
+    return None
+
+
+def check_clip(doc, nodes, joints, animation):
+    """Return a reason if one animation breaks the CLIPS table or the rig."""
+    name = animation.get("name")
+    frames, keys = CLIPS[name]
+    channels, samplers = animation.get("channels"), animation.get("samplers")
+    if not isinstance(channels, list) or not isinstance(samplers, list):
+        return "clip %s needs channels and samplers" % name
+    paths = set()
+    for channel in channels:
+        target = channel.get("target") if isinstance(channel, dict) else None
+        node = target.get("node") if isinstance(target, dict) else None
+        if not isinstance(node, int) or isinstance(node, bool) or node not in joints:
+            return "clip %s: channels may target the rig joints only" % name
+        path = target.get("path")
+        if path not in ("rotation", "translation"):
+            return "clip %s: channel path %r must be rotation or translation" % (name, path)
+        paths.add((nodes[node]["name"], path))
+        sampler = channel.get("sampler")
+        if not isinstance(sampler, int) or isinstance(sampler, bool) or not 0 <= sampler < len(samplers):
+            return "clip %s: a channel's sampler index is out of range" % name
+    for joint in RIG:
+        if (joint, "rotation") not in paths:
+            return "clip %s: joint %s has no rotation channel" % (name, joint)
+    if ("Hips", "translation") not in paths:
+        return "clip %s: Hips has no translation channel" % name
+    inputs = {s.get("input") for s in samplers if isinstance(s, dict)}
+    if len(inputs) > 1:
+        return "clip %s: every sampler must share one input accessor, so every channel has the same key times" % name
+    for sampler in samplers:
+        if not isinstance(sampler, dict) or sampler.get("interpolation") != "LINEAR":
+            return "clip %s: every sampler must be LINEAR" % name
+        times = accessor_of(doc, sampler.get("input"))
+        if times is None or times.get("count") != keys:
+            return "clip %s: every sampler needs %d keys" % (name, keys)
+        low, high = times.get("min"), times.get("max")
+        if (
+            not isinstance(low, list)
+            or not isinstance(high, list)
+            or len(low) != 1
+            or len(high) != 1
+            or not is_finite_number(low[0])
+            or not is_finite_number(high[0])
+        ):
+            return "clip %s: the key times need a min and a max" % name
+        if abs(low[0]) > TIME_TOLERANCE or abs(high[0] - frames / FPS) > TIME_TOLERANCE:
+            return "clip %s must run 0 to %d frames at %d fps, found %s to %s" % (
+                name,
+                frames,
+                FPS,
+                low[0],
+                high[0],
+            )
+    return None
+
+
+def check_champion(path, doc):
+    nodes = doc.get("nodes", [])
+    error = check_skin(doc, nodes)
+    if error:
+        return error
+    joints = set(doc["skins"][0]["joints"])
+    animations = doc.get("animations")
+    if not isinstance(animations, list) or not all(isinstance(a, dict) for a in animations):
+        return "animations must be a list of objects"
+    names = [a.get("name") for a in animations]
+    if sorted(map(str, names)) != sorted(CLIPS):
+        return "the animations must be exactly %s, found %s" % (
+            ", ".join(CLIPS),
+            ", ".join(str(n) for n in names),
+        )
+    for animation in animations:
+        error = check_clip(doc, nodes, joints, animation)
+        if error:
+            return error
     return None
 
 
@@ -331,14 +503,14 @@ def validate_file(path):
     doc, error = read_glb(data)
     if error:
         return error
-    for key in FORBIDDEN_KEYS:
-        if key in doc:
-            return "%s are not allowed, models are flat-colour and unrigged" % key
     rule = CATEGORY_RULES.get(path.parent.name)
     if rule is None:
         return "unknown category folder %r, expected arenas or champions" % (
             path.parent.name
         )
+    for key in FORBIDDEN_KEYS[path.parent.name]:
+        if key in doc:
+            return "%s are not allowed in %s" % (key, path.parent.name)
     return check_nodes(doc) or rule(path, doc)
 
 
