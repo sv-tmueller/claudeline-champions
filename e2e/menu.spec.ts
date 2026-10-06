@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { orFail, watchProblems } from './support';
 
-// The Escape menu: the pause, restart, the champion and arena select, and a rebinding
-// that survives a reload. Like match.spec.ts the clock is paused and the test runs it in
+// The Escape menu: the pause, restart, the champion, arena and team select (the team row,
+// the 3v3 relaunch and a Restart that keeps it), and a rebinding that survives a reload. Like match.spec.ts the clock is paused and the test runs it in
 // 16 ms frames, reading the hooks between steps, so a slow machine changes the time a
 // test takes and never what it sees. A frame is one tick, about: the sim ticks every
 // 16.67 ms and the fake clock fires a frame every 16 ms.
@@ -240,6 +240,7 @@ test('relaunches as a 3v3 from the menu select, and a restart keeps the team siz
     expect((await readHooks(page)).bars, 'a 2v2 has four bars').toBe(4);
     await mark(page);
     await openMenu(page);
+    await expect(page.locator('[data-menu="panel"] [data-action="select"]')).toHaveText('Champion, arena and teams');
     await page.locator('[data-menu="panel"] [data-action="select"]').click();
     await expectMenu(page, true, 'select');
     await page.locator('[data-menu="panel"] [data-team-size="3"]').click();

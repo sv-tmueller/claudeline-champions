@@ -69,9 +69,10 @@ port 5173, which Playwright starts itself.
   for the 3v3 rows), within a budget of ticks and frames per row: 15 000 and
   182 on arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5184 in the e2e and
   5117 in a headless run, on 8d80073), 13 000 and 161 on arena02, and 21 000
-  and 244 on the 3v3 of arena01 (it ends at tick 10 631, a Victory 3 : 1) and
-  18 000 and 213 on the 3v3 of arena02 (tick 7119, a Defeat 2 : 3). A headless
-  run through the client's setup and driver gives each row's tick, in
+  and 244 on the 3v3 of arena01 (it ends at tick 10 631 headless and 10 944 in
+  the e2e, a Victory 3 : 1) and 18 000 and 213 on the 3v3 of arena02 (tick 7119
+  headless and 7584 in the e2e, a Defeat 2 : 3). A headless run through the
+  client's setup and driver gives each row's tick, in
   `match-setup.test.ts`. The budget is that tick plus two rounds of about 1000
   and one round to sudden death of about 7000, rounded up to 1000, and the
   frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their rows
