@@ -39,8 +39,10 @@ first.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot
   test; casting from kit data with range profiles for all four roster ids; the
-  energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81);
-  aim leading and three tiers. A think allocates nothing in the steady state
+  energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81),
+  Skerrow's wait at 6 to 8 m and her Quiet Dart opener, and no dash pressed on
+  an escape think for any kit (#98); aim leading and three tiers. A think
+  allocates nothing in the steady state and a plan search only its path
   (`packages/bots/test/allocation.test.ts`). No Lumeth rules yet.
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
@@ -52,9 +54,9 @@ first.
   two settings methods, asynchronous, and the browser platform keeps the
   bindings in `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
   the `__runProbeFrames` hook. The heap probe measures two scenes, the
-  sandbox and the live match. Not built: a pre-match screen, audio, the
-  scoreboard, the other three `Platform` methods (`identity`,
-  `unlockAchievement`, `openUrl`).
+  sandbox and the live match with a moving pointer, and bounds the bots' bytes
+  in the live match. Not built: a pre-match screen, audio, the scoreboard, the
+  other three `Platform` methods (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
   placeholder, each rigged, with four clips the client does not play yet.
@@ -70,7 +72,8 @@ Topics:
 - [Client](client.md): loop, input, camera, scene, HUD, platform interface.
 - [Bots](bots.md): navigation, decisions, aim, difficulty tiers.
 - [Online](online.md): netcode and ladder principles.
-- [Assets](assets.md): Blender pipeline, node naming, arena definition.
+- [Assets](assets.md): Blender pipeline, node naming, arena definition, the
+  champion rig and clips.
 - [Testing](testing.md): check suite and test types.
 
 Decisions:
