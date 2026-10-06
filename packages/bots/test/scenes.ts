@@ -1,5 +1,5 @@
 import { Button, SLOTS, createMatch } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, MatchConfig, Slot } from '@claudeline/sim';
+import type { ArenaDef, ChampionState, GameState, KitDef, MatchConfig, Slot } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
@@ -18,6 +18,8 @@ export const THINKS = TIERS.hard.delay + TIERS.hard.castDelay + 60;
 export interface Options {
   /** Default: `OPEN`. */
   arena?: ArenaDef;
+  /** Default: the three shipped kits. */
+  kits?: readonly KitDef[];
   /** Default: the champion at (-6, 0), the enemy `distance` metres east of it. */
   me?: readonly [number, number];
   enemy?: readonly [number, number];
@@ -41,7 +43,7 @@ export function sceneOf(championId: string, distance: number, options: Options =
       { championId: 'dummy', team: 'B' },
     ],
   };
-  const state = createMatch(config, options.arena ?? OPEN, 1, jsonKits());
+  const state = createMatch(config, options.arena ?? OPEN, 1, options.kits ?? jsonKits());
   for (const id of [1, 3]) (state.champions[id] as ChampionState).alive = false;
   const me = state.champions[0] as ChampionState;
   const enemy = state.champions[2] as ChampionState;

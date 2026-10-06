@@ -10,17 +10,9 @@ import { lineOfSight } from './sight';
 import type { SightScratch } from './sight';
 
 // Escapes: the slots a bot presses to get out of reach (docs/architecture/bots.md, Openers and
-// escapes). The trigger is the escape think of bot.ts; the choice is `chooseEscape`; a teleport escape
+// escapes). The trigger is the escape think of `computeCues` in casting.ts; the choice is `chooseEscape`; a teleport escape
 // (Quillon's Skip, Skerrow's Vanish Step) needs a landing, which is `landingInto` and the search
 // over the five kite directions in `findLanding`.
-
-/**
- * An escape think is a retreat with the acted target within this many metres, inclusive, or a
- * kite with the acted target inside rangeMin (the test is in bot.ts, over a field, so that no
- * double crosses a call). Six metres is the roster's "inside 6 m" for the
- * ranged champion's back-off, applied to a retreat of any champion.
- */
-export const ESCAPE_RANGE = 6;
 
 /**
  * The scratch of a teleport landing, in fields that start as doubles. `dirX`, `dirY`, `range` and

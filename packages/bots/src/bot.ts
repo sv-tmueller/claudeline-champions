@@ -5,6 +5,7 @@ import {
   abilityFor,
   buttonsOf,
   chooseCast,
+  computeCues,
   createCastCues,
   createKitCache,
   findKit,
@@ -14,7 +15,7 @@ import {
 import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
-import { ESCAPE_RANGE, chooseEscape, createEscapeScratch } from './escape';
+import { chooseEscape, createEscapeScratch } from './escape';
 import { createFollower, followPathInto } from './follow';
 import { buildNavGrid, cellCenterInto } from './grid';
 import type { NavGrid, Vec2 } from './grid';
@@ -29,6 +30,7 @@ import {
   SIGHT_CLEARANCE,
   SIGHT_RADIUS,
   clearShot,
+  clearShotWith,
   createSightScratch,
   nearestSightCellIn,
 } from './sight';
@@ -271,6 +273,15 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     decided.targetId = targetId;
   }
 
+  /**
+   * Whether a stand has a clear shot: of `sight.standClearance`, a champion's 0.5 m unless the bot
+   * could press a wider ultimate on this think (see computeCues in casting.ts).
+   */
+  function standShot(state: GameState, me: ChampionState, target: ChampionState): boolean {
+    sight.clearance = sight.standClearance;
+    return clearShotWith(state, me, target, sight);
+  }
+
   /** Path following with a fresh follower when the goal kind differs from the previous think's. */
   function follow(kind: FollowGoal, g: NavGrid, me: ChampionState, goal: Vec2): void {
     if (kind !== previousGoal) follower = createFollower();
@@ -299,7 +310,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   ): void {
     if (
       (!requireRange || dist.metres <= profile.rangeMax) &&
-      clearShot(state, me, target, SIGHT_CLEARANCE, sight)
+      standShot(state, me, target)
     ) {
       return stand();
     }
@@ -321,7 +332,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     const g = navGrid(state);
     switch (acted.intent) {
       case 'engage':
-        if (d <= profile.rangeMax && clearShot(state, me, target, SIGHT_CLEARANCE, sight)) {
+        if (d <= profile.rangeMax && standShot(state, me, target)) {
           return stand();
         }
         return follow('target', g, me, target);
@@ -478,6 +489,13 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       lastActed.intent = acted.intent;
       lastActed.targetId = acted.targetId;
 
+      if (kit !== undefined && target !== undefined && acted.intent !== 'idle') {
+        computeCues(cues, kitCache, profile, acted.intent, me, target, sight, dist);
+      } else {
+        cues.reserve = false;
+        cues.escape = false;
+        sight.standClearance = SIGHT_CLEARANCE;
+      }
       move(state, me, profile);
       input.moveX = command.moveX;
       input.moveY = command.moveY;
@@ -492,13 +510,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       escapeScratch.tried = 0;
       escapeScratch.landed = false;
       if (kit !== undefined) {
-        // An escape think: a retreat with the target within ESCAPE_RANGE, or a kite inside
-        // rangeMin. The escape slots count it as their run, and are chosen before the others.
-        distanceInto(dist, me, target);
-        const d = dist.metres;
-        cues.escape =
-          (acted.intent === 'retreat' && d <= ESCAPE_RANGE) ||
-          (acted.intent === 'kite' && d < profile.rangeMin);
+        // On an escape think (see computeCues) the escape slots count the trigger as their run,
+        // and are chosen before the others.
         updateRuns(runs, state, kitCache, me, target, sight, dist, cues);
         if (cues.escape && kitCache.escapeOrder[0] !== -1) {
           pressed = chooseEscape(
@@ -517,7 +530,16 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
           );
         }
         if (!pressed) {
-          pressed = chooseCast(choice, runs, tier.castDelay, kit, kitCache, me, escapeScratch.tried);
+          pressed = chooseCast(
+            choice,
+            runs,
+            tier.castDelay,
+            kit,
+            kitCache,
+            me,
+            cues,
+            escapeScratch.tried,
+          );
         }
       } else {
         runs.fill(0);

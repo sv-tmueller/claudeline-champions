@@ -95,6 +95,8 @@ export interface CastCues {
    * when it walks toward it, 0 when it stands or walks across.
    */
   dot: number;
+  /** True while F holds the energy back from the EX variants, see `computeCues`. */
+  reserve: boolean;
   /**
    * True on an escape think: the acted intent is retreat with the target within `ESCAPE_RANGE`,
    * or kite with the target inside rangeMin (see `ESCAPE_RANGE` in escape.ts). Set by the bot
@@ -104,7 +106,7 @@ export interface CastCues {
 }
 
 export function createCastCues(): CastCues {
-  return { dot: 0.5, escape: false };
+  return { dot: 0.5, reserve: false, escape: false };
 }
 
 export function createKitCache(): KitCache {
@@ -225,6 +227,13 @@ export function hasDash(ability: AbilitySpec): boolean {
   return false;
 }
 
+/**
+ * An escape think is a retreat with the acted target within this many metres, inclusive, or a
+ * kite with the acted target inside rangeMin. Six metres is the roster's "inside 6 m" for the
+ * ranged champion's back-off, applied to a retreat of any champion.
+ */
+export const ESCAPE_RANGE = 6;
+
 /** The slot index of F. */
 const F_INDEX = SLOTS.indexOf('F');
 
@@ -237,18 +246,57 @@ const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
 /**
  * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
  * `kit.ex`, has a variant with a reach band (the cache holds one only then), the champion has
- * the energy, and F is not holding the energy back. F holds it back while it is ready (its
- * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band and the
- * energy is at least `EX_RESERVE_ENERGY`: a support ultimate that reaches allies only has no band
- * and must not freeze the EX variants for good. F never has an EX variant.
+ * the energy, and F is not holding the energy back (`cues.reserve`, see `computeCues`). F never
+ * has an EX variant.
  */
-function exFor(cache: KitCache, index: number, me: ChampionState): boolean {
+function exFor(cache: KitCache, index: number, me: ChampionState, cues: CastCues): boolean {
   if (cache.hasEx[index] !== 1 || me.energy < EX_ENERGY_COST) return false;
-  const holding =
+  return !cues.reserve;
+}
+
+/**
+ * Works the cues of a think out, from the acted target: the motion of the target, whether this is
+ * an escape think, the energy reserve, and the clearance a stand needs. Run once per think, before
+ * the move (the stand reads `sight.standClearance`) and before `updateRuns`.
+ *
+ * The reserve: F holds the energy back, so the EX variants are not cast, while F is ready (its
+ * cooldown is at most 1, as the cast gate reads it), its base ability has a reach band (a support
+ * ultimate that reaches allies only must not freeze every EX variant for good), the energy is at
+ * least `EX_RESERVE_ENERGY` (what F costs less one EX press, so the bar can reach the cost of F
+ * instead of falling back by an EX cast first) and the target is within F's reach, the band less
+ * the margin. Without the reach clause a bot at 75 energy or more did without its EX variants for
+ * as long as any ultimate was ready, whether or not an enemy was ever in reach of it.
+ *
+ * The stand clearance: a bot that could press F now (the reserve and the full cost) stands where
+ * a shot of F's width fits, not only a champion's 0.5 m: a wide ultimate (Quillon's 0.6 m) can
+ * wait behind cover that a 0.5 m shot clears. Any other think keeps 0.5.
+ */
+export function computeCues(
+  cues: CastCues,
+  cache: KitCache,
+  profile: BotProfile,
+  intent: string,
+  me: ChampionState,
+  target: ChampionState,
+  sight: SightScratch,
+  dist: Measure,
+): void {
+  distanceInto(dist, me, target);
+  const d = dist.metres;
+  cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
+  cues.escape =
+    (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
+  cues.reserve =
     cache.hasBase[F_INDEX] === 1 &&
     (me.cooldowns[F_INDEX] as number) <= 1 &&
-    me.energy >= EX_RESERVE_ENERGY;
-  return !holding;
+    me.energy >= EX_RESERVE_ENERGY &&
+    (cache.baseMin[F_INDEX] as number) <= d &&
+    d <= (cache.baseMax[F_INDEX] as number) - RANGE_MARGIN;
+  sight.standClearance = 0.5;
+  if (cues.reserve && me.energy >= ULTIMATE_ENERGY_COST) {
+    const wide = cache.baseClearance[F_INDEX] as number;
+    if (wide > 0.5) sight.standClearance = wide;
+  }
 }
 
 /**
@@ -282,14 +330,13 @@ export function updateRuns(
 ): void {
   distanceInto(dist, me, target);
   const d = dist.metres;
-  cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
   for (let i = 0; i < SLOTS.length; i++) {
     // An escape slot on an escape think counts the trigger: no band, no shot test.
     if (cues.escape && cache.isEscape[i] === 1) {
       runs[i] = (runs[i] as number) + 1;
       continue;
     }
-    const ex = exFor(cache, i, me);
+    const ex = exFor(cache, i, me, cues);
     let inBand = false;
     if (ex) {
       // `inReach` of the EX band, written out over the typed arrays.
@@ -327,6 +374,7 @@ export function chooseCast(
   kit: KitDef,
   cache: KitCache,
   me: ChampionState,
+  cues: CastCues,
   skip: number,
 ): boolean {
   if (me.cast !== null && me.cast.windupLeft !== 1) return false;
@@ -338,7 +386,7 @@ export function chooseCast(
     if ((runs[i] as number) <= castDelay) continue;
     if ((me.cooldowns[i] as number) > 1) continue;
     const slot = SLOTS[i] as Slot;
-    const ex = exFor(cache, i, me);
+    const ex = exFor(cache, i, me, cues);
     const cost = slot === 'F' ? ULTIMATE_ENERGY_COST : ex ? EX_ENERGY_COST : 0;
     if (me.energy < cost) continue;
     if (rooted && hasDash(abilityFor(kit, slot, ex))) continue;
