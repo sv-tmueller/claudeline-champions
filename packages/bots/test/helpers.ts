@@ -1,5 +1,6 @@
 import arena01Json from '../../../data/arenas/arena01.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
+import lumethJson from '../../../data/kits/lumeth.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
 import {
@@ -40,6 +41,14 @@ export const arena01: ArenaDef = parseArenaDef(arena01Json);
  */
 export function jsonKits(): KitDef[] {
   return [hargrimJson, quillonJson, skerrowJson].map((kit) => structuredClone(kit) as unknown as KitDef);
+}
+
+/**
+ * The four shipped kits: `jsonKits()` and the shipped Lumeth. `jsonKits()` keeps its three, so the
+ * pins that read a champion with no kit (a Skerrow at a kitless Lumeth) stay as they are.
+ */
+export function rosterKits(): KitDef[] {
+  return [...jsonKits(), structuredClone(lumethJson) as unknown as KitDef];
 }
 
 function validAxis(v: number): boolean {
