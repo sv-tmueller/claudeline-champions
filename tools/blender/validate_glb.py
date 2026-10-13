@@ -24,10 +24,12 @@ FORBIDDEN_KEYS = {
     "champions": ("textures", "images"),
 }
 
-# The champion rig and clips. docs/architecture/assets.md has the same two
-# tables, and a unit test fails if they drift apart. RIG maps each joint to its
-# parent in glTF order (Hips hangs from the node `Rig`). CLIPS maps each clip to
-# (length in frames, key count). The frame rate is 30.
+# The champion rig and clips. docs/architecture/assets.md has the same tables,
+# and a unit test fails if they drift apart. RIG maps each joint to its parent
+# in glTF order (Hips hangs from the node `Rig`). CLIPS maps each clip to
+# (length in frames, key count). CHANNELS maps each clip to the exact set of
+# (joint, path) channels it keys: a clip keys only what it moves, and the client
+# restores the rest to the rest pose. The frame rate is 30.
 RIG = {
     "Hips": "Rig",
     "Spine": "Hips",
@@ -36,7 +38,24 @@ RIG = {
     "Leg_L": "Hips",
     "Leg_R": "Hips",
 }
-CLIPS = {"Idle": (60, 3), "Run": (20, 5), "Cast": (15, 4), "Death": (30, 4)}
+CLIPS = {
+    "Idle": (60, 3),
+    "Run": (20, 9),
+    "Attack": (12, 4),
+    "Cast": (15, 4),
+    "Hit": (9, 3),
+    "Death": (30, 4),
+}
+_UPPER = (("Spine", "rotation"), ("Arm_L", "rotation"), ("Arm_R", "rotation"))
+_HIPS_MOVE = (("Hips", "translation"),)
+CHANNELS = {
+    "Idle": frozenset(_UPPER + _HIPS_MOVE),
+    "Run": frozenset(_UPPER + (("Leg_L", "rotation"), ("Leg_R", "rotation")) + _HIPS_MOVE),
+    "Attack": frozenset(_UPPER),
+    "Cast": frozenset(_UPPER),
+    "Hit": frozenset(_UPPER),
+    "Death": frozenset(_UPPER + (("Hips", "rotation"),) + _HIPS_MOVE),
+}
 FPS = 30
 TIME_TOLERANCE = 1e-4
 
@@ -419,7 +438,7 @@ def check_clip(doc, nodes, joints, animation):
     channels, samplers = animation.get("channels"), animation.get("samplers")
     if not isinstance(channels, list) or not isinstance(samplers, list):
         return "clip %s needs channels and samplers" % name
-    paths = set()
+    paths = []
     for channel in channels:
         target = channel.get("target") if isinstance(channel, dict) else None
         node = target.get("node") if isinstance(target, dict) else None
@@ -428,7 +447,10 @@ def check_clip(doc, nodes, joints, animation):
         path = target.get("path")
         if path not in ("rotation", "translation"):
             return "clip %s: channel path %r must be rotation or translation" % (name, path)
-        paths.add((nodes[node]["name"], path))
+        joint = nodes[node]["name"]
+        if path == "translation" and joint != "Hips":
+            return "clip %s: only Hips may translate, found a translation on %s" % (name, joint)
+        paths.append((joint, path))
         sampler = channel.get("sampler")
         if (
             not isinstance(sampler, int)
@@ -436,11 +458,14 @@ def check_clip(doc, nodes, joints, animation):
             or not 0 <= sampler < len(samplers)
         ):
             return "clip %s: a channel's sampler index is out of range" % name
-    for joint in RIG:
-        if (joint, "rotation") not in paths:
-            return "clip %s: joint %s has no rotation channel" % (name, joint)
-    if ("Hips", "translation") not in paths:
-        return "clip %s: Hips has no translation channel" % name
+    wanted = CHANNELS[name]
+    for pair in sorted(set(paths)):
+        if paths.count(pair) > 1:
+            return "clip %s: duplicate channel %s %s" % ((name,) + pair)
+    for pair in sorted(wanted - set(paths)):
+        return "clip %s: missing channel %s %s" % ((name,) + pair)
+    for pair in sorted(set(paths) - wanted):
+        return "clip %s: unexpected channel %s %s" % ((name,) + pair)
     inputs = {
         s["input"] for s in samplers if isinstance(s, dict) and isinstance(s.get("input"), int)
     }

@@ -41,19 +41,23 @@ FLOOR_TOLERANCE = 1e-4
 KEY_TIME_TOLERANCE = 1e-4
 FPS = 30
 # Between two keys three interpolates a rotation with slerp and a translation
-# with lerp, and the leg turn and the Hips drop do not stay in step, so the
-# lowest vertex dips below the floor. The keys are held to FLOOR_TOLERANCE, the
-# interior samples to this. The animation work in batch 10 may rework the poses.
+# with lerp. The poses are built so the floor holds between keys too (the two
+# rules are in gen_champion.py), so the interior samples are held to the same
+# tolerance as the keys.
 SAMPLE_STEPS = 20
-SAMPLED_FLOOR = -0.04
+SAMPLED_FLOOR = -FLOOR_TOLERANCE
 # The key frames of each clip. assets.md's Clips table lists the same frames,
 # and a test fails if they drift apart.
 KEY_FRAMES = {
     "Idle": (0, 30, 60),
-    "Run": (0, 5, 10, 15, 20),
+    "Run": (0, 3, 5, 7, 10, 13, 15, 17, 20),
+    "Attack": (0, 2, 4, 12),
     "Cast": (0, 5, 9, 15),
+    "Hit": (0, 2, 9),
     "Death": (0, 10, 20, 30),
 }
+LOOPING = ("Idle", "Run")
+LOOP_TOLERANCE = 1e-6
 
 JOINTS = ("Hips", "Spine", "Arm_L", "Arm_R", "Leg_L", "Leg_R")
 NODE_COUNT = 8  # the six joints, Champion and Rig
@@ -416,6 +420,13 @@ def clip_problems(doc, bin_chunk, joints, inverse, vertices):
             )
             continue
         values = clip_values(doc, bin_chunk, animation)
+        if name in LOOPING:
+            for (node, path), outputs in values.items():
+                if any(abs(p - q) > LOOP_TOLERANCE for p, q in zip(outputs[0], outputs[-1])):
+                    problems.append(
+                        "loop of %s does not close: %s %s starts at %s and ends at %s"
+                        % (name, doc["nodes"][node]["name"], path, outputs[0], outputs[-1])
+                    )
         for key in range(len(times)):
             pose = pose_between(doc, values, key, 0)
             low, high = pose_extremes(doc, joints, inverse, vertices, pose)
@@ -433,7 +444,7 @@ def clip_problems(doc, bin_chunk, joints, inverse, vertices):
         if low < SAMPLED_FLOOR:
             problems.append(
                 "sampled floor is %.4f m in %s after key %d (%.2f of the way), "
-                "the limit is %.2f m" % (low, name, low_at[0], low_at[1], SAMPLED_FLOOR)
+                "the limit is %.4f m" % (low, name, low_at[0], low_at[1], SAMPLED_FLOOR)
             )
         if high > MAX_TOP + TOP_TOLERANCE:
             problems.append(
@@ -530,6 +541,19 @@ def load(path):
 
 def node_named(doc, name):
     return next(n for n in doc["nodes"] if n.get("name") == name)
+
+
+def joint_index(doc, name):
+    return next(i for i, n in enumerate(doc["nodes"]) if n.get("name") == name)
+
+
+def clip_named(doc, name):
+    return next(a for a in doc["animations"] if a["name"] == name)
+
+
+def channel_of(doc, clip, joint, path):
+    target = {"node": joint_index(doc, joint), "path": path}
+    return next(c for c in clip_named(doc, clip)["channels"] if c["target"] == target)
 
 
 def accent_primitive(doc):
@@ -674,15 +698,23 @@ class ContractCheckTests(unittest.TestCase):
 
     def move_run_hips(self, dy):
         """Move the second key of the Run clip's Hips translation by dy (glTF y)."""
-        run = next(a for a in self.doc["animations"] if a["name"] == "Run")
-        hips = next(i for i, n in enumerate(self.doc["nodes"]) if n["name"] == "Hips")
-        channel = next(
-            c for c in run["channels"] if c["target"] == {"node": hips, "path": "translation"}
-        )
-        output = run["samplers"][channel["sampler"]]["output"]
-        offset = accessor_offset(self.doc, output)
+        run = clip_named(self.doc, "Run")
+        channel = channel_of(self.doc, "Run", "Hips", "translation")
+        offset = accessor_offset(self.doc, run["samplers"][channel["sampler"]]["output"])
         x, y, z = struct.unpack_from("<3f", self.bin, offset + 12)
         struct.pack_into("<3f", self.bin, offset + 12, x, y + dy, z)
+
+    def test_rejects_a_looping_clip_that_does_not_close(self):
+        for name in LOOPING:
+            with self.subTest(clip=name):
+                self.setUp()
+                clip = clip_named(self.doc, name)
+                channel = channel_of(self.doc, name, "Spine", "rotation")
+                offset = accessor_offset(self.doc, clip["samplers"][channel["sampler"]]["output"])
+                last = 16 * (len(KEY_FRAMES[name]) - 1)
+                x, y, z, w = struct.unpack_from("<4f", self.bin, offset + last)
+                struct.pack_into("<4f", self.bin, offset + last, x, y + 0.001, z, w)
+                self.assertProblem("loop of %s does not close" % name)
 
     def test_rejects_a_pose_that_lifts_the_top_above_the_limit(self):
         self.move_run_hips(1.0)
@@ -700,22 +732,20 @@ class ContractCheckTests(unittest.TestCase):
         self.move_run_hips(1.0)
         self.assertProblem("sampled top")
 
-    def test_the_sampling_sees_the_dip_between_keys_that_the_keys_do_not(self):
-        doc, bin_chunk = load(CHAMPIONS_DIR / "placeholder.glb")
-        skin = doc["skins"][0]
-        joints = skin["joints"]
-        matrices = read_accessor(doc, bin_chunk, skin["inverseBindMatrices"])
-        inverse = [column_major(m) for m in matrices]
-        vertices = skinned_vertices(doc, bin_chunk)
-        run = next(a for a in doc["animations"] if a["name"] == "Run")
-        values = clip_values(doc, bin_chunk, run)
-        key_lows = [
-            pose_extremes(doc, joints, inverse, vertices, pose_between(doc, values, k, 0))[0]
-            for k in range(5)
-        ]
-        low, _, _ = sampled_extremes(doc, joints, inverse, vertices, values, 5)
-        self.assertLess(low, min(key_lows) - 0.01)
-        self.assertGreaterEqual(low, SAMPLED_FLOOR)
+    def test_the_sampled_floor_catches_what_the_keys_miss(self):
+        # Run key 1 (frame 3) lifts Hips by 0.022 m, which holds the foot corner
+        # on the floor while the leg straightens into the passing key. At 0.010 m
+        # every key is still at or above the floor, but between key 1 and key 2
+        # the corner sinks by 1.3 mm.
+        run = clip_named(self.doc, "Run")
+        output = run["samplers"][channel_of(self.doc, "Run", "Hips", "translation")["sampler"]]["output"]
+        offset = accessor_offset(self.doc, output)
+        x, y, z = struct.unpack_from("<3f", self.bin, offset + 12)
+        self.assertAlmostEqual(y, 0.80 + 0.022, places=4)
+        struct.pack_into("<3f", self.bin, offset + 12, x, 0.80 + 0.010, z)
+        problems = contract_problems(self.doc, self.bin)
+        self.assertTrue(any("sampled floor" in p for p in problems), problems)
+        self.assertFalse(any("posed floor" in p for p in problems), problems)
 
     def test_slerp_takes_the_short_arc_and_the_midpoint_of_a_quarter_turn(self):
         quarter = (0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4))
@@ -737,14 +767,14 @@ class ContractCheckTests(unittest.TestCase):
         self.assertProblem("skin joints must be")
 
     def test_rejects_key_times_that_differ_from_the_table(self):
-        cast = next(a for a in self.doc["animations"] if a["name"] == "Cast")
+        cast = clip_named(self.doc, "Cast")
         offset = accessor_offset(self.doc, cast["samplers"][0]["input"])
         # Key 2 moves from frame 9 to frame 10, for every channel at once.
         struct.pack_into("<f", self.bin, offset + 8, 10 / 30)
         self.assertProblem("key times")
 
     def test_rejects_samplers_that_do_not_share_one_input(self):
-        cast = next(a for a in self.doc["animations"] if a["name"] == "Cast")
+        cast = clip_named(self.doc, "Cast")
         self.doc["accessors"].append(dict(self.doc["accessors"][cast["samplers"][0]["input"]]))
         cast["samplers"][1]["input"] = len(self.doc["accessors"]) - 1
         self.assertProblem("share one input")

@@ -126,12 +126,14 @@ check the posed top and floor at every key, and sample 20 steps in each key
 interval (slerp for rotations, lerp for translations) against a floor of
 -0.04 m and the same top.
 
-| Clip | Frames | Seconds | Keys | Plays |
-|------|--------|---------|------|-------|
-| `Idle` | 60 | 2.000 | 0, 30, 60 | loops |
-| `Run` | 20 | 0.667 | 0, 5, 10, 15, 20 | loops |
-| `Cast` | 15 | 0.500 | 0, 5, 9, 15 | once, from rest back to rest |
-| `Death` | 30 | 1.000 | 0, 10, 20, 30 | once, holds the last frame |
+| Clip | Frames | Seconds | Keys | Channels | Plays |
+|------|--------|---------|------|----------|-------|
+| `Idle` | 60 | 2.000 | 0, 30, 60 | `Spine, Arm_L, Arm_R, Hips translation` | loops |
+| `Run` | 20 | 0.667 | 0, 3, 5, 7, 10, 13, 15, 17, 20 | `Spine, Arm_L, Arm_R, Leg_L, Leg_R, Hips translation` | loops |
+| `Attack` | 12 | 0.400 | 0, 2, 4, 12 | `Spine, Arm_L, Arm_R` | once, from rest back to rest |
+| `Cast` | 15 | 0.500 | 0, 5, 9, 15 | `Spine, Arm_L, Arm_R` | once, from rest back to rest |
+| `Hit` | 9 | 0.300 | 0, 2, 9 | `Spine, Arm_L, Arm_R` | once, from rest back to rest |
+| `Death` | 30 | 1.000 | 0, 10, 20, 30 | `Hips, Hips translation, Spine, Arm_L, Arm_R` | once, holds the last frame |
 
 `Run` is the movement clip. `Attack` and `Hit` are not built yet.
 
