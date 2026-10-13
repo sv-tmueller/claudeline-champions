@@ -33,6 +33,12 @@ export interface SightScratch {
   arena: GameState['arena'] | undefined;
   table: Float64Array;
   measure: Measure;
+  /**
+   * The smallest squared distance `nearestSightCellIn` has found, in a field: kept in a local of
+   * the scan, V8's Maglev tier boxed (16 B) the double each time it was written (the kite scene
+   * of the heap check read 16 B a think, with every call inlined; see allocation.test.ts).
+   */
+  bestDistance: number;
 }
 
 /** Points that start as doubles, as the sim's geometry does, so no field changes representation. */
@@ -48,6 +54,7 @@ export function createSightScratch(): SightScratch {
     arena: undefined,
     table: new Float64Array(0),
     measure: createMeasure(),
+    bestDistance: 0.5,
   };
 }
 
@@ -276,7 +283,7 @@ export function nearestSightCellIn(
   const colMax = Math.min(grid.cols - 1, homeCol + radius);
 
   let best = -1;
-  let bestDistance = Infinity;
+  scratch.bestDistance = Infinity;
   for (let row = rowMin; row <= rowMax; row++) {
     for (let col = colMin; col <= colMax; col++) {
       const index = row * grid.cols + col;
@@ -290,13 +297,13 @@ export function nearestSightCellIn(
       if (toTarget < rangeMin || toTarget > rangeMax) continue;
       const distance = (cx - p.x) * (cx - p.x) + (cy - p.y) * (cy - p.y);
       // Strict, and the scan runs in index order, so a tie keeps the lower index.
-      if (distance >= bestDistance) continue;
+      if (distance >= scratch.bestDistance) continue;
       // The clear shot sweep runs last: it is the costly filter. `scratch.from` holds the cell
       // centre, written above for the distance.
       scratch.clearance = scratch.standClearance;
       if (!clearShotWith(state, scratch.from, target, scratch)) continue;
       best = index;
-      bestDistance = distance;
+      scratch.bestDistance = distance;
     }
   }
   return best;
