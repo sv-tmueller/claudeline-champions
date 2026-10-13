@@ -867,6 +867,43 @@ describe('aim error', () => {
     }
   });
 
+  // The aim error of a think is a draw of the bot's own generator, mulberry32 of the seed, one per
+  // 15 acting thinks. `think` writes the draw out inside `aim` (over a typed state, so a draw
+  // allocates nothing: see allocation.test.ts), and `rng.ts` stays as its reference. This replays
+  // the stream of several seeds (the same state for -1 and 2^32 - 1, and for 0 and 2^32) over
+  // thousands of thinks at a target that stands still, with the chain of aim.ts, and compares every
+  // aim to the centimetre. A changed constant, shift or the order of an operation moves the stream
+  // within a few draws.
+  it('draws the error of each 15 thinks from the seeded stream of rng.ts, over thousands of thinks', () => {
+    const seeds = [-1, 0, 1, 2, 5, 77, 123456789, 2 ** 31, -(2 ** 31), 2 ** 32 - 1, 2 ** 32, 2 ** 40 + 3];
+    const THINKS_PER_SEED = 2400;
+    let compared = 0;
+    for (const tier of ['easy', 'normal', 'hard'] as const) {
+      for (const seed of seeds) {
+        const state = setup();
+        kill(state, 0, 3);
+        const me = put(state, 1, -5, 0);
+        const target = put(state, 2, 5, 0);
+        const bot = createBot(1, tier, seed);
+        const rng = createRng(seed);
+        const { delay, maxU } = TIERS[tier];
+        let u = 0;
+        for (let i = 0; i < THINKS_PER_SEED; i++) {
+          const input = bot.think(state);
+          // The bot idles on the aim until its first acted think, then draws on every 15th.
+          if (i < delay) continue;
+          if ((i - delay) % 15 === 0) u = (2 * rng.next() - 1) * maxU;
+          const turned = rotateByHalfTangent(target.x - me.x, target.y - me.y, u);
+          const expected = [roundAim(me.x + turned.x), roundAim(me.y + turned.y)];
+          expect([input.aimX, input.aimY], `${tier} seed ${seed} think ${i}`).toEqual(expected);
+          compared++;
+        }
+      }
+    }
+    // The easy, normal and hard bots idle (and aim nowhere new) for 30, 15 and 6 thinks.
+    expect(compared).toBe(seeds.length * (3 * THINKS_PER_SEED - (30 + 15 + 6)));
+  });
+
   it('keeps the stored aim while idle', () => {
     const state = setup();
     kill(state, 2, 3);

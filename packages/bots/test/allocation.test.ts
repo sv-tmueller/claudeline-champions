@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
-import { createBot } from '../src/bot';
+import { AIM_ERROR_HOLD, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { createFollower, followPathInto } from '../src/follow';
 import type { PathFollower } from '../src/follow';
@@ -176,6 +176,13 @@ const CONTROL_FLOOR_BYTES_PER_CALL = 16;
 function hypotLoop(out: Float64Array, seed: number): void {
   for (let i = 0; i < CONTROL_CALLS; i++) out[i] = hypot2(seed + i * 0.25, 3 + i);
 }
+
+/**
+ * The most heap a block of 15 thinks with one aim draw may allocate in Maglev alone, in bytes
+ * (median over the blocks of a round, the lowest round, the empty pair taken off). Main's draw
+ * (`rng.ts:next`) read 16 to 32 B there, the draw written out in `aim` reads 0.
+ */
+const DRAW_BLOCK_MAGLEV_LIMIT_BYTES = 8;
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -612,6 +619,36 @@ describe('think allocation', () => {
         `lowest round of the median bytes per ${name} plan: ${rounds.map(Math.round).join(', ')}`,
       ).toBeLessThan(limit);
     }
+  });
+
+  // The draw block: the per-think median hides the aim error draw, which runs once in 15 thinks
+  // (AIM_ERROR_HOLD). A block of 15 thinks holds exactly one draw, wherever it starts, so the
+  // median over blocks reads the draw in its first think. On main the draw was `rng.ts:next`, run
+  // too rarely to be optimised before a long run: it read about 30 B a draw in the browser.
+  // Run in Maglev alone: in the default tiers a block reads about -140 B whatever the draw (a
+  // block of thinks reads less than the empty pair there, so the check has no power), and `next`
+  // is optimised there.
+  it.runIf(MAGLEV)('allocates nothing in a block of 15 thinks with one aim draw', () => {
+    const s = scene('press', 1, 'engage', true, false, (state) => {
+      put(state, 1, -4, -3);
+      put(state, 2, 4, -3);
+      ch(state, 1).energy = 60;
+    });
+    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
+    const figures: number[] = [];
+    for (let round = 0; round < ROUNDS; round++) {
+      for (let i = 0; i < WINDOW; i++) {
+        const before = heap();
+        for (let k = 0; k < AIM_ERROR_HOLD; k++) s.bot.think(s.state);
+        deltas[i] = heap() - before;
+      }
+      figures.push(median(deltas, WINDOW) - emptyPairMedian());
+    }
+    console.log(`think allocation, a block of ${AIM_ERROR_HOLD} thinks with one draw: ${figures.map((f) => Math.round(f)).join(', ')} B per block`);
+    expect(
+      Math.min(...figures),
+      `lowest round of the median bytes per block of ${AIM_ERROR_HOLD} thinks: ${figures.map(Math.round).join(', ')}`,
+    ).toBeLessThan(DRAW_BLOCK_MAGLEV_LIMIT_BYTES);
   });
 
   // The first aim of -0: after a warm-up on whole-centimetre aims, a point in [-0.5, 0) cm rounds

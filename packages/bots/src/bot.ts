@@ -26,7 +26,6 @@ import { chooseIntent, scoreIntentsInto } from './intent';
 import type { Intent, ScoredIntent, Scores } from './intent';
 import { KITE_STEP, createKiteScratch, kiteStepInto } from './kite';
 import type { BotProfile } from './profile';
-import { createRng } from './rng';
 import {
   SIGHT_CLEARANCE,
   SIGHT_RADIUS,
@@ -187,7 +186,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   if (!Number.isInteger(seed)) fail('seed must be an integer');
 
   const tier = TIERS[difficulty];
-  const rng = createRng(seed >>> 0);
+  // The state of the bot's own generator, mulberry32 (rng.ts is the reference): one 32-bit word in
+  // a typed array, which `aim` advances. A closure variable or an object field would box it.
+  const rngState = new Uint32Array(1);
+  rngState[0] = seed >>> 0;
   // Every record a think reads or writes is made here, once, and rewritten field by field: the
   // steady state allocates nothing (packages/bots/test/allocation.test.ts). A plan (its path
   // only), a fresh follower after a goal or intent change, and `inspect()` allocate by design.
@@ -398,7 +400,18 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     kit: KitDef | undefined,
     pressed: boolean,
   ): void {
-    if (aimAge === 0) aimError.aimU = (2 * rng.next() - 1) * tier.maxU;
+    if (aimAge === 0) {
+      // The draw of createRng(seed).next() of rng.ts, operation for operation (a test compares
+      // the two over thousands of thinks): `next` runs once in 15 thinks, so V8 never optimised
+      // it, and in the interpreter its double result and every int32 above the Smi range boxed
+      // (about 30 B a draw). Written out here it runs in the compiled code of `aim`.
+      const state = (rngState[0] as number + 0x6d2b79f5) >>> 0;
+      rngState[0] = state;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      aimError.aimU = (2 * (((t ^ (t >>> 14)) >>> 0) / 4294967296) - 1) * tier.maxU;
+    }
     const u = aimError.aimU;
     aimAge = (aimAge + 1) % AIM_ERROR_HOLD;
 
