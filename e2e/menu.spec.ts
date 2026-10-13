@@ -241,7 +241,7 @@ test('relaunches as a 3v3 from the menu select, and a restart keeps the team siz
     expect((await readHooks(page)).bars, 'a 2v2 has four bars').toBe(4);
     await mark(page);
     await openMenu(page);
-    await expect(page.locator('[data-menu="panel"] [data-action="select"]')).toHaveText('Champion, arena and teams');
+    await expect(page.locator('[data-menu="panel"] [data-action="select"]')).toHaveText('Champion, arena, teams and difficulty');
     await page.locator('[data-menu="panel"] [data-action="select"]').click();
     await expectMenu(page, true, 'select');
     await page.locator('[data-menu="panel"] [data-team-size="3"]').click();

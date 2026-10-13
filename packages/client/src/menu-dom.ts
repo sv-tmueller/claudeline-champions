@@ -52,7 +52,7 @@ export function buildMenu(
   const main = make(panel, 'div', { 'data-section': 'main' });
   const resume = make(main, 'button', { 'data-action': 'resume' }, 'Resume');
   const restart = make(main, 'button', { 'data-action': 'restart' }, 'Restart');
-  const select = make(main, 'button', { 'data-action': 'select' }, 'Champion, arena and teams');
+  const select = make(main, 'button', { 'data-action': 'select' }, 'Champion, arena, teams and difficulty');
   const keys = make(main, 'button', { 'data-action': 'keys' }, 'Keys');
 
   const selectSection = make(panel, 'div', { 'data-section': 'select' });
