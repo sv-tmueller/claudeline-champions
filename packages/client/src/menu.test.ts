@@ -15,7 +15,7 @@ interface Rig {
   input: ReturnType<typeof createInputCore>;
 }
 
-function rig(stored: Bindings = DEFAULT_BINDINGS): Rig {
+function rig(stored: Bindings = DEFAULT_BINDINGS, muted = false): Rig {
   const panel = fake();
   const keys = fake();
   const rows = Object.fromEntries(ACTIONS.map((action) => [action, { row: fake(), key: fake() }])) as Record<
@@ -42,6 +42,7 @@ function rig(stored: Bindings = DEFAULT_BINDINGS): Rig {
       restart: () => calls.push('restart'),
       releaseInput: () => calls.push('release'),
     },
+    muted,
   );
   return { menu, panel, keys, rows, calls, saved, input };
 }
@@ -170,7 +171,7 @@ describe('the keys view', () => {
     expect(attribute(rows.right.row, 'data-capturing')).toBe('true');
     menu.capture('KeyL');
     expect(input.bindings).toEqual({ ...DEFAULT_BINDINGS, right: 'KeyL' });
-    expect(saved).toEqual([{ version: 1, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' } }]);
+    expect(saved).toEqual([{ version: 2, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' }, muted: false }]);
     expect(rows.right.key.textContent).toBe('L');
     expect(menu.capturing).toBeUndefined();
     expect(attribute(keys, 'data-capturing')).toBe('none');
@@ -235,8 +236,21 @@ describe('the keys view', () => {
     expect(rows.right.key.textContent).toBe('L');
     menu.resetBindings();
     expect(input.bindings).toEqual(DEFAULT_BINDINGS);
-    expect(saved).toEqual([{ version: 1, bindings: DEFAULT_BINDINGS }]);
+    expect(saved).toEqual([{ version: 2, bindings: DEFAULT_BINDINGS, muted: false }]);
     expect(rows.right.key.textContent).toBe('D');
+  });
+
+  it('keeps the stored mute in the settings a rebind and a reset save', () => {
+    const { menu, saved } = rig(DEFAULT_BINDINGS, true);
+    menu.toggle();
+    menu.showKeys();
+    menu.startCapture('right');
+    menu.capture('KeyL');
+    menu.resetBindings();
+    expect(saved).toEqual([
+      { version: 2, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' }, muted: true },
+      { version: 2, bindings: DEFAULT_BINDINGS, muted: true },
+    ]);
   });
 
   it('ends a capture when the menu closes', () => {

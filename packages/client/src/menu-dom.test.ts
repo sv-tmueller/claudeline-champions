@@ -22,6 +22,7 @@ function setup() {
       restart: () => calls.push('restart'),
       releaseInput: () => calls.push('release'),
     },
+    false,
   );
   const win = new EventTarget();
   const buttons: MenuButtons = {

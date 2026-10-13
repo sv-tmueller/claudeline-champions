@@ -166,7 +166,8 @@ function browserStorage(): SettingsStorage | undefined {
 const input = createInputCore();
 const platform = createBrowserPlatform(browserStorage());
 // The saved keys apply before the first key is read.
-input.setBindings((await platform.loadSettings()).bindings);
+const settings = await platform.loadSettings();
+input.setBindings(settings.bindings);
 bindInput(window, renderer.domElement, input);
 // Dev builds only: Vite replaces the flag with false in a build, and the module
 // goes with it, so a production page has no time scale.
@@ -407,6 +408,6 @@ const menu = new Menu(menuDom.handles, input, platform, {
   },
   restart: () => location.reload(),
   releaseInput: () => input.releaseAll(),
-});
+}, settings.muted);
 bindMenu(window, menu, menuDom.buttons);
 renderer.setAnimationLoop(frame);

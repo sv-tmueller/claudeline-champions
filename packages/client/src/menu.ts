@@ -59,6 +59,8 @@ export class Menu {
     private readonly input: Pick<InputCore, 'bindings' | 'setBindings'>,
     private readonly platform: Pick<Platform, 'saveSettings'>,
     private readonly actions: MenuActions,
+    /** Whether the sound is off: the stored value, which every save carries. */
+    private readonly muted: boolean,
   ) {}
 
   get isOpen(): boolean {
@@ -200,6 +202,6 @@ export class Menu {
   }
 
   private save(): void {
-    void this.platform.saveSettings({ version: 1, bindings: this.input.bindings });
+    void this.platform.saveSettings({ version: 2, bindings: this.input.bindings, muted: this.muted });
   }
 }
