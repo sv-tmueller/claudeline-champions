@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor, rulesFor } from '../src/profile';
-import { jsonKits } from './helpers';
+import { jsonKits, rosterKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -59,12 +59,27 @@ describe('profileFor with a kit', () => {
     expect(profileFor('quillon', hargrimKit())).toEqual({ rangeMin: 6, rangeMax: 13 });
   });
 
-  it('keeps the table for a champion with no rule, even with a kit of its id', () => {
-    expect(profileFor('lumeth', quietKit('lumeth'))).toEqual({ rangeMin: 6, rangeMax: 10 });
+  it('keeps the table for a champion with no rule, whatever its kit', () => {
+    // No champion of the roster is left without a rule; one that is not on it keeps the table.
+    expect(profileFor('dummy', quietKit('dummy'))).toEqual({ rangeMin: 4, rangeMax: 8 });
+    expect(profileFor('dummy', withM1(quietKit('dummy'), boltSlot(21, 40)))).toEqual({
+      rangeMin: 4,
+      rangeMax: 8,
+    });
+  });
+
+  it('reads Lumeth from the base M1 band too: 20 m/s for 36 ticks reaches 12 m, so rangeMax is 11', () => {
+    const lumeth = rosterKits().find((kit) => kit.id === 'lumeth') as KitDef;
+    expect(profileFor('lumeth', lumeth)).toEqual({ rangeMin: 6, rangeMax: 11 });
+    // Derived, not hard-coded: 21 m/s for 40 ticks reaches 14 m.
     expect(profileFor('lumeth', withM1(quietKit('lumeth'), boltSlot(21, 40)))).toEqual({
       rangeMin: 6,
-      rangeMax: 10,
+      rangeMax: 13,
     });
+    // With no M1 band, no kit or a kit of another id she keeps the table: 6 to 10 m.
+    expect(profileFor('lumeth', quietKit('lumeth'))).toEqual({ rangeMin: 6, rangeMax: 10 });
+    expect(profileFor('lumeth')).toEqual({ rangeMin: 6, rangeMax: 10 });
+    expect(profileFor('lumeth', quietKit('hargrim'))).toEqual({ rangeMin: 6, rangeMax: 10 });
   });
 
   it('reads Skerrow from the base M1 band too: the arc of 2.5 m less the margin is 1.5 m', () => {
@@ -106,7 +121,7 @@ describe('rulesFor', () => {
 
   it('gives no rule without a kit or with a kit of another id', () => {
     const quillon = jsonKits().find((kit) => kit.id === 'quillon') as KitDef;
-    const none = { openers: [], escapes: [], holdF: false, wait: null };
+    const none = { openers: [], escapes: [], holdF: false, wait: null, escapeWithin: null };
     expect(rulesFor('hargrim')).toEqual(none);
     expect(rulesFor('hargrim', quillon)).toEqual(none);
   });
@@ -130,5 +145,27 @@ describe('rulesFor', () => {
       const other = rulesFor(id, kits.find((k) => k.id === id) as KitDef);
       expect(other.openers.map((o) => o.when), id).not.toContain('escapeReady');
     }
+  });
+
+  it('gives Lumeth the escape trigger of 3 m, and Hargrim, Quillon and Skerrow none', () => {
+    const kits = rosterKits();
+    const kit = (id: string) => kits.find((k) => k.id === id) as KitDef;
+    expect(rulesFor('lumeth', kit('lumeth')).escapeWithin).toBe(3);
+    for (const id of ['hargrim', 'quillon', 'skerrow']) {
+      expect(rulesFor(id, kit(id)).escapeWithin, id).toBeNull();
+    }
+  });
+
+  it("gives Lumeth Binding Sigil beside an ally and Lantern Burst as her escape, frozen", () => {
+    const kits = rosterKits();
+    const rules = rulesFor('lumeth', kits.find((k) => k.id === 'lumeth') as KitDef);
+    expect(rules.openers).toEqual([{ slot: 'Q', band: null, motion: null, when: 'nearAlly' }]);
+    expect(rules.escapes).toEqual(['E']);
+    expect(rules.holdF).toBe(false);
+    expect(rules.wait).toBeNull();
+    expect(Object.isFrozen(rules)).toBe(true);
+    expect(Object.isFrozen(rules.openers)).toBe(true);
+    expect(Object.isFrozen(rules.escapes)).toBe(true);
+    for (const opener of rules.openers) expect(Object.isFrozen(opener)).toBe(true);
   });
 });

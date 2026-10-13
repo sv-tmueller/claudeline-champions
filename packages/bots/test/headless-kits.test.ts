@@ -2,19 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
-import { oracleCornered, oracleLanding, triggerProblems } from './escape-oracle';
+import { WITHIN, oracleCornered, oracleLanding, triggerProblems } from './escape-oracle';
 import type { EscapeRow, OracleLanding } from './escape-oracle';
 import type { MatchRun } from './helpers';
 import {
   checkInvariants,
   clearShotOracle,
   configMirror,
+  configLumeth,
   configSkerrow,
   createRun,
   createStallTracker,
   createTeleportTally,
   jsonKits,
   kitOf,
+  rosterKits,
   tallyTeleports,
   validInput,
 } from './helpers';
@@ -56,8 +58,11 @@ interface Band {
   max: number;
   margin?: number;
   motion?: 'away' | 'closing';
-  /** Quiet Dart: the target has an escape ready, see `escapeReady`. */
-  needs?: 'escapeReady';
+  /**
+   * Quiet Dart: the target has an escape ready, see `escapeReady`. Binding Sigil: the target is
+   * within 6 m of an alive ally of the champion, itself not counted, see `nearAlly`.
+   */
+  needs?: 'escapeReady' | 'nearAlly';
 }
 
 // The oracle's own band and clearance tables, one per kit set, written out from the kit files
@@ -85,6 +90,8 @@ const ESCAPES: Record<string, EscapeRow> = {
   'quillon:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: 4 } },
   // Vanish Step: a 5 m teleport that is not fixed (the shipped Skerrow kit only).
   'skerrow:R': { slot: 'R', teleport: 5, after: null },
+  // Lantern Burst: the trigger is Lumeth's own (3 m, any intent but idle), and it costs nothing.
+  'lumeth:E': { slot: 'E', teleport: null, after: null },
 };
 
 /**
@@ -98,6 +105,20 @@ function escapeReady(target: ChampionState): boolean {
     ([key, row]) =>
       key.startsWith(`${target.championId}:`) &&
       (target.cooldowns[SLOTS.indexOf(row.slot)] ?? Infinity) <= 1,
+  );
+}
+
+/**
+ * Whether the target is within 6 m of an alive ally of `c`, `c` itself not counted. Written here
+ * from the rule of bots.md (Openers and escapes), not from the code of the bot.
+ */
+function nearAlly(state: GameState, c: ChampionState, target: ChampionState): boolean {
+  return state.champions.some(
+    (o) =>
+      o.alive &&
+      o.team === c.team &&
+      o.id !== c.id &&
+      Math.hypot(o.x - target.x, o.y - target.y) <= 6,
   );
 }
 
@@ -152,6 +173,26 @@ const SKERROW_CLEARANCES: Record<string, number> = {
   'skerrow:F': 0.5,
 };
 
+// data/kits/lumeth.json, in the shipped set only: Soothing Bolt is a bolt of 20 m/s for 36 ticks
+// (12 m); Binding Sigil is an area at the aim, range 9 plus radius 1.5 plus 0.5, an opener at a
+// target beside an ally; Lantern Burst is an area around her, radius 3 plus 0.5, which she presses
+// as an escape (the row in `ESCAPES`; the band is the kit's and is never what presses it, because
+// her trigger reaches farther than its top); Dawnbloom is read from its second area, the slow on
+// enemies (radius 5 plus 0.5). Her ally presses (M2, R, and Dawnbloom and the bolt at an ally) have
+// no row yet: none of them is pressed, and one that is fails the run.
+const LUMETH_BANDS: Record<string, Band> = {
+  'lumeth:M1': { min: 0, max: (20 * 36) / 60 },
+  'lumeth:Q': { min: 0, max: 11, needs: 'nearAlly' },
+  'lumeth:E': { min: 0, max: 3.5 },
+  'lumeth:F': { min: 0, max: 5.5 },
+};
+const LUMETH_CLEARANCES: Record<string, number> = {
+  'lumeth:M1': 0.35,
+  'lumeth:Q': 0.5,
+  'lumeth:E': 0.5,
+  'lumeth:F': 0.5,
+};
+
 const KIT_SETS: KitSet[] = [
   {
     // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal
@@ -193,6 +234,7 @@ const KIT_SETS: KitSet[] = [
       'quillon:E:ex': { min: 0, max: (25 * 43) / 60 },
       'quillon:F': { min: 0, max: 20 },
       ...SKERROW_BANDS,
+      ...LUMETH_BANDS,
     },
     clearances: {
       ...HARGRIM_CLEARANCES,
@@ -204,9 +246,13 @@ const KIT_SETS: KitSet[] = [
       'quillon:E:ex': 0.2,
       'quillon:F': 0.6,
       ...SKERROW_CLEARANCES,
+      ...LUMETH_CLEARANCES,
     },
   },
 ];
+
+/** The shipped set with Lumeth's kit: `jsonKits()` has no Lumeth, so the plain runs stay as they were. */
+const LUMETH_SET: KitSet = { ...(KIT_SETS[1] as KitSet), name: 'the four shipped kits', kits: rosterKits };
 /** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
@@ -307,6 +353,9 @@ function pressProblems(
       if (band.needs === 'escapeReady' && !escapeReady(target)) {
         problems.push(`${key} pressed at a target with no escape ready`);
       }
+      if (band.needs === 'nearAlly' && !nearAlly(state, c, target)) {
+        problems.push(`${key} pressed at a target that is not within 6 m of an ally`);
+      }
     }
   }
   if (cooldown > 1) problems.push(`cooldown ${cooldown} above 1`);
@@ -347,6 +396,8 @@ interface Played {
   state: GameState;
   worst: { id: number; from: number; length: number; intent: string };
   started: number[];
+  /** Casts started per `champion:SLOT` (an EX variant counts under its slot). */
+  slots: Record<string, number>;
   exStarted: number[];
   ultimates: number[];
   /** A champion that had a cast fire killed an enemy. */
@@ -375,6 +426,7 @@ function play(set: KitSet, run: MatchRun): Played {
   const { state, bots } = run;
   const tracker = createStallTracker(state, bots);
   const started = state.champions.map(() => 0);
+  const slots: Record<string, number> = {};
   const exStarted = state.champions.map(() => 0);
   const ultimates = state.champions.map(() => 0);
   const fired = new Set<number>();
@@ -444,6 +496,8 @@ function play(set: KitSet, run: MatchRun): Played {
           if (firstLunge < 0) firstLunge = tick;
         }
         started[e.championId] = (started[e.championId] ?? 0) + 1;
+        const slotKey = `${state.champions[e.championId]?.championId}:${e.slot}`;
+        slots[slotKey] = (slots[slotKey] ?? 0) + 1;
         if (e.ex) exStarted[e.championId] = (exStarted[e.championId] ?? 0) + 1;
         if (e.slot === 'F') ultimates[e.championId] = (ultimates[e.championId] ?? 0) + 1;
       } else if (e.type === 'castFired') {
@@ -463,11 +517,12 @@ function play(set: KitSet, run: MatchRun): Played {
     expect(Number.isFinite(checksum(state))).toBe(true);
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; slots ${JSON.stringify(slots)}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
     started,
+    slots,
     exStarted,
     ultimates,
     killed,
@@ -565,12 +620,45 @@ describe('a headless match with Skerrow on the shipped kits', () => {
   }, 30_000);
 });
 
+describe('a headless match with Lumeth on the four shipped kits', () => {
+  const NORMAL = ['normal', 'normal', 'normal', 'normal'] as const;
+
+  // Free play, 3600 ticks, pinned seeds: a miss after a change to the bots, the sim or the Node
+  // version is governed by batch #53 decision 8.3. Her ally presses are not in this package, so the
+  // oracle has no row for them and a run that presses one fails.
+  it('Hargrim and Lumeth against Hargrim and Quillon: every press passes the oracle', () => {
+    const run = createRun(SEEDS, NORMAL, 7, { config: configLumeth(), kits: LUMETH_SET.kits() });
+    const played = play(LUMETH_SET, run);
+    expect(played.eliminatedAt, played.summary).toBeGreaterThan(0);
+    expect(played.slots['lumeth:M1'], `Lumeth started no M1: ${played.summary}`).toBeGreaterThan(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
+  }, 30_000);
+
+  // The same match with a declared start edit: the enemy Hargrim stands 2 m east of Lumeth on tick
+  // 0, so her trigger (3 m) holds at once and Lantern Burst is pressed through the oracle's escape
+  // row. In the unedited run above she is never that close to anyone with E ready.
+  it('Lumeth presses Lantern Burst at a Hargrim 2 m away on tick 0', () => {
+    const run = createRun(SEEDS, NORMAL, 7, { config: configLumeth(), kits: LUMETH_SET.kits() });
+    const lumeth = run.state.champions[1] as ChampionState;
+    const hargrim = run.state.champions[2] as ChampionState;
+    hargrim.x = lumeth.x + 2;
+    hargrim.y = lumeth.y;
+    const played = play(LUMETH_SET, run);
+    expect(played.slots['lumeth:E'], `Lumeth started no Lantern Burst: ${played.summary}`).toBeGreaterThan(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
+  }, 30_000);
+});
+
 // The run presses only some slots, so a wrong row of a table could go unseen. This reads the
 // kit files and works every row out again, by the rule of docs/architecture/bots.md (the end of
 // the first effect that reaches an enemy) written here by hand for the shapes these kits use.
 describe('the band and clearance tables of the shipped kits', () => {
   const set = KIT_SETS[1] as KitSet;
-  const kits = jsonKits();
+  const kits = rosterKits();
   const slotOf = (id: string, key: string): AbilitySpec => {
     const kit = kits.find((k) => k.id === id) as KitDef;
     const [slot, variant] = key.split(':') as [Slot, string | undefined];
@@ -682,5 +770,36 @@ describe('the band and clearance tables of the shipped kits', () => {
     if (skip === undefined || skip.type !== 'teleport') throw new Error('no teleport');
     expect(ESCAPES['quillon:SPACE']?.teleport).toBe(skip.range);
     expect(ESCAPES['quillon:R']?.after?.teleport).toBe(skip.range);
+  });
+  it('has the reach, the width, the opener condition and the escape of every Lumeth ability that is pressed', () => {
+    const shipped = KIT_SETS[1] as KitSet;
+    const bolt = projectile(slotOf('lumeth', 'M1'));
+    expect(shipped.bands['lumeth:M1']).toEqual({ min: 0, max: (bolt.speed * bolt.lifetimeTicks) / 60 });
+    expect(shipped.clearances['lumeth:M1']).toBe(bolt.radius);
+    // Binding Sigil: the area at the aim, range plus radius plus 0.5, at a target beside an ally.
+    const sigil = slotOf('lumeth', 'Q').effects[0];
+    if (sigil === undefined || sigil.type !== 'area' || sigil.placement.type !== 'aim') {
+      throw new Error('no area at the aim');
+    }
+    expect(shipped.bands['lumeth:Q']).toEqual({
+      min: 0,
+      max: sigil.placement.range + sigil.radius + 0.5,
+      needs: 'nearAlly',
+    });
+    expect(shipped.clearances['lumeth:Q']).toBe(0.5);
+    // Lantern Burst: an area around her; the trigger of the oracle is her 3 m.
+    const burst = slotOf('lumeth', 'E').effects[0];
+    if (burst === undefined || burst.type !== 'area') throw new Error('no area');
+    expect(shipped.bands['lumeth:E']).toEqual({ min: 0, max: burst.radius + 0.5 });
+    expect(ESCAPES['lumeth:E']).toEqual({ slot: 'E', teleport: null, after: null });
+    expect(WITHIN['lumeth']).toBe(3);
+    // Dawnbloom, read from its slow on enemies, the second area.
+    const slow = slotOf('lumeth', 'F').effects[1];
+    if (slow === undefined || slow.type !== 'area' || slow.targets !== 'enemies') {
+      throw new Error('no area on enemies');
+    }
+    expect(shipped.bands['lumeth:F']).toEqual({ min: 0, max: slow.radius + 0.5 });
+    // Soothing Surge has no enemy effect and so no band row.
+    expect(shipped.bands['lumeth:M2']).toBeUndefined();
   });
 });

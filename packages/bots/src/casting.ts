@@ -84,6 +84,19 @@ export interface KitCache {
   needsEscape: Uint8Array;
   anyEscapeCondition: boolean;
   /**
+   * 1 when the opener of the slot needs the target within `NEAR_ALLY` of an ally of the bot
+   * (`OpenerRule.when`); an EX press has no such condition. `anyNearAlly` is true when some slot
+   * has one, so a think scans the allies only for a champion that reads the cue.
+   */
+  needsNearAlly: Uint8Array;
+  anyNearAlly: boolean;
+  /**
+   * The escape trigger of the champion (see `ChampionRules.escapeWithin`): the distance in metres
+   * in `escapeWithin[0]`, or -1 for the common trigger. A typed array, so a double is read without
+   * boxing.
+   */
+  escapeWithin: Float64Array;
+  /**
    * The wait of the champion (see `WaitRule`): the slot index in `waitSlot[0]`, -1 for none, and
    * in `waitBand` the band's two ends and the most ticks of cooldown. Typed arrays, so a double
    * is read without boxing.
@@ -139,8 +152,9 @@ export interface CastCues {
   corner: MoveCommand;
   /**
    * True on an escape think: the acted intent is retreat with the target within `ESCAPE_RANGE`,
-   * or kite with the target inside rangeMin (see `ESCAPE_RANGE` below). Set by `computeCues`
-   * before `updateRuns`. Not the cornered kiter's latch `escaping` of bot.ts.
+   * or kite with the target inside rangeMin (see `ESCAPE_RANGE` below), or for a champion with an
+   * `escapeWithin` any intent but idle with the target that close. Set by `computeCues` before
+   * `updateRuns`. Not the cornered kiter's latch `escaping` of bot.ts.
    */
   escapeThink: boolean;
   /**
@@ -148,6 +162,11 @@ export interface CastCues {
    * champion has an opener that reads it (`KitCache.anyEscapeCondition`), else false.
    */
   escapeReady: boolean;
+  /**
+   * Whether the acted target is within `NEAR_ALLY` of an alive ally of the bot (`nearAllyOf`). Only
+   * worked out when the champion has an opener that reads it (`KitCache.anyNearAlly`), else false.
+   */
+  nearAlly: boolean;
 }
 
 export function createCastCues(kite: KiteScratch): CastCues {
@@ -159,6 +178,7 @@ export function createCastCues(kite: KiteScratch): CastCues {
     corner: { moveX: 0, moveY: 0 },
     escapeThink: false,
     escapeReady: false,
+    nearAlly: false,
   };
 }
 
@@ -182,6 +202,9 @@ export function createKitCache(): KitCache {
     motion: new Int8Array(SLOTS.length),
     needsEscape: new Uint8Array(SLOTS.length),
     anyEscapeCondition: false,
+    needsNearAlly: new Uint8Array(SLOTS.length),
+    anyNearAlly: false,
+    escapeWithin: new Float64Array(1).fill(-1),
     waitSlot: new Int8Array(1).fill(-1),
     waitBand: new Float64Array(3),
     baseDash: new Uint8Array(SLOTS.length),
@@ -215,6 +238,7 @@ export function refreshKitCache(
     cache.hasOpen[i] = 0;
     cache.motion[i] = 0;
     cache.needsEscape[i] = 0;
+    cache.needsNearAlly[i] = 0;
     cache.baseDash[i] = 0;
     cache.exDash[i] = 0;
     cache.isEscape[i] = 0;
@@ -244,6 +268,7 @@ export function refreshKitCache(
     }
   }
   cache.anyEscapeCondition = false;
+  cache.anyNearAlly = false;
   for (const opener of rules.openers) {
     if (kit === undefined) break;
     const i = SLOTS.indexOf(opener.slot);
@@ -251,6 +276,10 @@ export function refreshKitCache(
     if (opener.when === 'escapeReady') {
       cache.needsEscape[i] = 1;
       cache.anyEscapeCondition = true;
+    }
+    if (opener.when === 'nearAlly') {
+      cache.needsNearAlly[i] = 1;
+      cache.anyNearAlly = true;
     }
     const band = opener.band === 'dash' ? dashBand(kit.slots[opener.slot]) : opener.band;
     if (band === null) continue;
@@ -265,6 +294,7 @@ export function refreshKitCache(
     cache.waitBand[1] = rules.wait.band[1];
     cache.waitBand[2] = rules.wait.maxTicks;
   }
+  cache.escapeWithin[0] = kit !== undefined && rules.escapeWithin !== null ? rules.escapeWithin : -1;
   cache.holdF = kit !== undefined && rules.holdF;
   cache.lowHealth = kit !== undefined && rules.holdF ? damageIn(kit.slots.F.effects) : 0;
   cache.escapeOrder.fill(-1);
@@ -376,6 +406,27 @@ function targetEscapeReady(state: GameState, target: ChampionState): boolean {
  */
 export const ESCAPE_RANGE = 6;
 
+/**
+ * The distance, in metres and inclusive, within which the acted target counts as near an ally of
+ * the bot (`OpenerRule.when` `'nearAlly'`): the roster's "inside 6 m" of Binding Sigil.
+ */
+export const NEAR_ALLY = 6;
+
+/**
+ * Whether the target is within `NEAR_ALLY` of an alive ally of `me`, `me` itself not counted.
+ * Overwrites `dist`; allocates nothing.
+ */
+function nearAllyOf(state: GameState, me: ChampionState, target: ChampionState, dist: Measure): boolean {
+  const { champions } = state;
+  for (let i = 0; i < champions.length; i++) {
+    const c = champions[i] as ChampionState;
+    if (!c.alive || c.team !== me.team || c.id === me.id) continue;
+    distanceInto(dist, c, target);
+    if (dist.metres <= NEAR_ALLY) return true;
+  }
+  return false;
+}
+
 /** The slot index of F. */
 const F_INDEX = SLOTS.indexOf('F');
 
@@ -429,9 +480,16 @@ export function computeCues(
   distanceInto(dist, me, target);
   const d = dist.metres;
   cues.dot = (target.x - me.x) * target.vx + (target.y - me.y) * target.vy;
+  // A champion with a trigger of its own (`escapeWithin`) has it instead of the common one.
+  const within = cache.escapeWithin[0] as number;
   cues.escapeThink =
-    (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
+    within >= 0
+      ? intent !== 'idle' && d <= within
+      : (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
   cues.escapeReady = cache.anyEscapeCondition && targetEscapeReady(state, target);
+  cues.nearAlly = cache.anyNearAlly && nearAllyOf(state, me, target, dist);
+  // The scan measured the allies: leave `dist` as the distance to the target.
+  if (cache.anyNearAlly) distanceInto(dist, me, target);
   // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
   // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
   cues.fOk =
@@ -509,6 +567,8 @@ export function updateRuns(
       if (motion < 0 && !(cues.dot < 0)) inBand = false;
       // The target must have an escape ready (Quiet Dart).
       if (cache.needsEscape[i] === 1 && !cues.escapeReady) inBand = false;
+      // The target must be beside an ally of the bot (Binding Sigil).
+      if (cache.needsNearAlly[i] === 1 && !cues.nearAlly) inBand = false;
       if (i === F_INDEX && !cues.fOk) inBand = false;
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;

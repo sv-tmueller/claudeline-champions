@@ -512,6 +512,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         cues.reserve = false;
         cues.escapeThink = false;
         cues.escapeReady = false;
+        cues.nearAlly = false;
         sight.standClearance = SIGHT_CLEARANCE;
       }
       move(state, me, profile);

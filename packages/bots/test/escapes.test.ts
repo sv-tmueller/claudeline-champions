@@ -12,10 +12,15 @@ import type {
 } from '@claudeline/sim';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createBot } from '../src/bot';
+import { computeCues, createCastCues, createKitCache, refreshKitCache } from '../src/casting';
+import { buildNavGrid } from '../src/grid';
+import { createMeasure } from '../src/hypot';
+import { createKiteScratch } from '../src/kite';
+import { createSightScratch } from '../src/sight';
 import { TIERS } from '../src/difficulty';
 import { createLanding, teleportEndInto } from '../src/escape';
 import { createRng } from '../src/rng';
-import { arena01, copyInput, jsonKits } from './helpers';
+import { arena01, copyInput, jsonKits, rosterKits } from './helpers';
 import { quietKit } from './kits';
 import { THINKS, firstPress, labelOf, pressOf, sceneOf } from './scenes';
 
@@ -84,6 +89,95 @@ describe('the escape trigger', () => {
       health: 0.2,
     });
     expect(pressOf(state)).toBe('R');
+  });
+});
+
+// Lumeth's trigger is her own: any acted intent but idle, with the acted target within 3 m,
+// inclusive (the roster's "an enemy inside 3 m"). It replaces the common trigger for her: a kite
+// inside rangeMin 6 and a retreat within 6 m are no escape think unless the target is that close.
+describe('Lantern Burst, the escape of Lumeth, and her trigger', () => {
+  const kits = rosterKits();
+  const burst = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('lumeth', d, { kits, ready: ['E'], ...options });
+
+  it('presses E at a kiting target within 3 m, inclusive, and not at 3.05 m', () => {
+    expect(pressOf(burst(3))).toBe('E');
+    expect(pressOf(burst(2))).toBe('E');
+    expect(pressOf(burst(3.05))).toBeNull();
+  });
+
+  it('presses E on a retreat with the target within 3 m, and not at 3.05 or 4 m', () => {
+    const retreat = (d: number) => burst(d, { health: 0.2 });
+    expect(pressOf(retreat(3))).toBe('E');
+    expect(pressOf(retreat(3.05))).toBeNull();
+    expect(pressOf(retreat(4))).toBeNull();
+  });
+
+  it('does not treat a kite at 5 m, inside rangeMin, as an escape think', () => {
+    // The common trigger would: a kite inside rangeMin 6. Burst reaches 3.5 m, so no press follows.
+    const state = burst(5);
+    const bot = createBot(0, 'hard', 1);
+    for (let i = 0; i < THINKS; i++) expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+    expect(bot.inspect().intent).toBe('kite');
+  });
+
+  it('presses E beyond its band at 3 m, with no clear shot: the trigger needs neither', () => {
+    // Lantern Burst reaches 3.5 m and the margin takes 1 m off, so 3 m is outside its band; the
+    // wall is no matter to an escape.
+    const state = burst(3, { arena: arenaWith({ ...WALL, x: -4.5, h: 4 }) });
+    expect(pressOf(state)).toBe('E');
+  });
+});
+
+describe('the escape trigger of computeCues', () => {
+  const kit = rosterKits().find((k) => k.id === 'lumeth') as KitDef;
+
+  /** The `escapeThink` cue for an acted intent and a target `d` metres from Lumeth. */
+  function think(championId: string, intent: string, d: number): boolean {
+    const state = sceneOf(championId, d, { kits: rosterKits() });
+    const me = state.champions[0] as ChampionState;
+    const target = state.champions[2] as ChampionState;
+    const kite = createKiteScratch();
+    const cache = createKitCache();
+    refreshKitCache(cache, state.kits.find((k) => k.id === championId), championId);
+    const cues = createCastCues(kite);
+    cues.escapeThink = false;
+    computeCues(
+      cues,
+      cache,
+      cache.profile,
+      intent,
+      state,
+      me,
+      target,
+      createSightScratch(),
+      createMeasure(),
+      buildNavGrid(state.arena),
+    );
+    return cues.escapeThink;
+  }
+
+  it('is any intent but idle within 3 m for Lumeth, 3 m inclusive', () => {
+    expect(kit.id).toBe('lumeth');
+    for (const intent of ['engage', 'kite', 'retreat']) {
+      expect(think('lumeth', intent, 3), `${intent} at 3 m`).toBe(true);
+      expect(think('lumeth', intent, 3.05), `${intent} at 3.05 m`).toBe(false);
+      expect(think('lumeth', intent, 0.5), `${intent} at 0.5 m`).toBe(true);
+    }
+  });
+
+  it('is never an idle think, however close the target', () => {
+    expect(think('lumeth', 'idle', 2)).toBe(false);
+  });
+
+  it('keeps the common trigger for Hargrim, Quillon and Skerrow', () => {
+    // A retreat within 6 m, inclusive, or a kite inside rangeMin.
+    expect(think('hargrim', 'retreat', 6)).toBe(true);
+    expect(think('hargrim', 'retreat', 6.05)).toBe(false);
+    expect(think('hargrim', 'engage', 2)).toBe(false);
+    expect(think('quillon', 'kite', 5.9)).toBe(true);
+    expect(think('quillon', 'kite', 6)).toBe(false);
+    expect(think('skerrow', 'retreat', 4)).toBe(true);
   });
 });
 

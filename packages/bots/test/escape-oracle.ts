@@ -14,6 +14,13 @@ export const ESCAPE_REACH = 6;
 export const RANGE_MIN: Record<string, number> = { hargrim: 0, quillon: 6, skerrow: 0 };
 
 /**
+ * The champions with a trigger of their own, literal, in metres: any acted intent but idle with
+ * the target within this distance, inclusive, is an escape think, and the common trigger does not
+ * apply to them (the roster: Lumeth's "an enemy inside 3 m").
+ */
+export const WITHIN: Record<string, number> = { lumeth: 3 };
+
+/**
  * One escape slot: the range of the teleport it starts with, and the teleport slot that goes
  * first when it is ready and has a landing.
  */
@@ -30,6 +37,12 @@ export function triggerProblems(
   intent: string,
 ): string[] {
   const d = Math.hypot(c.x - target.x, c.y - target.y);
+  const within = WITHIN[c.championId];
+  if (within !== undefined) {
+    return intent !== 'idle' && d <= within
+      ? []
+      : [`not an escape think: ${intent} at ${d} m (within ${within})`];
+  }
   const rangeMin = RANGE_MIN[c.championId] ?? 0;
   const retreat = intent === 'retreat' && d <= ESCAPE_REACH;
   const kite = intent === 'kite' && d < rangeMin;

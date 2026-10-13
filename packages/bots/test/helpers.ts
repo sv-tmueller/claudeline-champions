@@ -131,6 +131,19 @@ export function configSkerrow(): MatchConfig {
   };
 }
 
+/** Hargrim and Lumeth against Hargrim and Quillon: the healer on team A, so champion 1. */
+export function configLumeth(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'lumeth', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
 /** A teleport event of the sim. */
 export type TeleportEvent = Extract<SimEvent, { type: 'teleport' }>;
 
