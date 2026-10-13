@@ -38,6 +38,34 @@ jobs:
       - run: npm run assets:validate
       - run: npm run assets:test
 
+  # The bots' heap check (packages/bots/test/allocation.test.ts) on the Node majors the unit job does
+  # not run, through vitest.heap.config.ts: Node 26 (V8 14.6) in the default tiers and in Maglev
+  # alone, the tier a browser match runs the bots in, and Node 24 in the default tiers (its limits sit
+  # within 10 percent of the clean figures, so every Node major the engines field allows runs the
+  # check). Node 22 runs it in `checks`. Node 26 is pinned to the version the Maglev limits were
+  # measured on: a bump means measuring again (docs/architecture/bots.md, Allocation).
+  bots-heap-node26:
+    name: Bots heap check, Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: 26.7.0
+            projects: ''
+          - node: 24
+            projects: '--project bots-heap'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # The verbose reporter prints the figures of the passing runs, which the limits are read from.
+      - run: npx vitest run --config vitest.heap.config.ts --reporter verbose ${{ matrix.projects }}
+
   # Build and e2e skip draft pull requests. A draft shows green without them.
   build:
     name: Production build
