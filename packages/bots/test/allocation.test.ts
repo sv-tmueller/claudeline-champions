@@ -8,6 +8,7 @@ import type { PathFollower } from '../src/follow';
 import { pointBlocked } from '../src/geometry';
 import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
 import type { NavGrid, Vec2 } from '../src/grid';
+import { hypot2 } from '../src/hypot';
 import type { Intent } from '../src/intent';
 import type { MoveCommand } from '../src/steer';
 import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKits } from './helpers';
@@ -103,6 +104,22 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
 
 /**
+ * The tier the run is in: vitest.heap.config.ts sets `BOTS_HEAP_TIER=maglev` for its
+ * `bots-heap-maglev` project, which runs this file with `--maglev --no-turbofan` (the middle tier
+ * alone, as a browser match runs the bots). Every other run, `npm run test` included, is the
+ * default tier.
+ */
+const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
+
+/**
+ * The most heap one think may allocate in Maglev alone, in bytes. Maglev boxes every double that
+ * crosses a call it does not inline, and every number written to a closure variable, 16 B each;
+ * the scenes read 0 there, so the smallest mutation is one box per think, 16 B. The limit sits
+ * between the two.
+ */
+const THINK_MAGLEV_LIMIT_BYTES = 8;
+
+/**
  * The least the baseline sim step must read, as in the sim's own allocation test: it proves the
  * counter moves. A measuring call alone reads 160 to 256 B, a real baseline step 2,272 to 4,048 B.
  */
@@ -146,6 +163,19 @@ const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
  */
 const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
 const PLAN_FALLBACK_LIMIT_BYTES = 2300;
+// Maglev alone: the clear plan reads the same 2784 B, the fallback plan 2400 to 2416 B (the default
+// tier 1920 to 2064 B): Maglev allocates a little more for a fallback plan.
+const PLAN_MAGLEV_LIMIT_BYTES = 2950;
+const PLAN_MAGLEV_FALLBACK_LIMIT_BYTES = 2600;
+
+/** Calls of `hypot2` in one control window, and the least per call the control must read. */
+const CONTROL_CALLS = 20;
+const CONTROL_FLOOR_BYTES_PER_CALL = 16;
+
+/** The control loop: the result of every call is stored, so it must be a number. */
+function hypotLoop(out: Float64Array, seed: number): void {
+  for (let i = 0; i < CONTROL_CALLS; i++) out[i] = hypot2(seed + i * 0.25, 3 + i);
+}
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -421,11 +451,38 @@ function arrangeHeal(state: GameState): void {
 }
 
 describe('think allocation', () => {
+  // The Maglev project is only worth its figures on the engine they were measured on and with the
+  // flags applied: V8 12.4 (Node 22) does not reproduce them, and a worker that lost its execArgv
+  // runs the default tiers and reads 0 B everywhere. The control below proves the tier itself.
+  it.runIf(MAGLEV)('runs on Node 26 (V8 14) with --maglev --no-turbofan', () => {
+    const v8Major = Number.parseInt(process.versions.v8.split('.')[0] ?? '0', 10);
+    const flags = ['--maglev', '--no-turbofan'].filter((flag) => process.execArgv.includes(flag));
+    const problem = `the Maglev heap check needs Node 26 (V8 14.6) and --no-turbofan: found V8 ${process.versions.v8} with ${flags.join(' ') || 'neither flag'}`;
+    expect(v8Major >= 14 && flags.length === 2, problem).toBe(true);
+  });
+
+  // The control: a call V8 does not inline boxes the double it returns, and Maglev does not inline
+  // `hypot2` into this loop (Turbofan does, and reads about 0). So a Maglev run that reads 0 B in
+  // the scenes below has not gone vacuous: it reads at least 16 B per call here.
+  it.runIf(MAGLEV)('measures a Maglev that boxes: a loop of hypot2 calls reads at least 16 B a call', () => {
+    const out = new Float64Array(CONTROL_CALLS);
+    for (let i = 0; i < 2000; i++) hypotLoop(out, i);
+    for (let i = 0; i < WINDOW; i++) {
+      const before = heap();
+      hypotLoop(out, i);
+      deltas[i] = heap() - before;
+    }
+    const perCall = (median(deltas, WINDOW) - emptyPairMedian()) / CONTROL_CALLS;
+    console.log(`maglev control, hypot2 into a Float64Array: ${perCall} B per call`);
+    expect(perCall, 'median bytes per hypot2 call in the control loop, floor 16').toBeGreaterThanOrEqual(CONTROL_FLOOR_BYTES_PER_CALL);
+  });
+
   // Runner (ubuntu-latest, Node 22): 2.9 and 3.9 s green, 5.9, 5.9 and 5.7 s red on 5820f16
   // (runs 39001711657, 39008413462, 39009180211 x3); 1.6 s locally (Apple M5 Pro, Node 22.23.2,
   // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
   // runner time (testing.md, Check suite).
   it('allocates under the limit per think in every scene', { timeout: 15_000 }, () => {
+    const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
     const scenes = buildScenes();
     const lines: string[] = [];
     const checksums = scenes.map((s) => checksum(s.state));
@@ -453,7 +510,7 @@ describe('think allocation', () => {
         lines.push(`${s.name} round ${round + 1}: ${Math.round(figure)} B per think`);
       }
       console.log(`think allocation, ${s.name}: ${figures.map((f) => Math.round(f)).join(', ')} B per think`);
-      if (!(best < THINK_ALLOCATION_LIMIT_BYTES)) {
+      if (!(best < thinkLimit)) {
         failures.push(`${s.name}: lowest round ${Math.round(best)} B, ${figures.map(Math.round).join(', ')}`);
       }
       // The scene is live: the bot acts on the intent the scene is built for, and presses (or not).
@@ -466,7 +523,7 @@ describe('think allocation', () => {
 
     expect(
       failures,
-      `scenes whose lowest round is at or over ${THINK_ALLOCATION_LIMIT_BYTES} B per think; ${lines.join('; ')}`,
+      `scenes whose lowest round is at or over ${thinkLimit} B per think; ${lines.join('; ')}`,
     ).toEqual([]);
     // think never mutates the state.
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
@@ -542,7 +599,14 @@ describe('think allocation', () => {
     const lines = Object.entries(figures).map(([name, rounds]) => `${name} ${rounds.map((f) => Math.round(f)).join(', ')}`);
     console.log(`plan allocation, the follower's plan step over ${WINDOW} pairs: ${lines.join('; ')} B per plan`);
     for (const [name, rounds] of Object.entries(figures)) {
-      const limit = name === 'clear' ? PLAN_ALLOCATION_LIMIT_BYTES : PLAN_FALLBACK_LIMIT_BYTES;
+      const limit =
+        name === 'clear'
+          ? MAGLEV
+            ? PLAN_MAGLEV_LIMIT_BYTES
+            : PLAN_ALLOCATION_LIMIT_BYTES
+          : MAGLEV
+            ? PLAN_MAGLEV_FALLBACK_LIMIT_BYTES
+            : PLAN_FALLBACK_LIMIT_BYTES;
       expect(
         Math.min(...rounds),
         `lowest round of the median bytes per ${name} plan: ${rounds.map(Math.round).join(', ')}`,
