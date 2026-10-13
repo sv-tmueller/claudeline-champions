@@ -75,11 +75,13 @@ export function teleportEndInto(land: Landing, me: ChampionState): void {
  * The landing of an escape teleport in the direction (`land.dirX`, `land.dirY`): the bot aims at
  * the point `range` metres off in whole centimetres, which is what an input can carry, and the
  * landing is worked out from that rounded aim by `teleportEndInto`. The rounding is `roundAim` of
- * aim.ts. Writes `land.aimX`, `land.aimY`, `land.x` and `land.y`.
+ * aim.ts, with its `+ 0` written `+ 0.5 - 0.5` as in `aim` of bot.ts (see the comment there): the
+ * same value, but a first -0 does not deoptimise the function in Maglev. Writes `land.aimX`,
+ * `land.aimY`, `land.x` and `land.y`.
  */
 export function landingInto(land: Landing, me: ChampionState): void {
-  land.aimX = Math.round((me.x + land.dirX * land.range) * 100) + 0;
-  land.aimY = Math.round((me.y + land.dirY * land.range) * 100) + 0;
+  land.aimX = Math.round((me.x + land.dirX * land.range) * 100) + 0.5 - 0.5;
+  land.aimY = Math.round((me.y + land.dirY * land.range) * 100) + 0.5 - 0.5;
   teleportEndInto(land, me);
 }
 

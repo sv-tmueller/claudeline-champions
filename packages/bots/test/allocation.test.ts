@@ -614,6 +614,65 @@ describe('think allocation', () => {
     }
   });
 
+  // The first aim of -0: after a warm-up on whole-centimetre aims, a point in [-0.5, 0) cm rounds
+  // to -0, and `Math.round(..) + 0` then saw its first value that is not an int32: V8 deoptimised
+  // the function, and in Maglev alone the bot ran about 1200 thinks in a lower tier at 290 to
+  // 420 B a think (the browser read 65 KB a window in `aim`). `+ 0.5 - 0.5` has number feedback
+  // from its first run. Each scene is warmed up where its aim is whole, then moved 1 to 3 m so
+  // the aim lands in [-0.5, 0) cm, and the lower of the two windows after the move must read under
+  // the limit (the first window alone reads 16 B in a run of this test by itself).
+  // Red under `+ 0` in aim (416 B) and in landingInto (288 B), Node 26.7, Maglev alone.
+  function expectNoDeoptAtMinusZero(s: Scene, move: (state: GameState) => void): void {
+    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
+    move(s.state);
+    const figures: number[] = [];
+    let zeros = 0;
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < WINDOW; i++) {
+        const before = heap();
+        const input = s.bot.think(s.state);
+        deltas[i] = heap() - before;
+        if (Object.is(input.aimX, 0) || Object.is(input.aimY, 0)) zeros++;
+      }
+      figures.push(median(deltas, WINDOW) - emptyPairMedian());
+    }
+    console.log(
+      `think allocation after the move to -0, ${s.name}: ${figures.map((f) => Math.round(f)).join(', ')} B per think, ${zeros} aims of +0`,
+    );
+    // The scene reaches the case it is for: the aim is +0, a -0 turned, on some thinks.
+    expect(zeros, `${s.name}: thinks with an aim of 0`).toBeGreaterThan(0);
+    expect(
+      Math.min(...figures),
+      `${s.name}: lowest of the two windows after the move, median bytes per think: ${figures.map(Math.round).join(', ')}`,
+    ).toBeLessThan(THINK_MAGLEV_LIMIT_BYTES);
+  }
+
+  // 8 m from the target, along x, with the error of a normal bot: aimX is
+  // 100 * (x + 8 cos(2 atan u)) cm, between -4 and 0 for x = -8, and a part of the draws are -0.
+  it.runIf(MAGLEV)('keeps the aim of a press optimised when it first rounds to -0', () => {
+    const s = scene('press, aim at -0.3 cm', 1, 'engage', true, false, (state) => {
+      put(state, 1, -5, -3);
+      put(state, 2, 3, -3);
+      ch(state, 1).energy = 60;
+    });
+    expectNoDeoptAtMinusZero(s, (state) => {
+      put(state, 1, -8, -3);
+      put(state, 2, 0, -3);
+    });
+  });
+
+  // Skip lands 4 m away, straight from the target: from x = 3.997 the landing is at x = -0.003.
+  it.runIf(MAGLEV)("keeps an escape press's landing optimised when it first rounds to -0", () => {
+    const s = scene('escape press, landing at -0.3 cm', 1, 'kite', true, true, (state) => {
+      put(state, 1, 2.997, -3);
+      put(state, 2, 5.997, -3);
+    });
+    expectNoDeoptAtMinusZero(s, (state) => {
+      put(state, 1, 3.997, -3);
+      put(state, 2, 6.997, -3);
+    });
+  });
+
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {
     const state = createMatch(config2v2(), arena01, 1);
     for (let i = 0; i < 300; i++) step(state, []);
