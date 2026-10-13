@@ -171,3 +171,39 @@ describe('the browser platform', () => {
     await expect(platform.saveSettings(MUTED)).resolves.toBeUndefined();
   });
 });
+
+describe('the platform sound', () => {
+  it('does not call the audio factory when the platform is created or the settings load', async () => {
+    let made = 0;
+    const platform = createBrowserPlatform(memory().storage, () => {
+      made += 1;
+      throw new Error('no audio here');
+    });
+    await platform.loadSettings();
+    await platform.saveSettings(DEFAULTS);
+    platform.sound.setMuted(true);
+    platform.sound.play(0);
+    expect(made).toBe(0);
+  });
+
+  it('calls the factory on the first unlock', () => {
+    let made = 0;
+    const platform = createBrowserPlatform(undefined, () => {
+      made += 1;
+      throw new Error('no audio here');
+    });
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      platform.sound.unlock();
+    } finally {
+      console.warn = warn;
+    }
+    expect(made).toBe(1);
+  });
+
+  it('is one sound for the life of the platform', () => {
+    const platform = createBrowserPlatform(undefined);
+    expect(platform.sound).toBe(platform.sound);
+  });
+});

@@ -1,3 +1,4 @@
+import { browserAudioContext, createWebSound, type SoundOutput } from './audio';
 import { DEFAULT_BINDINGS, parseBindings, type Bindings } from './bindings';
 
 /** What the platform stores: the key bindings and the sound mute. `version` is the schema. */
@@ -11,12 +12,15 @@ export interface Settings {
 /**
  * The part of the platform interface that is built (spec section 5, client.md).
  * `identity`, `unlockAchievement` and `openUrl` join with their first user. The
- * methods are asynchronous so an Electron renderer can reach files over IPC with
- * no change of signature (milestone 8).
+ * settings methods are asynchronous so an Electron renderer can reach files
+ * over IPC with no change of signature (milestone 8). `sound` is a sub-object
+ * (an amendment under spec section 5) so a desktop build can swap it.
  */
 export interface Platform {
   loadSettings(): Promise<Settings>;
   saveSettings(settings: Settings): Promise<void>;
+  /** The sound output. Reaches no audio until its first `unlock`. See audio.ts. */
+  readonly sound: SoundOutput;
 }
 
 /** The part of `localStorage` the browser platform uses, so a test passes its own. */
@@ -62,8 +66,12 @@ export function readSettings(text: string | null): Settings {
  * nothing. A storage that throws never fails the game: a read gives the defaults,
  * and a write warns on the console (a console error would fail every e2e spec).
  */
-export function createBrowserPlatform(storage: SettingsStorage | undefined): Platform {
+export function createBrowserPlatform(
+  storage: SettingsStorage | undefined,
+  makeContext: () => AudioContext = browserAudioContext,
+): Platform {
   return {
+    sound: createWebSound(makeContext),
     loadSettings(): Promise<Settings> {
       let text: string | null;
       try {
