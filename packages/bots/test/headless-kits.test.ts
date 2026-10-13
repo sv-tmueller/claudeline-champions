@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
-import { WITHIN, oracleCornered, oracleLanding, triggerProblems } from './escape-oracle';
+import {
+  WITHIN,
+  oracleCornered,
+  oracleDashLanding,
+  oracleLanding,
+  triggerProblems,
+} from './escape-oracle';
 import type { EscapeRow, OracleLanding } from './escape-oracle';
 import type { MatchRun } from './helpers';
 import {
@@ -92,6 +98,8 @@ const ESCAPES: Record<string, EscapeRow> = {
   'skerrow:R': { slot: 'R', teleport: 5, after: null },
   // Lantern Burst: the trigger is Lumeth's own (3 m, any intent but idle), and it costs nothing.
   'lumeth:E': { slot: 'E', teleport: null, after: null },
+  // Glide: a 4 m dash with a landing of its own, pressed only with Lantern Burst not ready.
+  'lumeth:SPACE': { slot: 'SPACE', teleport: null, dash: 4, after: { slot: 'E', teleport: null } },
 };
 
 /**
@@ -260,6 +268,7 @@ const DASHES = new Set([
   'hargrim:F',
   'skerrow:SPACE',
   'skerrow:SPACE:ex',
+  'lumeth:SPACE',
 ]);
 const MARGIN = 1;
 const EX_COST = 25;
@@ -271,8 +280,12 @@ interface Press {
   ex: boolean;
   key: string;
   gates: string;
-  /** Where the oracle says an escape teleport lands, for the check after the step. */
+  /** Where the oracle says an escape teleport or dash lands, for the check after the step. */
   landing: OracleLanding | null;
+  /** True for a dash escape (Glide): no teleport event follows, a `dashStarted` does. */
+  dash: boolean;
+  /** Where the champion stood when it pressed, which the direction of the dash is read from. */
+  from: { x: number; y: number };
 }
 
 function hasStatus(c: ChampionState, type: string): boolean {
@@ -331,11 +344,23 @@ function pressProblems(
         );
       }
     }
+    if (escape.dash !== undefined) {
+      landing = oracleDashLanding(state, c, target, escape.dash);
+      if (landing === null) problems.push('a dash escape was pressed with no landing');
+      else if (input.aimX !== landing.aimX || input.aimY !== landing.aimY) {
+        problems.push(
+          `aim ${input.aimX},${input.aimY} is not the first dash landing's ${landing.aimX},${landing.aimY} (direction ${landing.k})`,
+        );
+      }
+    }
     if (escape.after !== null) {
       const { slot: firstSlot, teleport } = escape.after;
       const ready = (c.cooldowns[SLOTS.indexOf(firstSlot)] ?? Infinity) <= 1;
-      if (ready && oracleLanding(state, c, target, firstSlot, teleport) !== null) {
-        problems.push(`${key} pressed with ${firstSlot} ready and a landing`);
+      if (
+        ready &&
+        (teleport === null || oracleLanding(state, c, target, firstSlot, teleport) !== null)
+      ) {
+        problems.push(`${key} pressed with ${firstSlot} ready${teleport === null ? '' : ' and a landing'}`);
       }
     }
   } else if (band !== undefined) {
@@ -364,7 +389,12 @@ function pressProblems(
   if (hasStatus(c, 'stun') || hasStatus(c, 'silence')) problems.push('stunned or silenced');
   if (hasStatus(c, 'root') && DASHES.has(key)) problems.push('rooted and the ability holds a dash');
   // The dash hold: on an escape think (the trigger of the escape rows) no dash is pressed.
-  if (target !== undefined && DASHES.has(key) && triggerProblems(c, target, acted.intent).length === 0) {
+  if (
+    target !== undefined &&
+    escape === undefined &&
+    DASHES.has(key) &&
+    triggerProblems(c, target, acted.intent).length === 0
+  ) {
     problems.push(`${key} is a dash pressed on an escape think (${acted.intent})`);
   }
   if (c.cast !== null && c.cast.windupLeft !== 1) problems.push(`windupLeft ${c.cast.windupLeft}`);
@@ -409,6 +439,8 @@ interface Played {
   tally: TeleportTally;
   /** The champion of each teleport the tally counted apart, in order: who cast Reaper's Dance. */
   otherTeleporters: number[];
+  /** Dash escapes (Glide) the sim started, each checked against the oracle's landing. */
+  glides: number;
   /** The tick on which a team had no champion alive, or -1. */
   eliminatedAt: number;
   /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
@@ -434,6 +466,7 @@ function play(set: KitSet, run: MatchRun): Played {
   const tally = createTeleportTally();
   const otherTeleporters: number[] = [];
   let eliminatedAt = -1;
+  let glides = 0;
   let firstLunge = -1;
   let firstDeath = -1;
   const presses = state.champions.map(() => 0);
@@ -456,7 +489,17 @@ function play(set: KitSet, run: MatchRun): Played {
       presses[id] = (presses[id] ?? 0) + 1;
       const { problems, key, gates, landing } = pressProblems(state, c, pressed, acted, input, set);
       expect(problems, `tick ${t} champion ${id} pressed ${key}: ${gates}`).toEqual([]);
-      pending.push({ id, slot: pressed.slot, ex: pressed.ex, key, gates, landing });
+      const dash = !pressed.ex && ESCAPES[key]?.dash !== undefined;
+      pending.push({
+        id,
+        slot: pressed.slot,
+        ex: pressed.ex,
+        key,
+        gates,
+        landing,
+        dash,
+        from: { x: c.x, y: c.y },
+      });
     });
     tracker.observe(inputs);
     const tick = state.tick;
@@ -472,7 +515,7 @@ function play(set: KitSet, run: MatchRun): Played {
     // Only the escape teleports are pinned to a landing and to never being blocked: Reaper's Dance
     // teleports after an 18 tick windup, aimed at where the target is when it fires, and may be
     // blocked legitimately, so the tally counts it apart.
-    const escapes = pending.filter((press) => press.landing !== null);
+    const escapes = pending.filter((press) => press.landing !== null && !press.dash);
     const found = tallyTeleports(
       tally,
       state.events,
@@ -490,6 +533,24 @@ function play(set: KitSet, run: MatchRun): Played {
         press.landing.y,
       ]);
     });
+    // A dash escape: the sim starts a dash from the press, along the direction of the aim the oracle
+    // found, which leaves the target (the landing is on the far side of the champion).
+    let dashEscapes = 0;
+    for (const press of pending) {
+      if (!press.dash || press.landing === null) continue;
+      const dashEvent = state.events.find(
+        (e) => e.type === 'dashStarted' && e.championId === press.id,
+      );
+      if (dashEvent === undefined || dashEvent.type !== 'dashStarted') continue;
+      dashEscapes++;
+      const vx = press.landing.aimX / 100 - press.from.x;
+      const vy = press.landing.aimY / 100 - press.from.y;
+      const length = Math.hypot(vx, vy);
+      expect(Math.abs(dashEvent.dirX - vx / length), `tick ${tick} dash direction x`).toBeLessThan(1e-9);
+      expect(Math.abs(dashEvent.dirY - vy / length), `tick ${tick} dash direction y`).toBeLessThan(1e-9);
+      expect(dashEvent.distance).toBe(4);
+    }
+    glides += dashEscapes;
     for (const e of state.events) {
       if (e.type === 'castStarted') {
         if (e.slot === 'SPACE' && state.champions[e.championId]?.championId === 'skerrow') {
@@ -517,7 +578,7 @@ function play(set: KitSet, run: MatchRun): Played {
     expect(Number.isFinite(checksum(state))).toBe(true);
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; slots ${JSON.stringify(slots)}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; dash escapes ${glides}; slots ${JSON.stringify(slots)}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
@@ -529,6 +590,7 @@ function play(set: KitSet, run: MatchRun): Played {
     tally,
     otherTeleporters,
     eliminatedAt,
+    glides,
     firstLunge,
     summary,
   };
@@ -647,6 +709,22 @@ describe('a headless match with Lumeth on the four shipped kits', () => {
     hargrim.y = lumeth.y;
     const played = play(LUMETH_SET, run);
     expect(played.slots['lumeth:E'], `Lumeth started no Lantern Burst: ${played.summary}`).toBeGreaterThan(0);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.state.tick).toBe(TICKS);
+    expectNoStall(played);
+  }, 30_000);
+
+  // The same edit with Lantern Burst cooling down: Glide is her only escape, and the oracle checks
+  // its landing (the first of five whose dash path is clear), the aim and the dash the sim starts.
+  it('Lumeth glides away from a Hargrim 2 m off with Lantern Burst cooling down', () => {
+    const run = createRun(SEEDS, NORMAL, 7, { config: configLumeth(), kits: LUMETH_SET.kits() });
+    const lumeth = run.state.champions[1] as ChampionState;
+    const hargrim = run.state.champions[2] as ChampionState;
+    hargrim.x = lumeth.x + 2;
+    hargrim.y = lumeth.y;
+    lumeth.cooldowns[SLOTS.indexOf('E')] = 600;
+    const played = play(LUMETH_SET, run);
+    expect(played.glides, `Lumeth started no Glide: ${played.summary}`).toBeGreaterThan(0);
     expect(played.tally.blockedEscapes, played.summary).toBe(0);
     expect(played.state.tick).toBe(TICKS);
     expectNoStall(played);

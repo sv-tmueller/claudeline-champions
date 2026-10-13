@@ -212,8 +212,9 @@ describe('Quiet Dart at a kitted Lumeth', () => {
   const dart = (options: Parameters<typeof sceneOf>[2] = {}) =>
     sceneOf('skerrow', 9, { kits: rosterKits(), ready: ['Q', 'M2'], enemyId: 'lumeth', ...options });
 
-  it('presses Q while Lantern Burst is ready, and M2 with it cooling down', () => {
+  it('presses Q while Lantern Burst or Glide is ready, and M2 with both cooling down', () => {
     expect(pressOf(dart({ enemyReady: ['E'] }))).toBe('Q');
+    expect(pressOf(dart({ enemyReady: ['SPACE'] }))).toBe('Q');
     expect(pressOf(dart({ enemyReady: [] }))).toBe('M2');
   });
 });

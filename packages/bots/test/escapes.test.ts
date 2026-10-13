@@ -22,7 +22,7 @@ import { createLanding, teleportEndInto } from '../src/escape';
 import { createRng } from '../src/rng';
 import { arena01, copyInput, jsonKits, rosterKits } from './helpers';
 import { quietKit } from './kits';
-import { THINKS, firstPress, labelOf, pressOf, sceneOf } from './scenes';
+import { THINKS, firstPress, labelOf, pressOf, sceneOf, walks } from './scenes';
 
 const C = Math.SQRT1_2;
 
@@ -126,6 +126,92 @@ describe('Lantern Burst, the escape of Lumeth, and her trigger', () => {
     // wall is no matter to an escape.
     const state = burst(3, { arena: arenaWith({ ...WALL, x: -4.5, h: 4 }) });
     expect(pressOf(state)).toBe('E');
+  });
+});
+
+// Glide is a dash, so it has no teleport landing: `chooseEscape` finds the point a dash of 4 m
+// reaches in the first of the five directions (straight away from the target, then +45, -45, +90,
+// -90 degrees) whose end cell is free and whose straight path nothing blocks. A dash collides with
+// low walls as well, which a teleport crosses, so the path test is `segmentClear`, not the line of
+// sight. The press is aimed at that point, with no aim error.
+describe('Glide, the dash escape of Lumeth', () => {
+  const kits = rosterKits();
+  const glide = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('lumeth', d, { kits, ready: ['SPACE'], ...options });
+
+  it('is pressed with Lantern Burst cooling down, aimed 4 m straight away, with no aim error', () => {
+    const state = glide(3);
+    expect(firstPress(state, 'hard', 1)).toEqual({ label: 'SPACE', aimX: -1000, aimY: 0 });
+    expect(firstPress(glide(3), 'easy', 7)).toEqual({ label: 'SPACE', aimX: -1000, aimY: 0 });
+  });
+
+  it('comes after Lantern Burst: with both ready, E is pressed', () => {
+    expect(pressOf(glide(3, { ready: ['E', 'SPACE'] }))).toBe('E');
+  });
+
+  it('is pressed on a retreat within 3 m, and not at 3.05 m or on a kite at 5 m', () => {
+    expect(pressOf(glide(3, { health: 0.2 }))).toBe('SPACE');
+    expect(pressOf(glide(3.05))).toBeNull();
+    expect(pressOf(glide(5))).toBeNull();
+  });
+
+  it('is not held on its escape think, unlike every other dash', () => {
+    // The dash hold of chooseCast reads the slot: Glide is pressed by the escape choice, which
+    // marks it tried, and the hold leaves it alone.
+    expect(pressOf(glide(2))).toBe('SPACE');
+  });
+
+  it('takes the first free direction in the order: +45 before -45 behind a wall', () => {
+    const state = glide(3, { arena: arenaWith(WALL), me: [0, 0] });
+    expect(firstPress(state)).toEqual({ label: 'SPACE', aimX: -283, aimY: -283 });
+  });
+
+  it('skips a direction whose path a low wall blocks, which a teleport would cross', () => {
+    // Arena 01, Lumeth at (6, 3) with the target 2 m south of her: straight away is (6, 7), across
+    // the low wall at (6, 5), and so is +45 degrees ((3.17, 5.83), through its corner) and -45
+    // degrees ((8.83, 5.83)). The first path that is clear is +90 degrees, west to (2, 3). Skip
+    // takes the straight landing in the same place (see the teleport pin above).
+    const state = glide(2, { arena: arena01, me: [6, 3], enemy: [6, 1] });
+    expect(firstPress(state)).toEqual({ label: 'SPACE', aimX: 200, aimY: 300 });
+  });
+
+  it('is not pressed boxed in at the north-east corner, where all five landings are outside', () => {
+    const corner = () => glide(0, { arena: arena01, me: [14.4, 9.4], enemy: [12.4, 7.4] });
+    expect(pressOf(corner())).toBeNull();
+    // The walk goes on: the bot leaves along the path to its spawn instead of standing.
+    expect(walks(corner())).toBe(true);
+  });
+
+  it('is not pressed while rooted, as every dash', () => {
+    const state = glide(3);
+    (state.champions[0] as ChampionState).statuses.push({
+      type: 'root',
+      sourceId: 2,
+      slot: null,
+      remainingTicks: 600,
+    });
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it('leaves the target: the sim starts the dash away from it and ends it 4 m off', () => {
+    const state = glide(3);
+    const me = state.champions[0] as ChampionState;
+    const target = state.champions[2] as ChampionState;
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('SPACE');
+    stepWith(state, input as PlayerInput);
+    const started = state.events.find((e) => e.type === 'dashStarted');
+    if (started?.type !== 'dashStarted') throw new Error('no dash started');
+    // Away from the target at (-3, 0): the dash goes west.
+    expect([started.dirX, started.dirY]).toEqual([-1, 0]);
+    for (let i = 0; i < 20; i++) step(state, []);
+    expect(Math.hypot(me.x - target.x, me.y - target.y)).toBeCloseTo(7, 6);
+    expect(me.x).toBeCloseTo(-10, 6);
   });
 });
 

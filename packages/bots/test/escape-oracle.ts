@@ -27,7 +27,13 @@ export const WITHIN: Record<string, number> = { lumeth: 3 };
 export interface EscapeRow {
   slot: Slot;
   teleport: number | null;
-  after: { slot: Slot; teleport: number } | null;
+  /** The distance of a dash escape (Glide), which has a landing of its own, or absent. */
+  dash?: number;
+  /**
+   * The slot that goes first when it is ready (a cooldown of 1 or less) and, with a `teleport`
+   * range, has a landing; a null `teleport` needs no landing, so ready is enough.
+   */
+  after: { slot: Slot; teleport: number | null } | null;
 }
 
 /** Why the acted intent and distance are not an escape think; empty when they are. */
@@ -49,6 +55,46 @@ export function triggerProblems(
   return retreat || kite
     ? []
     : [`not an escape think: ${intent} at ${d} m (rangeMin ${rangeMin}, reach ${ESCAPE_REACH})`];
+}
+
+/**
+ * The first of the five directions from the target (the same order as `oracleLanding`) in which a
+ * dash of `distance` metres from `c` ends in a free grid cell and a straight walk there touches
+ * nothing, low walls included: `oracleSegmentViolates`, the sampled walk. The aim is the point
+ * `distance` metres off in whole centimetres, as an input carries it. `x` and `y` are where the
+ * dash ends when no body stops it: the sim's dash goes `distance` metres along the direction of
+ * that aim, worked out here with `Math.hypot`. Null when none passes.
+ */
+export function oracleDashLanding(
+  state: GameState,
+  c: ChampionState,
+  target: ChampionState,
+  distance: number,
+): OracleLanding | null {
+  const d = Math.hypot(c.x - target.x, c.y - target.y);
+  const ax = d === 0 ? 1 : (c.x - target.x) / d;
+  const ay = d === 0 ? 0 : (c.y - target.y) / d;
+  const s = Math.SQRT1_2;
+  const directions = [
+    { x: ax, y: ay },
+    { x: ax * s - ay * s, y: ax * s + ay * s },
+    { x: ax * s + ay * s, y: -ax * s + ay * s },
+    { x: -ay, y: ax },
+    { x: ay, y: -ax },
+  ];
+  for (let k = 0; k < directions.length; k++) {
+    const dir = directions[k] as { x: number; y: number };
+    const aimX = Math.round((c.x + dir.x * distance) * 100) + 0;
+    const aimY = Math.round((c.y + dir.y * distance) * 100) + 0;
+    const vx = aimX / 100 - c.x;
+    const vy = aimY / 100 - c.y;
+    const length = Math.hypot(vx, vy);
+    const end = { x: c.x + (vx / length) * distance, y: c.y + (vy / length) * distance };
+    if (freeCell(state, end) && !oracleSegmentViolates(state.arena, c, end)) {
+      return { k, aimX, aimY, x: end.x, y: end.y };
+    }
+  }
+  return null;
 }
 
 export interface OracleLanding {

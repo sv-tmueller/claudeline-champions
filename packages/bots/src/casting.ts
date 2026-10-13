@@ -115,12 +115,17 @@ export interface KitCache {
   /** 1 when the slot is in `escapeOrder`. */
   isEscape: Uint8Array;
   /**
-   * The teleport an escape slot starts with, when its first effect is one: its range in metres
-   * (0 when the slot has none) and whether the range is fixed (it teleports the full range
-   * whatever the aim distance).
+   * The teleport or dash an escape slot starts with, when its first effect is one: its range (a
+   * dash's distance) in metres, 0 when the slot has neither, and whether the range is fixed (it
+   * goes the full range whatever the aim distance: always for a dash).
    */
   escapeRange: Float64Array;
   escapeFixed: Uint8Array;
+  /**
+   * 1 when the escape slot starts with a dash (Glide) and not a teleport: its landing needs a clear
+   * straight path, not only a line of sight (see `findLanding` in escape.ts).
+   */
+  escapeDash: Uint8Array;
   /**
    * True when F is held for a low or cornered target (see `ChampionRules.holdF`), and the health
    * at or below which a target is low: the sum of the `damage` amounts of F's effects. A double
@@ -213,6 +218,7 @@ export function createKitCache(): KitCache {
     isEscape: new Uint8Array(SLOTS.length),
     escapeRange: new Float64Array(SLOTS.length),
     escapeFixed: new Uint8Array(SLOTS.length),
+    escapeDash: new Uint8Array(SLOTS.length),
     holdF: false,
     lowHealth: 0.5,
   };
@@ -244,6 +250,7 @@ export function refreshKitCache(
     cache.isEscape[i] = 0;
     cache.escapeRange[i] = 0;
     cache.escapeFixed[i] = 0;
+    cache.escapeDash[i] = 0;
     if (kit === undefined) continue;
     const slot = SLOTS[i] as Slot;
     const spec = kit.slots[slot];
@@ -308,6 +315,11 @@ export function refreshKitCache(
     if (first !== undefined && first.type === 'teleport') {
       cache.escapeRange[i] = first.range;
       cache.escapeFixed[i] = first.fixed ? 1 : 0;
+    } else if (first !== undefined && first.type === 'dash') {
+      // A dash goes its whole distance along the aim, so its end is a fixed landing.
+      cache.escapeRange[i] = first.distance;
+      cache.escapeFixed[i] = 1;
+      cache.escapeDash[i] = 1;
     }
   }
 }

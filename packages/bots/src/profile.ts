@@ -134,9 +134,10 @@ const NO_RULES: ChampionRules = Object.freeze({
  * ticks left, bounded so a long cooldown is no stall (the roster: "waits at 6 to 8 m for the
  * opening"; decision 3 of batch #91 fixes the bound).
  * Lumeth's Binding Sigil keeps its kit band and needs a target within 6 m of an ally (the roster:
- * "Q on a target inside 6 m of an ally"). Lantern Burst is her escape on a trigger of her own: any
- * acted intent but idle with the target within 3 m (the roster: "an enemy inside 3 m"; decision 5
- * of batch #105).
+ * "Q on a target inside 6 m of an ally"). Lantern Burst, then Glide, are her escapes on a trigger of
+ * her own: any acted intent but idle with the target within 3 m (the roster: "an enemy inside
+ * 3 m"; decision 5 of batch #105). Glide is a dash: its landing is a dash end, see `findLanding`
+ * in escape.ts.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -170,7 +171,7 @@ const RULES = new Map<string, ChampionRules>([
     'lumeth',
     rule(
       [{ slot: 'Q', band: null, motion: null, when: 'nearAlly' }],
-      ['E'],
+      ['E', 'SPACE'],
       false,
       null,
       3,

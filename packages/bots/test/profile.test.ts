@@ -156,11 +156,11 @@ describe('rulesFor', () => {
     }
   });
 
-  it("gives Lumeth Binding Sigil beside an ally and Lantern Burst as her escape, frozen", () => {
+  it('gives Lumeth Binding Sigil beside an ally and Lantern Burst, then Glide, as her escapes, frozen', () => {
     const kits = rosterKits();
     const rules = rulesFor('lumeth', kits.find((k) => k.id === 'lumeth') as KitDef);
     expect(rules.openers).toEqual([{ slot: 'Q', band: null, motion: null, when: 'nearAlly' }]);
-    expect(rules.escapes).toEqual(['E']);
+    expect(rules.escapes).toEqual(['E', 'SPACE']);
     expect(rules.holdF).toBe(false);
     expect(rules.wait).toBeNull();
     expect(Object.isFrozen(rules)).toBe(true);
