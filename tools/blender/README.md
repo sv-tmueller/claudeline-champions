@@ -32,7 +32,7 @@ newer and no packages, so they can run in CI.
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
-| `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs: the body, the six-bone rig and the four clips from constant pose tables |
+| `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
 | `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
@@ -110,16 +110,18 @@ not vertical.
   equals it and a model with no clip playing looks as it did unrigged. Every
   part is rigid, with weight 1.0 on one of the six bones.
 - The bones (`Hips`, `Spine`, `Arm_L`, `Arm_R`, `Leg_L`, `Leg_R`) and the clips
-  (`Idle`, `Run`, `Cast`, `Death`, at 30 fps, LINEAR keys) are the two tables
-  in `docs/architecture/assets.md`, which the validator's constants must match.
-  The pose values are constant tables in `gen_champion.py`.
-- The export writes the keys as authored, so each file stays near 46 KB at
-  most. `export_glb(out, rigged=True)` sets by name every skin and animation
-  flag of the exporter that bears on the output. That includes
-  `export_optimize_animation_size` (off, so no key is dropped as a duplicate)
-  and the other animation flags at their 5.2 defaults. Arenas keep their flags.
-  Python's `keyframe_insert` ignores the interpolation preference, so
-  `key_clip` sets each key to LINEAR.
+  (`Idle`, `Run`, `Attack`, `Cast`, `Hit`, `Death`, at 30 fps, LINEAR keys, each
+  on only the channels it moves) are the two tables in
+  `docs/architecture/assets.md`, which the validator's constants must match.
+  The pose values are constant tables in `gen_champion.py`, and `key_clip`
+  asserts that a channel a clip does not key is at rest at every key.
+- The export writes the keys as authored, and only the channels each clip
+  keys, so each file stays at most 46 KB. `export_glb(out, rigged=True)` sets
+  by name every skin and animation flag of the exporter that bears on the
+  output. That includes `export_optimize_animation_size` (off, so no key is
+  dropped as a duplicate) and the other animation flags at their 5.2 defaults.
+  Arenas keep their flags. Python's `keyframe_insert` ignores the interpolation
+  preference, so `key_clip` sets each key to LINEAR.
 - The top of every model is at most 1.90 m, because the health bar starts
   above 1.97 m, and the ground radius is at most 0.50 m. Each file is at most
   48 KiB and 600 triangles.
@@ -160,17 +162,21 @@ reported as that file's FAIL line, and the remaining files still run.
   skin and exactly one skin; the six joint names once each with the parents of
   the rig table, `Hips` under `Rig`; `inverseBindMatrices` as a FLOAT MAT4
   accessor with one entry per joint; `JOINTS_0` and `WEIGHTS_0` on every
-  primitive; exactly the four clip names; channels on joints only, with a
-  rotation channel per joint and a translation channel on `Hips`; and LINEAR
-  samplers that share one input with the table's key count, a minimum of 0 and
-  a maximum of frames / 30 within 1e-4. A key moved to another frame makes the
-  exporter write a second input, and a dropped key makes it bake the channel,
-  so both fail. `test_champion_models.py` also reads the shared input times
-  from the BIN chunk and compares them with the frames of the Clips table
-  divided by 30, within 1e-4, so moving a key for every channel at once fails
-  too. It checks the top (at most 1.90 m) and the floor (no vertex below 0, with
-  a tolerance of 0.1 mm) at every key of every clip, and samples 20 steps in
-  each key interval, where the floor may dip to -0.04 m.
+  primitive; exactly the six clip names; channels on joints only, with only
+  `Hips` translating and each clip's channels exactly the set of the Clips
+  table, once each (a missing, an extra or a duplicate channel fails); and
+  LINEAR samplers that share one input with the table's key count, a minimum of
+  0 and a maximum of frames / 30 within 1e-4. A key moved to another frame
+  makes the exporter write a second input, and a dropped key makes it bake the
+  channel, so both fail. `test_champion_models.py` also reads the shared input
+  times from the BIN chunk and compares them with the frames of the Clips
+  table divided by 30, within 1e-4, so moving a key for every channel at once
+  fails too. It checks the top (at most 1.90 m) and the floor (no vertex below
+  0, with a tolerance of 0.1 mm) at every key of every clip, that `Idle` and
+  `Run` end on the pose they start with (within 1e-6), and samples 20 steps in
+  each key interval against the same floor and top. A mutation of Run key 1 that keeps
+  every key above the floor but sinks the foot between two keys is caught by the
+  sampled floor only.
 - The arena JSON must match spec 8.1 key for key, with positive sizes, 2 to 3
   spawns per team, obstacles and spawns (a 0.5 m circle) inside the playable
   rectangle, no spawn touching an obstacle, `startRadius > endRadius > 0`, and

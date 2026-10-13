@@ -9,10 +9,9 @@
 - `gen_arena.py --arena data/arenas/<id>.json --out assets/models/arenas/<id>.glb`
   builds floor, boundary walls and every obstacle from the arena definition.
 - `gen_champion.py --champion <id> --out assets/models/champions/<id>.glb`
-  builds a low-poly rigged humanoid with four clips. The spec names six clips
-  (`Idle`, `Run`, `Attack`, `Cast`, `Hit`, `Death`); `Idle`, `Run`, `Cast` and
-  `Death` are built, and `Attack` and `Hit` come with the client animation
-  state machine in batch 10.
+  builds a low-poly rigged humanoid with the six clips the spec names (`Idle`,
+  `Run`, `Attack`, `Cast`, `Hit`, `Death`), each keying only the channels it
+  moves.
 - `validate_glb.py` uses only the Python standard library: checks the glb
   magic and chunk layout, that required node names are present, and a
   champion's rig and clips. It also checks the arena JSON that an arena model
@@ -75,7 +74,7 @@ The commands and file list are in `tools/blender/README.md`.
   `rotation.y = aimAngle` directly, so the front must stay on +X.
 - The origin is at the feet. The footprint stays inside a 0.5 m radius and the
   model is about 1.7 m tall.
-- Flat colours only. Every champion model is rigged and has four clips, and
+- Flat colours only. Every champion model is rigged and has six clips, and
   the client plays none of them yet.
 - Each of the four roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
@@ -110,21 +109,33 @@ faces +X. The validator checks the names and the parents.
 
 ### Clips
 
-The scene rate is 30 fps. Every clip keys the rotation of all six bones and the
-translation of `Hips` at each listed frame, all with LINEAR interpolation.
-The last key of a looping clip equals its first. The pose values are constants
-in `gen_champion.py`, with nothing random and nothing time-based, and no pose
-puts a model above 1.90 m or any vertex below the floor (by more than 0.1 mm)
-at a key. In `Run` the contact keys (0, 10, 20) drop `Hips` so the feet plant,
-and the passing keys leave it at rest. Between keys the top holds, but the
-floor dips by up to 0.04 m (0.0365 m in `Run`, 0.0343 m in `Death`), because
-the client's interpolation slerps the leg turn while it lerps the `Hips` drop.
-The animation work in batch 10 may rework the poses to remove that. The
-validator checks the names, the key counts and the length. The contract tests
-read the shared key times from the BIN and compare them with the Keys column,
-check the posed top and floor at every key, and sample 20 steps in each key
-interval (slerp for rotations, lerp for translations) against a floor of
--0.04 m and the same top.
+The scene rate is 30 fps. Every clip keys only the channels in its Channels
+column, at each listed frame, all with LINEAR interpolation. The exporter
+writes only the channels an action keys, so an unkeyed channel is absent from
+the glb, and `key_clip` asserts that such a channel is at rest at every key. The
+client's mixer restores an unkeyed bone to rest, so played alone `Attack`,
+`Cast` and `Hit` show the legs and `Hips` at rest. The last key of a looping
+clip equals its first. The pose values are constants in `gen_champion.py`, with
+nothing random and nothing time-based. No pose puts a model above 1.90 m or any
+vertex below the floor (by more than 0.1 mm), at a key or between keys.
+
+The floor holds between keys by two rules. The client's interpolation lerps
+`Hips` and slerps each turn, and a rigid 0.8 m leg with a 0.09 m half width
+lifts its lowest corner by 0.8 (1 - cos a) - 0.09 sin |a| at leg angle a. That
+lift is convex in a, so a foot planted at both ends of a key interval sinks in
+between, by about 0.1 a^2 (a in radians, 0.037 m for a 35 degree turn).
+
+- R1: no key interval has a foot planted at both ends while its leg turns.
+- R2: leaving or entering a planted key, `Hips` rises at least as fast as the
+  foot's corner sinks. For a vertical leg that is 0.09 m per radian.
+
+The rig has no knee bone: one would cost about 4 KB per model even keyed
+sparsely. The validator checks the names, the key counts, the length and each
+clip's exact channel set. The contract tests read the shared key times from the
+BIN and compare them with the Keys column, check the posed top and floor at
+every key, check that `Idle` and `Run` end on the pose they start with (within
+1e-6), and sample 20 steps in each key interval (slerp for rotations, lerp for
+translations) against the same floor and top.
 
 | Clip | Frames | Seconds | Keys | Channels | Plays |
 |------|--------|---------|------|----------|-------|
@@ -135,15 +146,38 @@ interval (slerp for rotations, lerp for translations) against a floor of
 | `Hit` | 9 | 0.300 | 0, 2, 9 | `Spine, Arm_L, Arm_R` | once, from rest back to rest |
 | `Death` | 30 | 1.000 | 0, 10, 20, 30 | `Hips, Hips translation, Spine, Arm_L, Arm_R` | once, holds the last frame |
 
-`Run` is the movement clip. `Attack` and `Hit` are not built yet.
+- `Run` is the movement clip. Its nine keys alternate the planted passing key
+  (legs and arms at 0, `Hips` at rest) with a lift-off key (legs 13 degrees,
+  `Hips` +0.022 m, the foot corner on the floor) and a split (legs 35 degrees,
+  `Hips` +0.035 m, the flight phase with the feet 0.128 m up), in the order
+  split, lift-off, pass, lift-off, split, lift-off, pass, lift-off, split with
+  the legs mirrored in the second half. Only the passing keys are planted, so
+  R1 holds, and `Hips` rises 0.022 m over 13 degrees (0.097 m per radian) after
+  a passing key, so R2 holds. The top is at most 1.874 m, under the health bar
+  at 1.97 m. At 5.5 m/s a step covers 1.83 m of ground against about 0.92 m of
+  foot travel, so the feet slide unless the client scales the clip.
+- `Attack` is built for the first slot's cast. The strike at 0.133 s falls
+  between the 0.1 s and 0.15 s windups of the first slot, and the clip ends
+  inside the shortest cooldown of that slot (0.4 s). The arm swings through 110
+  degrees and the staff lies horizontal at the strike; a larger swing would
+  cross 1.90 m. `Cast` serves the other slots. `Hit` leans the spine back and
+  throws the arms outward.
+- `Death` jolts `Hips` up 0.035 m at key 10 (R2, 0.100 m per radian), sinks it
+  at key 20 and lies on the floor at key 30 (the lowest vertex 0.6 mm up). The
+  client holds the last frame.
+- The cue meshes ride the bones that move them: Hargrim's shoulder blocks and
+  Lumeth's halo on `Spine` (the `Attack` yaw, the `Hit` lean) and Quillon's
+  staff and Skerrow's blade on `Arm_R` (the `Attack` swing, the `Hit` lift). All
+  clips are shared, with no per-champion poses.
 
 ### Export
 
-The exporter writes the keys as authored, not sampled at every frame, which
-keeps each file near 46 KB at most. Every skin and animation flag of the
-exporter that bears on the output is set by name in
-`blender_common.export_glb(out, rigged=True)`, so a changed default in a later
-Blender cannot move the bytes unseen. That includes
+The exporter writes the keys as authored, not sampled at every frame, and only
+the channels each clip keys, which keeps each file at most 46 KB (Lumeth, the
+largest, is 45 628 B). Every skin and animation flag of the exporter that bears
+on the output is set by name in `blender_common.export_glb(out, rigged=True)`,
+so a changed default in a later Blender cannot move the bytes unseen. That
+includes
 `export_optimize_animation_size`, which is off so the exporter never drops a
 key it takes for a duplicate, and the other animation flags at their 5.2
 defaults (frame step, the sampling fallback, negative frames, NLA, merge and
@@ -165,7 +199,8 @@ must print it). Regenerate each model into a scratch directory twice and `cmp`
 both runs against the committed file. `test_export_determinism.py` does this
 four times per model. Regenerate the arenas in place: `git status` must stay
 clean for them. Every champion file must stay under 48 KiB, and the budget does
-not move to make a model fit.
+not move to make a model fit: the clips key only the channels they move, and
+Lumeth, the largest file, keeps 3 524 B of headroom.
 
 ## Validator
 
@@ -180,15 +215,17 @@ has `animations` or `skins`.
     matches the rig table (`Hips` hangs from the node `Rig`)
   - `inverseBindMatrices` is a FLOAT MAT4 accessor with one entry per joint
   - every `Champion` primitive has `JOINTS_0` and `WEIGHTS_0`
-  - the animations are exactly the four clip names
-  - channels target the joints only, with the path rotation or translation;
-    every joint has a rotation channel and `Hips` has a translation channel
+  - the animations are exactly the six clip names
+  - channels target the joints only, with the path rotation or translation,
+    and only `Hips` translates
+  - each clip's channels are exactly the set in the Clips table, once each
   - every sampler of a clip shares one input accessor, so every channel has
     the same key times
   - every sampler is LINEAR, and the input accessor has the clip's key count,
     a minimum of 0 and a maximum of frames / 30 within 1e-4
-- The two tables above and the validator's `RIG` and `CLIPS` constants are
-  checked against each other by a unit test, so they cannot drift.
+- The two tables above and the validator's `RIG`, `CLIPS` and `CHANNELS`
+  constants are checked against each other by a unit test, so they cannot
+  drift.
 - For an arena, each `Obstacle_i` translation must be `(x_i, 0, -y_i)` within
   1e-4, so the model cannot drift from the collision data.
 - The validator also checks the arena JSON itself. It must match the shape in
