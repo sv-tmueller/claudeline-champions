@@ -466,14 +466,17 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   there.
 - A slot whose first effect is a teleport needs a landing. The bot tries the five kite directions
   from the acted target (straight away, then +45, -45, +90, -90 degrees, the constants of the kite
-  step) and takes the first whose landing lies in a free grid cell and has a line of sight from
-  the bot. The landing is the point the sim's teleport moves to for the aim `range` metres off in
-  whole centimetres, worked out with the sim's own arithmetic (see Determinism); the reach is the
-  full range for a fixed teleport and `min(range, aim distance)` otherwise (Skip is 4 m and
-  fixed, Vanish Step 5 m and not). The line of sight is the one of Clear shot's `lineOfSight`: it
-  sees only obstacles that block projectiles, as the sim's teleport does, so a teleport may cross
-  a low wall. When no direction passes the slot is skipped and R comes next: a Quillon boxed in a
-  corner shields herself.
+  step) and takes the first whose landing lies in a free grid cell and has a line of sight from the
+  bot. The landing is the aim point `range` metres off in whole centimetres, worked out with the
+  sim's own arithmetic (see Determinism), and it is that raw point whose cell must be free: the
+  sim's teleport moves the champion to it, or pushes the champion clear of a wall the point
+  overlaps, and a point in a blocked cell is skipped even where the sim would push it clear, so a
+  pushed landing is never taken (the press oracle tests the same raw point, decision 16 of batch
+  #105); the reach is the full range for a fixed teleport and `min(range, aim distance)` otherwise
+  (Skip is 4 m and fixed, Vanish Step 5 m and not). The line of sight is the one of Clear shot's
+  `lineOfSight`: it sees only obstacles that block projectiles, as the sim's teleport does, so a
+  teleport may cross a low wall. When no direction passes the slot is skipped and R comes next: a
+  Quillon boxed in a corner shields herself.
 - A slot whose first effect is a dash (Lumeth's Glide, a dash of 4 m) needs a
   landing too: the end of the dash, which goes its whole distance along the aim
   (the same arithmetic as a fixed teleport, so `landingInto` gives it with the
