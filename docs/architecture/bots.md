@@ -468,15 +468,15 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   from the acted target (straight away, then +45, -45, +90, -90 degrees, the constants of the kite
   step) and takes the first whose landing lies in a free grid cell and has a line of sight from the
   bot. The landing is the aim point `range` metres off in whole centimetres, worked out with the
-  sim's own arithmetic (see Determinism), and it is that raw point whose cell must be free: the
-  sim's teleport moves the champion to it, or pushes the champion clear of a wall the point
-  overlaps, and a point in a blocked cell is skipped even where the sim would push it clear, so a
-  pushed landing is never taken (the press oracle tests the same raw point, decision 16 of batch
-  #105); the reach is the full range for a fixed teleport and `min(range, aim distance)` otherwise
-  (Skip is 4 m and fixed, Vanish Step 5 m and not). The line of sight is the one of Clear shot's
-  `lineOfSight`: it sees only obstacles that block projectiles, as the sim's teleport does, so a
-  teleport may cross a low wall. When no direction passes the slot is skipped and R comes next: a
-  Quillon boxed in a corner shields herself.
+  sim's own arithmetic (see Determinism), and it is that raw point whose cell must be free: a raw
+  point in a blocked cell is skipped even where the sim would push its teleport clear of the wall
+  (the press oracle tests the same raw point, decision 16 of batch #105), while a point in a free
+  cell may still land within 0.5 m of a wall or on a champion, where the sim pushes the champion out
+  after the teleport; the reach is the full range for a fixed teleport and
+  `min(range, aim distance)` otherwise (Skip is 4 m and fixed, Vanish Step 5 m and not). The line of
+  sight is the one of Clear shot's `lineOfSight`: it sees only obstacles that block projectiles, as
+  the sim's teleport does, so a teleport may cross a low wall. When no direction passes the slot is
+  skipped and R comes next: a Quillon boxed in a corner shields herself.
 - A slot whose first effect is a dash (Lumeth's Glide, a dash of 4 m) needs a
   landing too: the end of the dash, which goes its whole distance along the aim
   (the same arithmetic as a fixed teleport, so `landingInto` gives it with the
@@ -543,12 +543,12 @@ makes that true, and what stays outside it:
   `escapeRange`, `escapeFixed`, `escapeDash`, `escapeWithin` (one double) and
   `escapeOrder` (Int8 ended by -1), and `lowHealth` (a double field) with
   `holdF`. They are filled on a rebuild only; so are the ally arrays, `allyKind`
-  (Int8) and `allyMax`, `allyNeed` and `allyClearance` (doubles), per slot, with
-  `anyAlly`. The cues of a think (`dot`, `escapeThink`, `reserve`, `fOk`,
-  `nearAlly`, and `allyFor`, an Int32 per slot) are fields of one object, the
-  landing is a record of seven doubles and a boolean, and the kite points, the
-  cornered test's move and the landing are scratch the bot owns: the landing
-  search and the cornered test allocate nothing.
+  (Int8) and `allyMax`, `allyNeed` and `allyClearance` (doubles), per slot. The
+  cues of a think (`dot`, `escapeThink`, `reserve`, `fOk`, `nearAlly`, and
+  `allyFor`, an Int32 per slot) are fields of one object, the landing is a
+  record of seven doubles and a boolean, and the kite points, the cornered
+  test's move and the landing are scratch the bot owns: the landing search and
+  the cornered test allocate nothing.
 - `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32 B per
   call, so a bot that measures a dozen distances allocated 400 B for them. A test
   compares it, bit for bit, with `Math.hypot`. That test pins the `Math.hypot` of current
@@ -1016,16 +1016,19 @@ ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
 tick when the budget was set (6409, 4860, 11167 and 7373), plus two rounds of
-1000 in a 2v2 or 1600 in a 3v3 and one of 7000, rounded up to 1000 (16000,
-14000, 22000 and 18000). Every run has a Lumeth heal an ally; across the four,
-Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy, and
-Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
-start-edit runs of headless-kits.test.ts stay as their declared fallback (a miss
-is governed by decision 8.3 of batch #53). The seeds, tiers and budgets are
-pinned. The sim's ability watcher has the matching rows: a projectile hit on the
-owner's team needs `allyEffects` and a target that is not the owner, a hit on an
-enemy a non-empty `effects`, and energy for an ally another than the caster a
-support kit and a heal that restored health in the same step.
+the longest round that did not go to sudden death, rounded up to 100 (1700 in
+the 2v2 runs, whose longest is 1626, and 3400 in the 3v3 runs, the client's
+longest for the same roster), and one of 7000, rounded up to 1000 (17000, 16000,
+25000 and 22000); a run whose longest round passes its term fails. Every run has
+a Lumeth heal an ally; across the four, Soothing Surge heals an ally, Aegis Veil
+is cast, Mend Bolt hits an enemy, and Lantern Burst and Glide are pressed (both
+in the 3v3 on arena02). The two start-edit runs of headless-kits.test.ts stay as
+their declared fallback (a miss is governed by decision 8.3 of batch #53). The
+seeds, tiers and budgets are pinned. The sim's ability watcher has the matching
+rows: a projectile hit on the owner's team needs `allyEffects` and a target that
+is not the owner, a hit on an enemy a non-empty `effects`, and energy for an
+ally other than the caster a support kit and a heal that restored health in the
+same step.
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
 section. It builds sixteen frozen scenes on arena 1 with the shipped kits (a

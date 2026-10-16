@@ -85,15 +85,15 @@ port 5173, which Playwright starts itself.
   of about 1000 and one round to sudden death of about 7000, rounded up to 1000,
   and the frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their
   rows use 3400 for a round (the longest measured is 3331, with a Lumeth on each
-  team; it was 1557 with two Quillons a side). Each row logs its
-  wall time, and a row over 40 s gets its own timeout. The test follows the
-  Quillon link of the result panel, which keeps the arena and the team size. The
-  other plays the sandbox to the red edge: the ring warning hidden until 600
-  ticks before the ring, the countdown, the radius text equal to the sim's
-  within 0.1 m and falling, and the red edge (`ring.png`, counted as red pixels
-  against a picture without the edge). These assert budgets and tick relations
-  from the rules, and the frame budget makes a page without the scale fail at
-  once, however fast the machine is.
+  team; it was 1557 with two Quillons a side). Each row logs its wall time, and
+  a row over 40 s gets its own timeout. The test follows the Quillon link of the
+  result panel, which keeps the arena and the team size. The other plays the
+  sandbox to the red edge: the ring warning hidden until 600 ticks before the
+  ring, the countdown, the radius text equal to the sim's within 0.1 m and
+  falling, and the red edge (`ring.png`, counted as red pixels against a picture
+  without the edge). These assert budgets and tick relations from the rules, and
+  the frame budget makes a page without the scale fail at once, however fast the
+  machine is.
 - `menu.spec.ts`: the Escape menu on a paused clock in frames of 16 ms
   (`menu.png`). The pause: 60 frames under the open menu leave the tick as it
   was, and the 10 frames after Resume run at most 10 ticks (8 with the clock
