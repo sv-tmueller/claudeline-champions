@@ -10,7 +10,7 @@ import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
 import type { NavGrid, Vec2 } from '../src/grid';
 import type { Intent } from '../src/intent';
 import type { MoveCommand } from '../src/steer';
-import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './helpers';
+import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKits } from './helpers';
 
 /*
  * Platform gate: this test gates on the native runner (a GitHub-hosted x86 job or an Apple
@@ -47,11 +47,13 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  *   escape press         (new scene)     (new scene)     0              0
  *   skerrow engage       (new scene)     (new scene)     0              0
  *   skerrow wait         (new scene)     (new scene)     0              (not run)
+ *   lumeth escape        (new scene)     (new scene)     0              (not run)
  *
- * The last four scenes have no main figure: they test paths main does not have. The unit job of
+ * The last five scenes have no main figure: they test paths main does not have. The unit job of
  * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
  * skerrow wait scene (#98) reads 0 on macOS on Node 22 and Node 26, and its runner figure is the
- * unit job of that pull request.
+ * unit job of that pull request. The lumeth escape scene (#106) reads 0 in every round on macOS on
+ * Node 22 and Node 26.
  *
  * The branch reads 0 in the lowest round of every scene, and 256 in one round of the press scene
  * while V8 tiers up (the other two read 0). The mutations that put a cost back each go over the
@@ -69,6 +71,10 @@ import { arena01, config2v2, configMirror, configSkerrow, jsonKits } from './hel
  * condition of `updateRuns` (168 in each of the scenes read). `waitsFor` takes the distance as a
  * measure and not as a number: on Node 26 a double argument to it read 16 B a think in the opener
  * press scene.
+ * The same object (six doubles) kept in a module variable on the two new paths of #106 reads 168 in
+ * the lumeth escape scene on Node 22 and Node 26, in every round: in the dash landing search
+ * (`findLanding` of a dash escape) and in the near-ally scan (`nearAllyOf`, run on every think of a
+ * champion with Binding Sigil).
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
@@ -201,7 +207,7 @@ function scene(
   arrange: (state: GameState, bot: Bot) => void,
   config: MatchConfig = configMirror(),
 ): Scene {
-  const state = createMatch(config, arena01, 1, jsonKits());
+  const state = createMatch(config, arena01, 1, rosterKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', 5);
   arrange(state, bot);
@@ -335,6 +341,27 @@ function buildScenes(): Scene[] {
         ch(state, 2).cooldowns.fill(100);
       },
       configSkerrow(),
+    ),
+    // A Lumeth escape: Lumeth 2 m from a Hargrim, kiting, with Glide ready and Lantern Burst and
+    // every other slot cooling down, and her Hargrim ally 3 m from the target: the trigger (3 m,
+    // any intent), the near-ally scan that every think of hers runs, the dash landing search over
+    // the kite directions with a clear path each, and the aim override run on every think.
+    scene(
+      'lumeth escape',
+      1,
+      'kite',
+      true,
+      true,
+      (state) => {
+        put(state, 1, -4, -3);
+        put(state, 2, -2, -3);
+        ch(state, 0).alive = true;
+        put(state, 0, -2, 0);
+        const me = ch(state, 1);
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('SPACE')] = 0;
+      },
+      configLumeth(),
     ),
   ];
 }

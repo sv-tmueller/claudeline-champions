@@ -25,14 +25,15 @@ const PROFILES = new Map<string, BotProfile>([
 const KIT_RULES = new Map<string, number>([
   ['hargrim', 0],
   ['quillon', 6],
+  ['lumeth', 6],
   ['skerrow', 0],
 ]);
 
 /**
  * The preferred range of a champion. With a kit of the same id, a champion that has a rule gets
- * rangeMax = the top of its base M1 band minus `RANGE_MARGIN`. The table applies instead when
- * there is no rule, no kit or another kit, M1 has no band, or the derived maximum is at most
- * 1 m or at most rangeMin.
+ * rangeMax = the top of its base M1 band minus `RANGE_MARGIN` (Lumeth's M1 reaches 12 m, so 11).
+ * The table applies instead when there is no rule, no kit or another kit, M1 has no band, or the
+ * derived maximum is at most 1 m or at most rangeMin.
  */
 export function profileFor(championId: string, kit?: KitDef): BotProfile {
   const table = PROFILES.get(championId) ?? DEFAULT_PROFILE;
@@ -53,9 +54,10 @@ export type Motion = 'away' | 'closing';
 /**
  * What else must hold of the target for an opener: `'escapeReady'`, the target has a way out
  * (one of the escapes of its own rule is ready, and it is neither stunned nor silenced; see
- * `targetEscapeReady` in casting.ts).
+ * `targetEscapeReady` in casting.ts); `'nearAlly'`, the target is within `NEAR_ALLY` metres of an
+ * alive ally of the bot, the bot itself not counted (see `nearAllyOf` in casting.ts).
  */
-export type Condition = 'escapeReady';
+export type Condition = 'escapeReady' | 'nearAlly';
 
 /**
  * An opener: a slot the bot presses on a condition narrower than its kit band. `band` is the
@@ -100,6 +102,14 @@ export interface ChampionRules {
   readonly holdF: boolean;
   /** Where the champion stands to wait for an opener to come off cooldown, or null. */
   readonly wait: WaitRule | null;
+  /**
+   * The escape trigger of the champion, or null for the common one. A number is a distance in
+   * metres, inclusive: any acted intent but idle with the acted target that close is an escape
+   * think (see `computeCues` in casting.ts). With null the common trigger holds, for Hargrim,
+   * Quillon and Skerrow: a retreat with the target within `ESCAPE_RANGE`, or a kite inside
+   * rangeMin.
+   */
+  readonly escapeWithin: number | null;
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
@@ -108,6 +118,7 @@ const NO_RULES: ChampionRules = Object.freeze({
   escapes: Object.freeze([]),
   holdF: false,
   wait: null,
+  escapeWithin: null,
 });
 
 /**
@@ -123,6 +134,11 @@ const NO_RULES: ChampionRules = Object.freeze({
  * Skerrow waits for Lunge: she stands from 6 to 8 m with a clear shot while Lunge has 2 to 90
  * ticks left, bounded so a long cooldown is no stall (the roster: "waits at 6 to 8 m for the
  * opening"; decision 3 of batch #91 fixes the bound).
+ * Lumeth's Binding Sigil keeps its kit band and needs a target within 6 m of an ally (the roster:
+ * "Q on a target inside 6 m of an ally"). Lantern Burst, then Glide, are her escapes on a trigger
+ * of her own: any acted intent but idle with the target within 3 m (the roster: "an enemy inside
+ * 3 m"; decision 5 of batch #105). Glide is a dash: its landing is a dash end, see `findLanding`
+ * in escape.ts.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -152,6 +168,16 @@ const RULES = new Map<string, ChampionRules>([
       { slot: 'SPACE', band: [6, 8], maxTicks: 90 },
     ),
   ],
+  [
+    'lumeth',
+    rule(
+      [{ slot: 'Q', band: null, motion: null, when: 'nearAlly' }],
+      ['E', 'SPACE'],
+      false,
+      null,
+      3,
+    ),
+  ],
 ]);
 
 /** A frozen row: the row, its two lists, each opener and each literal band, and the wait. */
@@ -160,6 +186,7 @@ function rule(
   escapes: Slot[],
   holdF: boolean,
   wait: WaitRule | null = null,
+  escapeWithin: number | null = null,
 ): ChampionRules {
   const frozen = openers.map((opener) =>
     Object.freeze({
@@ -178,6 +205,7 @@ function rule(
       wait === null
         ? null
         : Object.freeze({ ...wait, band: Object.freeze([wait.band[0], wait.band[1]] as const) }),
+    escapeWithin,
   });
 }
 

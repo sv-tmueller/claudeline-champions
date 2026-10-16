@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createMatch } from '@claudeline/sim';
 import type { AbilityEffect, AbilitySpec, Effect, ThenEffect } from '@claudeline/sim';
 import { RANGE_MARGIN, abilityReach, inReach } from '../src/reach';
-import { arena01, config2v2 } from './helpers';
+import { arena01, config2v2, rosterKits } from './helpers';
 import { hargrimKit, quietKit, quillonKit } from './kits';
 
 const DAMAGE: Effect[] = [{ type: 'damage', amount: 1 }];
@@ -90,6 +90,46 @@ describe('abilityReach', () => {
 
   it('gives a lone teleport no reach', () => {
     expect(abilityReach(ability({ type: 'teleport', range: 4, fixed: false }))).toBeNull();
+  });
+
+  it('gives a projectile whose effects list is empty no reach: a bolt that only heals allies', () => {
+    const healBolt: AbilityEffect = {
+      type: 'projectile',
+      speed: 16,
+      radius: 0.5,
+      lifetimeTicks: 38,
+      pierce: false,
+      effects: [],
+      allyEffects: [{ type: 'heal', amount: 14 }],
+    };
+    expect(abilityReach(ability(healBolt))).toBeNull();
+    // A bolt that hits enemies too keeps its band.
+    expect(abilityReach(ability({ ...healBolt, effects: DAMAGE }))).toEqual({ min: 0, max: (16 * 38) / 60 });
+  });
+
+  it('keeps the band of an area that follows an empty bolt', () => {
+    const empty: AbilityEffect = {
+      type: 'projectile',
+      speed: 16,
+      radius: 0.5,
+      lifetimeTicks: 38,
+      pierce: false,
+      effects: [],
+    };
+    expect(abilityReach(ability(empty, area({ type: 'self' }, 4, 'enemies')))).toEqual({ min: 0, max: 4.5 });
+  });
+
+  it("gives Lumeth's Soothing Surge and its EX variant no band, and her other slots the kit bands", () => {
+    const lumeth = rosterKits().find((kit) => kit.id === 'lumeth');
+    if (lumeth === undefined) throw new Error('no lumeth kit');
+    const { slots } = lumeth;
+    expect(abilityReach(slots.M2)).toBeNull();
+    expect(slots.M2.ex && abilityReach(slots.M2.ex)).toBeNull();
+    expect(abilityReach(slots.M1)).toEqual({ min: 0, max: 12 });
+    expect(abilityReach(slots.Q)).toEqual({ min: 0, max: 11 });
+    expect(abilityReach(slots.E)).toEqual({ min: 0, max: 3.5 });
+    expect(abilityReach(slots.R)).toBeNull();
+    expect(abilityReach(slots.F)).toEqual({ min: 0, max: 5.5 });
   });
 
   it('gives shield, heal and status effects no reach', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { AbilitySpec, KitDef, Slot, SlotSpec } from '@claudeline/sim';
+import type { AbilitySpec, ChampionState, KitDef, Slot, SlotSpec } from '@claudeline/sim';
 import { dashBand } from '../src/casting';
-import { jsonKits } from './helpers';
+import { jsonKits, rosterKits } from './helpers';
 import { pressOf, sceneOf } from './scenes';
 
 function kitById(id: string): KitDef {
@@ -155,5 +155,66 @@ describe('Quiet Dart, the opener of Skerrow on a target with an escape ready', (
     expect(pressOf(quillon({ enemyReady: ['SPACE'], ready: ['Q'] }))).toBe('Q');
     const far = sceneOf('skerrow', 10.05, { ready: ['Q'], enemyId: 'quillon', enemyReady: ['SPACE'] });
     expect(pressOf(far)).toBeNull();
+  });
+});
+
+describe('Binding Sigil, the opener of Lumeth beside an ally', () => {
+  // Lumeth stands at (-6, 0) with the enemy 8 m east of her, at (2, 0): inside Q's band less the
+  // margin (10 m). Only Q is ready. Champion 1 is her ally, `gap` metres behind the enemy.
+  const kits = rosterKits();
+  const sigil = (options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('lumeth', 8, { kits, ready: ['Q'], ...options });
+  const behind = (gap: number) => sigil({ ally: [2 + gap, 0] });
+
+  it('presses Q at a target within 6 m of an ally, inclusive, and not at 6.05 m', () => {
+    expect(pressOf(behind(5.95))).toBe('Q');
+    expect(pressOf(behind(6))).toBe('Q');
+    expect(pressOf(behind(6.05))).toBeNull();
+  });
+
+  it('measures from the target, in any direction', () => {
+    expect(pressOf(sigil({ ally: [2, 5.95] }))).toBe('Q');
+    expect(pressOf(sigil({ ally: [2, 6.05] }))).toBeNull();
+  });
+
+  it('does not press Q with no ally alive', () => {
+    expect(pressOf(sigil())).toBeNull();
+  });
+
+  it('does not count herself: Q at a target 5 m away with no ally is not pressed', () => {
+    expect(pressOf(sceneOf('lumeth', 5, { kits, ready: ['Q'] }))).toBeNull();
+  });
+
+  it('does not count a dead ally', () => {
+    const state = behind(2);
+    (state.champions[1] as ChampionState).alive = false;
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it('does not count a champion of the other team: the target\'s own partner', () => {
+    const state = sigil();
+    const partner = state.champions[3] as ChampionState;
+    partner.alive = true;
+    partner.x = 2;
+    partner.y = 3;
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it('presses Q beside an ally at the top of its band less the margin, and not past it', () => {
+    expect(pressOf(sceneOf('lumeth', 10, { kits, ready: ['Q'], ally: [6, 0] }))).toBe('Q');
+    expect(pressOf(sceneOf('lumeth', 10.05, { kits, ready: ['Q'], ally: [6, 0] }))).toBeNull();
+  });
+});
+
+describe('Quiet Dart at a kitted Lumeth', () => {
+  // The Quiet Dart condition reads the escapes of the target's own rule: with her kit, Lumeth has
+  // Lantern Burst. The pin at the top of this file, a Lumeth with no kit, still gets M2.
+  const dart = (options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('skerrow', 9, { kits: rosterKits(), ready: ['Q', 'M2'], enemyId: 'lumeth', ...options });
+
+  it('presses Q while Lantern Burst or Glide is ready, and M2 with both cooling down', () => {
+    expect(pressOf(dart({ enemyReady: ['E'] }))).toBe('Q');
+    expect(pressOf(dart({ enemyReady: ['SPACE'] }))).toBe('Q');
+    expect(pressOf(dart({ enemyReady: [] }))).toBe('M2');
   });
 });

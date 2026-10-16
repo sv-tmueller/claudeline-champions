@@ -12,12 +12,17 @@ import type {
 } from '@claudeline/sim';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createBot } from '../src/bot';
+import { computeCues, createCastCues, createKitCache, refreshKitCache } from '../src/casting';
+import { buildNavGrid } from '../src/grid';
+import { createMeasure } from '../src/hypot';
+import { createKiteScratch } from '../src/kite';
+import { createSightScratch } from '../src/sight';
 import { TIERS } from '../src/difficulty';
 import { createLanding, teleportEndInto } from '../src/escape';
 import { createRng } from '../src/rng';
-import { arena01, copyInput, jsonKits } from './helpers';
+import { arena01, copyInput, jsonKits, rosterKits } from './helpers';
 import { quietKit } from './kits';
-import { THINKS, firstPress, labelOf, pressOf, sceneOf } from './scenes';
+import { THINKS, firstPress, labelOf, pressOf, sceneOf, walks } from './scenes';
 
 const C = Math.SQRT1_2;
 
@@ -84,6 +89,181 @@ describe('the escape trigger', () => {
       health: 0.2,
     });
     expect(pressOf(state)).toBe('R');
+  });
+});
+
+// Lumeth's trigger is her own: any acted intent but idle, with the acted target within 3 m,
+// inclusive (the roster's "an enemy inside 3 m"). It replaces the common trigger for her: a kite
+// inside rangeMin 6 and a retreat within 6 m are no escape think unless the target is that close.
+describe('Lantern Burst, the escape of Lumeth, and her trigger', () => {
+  const kits = rosterKits();
+  const burst = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('lumeth', d, { kits, ready: ['E'], ...options });
+
+  it('presses E at a kiting target within 3 m, inclusive, and not at 3.05 m', () => {
+    expect(pressOf(burst(3))).toBe('E');
+    expect(pressOf(burst(2))).toBe('E');
+    expect(pressOf(burst(3.05))).toBeNull();
+  });
+
+  it('presses E on a retreat with the target within 3 m, and not at 3.05 or 4 m', () => {
+    const retreat = (d: number) => burst(d, { health: 0.2 });
+    expect(pressOf(retreat(3))).toBe('E');
+    expect(pressOf(retreat(3.05))).toBeNull();
+    expect(pressOf(retreat(4))).toBeNull();
+  });
+
+  it('does not treat a kite at 5 m, inside rangeMin, as an escape think', () => {
+    // The common trigger would: a kite inside rangeMin 6. Burst reaches 3.5 m, so no press follows.
+    const state = burst(5);
+    const bot = createBot(0, 'hard', 1);
+    for (let i = 0; i < THINKS; i++) expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+    expect(bot.inspect().intent).toBe('kite');
+  });
+
+  it('presses E beyond its band at 3 m, with no clear shot: the trigger needs neither', () => {
+    // Lantern Burst reaches 3.5 m and the margin takes 1 m off, so 3 m is outside its band; the
+    // wall is no matter to an escape.
+    const state = burst(3, { arena: arenaWith({ ...WALL, x: -4.5, h: 4 }) });
+    expect(pressOf(state)).toBe('E');
+  });
+});
+
+// Glide is a dash, so it has no teleport landing: `chooseEscape` finds the point a dash of 4 m
+// reaches in the first of the five directions (straight away from the target, then +45, -45, +90,
+// -90 degrees) whose end cell is free and whose straight path nothing blocks. A dash collides with
+// low walls as well, which a teleport crosses, so the path test is `segmentClear`, not the line of
+// sight. The press is aimed at that point, with no aim error.
+describe('Glide, the dash escape of Lumeth', () => {
+  const kits = rosterKits();
+  const glide = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('lumeth', d, { kits, ready: ['SPACE'], ...options });
+
+  it('is pressed with Lantern Burst cooling down, aimed 4 m straight away, with no aim error', () => {
+    const state = glide(3);
+    expect(firstPress(state, 'hard', 1)).toEqual({ label: 'SPACE', aimX: -1000, aimY: 0 });
+    expect(firstPress(glide(3), 'easy', 7)).toEqual({ label: 'SPACE', aimX: -1000, aimY: 0 });
+  });
+
+  it('comes after Lantern Burst: with both ready, E is pressed', () => {
+    expect(pressOf(glide(3, { ready: ['E', 'SPACE'] }))).toBe('E');
+  });
+
+  it('is pressed on a retreat within 3 m, and not at 3.05 m or on a kite at 5 m', () => {
+    expect(pressOf(glide(3, { health: 0.2 }))).toBe('SPACE');
+    expect(pressOf(glide(3.05))).toBeNull();
+    expect(pressOf(glide(5))).toBeNull();
+  });
+
+  it('is not held on its escape think, unlike every other dash', () => {
+    // The dash hold of chooseCast reads the slot: Glide is pressed by the escape choice, which
+    // marks it tried, and the hold leaves it alone.
+    expect(pressOf(glide(2))).toBe('SPACE');
+  });
+
+  it('takes the first free direction in the order: +45 before -45 behind a wall', () => {
+    const state = glide(3, { arena: arenaWith(WALL), me: [0, 0] });
+    expect(firstPress(state)).toEqual({ label: 'SPACE', aimX: -283, aimY: -283 });
+  });
+
+  it('skips a direction whose path a low wall blocks, which a teleport would cross', () => {
+    // Arena 01, Lumeth at (6, 3) with the target 2 m south of her: straight away is (6, 7), across
+    // the low wall at (6, 5), and so is +45 degrees ((3.17, 5.83), through its corner) and -45
+    // degrees ((8.83, 5.83)). The first path that is clear is +90 degrees, west to (2, 3). Skip
+    // takes the straight landing in the same place (see the teleport pin above).
+    const state = glide(2, { arena: arena01, me: [6, 3], enemy: [6, 1] });
+    expect(firstPress(state)).toEqual({ label: 'SPACE', aimX: 200, aimY: 300 });
+  });
+
+  it('is not pressed boxed in at the north-east corner, where all five landings are outside', () => {
+    const corner = () => glide(0, { arena: arena01, me: [14.4, 9.4], enemy: [12.4, 7.4] });
+    expect(pressOf(corner())).toBeNull();
+    // The walk goes on: the bot leaves along the path to its spawn instead of standing.
+    expect(walks(corner())).toBe(true);
+  });
+
+  it('is not pressed while rooted, as every dash', () => {
+    const state = glide(3);
+    (state.champions[0] as ChampionState).statuses.push({
+      type: 'root',
+      sourceId: 2,
+      slot: null,
+      remainingTicks: 600,
+    });
+    expect(pressOf(state)).toBeNull();
+  });
+
+  it('leaves the target: the sim starts the dash away from it and ends it 4 m off', () => {
+    const state = glide(3);
+    const me = state.champions[0] as ChampionState;
+    const target = state.champions[2] as ChampionState;
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('SPACE');
+    stepWith(state, input as PlayerInput);
+    const started = state.events.find((e) => e.type === 'dashStarted');
+    if (started?.type !== 'dashStarted') throw new Error('no dash started');
+    // Away from the target at (-3, 0): the dash goes west.
+    expect([started.dirX, started.dirY]).toEqual([-1, 0]);
+    for (let i = 0; i < 20; i++) step(state, []);
+    expect(Math.hypot(me.x - target.x, me.y - target.y)).toBeCloseTo(7, 6);
+    expect(me.x).toBeCloseTo(-10, 6);
+  });
+});
+
+describe('the escape trigger of computeCues', () => {
+  const kit = rosterKits().find((k) => k.id === 'lumeth') as KitDef;
+
+  /** The `escapeThink` cue for an acted intent and a target `d` metres from Lumeth. */
+  function think(championId: string, intent: string, d: number): boolean {
+    const state = sceneOf(championId, d, { kits: rosterKits() });
+    const me = state.champions[0] as ChampionState;
+    const target = state.champions[2] as ChampionState;
+    const kite = createKiteScratch();
+    const cache = createKitCache();
+    refreshKitCache(cache, state.kits.find((k) => k.id === championId), championId);
+    const cues = createCastCues(kite);
+    cues.escapeThink = false;
+    computeCues(
+      cues,
+      cache,
+      cache.profile,
+      intent,
+      state,
+      me,
+      target,
+      createSightScratch(),
+      createMeasure(),
+      buildNavGrid(state.arena),
+    );
+    return cues.escapeThink;
+  }
+
+  it('is any intent but idle within 3 m for Lumeth, 3 m inclusive', () => {
+    expect(kit.id).toBe('lumeth');
+    for (const intent of ['engage', 'kite', 'retreat']) {
+      expect(think('lumeth', intent, 3), `${intent} at 3 m`).toBe(true);
+      expect(think('lumeth', intent, 3.05), `${intent} at 3.05 m`).toBe(false);
+      expect(think('lumeth', intent, 0.5), `${intent} at 0.5 m`).toBe(true);
+    }
+  });
+
+  it('is never an idle think, however close the target', () => {
+    expect(think('lumeth', 'idle', 2)).toBe(false);
+  });
+
+  it('keeps the common trigger for Hargrim, Quillon and Skerrow', () => {
+    // A retreat within 6 m, inclusive, or a kite inside rangeMin.
+    expect(think('hargrim', 'retreat', 6)).toBe(true);
+    expect(think('hargrim', 'retreat', 6.05)).toBe(false);
+    expect(think('hargrim', 'engage', 2)).toBe(false);
+    expect(think('quillon', 'kite', 5.9)).toBe(true);
+    expect(think('quillon', 'kite', 6)).toBe(false);
+    expect(think('skerrow', 'retreat', 4)).toBe(true);
   });
 });
 

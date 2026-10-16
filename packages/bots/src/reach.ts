@@ -19,6 +19,8 @@ export function inReach(band: Reach, d: number): boolean {
 function effectReach(effect: AbilityEffect | ThenEffect, offset: number): Reach | null {
   switch (effect.type) {
     case 'projectile':
+      // A bolt that hits no enemy (a heal bolt: `effects` empty, only `allyEffects`) reaches none.
+      if (effect.effects.length === 0) return null;
       // Multiplied first: 21 x 40 / 60 is exactly 14, while 21 x (40 / 60) is not.
       return { min: 0, max: offset + (effect.speed * effect.lifetimeTicks) / TICK_RATE };
     case 'meleeArc':
@@ -65,8 +67,8 @@ function hull(effects: readonly (AbilityEffect | ThenEffect)[], start: number): 
 
 /**
  * The centre distances at which an ability can hit a champion, read from its effects; null when
- * no effect reaches an enemy (a self or ally ability). The effects after a teleport start from its
- * range. A top-level dash does not move the effects listed after it.
+ * no effect reaches an enemy (a self or ally ability, a bolt with no `effects`). The effects after
+ * a teleport start from its range. A top-level dash does not move the effects listed after it.
  */
 export function abilityReach(ability: AbilitySpec): Reach | null {
   return hull(ability.effects, 0);

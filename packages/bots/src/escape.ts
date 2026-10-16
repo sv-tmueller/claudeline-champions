@@ -4,6 +4,7 @@ import { hasDash, hasStatus } from './casting';
 import type { CastChoice, KitCache } from './casting';
 import type { NavGrid } from './grid';
 import type { Measure } from './hypot';
+import { segmentClear } from './geometry';
 import { awayFromInto, cellFree, kiteDirectionInto } from './kite';
 import type { KiteScratch } from './kite';
 import { lineOfSight } from './sight';
@@ -12,7 +13,8 @@ import type { SightScratch } from './sight';
 // Escapes: the slots a bot presses to get out of reach (docs/architecture/bots.md, Openers and
 // escapes). The trigger is the escape think of `computeCues` in casting.ts; the choice is
 // `chooseEscape`; a teleport escape (Quillon's Skip, Skerrow's Vanish Step) needs a landing, which
-// is `landingInto` and the search over the five kite directions in `findLanding`.
+// is `landingInto` and the search over the five kite directions in `findLanding`. A dash escape
+// (Lumeth's Glide) has a landing too: the end of the dash, found by the same search.
 
 /**
  * The scratch of a teleport landing, in fields that start as doubles. `dirX`, `dirY`, `range` and
@@ -103,8 +105,12 @@ export function createEscapeScratch(kite: KiteScratch): EscapeScratch {
  * The first of the five kite directions from the acted target (straight away from it, then +45,
  * -45, +90, -90 degrees) whose landing lies in a free grid cell and has a line of sight from the
  * champion: `lineOfSight` sees only the obstacles that block projectiles, as the sim's teleport
- * does, so a teleport may cross a low wall. The landing is left in `scratch.land`, the point the
- * sim moves to. False when none passes.
+ * does, so a teleport may cross a low wall. A dash escape (`escapeDash`) needs a clear path
+ * instead: `segmentClear` sees every obstacle, low walls too, which stop a dash. Its landing is the
+ * end of a dash of the full distance along the aim, the same arithmetic as a fixed teleport's, so
+ * `landingInto` gives it with `range` the dash distance. A body stops a dash early and the search
+ * ignores champions. The landing is left in `scratch.land`, the point the sim moves to. False when
+ * none passes.
  */
 function findLanding(
   scratch: EscapeScratch,
@@ -122,6 +128,7 @@ function findLanding(
   awayFromInto(away, me, target, dist);
   land.range = cache.escapeRange[index] as number;
   land.fixed = cache.escapeFixed[index] === 1;
+  const dash = cache.escapeDash[index] === 1;
   for (let k = 0; k < 5; k++) {
     kiteDirectionInto(dir, away, k);
     land.dirX = dir.x;
@@ -129,7 +136,8 @@ function findLanding(
     landingInto(land, me);
     point.x = land.x;
     point.y = land.y;
-    if (cellFree(grid, point) && lineOfSight(state, me, point, sight)) return true;
+    if (!cellFree(grid, point)) continue;
+    if (dash ? segmentClear(grid, me, point) : lineOfSight(state, me, point, sight)) return true;
   }
   return false;
 }
@@ -138,10 +146,10 @@ function findLanding(
  * On an escape think, the first slot of the escape order that passes its gates is chosen: the cast
  * delay run (an escape slot counts the trigger, see `updateRuns`), the cooldown at most 1, no
  * windup in progress unless it fires on this tick, no stun or silence, no root for a dash, and for
- * a teleport a landing. Writes the slot into `choice` (never an EX variant) and returns true; the
- * landing is in `scratch.land` with `scratch.landed` set. Every slot of the order is marked in
- * `scratch.tried`, so the main walk of `chooseCast` skips it: a teleport that found no landing must
- * not be pressed there.
+ * a teleport or a dash a landing. Writes the slot into `choice` (never an EX variant) and returns
+ * true; the landing is in `scratch.land` with `scratch.landed` set. Every slot of the order is
+ * marked in `scratch.tried`, so the main walk of `chooseCast` skips it: a teleport that found no
+ * landing must not be pressed there, and the dash hold of `chooseCast` never reaches Glide.
  *
  * There is no energy gate, unlike `chooseCast`: every escape row costs nothing (a base press that
  * is not F), and a row with an EX variant or F would need the cost check added with its test.
