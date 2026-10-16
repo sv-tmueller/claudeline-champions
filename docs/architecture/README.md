@@ -60,8 +60,9 @@ first.
   `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
   the `__runProbeFrames` hook. The heap probe measures two scenes, the
   sandbox and the live match with a moving pointer, and bounds the bots' bytes
-  in the live match. No raw double crosses a call on the frame path, and a
-  heal bolt's ring takes the projectile colour of its team. Not built: a
+  in the live match. No raw double crosses a call in the aim sampling, the
+  champion placing, the entity drawing, the overlay circles or the ring records,
+  and a heal bolt's ring takes the projectile colour of its team. Not built: a
   pre-match screen, music, the scoreboard, the other three `Platform` methods
   (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,

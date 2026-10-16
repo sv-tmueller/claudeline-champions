@@ -413,7 +413,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   passes objects in and reads fields out (the canvas rect is copied into an
   object once per resize, the ground point is written into a scratch record, and
   `draw` writes the fields of the mesh's position).
-- The rest of the frame path reads 0 B too (#117). On 13dab62 plus the carries,
+- Five more frame-path functions read 0 B (#117). On 13dab62 plus the carries,
   `main.ts:draw`, `entity-views.ts:draw`,
   `debug-overlay.ts:updateChampionCircles`, `feedback.ts:routeEvents` and
   `impact-rings.ts:spawn` read 0 B in all 60 windows of the 12 local attempts of

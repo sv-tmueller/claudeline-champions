@@ -31,27 +31,28 @@ copies the canvas's client rect into an object once per resize
 call, and `groundAimFromPointer` casts the pointer's ray through that copy and
 writes the ground point into a scratch record (`aimHit`), returning only
 whether the ray hit the plane. For the aim sampling, the entity drawing, the
-champion placing, the overlay circles and the rings the rule is that no raw
-double crosses a call: objects go in and fields are read out, since a double
-passed to a call that V8 does not inline is boxed. `main.ts:draw` places each
-champion view through `placeChampion` in `interpolate.ts` (the fields of the
-position, and the facing through `rotation.fromArray` over a preallocated
-tuple of doubles), the overlay hands its circles group back once from the
-build and `updateChampionCircles` writes the fields of each position, and the
-loop clock's `alpha` is read by field in `interpolatePoses` and in the `draw`
-of the entity views and the rings, which take the clock record. `routeEvents`
-passes the sim's event records to `hit` and `expire`. A hit is rare, so its
-code runs in V8's interpreter, where every load of a double field allocates:
-`ImpactRings.spawn` only keeps the record, and the rings' `draw` reads its
-coordinates. It is not a rule of the whole frame path: `interpolatePoses`
-still passes three raw doubles to `lerpAngle`, which reads 0 B in the probe
-because V8 inlines it when hot, and the probe's mutations catch a regression
-there. The hook's `frameMany` boxes one timestamp per frame (9 to 18 B, see
-[testing](testing.md)). The copy assumes the canvas fills `#app`, so only a
-resize moves its rect; a layout change without a resize event would leave it
-stale. The mapping itself is unchanged, and `camera.test.ts` keeps the two
-functions it replaced as an oracle, compared to the new path with `Object.is`
-over a grid of canvases and pointers.
+champion placing, the overlay circles and the rings' `spawn` and position the
+rule is that no raw double crosses a call: objects go in and fields are read
+out, since a double passed to a call that V8 does not inline is boxed.
+`main.ts:draw` places each champion view through `placeChampion` in
+`interpolate.ts` (the fields of the position, and the facing through
+`rotation.fromArray` over a preallocated tuple of doubles), the overlay hands
+its circles group back once from the build and `updateChampionCircles` writes
+the fields of each position, and the loop clock's `alpha` is read by field in
+`interpolatePoses` and in the `draw` of the entity views and the rings, which
+take the clock record. `routeEvents` passes the sim's event records to `hit`
+and `expire`. A hit is rare, so its code runs in V8's interpreter, where every
+load of a double field allocates: `ImpactRings.spawn` only keeps the record,
+and the rings' `draw` reads its coordinates. It is not a rule of the whole
+frame path: `interpolatePoses` still passes three raw doubles to `lerpAngle`,
+and the rings' `draw` passes two to `scale.set` per live ring, which read 0 B
+in the probe because V8 inlines them when hot, and the probe's mutations catch
+a regression there. The hook's `frameMany` boxes one timestamp per frame (9 to
+18 B, see [testing](testing.md)). The copy assumes the canvas fills `#app`, so
+only a resize moves its rect; a layout change without a resize event would
+leave it stale. The mapping itself is unchanged, and `camera.test.ts` keeps
+the two functions it replaced as an oracle, compared to the new path with
+`Object.is` over a grid of canvases and pointers.
 
 Keys match on `event.code`, and the nine movement and slot actions can be
 rebound: `bindings.ts` (pure) holds `Action` (up, left, down, right, SPACE, Q,
