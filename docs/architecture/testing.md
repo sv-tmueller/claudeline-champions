@@ -49,7 +49,7 @@ port 5173, which Playwright starts itself.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other four rows carrying `difficulty=hard`, and
+  and every link of the other three rows carrying `difficulty=hard`, and
   `/?difficulty=brutal` reads normal as current.
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
