@@ -1,4 +1,5 @@
 import arena01Json from '../../../data/arenas/arena01.json';
+import arena02Json from '../../../data/arenas/arena02.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import lumethJson from '../../../data/kits/lumeth.json';
 import quillonJson from '../../../data/kits/quillon.json';
@@ -32,6 +33,7 @@ import { findPath } from '../src/path';
 import { profileFor } from '../src/profile';
 
 export const arena01: ArenaDef = parseArenaDef(arena01Json);
+export const arena02: ArenaDef = parseArenaDef(arena02Json);
 
 /**
  * The shipped Hargrim, Quillon and Skerrow kits from `data/kits`, for `createMatch`, which
@@ -140,6 +142,24 @@ export function configLumeth(): MatchConfig {
       { championId: 'lumeth', team: 'A' },
       { championId: 'hargrim', team: 'B' },
       { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
+/**
+ * Hargrim, Quillon and Lumeth on each team, in that order: the 3v3 roster the client plays (team B
+ * of the 3v3 row, with the pick of the Hargrim launch in place of its Hargrim on team A).
+ */
+export function configLumeth3v3(): MatchConfig {
+  return {
+    teamSize: 3,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'quillon', team: 'A' },
+      { championId: 'lumeth', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+      { championId: 'lumeth', team: 'B' },
     ],
   };
 }
@@ -303,6 +323,8 @@ export interface MatchRun {
 
 export interface RunOptions {
   config?: MatchConfig;
+  /** Default: arena01. */
+  arena?: ArenaDef;
   kits?: readonly KitDef[];
   /** Replaces `createBot`, for a test that drives the run with its own bots. */
   makeBot?: (id: number, tier: Difficulty, seed: number) => Bot;
@@ -325,7 +347,12 @@ export function createRun(
   matchSeed = 7,
   options: RunOptions = {},
 ): MatchRun {
-  const state = createMatch(options.config ?? config2v2(), arena01, matchSeed, options.kits ?? []);
+  const state = createMatch(
+    options.config ?? config2v2(),
+    options.arena ?? arena01,
+    matchSeed,
+    options.kits ?? [],
+  );
   const bots = state.champions.map((c) => {
     const seed = botSeeds[c.id];
     const tier = tiers[c.id];

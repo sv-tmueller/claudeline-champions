@@ -290,6 +290,8 @@ interface Press {
   dash: number | null;
   /** Where the champion stood when it pressed, which the direction of the dash is read from. */
   from: { x: number; y: number };
+  /** True when the match was in warmup, round end or match end: the sim ignores buttons then. */
+  outsideRound: boolean;
 }
 
 function hasStatus(c: ChampionState, type: string): boolean {
@@ -467,6 +469,9 @@ function pressProblems(
  * Whether the sim may have refused this press in the step, for a reason other than the bot's gates.
  */
 function explained(events: readonly SimEvent[], press: Press): boolean {
+  // `step` runs only the aim and the facing outside the round phase of a match, so the buttons of
+  // a bot that thinks in the warmup or the pause between rounds start nothing.
+  if (press.outsideRound) return true;
   for (const e of events) {
     const sameCast = e.type === 'castStarted' && e.championId === press.id && e.slot === press.slot;
     if (sameCast && e.ex === press.ex) {
@@ -507,16 +512,25 @@ export interface Played {
   eliminatedAt: number;
   /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
   firstLunge: number;
+  /**
+   * Projectile hits per `champion:SLOT:ally` or `champion:SLOT:enemy`: the slot of the cast that
+   * fired the projectile, and whether the target was on the owner's team (never the owner).
+   */
+  hits: Record<string, number>;
+  /** Per champion id, the heal events with that champion as source on an ally other than itself. */
+  allyHeals: number[];
+  /** Per champion id, the thinks on which it pressed a button, whether or not the sim started it. */
+  presses: number[];
   summary: string;
 }
 
 /**
-  * Plays `TICKS` ticks of a match of bots and checks every tick: the bots leave the state alone,
-  * every input is valid, every press passes the oracle of `set` on the state the bot thought on and
-  * the sim starts it (or something explains why not), the invariants hold, and the stall tracker is
-  * fed.
+  * Plays `ticks` ticks of a match of bots (`TICKS` by default), or until its matchEnd, and checks
+  * every tick: the bots leave the state alone, every input is valid, every press passes the oracle
+  * of `set` on the state the bot thought on and the sim starts it (or something explains why not),
+  * the invariants hold, and the stall tracker is fed.
  */
-export function play(set: KitSet, run: MatchRun): Played {
+export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played {
   const { state, bots } = run;
   const tracker = createStallTracker(state, bots);
   const started = state.champions.map(() => 0);
@@ -532,8 +546,12 @@ export function play(set: KitSet, run: MatchRun): Played {
   let firstLunge = -1;
   let firstDeath = -1;
   const presses = state.champions.map(() => 0);
+  const hits: Record<string, number> = {};
+  const allyHeals = state.champions.map(() => 0);
+  /** The `champion:SLOT` of the cast that fired each projectile still to be heard of. */
+  const projectileSlot = new Map<number, string>();
 
-  for (let t = 0; t < TICKS; t++) {
+  for (let t = 0; t < ticks; t++) {
     const before = checksum(state);
     const inputs = bots.map((bot) => {
       const input = bot.think(state);
@@ -541,6 +559,7 @@ export function play(set: KitSet, run: MatchRun): Played {
       return input;
     });
     const pending: Press[] = [];
+    const outsideRound = state.match !== undefined && state.match.phase !== 'round';
     state.champions.forEach((c, id) => {
       const input = inputs[id];
       if (input === undefined) throw new Error(`no input ${id}`);
@@ -561,6 +580,7 @@ export function play(set: KitSet, run: MatchRun): Played {
         landing,
         dash,
         from: { x: c.x, y: c.y },
+        outsideRound,
       });
     });
     tracker.observe(inputs);
@@ -625,6 +645,26 @@ export function play(set: KitSet, run: MatchRun): Played {
         if (e.slot === 'F') ultimates[e.championId] = (ultimates[e.championId] ?? 0) + 1;
       } else if (e.type === 'castFired') {
         fired.add(e.championId);
+      } else if (e.type === 'projectileSpawned') {
+        // The cast that fired it fires in this very step, on the turn of its owner.
+        const cast = state.events.find((x) => x.type === 'castFired' && x.championId === e.ownerId);
+        if (cast?.type === 'castFired') {
+          projectileSlot.set(e.projectileId, `${state.champions[e.ownerId]?.championId}:${cast.slot}`);
+        }
+      } else if (e.type === 'projectileHit') {
+        const owner = state.champions[e.ownerId];
+        const target = state.champions[e.targetId];
+        const slotKey = projectileSlot.get(e.projectileId);
+        if (owner && target && slotKey !== undefined) {
+          const key = `${slotKey}:${owner.team === target.team ? 'ally' : 'enemy'}`;
+          hits[key] = (hits[key] ?? 0) + 1;
+        }
+      } else if (e.type === 'heal') {
+        const source = state.champions[e.sourceId];
+        const target = state.champions[e.targetId];
+        if (source && target && source.team === target.team && source.id !== target.id) {
+          allyHeals[e.sourceId] = (allyHeals[e.sourceId] ?? 0) + 1;
+        }
       } else if (e.type === 'death') {
         if (firstDeath < 0) firstDeath = tick;
         const victim = state.champions[e.targetId];
@@ -638,9 +678,10 @@ export function play(set: KitSet, run: MatchRun): Played {
     }
     expect(checkInvariants(state)).toEqual([]);
     expect(Number.isFinite(checksum(state))).toBe(true);
+    if (state.match?.phase === 'matchEnd') break;
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; dash escapes ${glides}; slots ${JSON.stringify(slots)}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; dash escapes ${glides}; slots ${JSON.stringify(slots)}; hits ${JSON.stringify(hits)}; ally heals ${allyHeals.join(',')}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
@@ -654,6 +695,9 @@ export function play(set: KitSet, run: MatchRun): Played {
     eliminatedAt,
     glides,
     firstLunge,
+    hits,
+    allyHeals,
+    presses,
     summary,
   };
 }

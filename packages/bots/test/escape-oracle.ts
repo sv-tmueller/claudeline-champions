@@ -111,7 +111,11 @@ export interface OracleLanding {
  * degrees) whose landing is in a free grid cell, by the clearance of the cell centre, and has a
  * line of sight from the champion. The landing of a direction is the point the sim teleports the
  * champion to for the aim `range` metres off in whole centimetres: it is read from a clone of the
- * state in which only this champion casts `slot`. Null when none passes.
+ * state in which only this champion casts `slot`. The bot tests the point the teleport aims at,
+ * before the sim's collision pushes a champion off a wall or an obstacle, so a direction whose
+ * point (`rawLanding`) is not a free cell is skipped even where the sim would push the champion
+ * clear into one: the bot is the more careful, and a match played to its end has such a landing
+ * (a Quillon at the south wall, a Skip that ends 2 cm into it). Null when none passes.
  */
 export function oracleLanding(
   state: GameState,
@@ -136,11 +140,40 @@ export function oracleLanding(
     const aimX = Math.round((c.x + dir.x * range) * 100) + 0;
     const aimY = Math.round((c.y + dir.y * range) * 100) + 0;
     const at = teleportOf(state, c, slot, aimX, aimY);
-    if (at !== null && freeCell(state, at) && hasLineOfSight(state, c, at)) {
+    if (
+      at !== null &&
+      freeCell(state, rawLanding(state, c, slot, range, aimX, aimY)) &&
+      freeCell(state, at) &&
+      hasLineOfSight(state, c, at)
+    ) {
       return { k, aimX, aimY, x: at.x, y: at.y };
     }
   }
   return null;
+}
+
+/**
+ * The point the first teleport of `slot` aims at, before any collision: the champion's own point
+ * moved along the aim by the range (a fixed teleport) or by `min(range, aim distance)`. Written
+ * out from the kit and the aim with `Math.hypot`, not by the bot's arithmetic.
+ */
+function rawLanding(
+  state: GameState,
+  c: ChampionState,
+  slot: Slot,
+  range: number,
+  aimX: number,
+  aimY: number,
+): { x: number; y: number } {
+  const kit = state.kits.find((k) => k.id === c.championId);
+  const first = kit?.slots[slot].effects[0];
+  const fixed = first !== undefined && first.type === 'teleport' && first.fixed;
+  const vx = aimX / 100 - c.x;
+  const vy = aimY / 100 - c.y;
+  const aimDistance = Math.hypot(vx, vy);
+  if (aimDistance === 0) return { x: c.x, y: c.y };
+  const reach = fixed ? range : Math.min(range, aimDistance);
+  return { x: c.x + (vx / aimDistance) * reach, y: c.y + (vy / aimDistance) * reach };
 }
 
 /** Where the sim puts champion `c` when it casts `slot` aimed at the centimetres; null if it does not move. */
