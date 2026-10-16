@@ -152,6 +152,8 @@ def key_clip(rig, name, frames, key_poses, loops, channels):
         assert path in ("rotation", "translation"), "bad path %s" % path
         assert path == "rotation" or bone == bone_names[0], "only the root translates"
     for frame, key in key_poses.items():
+        unknown = sorted(set(key) - set(bone_names))
+        assert not unknown, "frame %d poses bones the rig lacks: %s" % (frame, unknown)
         for bone in bone_names:
             degrees, metres = key.get(bone, ((0, 0, 0), (0, 0, 0)))
             for path, value in (("rotation", degrees), ("translation", metres)):

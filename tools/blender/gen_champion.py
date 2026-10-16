@@ -96,7 +96,7 @@ HIPS_MOVE = (("Hips", "translation"),)
 # Run, 20 frames at 30 fps. Eight key intervals alternate the planted passing
 # key M (legs and arms at 0, Hips at 0) with the split S (legs 35 degrees, arms
 # 40, Hips +0.035 m, the flight phase: the feet are 0.128 m up) and the lift-off
-# L (legs 13 degrees, arms 15, Hips +0.022 m, the foot corner on the floor). The
+# L (legs 13 degrees, arms 15, Hips +0.022 m, the feet 22 mm up). The
 # order is S+ L+ M L- S- L- M L+ S+, the minus keys mirroring the plus keys, and
 # only M is planted, so R1 holds. R2 at M: 0.022 m over 13 degrees (0.227 rad)
 # is 0.097 m per radian. Past 13 degrees the corner is at or above the floor.
@@ -130,9 +130,10 @@ RUN = {
 # Attack, 12 frames (0.4 s), once, rest to rest. It is built for the first
 # slot's cast: the strike at 0.133 s falls between the 0.1 s and 0.15 s windups
 # of M1, and the clip ends inside the shortest M1 cooldown. The staff and the
-# blade ride Arm_R, which swings through 110 degrees (the staff lies horizontal
-# at the strike, and past about 110 degrees it would cross 1.90 m); the shoulder
-# blocks and the halo ride Spine, which yaws. Legs and Hips stay at rest.
+# blade ride Arm_R, which swings from +30 to -80 degrees about Y (turned past
+# about 105 degrees from hanging, it would lift Quillon's staff over 1.90 m);
+# the shoulder blocks and the halo ride Spine, which yaws. Legs and Hips stay at
+# rest.
 ATTACK_WIND = pose({"Spine": (0, 0, -25), "Arm_R": (-10, 30, 0), "Arm_L": (0, -20, 0)})
 ATTACK_STRIKE = pose({"Spine": (0, 5, 30), "Arm_R": (0, -80, 0), "Arm_L": (0, 20, 0)})
 

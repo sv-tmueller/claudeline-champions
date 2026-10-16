@@ -56,6 +56,7 @@ CHANNELS = {
     "Hit": frozenset(_UPPER),
     "Death": frozenset(_UPPER + (("Hips", "rotation"),) + _HIPS_MOVE),
 }
+OUTPUT_TYPES = {"rotation": "VEC4", "translation": "VEC3"}
 FPS = 30
 TIME_TOLERANCE = 1e-4
 
@@ -438,7 +439,7 @@ def check_clip(doc, nodes, joints, animation):
     channels, samplers = animation.get("channels"), animation.get("samplers")
     if not isinstance(channels, list) or not isinstance(samplers, list):
         return "clip %s needs channels and samplers" % name
-    paths = []
+    paths, outputs = [], []
     for channel in channels:
         target = channel.get("target") if isinstance(channel, dict) else None
         node = target.get("node") if isinstance(target, dict) else None
@@ -458,14 +459,16 @@ def check_clip(doc, nodes, joints, animation):
             or not 0 <= sampler < len(samplers)
         ):
             return "clip %s: a channel's sampler index is out of range" % name
+        outputs.append((path, sampler))
+    counts = Counter(paths)
     wanted = CHANNELS[name]
-    for pair in sorted(set(paths)):
-        if paths.count(pair) > 1:
-            return "clip %s: duplicate channel %s %s" % ((name,) + pair)
-    for pair in sorted(wanted - set(paths)):
-        return "clip %s: missing channel %s %s" % ((name,) + pair)
-    for pair in sorted(set(paths) - wanted):
-        return "clip %s: unexpected channel %s %s" % ((name,) + pair)
+    for label, pairs in (
+        ("duplicate", sorted(pair for pair, n in counts.items() if n > 1)),
+        ("missing", sorted(wanted - counts.keys())),
+        ("unexpected", sorted(counts.keys() - wanted)),
+    ):
+        if pairs:
+            return "clip %s: %s channel %s %s" % ((name, label) + pairs[0])
     inputs = {
         s["input"] for s in samplers if isinstance(s, dict) and isinstance(s.get("input"), int)
     }
@@ -495,6 +498,15 @@ def check_clip(doc, nodes, joints, animation):
                 low[0],
                 high[0],
             )
+    # Each channel's output holds one value per key: a VEC4 quaternion for a
+    # rotation, a VEC3 move for a translation.
+    for path, sampler in outputs:
+        shape = OUTPUT_TYPES[path]
+        values = accessor_of(doc, samplers[sampler].get("output"))
+        if values is None or values.get("componentType") != FLOAT or values.get("type") != shape:
+            return "clip %s: a %s output must be a FLOAT %s accessor" % (name, path, shape)
+        if values.get("count") != keys:
+            return "clip %s: a %s output needs %d elements, one per key" % (name, path, keys)
     return None
 
 

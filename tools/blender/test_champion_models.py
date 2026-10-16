@@ -696,25 +696,36 @@ class ContractCheckTests(unittest.TestCase):
         struct.pack_into("<4B", self.bin, accessor_offset(self.doc, joints), 9, 0, 0, 0)
         self.assertProblem("rigid")
 
+    def output_offset(self, clip, joint, path):
+        """The byte offset of a channel's output accessor in the BIN chunk."""
+        channel = channel_of(self.doc, clip, joint, path)
+        sampler = clip_named(self.doc, clip)["samplers"][channel["sampler"]]
+        return accessor_offset(self.doc, sampler["output"])
+
+    def run_hips_key(self, key):
+        """The offset of a Run Hips translation key in the BIN and its (x, y, z)."""
+        offset = self.output_offset("Run", "Hips", "translation") + 12 * key
+        return offset, struct.unpack_from("<3f", self.bin, offset)
+
     def move_run_hips(self, dy):
         """Move the second key of the Run clip's Hips translation by dy (glTF y)."""
-        run = clip_named(self.doc, "Run")
-        channel = channel_of(self.doc, "Run", "Hips", "translation")
-        offset = accessor_offset(self.doc, run["samplers"][channel["sampler"]]["output"])
-        x, y, z = struct.unpack_from("<3f", self.bin, offset + 12)
-        struct.pack_into("<3f", self.bin, offset + 12, x, y + dy, z)
+        offset, (x, y, z) = self.run_hips_key(1)
+        struct.pack_into("<3f", self.bin, offset, x, y + dy, z)
 
-    def test_rejects_a_looping_clip_that_does_not_close(self):
-        for name in LOOPING:
-            with self.subTest(clip=name):
-                self.setUp()
-                clip = clip_named(self.doc, name)
-                channel = channel_of(self.doc, name, "Spine", "rotation")
-                offset = accessor_offset(self.doc, clip["samplers"][channel["sampler"]]["output"])
-                last = 16 * (len(KEY_FRAMES[name]) - 1)
-                x, y, z, w = struct.unpack_from("<4f", self.bin, offset + last)
-                struct.pack_into("<4f", self.bin, offset + last, x, y + 0.001, z, w)
-                self.assertProblem("loop of %s does not close" % name)
+    def open_the_loop(self, clip):
+        """Move the last Spine key of a clip by 0.001 in the quaternion's y."""
+        last = 16 * (len(KEY_FRAMES[clip]) - 1)
+        offset = self.output_offset(clip, "Spine", "rotation") + last
+        x, y, z, w = struct.unpack_from("<4f", self.bin, offset)
+        struct.pack_into("<4f", self.bin, offset, x, y + 0.001, z, w)
+
+    def test_rejects_an_idle_loop_that_does_not_close(self):
+        self.open_the_loop("Idle")
+        self.assertProblem("loop of Idle does not close")
+
+    def test_rejects_a_run_loop_that_does_not_close(self):
+        self.open_the_loop("Run")
+        self.assertProblem("loop of Run does not close")
 
     def test_rejects_a_pose_that_lifts_the_top_above_the_limit(self):
         self.move_run_hips(1.0)
@@ -737,12 +748,8 @@ class ContractCheckTests(unittest.TestCase):
         # on the floor while the leg straightens into the passing key. At 0.010 m
         # every key is still at or above the floor, but between key 1 and key 2
         # the corner sinks by 1.3 mm.
-        run = clip_named(self.doc, "Run")
-        output = run["samplers"][channel_of(self.doc, "Run", "Hips", "translation")["sampler"]]["output"]
-        offset = accessor_offset(self.doc, output)
-        x, y, z = struct.unpack_from("<3f", self.bin, offset + 12)
-        self.assertAlmostEqual(y, 0.80 + 0.022, places=4)
-        struct.pack_into("<3f", self.bin, offset + 12, x, 0.80 + 0.010, z)
+        self.assertAlmostEqual(self.run_hips_key(1)[1][1], 0.80 + 0.022, places=4)
+        self.move_run_hips(-0.012)
         problems = contract_problems(self.doc, self.bin)
         self.assertTrue(any("sampled floor" in p for p in problems), problems)
         self.assertFalse(any("posed floor" in p for p in problems), problems)

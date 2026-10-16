@@ -114,7 +114,8 @@ def rigged_champion_doc(name="Champion"):
     Nodes: the six joints, the skinned mesh `Champion` and `Rig`, whose
     children are the mesh and Hips. Accessor 0 is the inverse bind matrices,
     1 to 3 are the Champion primitive's attributes, and every clip adds one
-    input accessor, with a sampler per channel of CHANNEL_TABLE.
+    input accessor, then a sampler and an output accessor (VEC4 for a rotation,
+    VEC3 for a translation, one element per key) per channel of CHANNEL_TABLE.
     """
     joints = list(RIG_PARENTS)
     nodes = [{"name": joint} for joint in joints]
@@ -132,6 +133,7 @@ def rigged_champion_doc(name="Champion"):
     ]
     animations = []
     for clip, (frames, keys) in CLIP_TABLE.items():
+        input_index = len(accessors)
         accessors.append(
             {
                 "componentType": 5126,
@@ -142,13 +144,26 @@ def rigged_champion_doc(name="Champion"):
             }
         )
         targets = [(index[joint], path) for joint, path in sorted(CHANNEL_TABLE[clip])]
+        samplers = []
+        for _, path in targets:
+            accessors.append(
+                {
+                    "componentType": 5126,
+                    "type": "VEC4" if path == "rotation" else "VEC3",
+                    "count": keys,
+                }
+            )
+            samplers.append(
+                {
+                    "input": input_index,
+                    "interpolation": "LINEAR",
+                    "output": len(accessors) - 1,
+                }
+            )
         animations.append(
             {
                 "name": clip,
-                "samplers": [
-                    {"input": len(accessors) - 1, "interpolation": "LINEAR", "output": 1}
-                    for _ in targets
-                ],
+                "samplers": samplers,
                 "channels": [
                     {"sampler": i, "target": {"node": node, "path": path}}
                     for i, (node, path) in enumerate(targets)
@@ -619,6 +634,38 @@ class RigRuleTests(ValidatorCase):
 
         self.rejects(mutate, "Hips")
 
+    def output_of(self, doc, clip, joint, path):
+        channel = channel_of(doc, clip, joint, path)
+        return clip_named(doc, clip)["samplers"][channel["sampler"]]
+
+    def test_rejects_a_rotation_channel_pointed_at_a_translation_output(self):
+        def mutate(d):
+            hips = self.output_of(d, "Idle", "Hips", "translation")
+            self.output_of(d, "Idle", "Spine", "rotation")["output"] = hips["output"]
+
+        self.rejects(mutate, "rotation output must be a FLOAT VEC4")
+
+    def test_rejects_a_translation_channel_pointed_at_a_rotation_output(self):
+        def mutate(d):
+            spine = self.output_of(d, "Idle", "Spine", "rotation")
+            self.output_of(d, "Idle", "Hips", "translation")["output"] = spine["output"]
+
+        self.rejects(mutate, "translation output must be a FLOAT VEC3")
+
+    def test_rejects_an_output_that_is_not_float(self):
+        def mutate(d):
+            sampler = self.output_of(d, "Run", "Leg_L", "rotation")
+            d["accessors"][sampler["output"]]["componentType"] = 5123
+
+        self.rejects(mutate, "FLOAT VEC4")
+
+    def test_rejects_an_output_with_one_key_too_few(self):
+        def mutate(d):
+            sampler = self.output_of(d, "Run", "Leg_L", "rotation")
+            d["accessors"][sampler["output"]]["count"] -= 1
+
+        self.rejects(mutate, "needs 9 elements")
+
     def test_rejects_a_sampler_that_does_not_exist(self):
         def mutate(d):
             clip_named(d, "Idle")["channels"][0]["sampler"] = 99
@@ -626,15 +673,16 @@ class RigRuleTests(ValidatorCase):
         self.rejects(mutate, "sampler")
 
     def test_a_malformed_document_fails_with_a_reason_not_a_crash(self):
+        def list_input(d):
+            clip_named(d, "Idle")["samplers"][0]["input"] = [4]
+
         for label, mutate in {
             "skins is not a list": lambda d: d.update(skins=5),
             "no accessors": lambda d: d.pop("accessors"),
             "animation is not an object": lambda d: d["animations"].__setitem__(0, 7),
             "no meshes": lambda d: d.pop("meshes"),
             "a joint node without a name": lambda d: node_named(d, "Spine").pop("name"),
-            "a sampler input that is a list": lambda d: clip_named(d, "Idle")["samplers"][0].update(
-                input=[4]
-            ),
+            "a sampler input that is a list": list_input,
         }.items():
             doc = rigged_champion_doc()
             mutate(doc)
