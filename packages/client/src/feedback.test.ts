@@ -335,6 +335,34 @@ describe('routing real sim events', () => {
     return feedback;
   }
 
+  // The rings keep the sim's event record until their draw reads it, so the sim must
+  // never write to a record after pushing it, and spawn must not share one between rings.
+  it('draws each ring at its own hit point after the sim has stepped on', () => {
+    const state = match();
+    shoot(state, 10, 2, 1, 0);
+    shoot(state, 10, -2, 1, 0);
+    const rings = createImpactRings();
+    const feedback = new CombatFeedback(state.champions, 'A', rings, createKillFeed());
+    const hits: { x: number; y: number }[] = [];
+    for (let i = 0; i < 30 && hits.length < 2; i++) {
+      step(state, []);
+      for (const event of state.events) if (event.type === 'projectileHit') hits.push({ x: event.x, y: event.y });
+      routeEvents(state, feedback);
+    }
+    expect(hits).toHaveLength(2);
+    expect(hits[0]?.y).not.toBe(hits[1]?.y);
+    // A few more ticks, then draw while the rings still live.
+    for (let i = 0; i < 4; i++) {
+      step(state, []);
+      routeEvents(state, feedback);
+    }
+    rings.draw(state.tick, { alpha: 0 });
+    const shown = (rings.group.children as Mesh[]).filter((mesh) => mesh.visible);
+    expect(shown.map((mesh) => [mesh.position.x, mesh.position.z])).toEqual(
+      hits.map((hit) => [hit.x, -hit.y]),
+    );
+  });
+
   it('makes one ring, one hit and one flash for a projectile that hits', () => {
     const state = match();
     shoot(state, 10, 2, 1, 0);

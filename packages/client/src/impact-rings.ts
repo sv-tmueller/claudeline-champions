@@ -13,8 +13,9 @@ export type RingTint = 0 | 1 | 2;
 export const RING_TINT_YELLOW = 0;
 export const RING_TINT_ALLY = 1;
 export const RING_TINT_ENEMY = 2;
-// Indexed by the tint. A ring copies one of these into its own colour, so a spawn
-// writes three fields and a recycled ring never keeps the tint of its last use.
+// Indexed by the tint. A ring copies one of these into its own colour when its tint
+// changes, so a recycled ring never keeps the tint of its last use and a spawn in
+// the same tint copies nothing.
 const TINT_COLOURS: readonly Color[] = [
   new Color(RING_COLOUR),
   new Color(PROJECTILE_ALLY_COLOUR),
@@ -41,10 +42,14 @@ export class ImpactRings {
   private readonly meshes: Mesh[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
   private readonly startTicks: number[] = [];
-  /** Where each ring is, as the sim's record: spawn keeps it and draw reads it. */
+  /**
+   * Where each ring is, as the sim's event record: spawn keeps it and draw reads it.
+   * The sim never writes to a record after pushing it (its events are fresh literals
+   * and the next step only truncates the array), so a kept record stays what it was.
+   */
   private readonly at: Point[] = [];
   /** The tint each ring's colour has now. */
-  private readonly tints: number[] = [];
+  private readonly tints: RingTint[] = [];
   private readonly active: boolean[] = [];
   private next = 0;
 

@@ -142,7 +142,9 @@ describe('placeChampion', () => {
   it('does not call the position set or the rotation setter, which take raw doubles', () => {
     const view = new Object3D();
     const set = vi.spyOn(view.position, 'set');
+    const setY = vi.spyOn(view.rotation, 'y', 'set');
     placeChampion(view, champion(1, 2, 3));
     expect(set).not.toHaveBeenCalled();
+    expect(setY).not.toHaveBeenCalled();
   });
 });
