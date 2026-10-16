@@ -1,7 +1,6 @@
 import { expect } from 'vitest';
 import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
-import type { ChampionState, GameState, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
-import type { KitDef } from '@claudeline/sim';
+import type { ChampionState, GameState, KitDef, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import {
   oracleCornered,
   oracleDashLanding,
@@ -59,12 +58,12 @@ export interface KitSet {
 }
 
 /**
- * An ally slot, written from the kit file (docs/architecture/bots.md, Allies): the slot is pressed
- * at an alive ally of the champion that is missing at least `need` health (no overheal), within
- * `reach` less the 1 m margin of it, and for a bolt with a clear shot of `clearance`. A bolt never
- * hits its owner (the champion is not an ally of itself) and is aimed at the ally; an area on
- * allies is placed on the champion and counts the champion itself. Of several allies the one with
- * the lowest health fraction is the one, a tie going to the lower id.
+ * An ally slot, written from the kit file (docs/architecture/bots.md, Casting, Ally slots): the
+ * slot is pressed at an alive ally of the champion that is missing at least `need` health (no
+ * overheal), within `reach` less the 1 m margin of it, and for a bolt with a clear shot of
+ * `clearance`. A bolt never hits its owner (the champion is not an ally of itself) and is aimed at
+ * the ally; an area on allies is placed on the champion and counts the champion itself. Of several
+ * allies the one with the lowest health fraction is the one, a tie going to the lower id.
  */
 export interface AllyRow {
   bolt: boolean;
@@ -521,6 +520,8 @@ export interface Played {
   allyHeals: number[];
   /** Per champion id, the thinks on which it pressed a button, whether or not the sim started it. */
   presses: number[];
+  /** The ticks from roundStarted to roundEnded of the rounds that were not sudden death, in order. */
+  rounds: number[];
   summary: string;
 }
 
@@ -547,6 +548,9 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
   let firstDeath = -1;
   const presses = state.champions.map(() => 0);
   const hits: Record<string, number> = {};
+  const rounds: number[] = [];
+  let roundStartedAt = 0;
+  let suddenDeath = false;
   const allyHeals = state.champions.map(() => 0);
   /** The `champion:SLOT` of the cast that fired each projectile still to be heard of. */
   const projectileSlot = new Map<number, string>();
@@ -645,6 +649,13 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
         if (e.slot === 'F') ultimates[e.championId] = (ultimates[e.championId] ?? 0) + 1;
       } else if (e.type === 'castFired') {
         fired.add(e.championId);
+      } else if (e.type === 'roundStarted') {
+        roundStartedAt = state.tick;
+        suddenDeath = false;
+      } else if (e.type === 'suddenDeathStarted') {
+        suddenDeath = true;
+      } else if (e.type === 'roundEnded') {
+        if (!suddenDeath) rounds.push(state.tick - roundStartedAt);
       } else if (e.type === 'projectileSpawned') {
         // The cast that fired it fires in this very step, on the turn of its owner.
         const cast = state.events.find((x) => x.type === 'castFired' && x.championId === e.ownerId);
@@ -698,6 +709,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
     hits,
     allyHeals,
     presses,
+    rounds,
     summary,
   };
 }

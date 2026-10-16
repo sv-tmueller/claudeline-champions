@@ -11,11 +11,11 @@ import { arena01, copyInput, rosterKits } from './helpers';
 import { OPEN, THINKS, firstPress, labelOf, pressOf, sceneOf } from './scenes';
 import type { Options, Press } from './scenes';
 
-// Lumeth's ally slots (docs/architecture/bots.md, Allies): M2, R, F and M1 are pressed at an ally
-// that is missing at least what the ability gives (M1 10, M2 14, R 30, F 30), within the reach of
-// the ability less the 1 m margin (11, 9.133, 4.5, 4.5 m), and a bolt needs a clear shot. Lumeth
-// stands at (-6, 0); the enemy, the acted target, is 8 m north of her at (-6, 8), so it is neither
-// in line with an ally nor within her 3 m trigger.
+// Lumeth's ally slots (docs/architecture/bots.md, Casting, Ally slots): M2, R, F and M1 are
+// pressed at an ally that is missing at least what the ability gives (M1 10, M2 14, R 30, F 30),
+// within the reach of the ability less the 1 m margin (11, 9.133, 4.5, 4.5 m), and a bolt needs a
+// clear shot. Lumeth stands at (-6, 0); the enemy, the acted target, is 8 m north of her at
+// (-6, 8), so it is neither in line with an ally nor within her 3 m trigger.
 
 const kits = rosterKits();
 const ME = { x: -6, y: 0 };
@@ -185,7 +185,7 @@ describe('Mend Bolt (M1) at an ally or an enemy', () => {
   });
 
   it('is pressed at an ally within 11 m, and at the enemy past 11.05 m', () => {
-    expect(degreesOff(pressAt(bolt(10, [4.9, 0])), { x: 4.9, y: 0 })).toBeLessThan(6);
+    expect(degreesOff(pressAt(bolt(10, [5, 0])), { x: 5, y: 0 })).toBeLessThan(6);
     expect(degreesOff(pressAt(bolt(10, [5.05, 0])), ENEMY)).toBeLessThan(6);
   });
 

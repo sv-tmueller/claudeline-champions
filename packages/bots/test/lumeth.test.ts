@@ -20,7 +20,10 @@ const SEEDS_3V3 = [101, 102, 103, 104, 105, 106];
 /**
  * The tick budget of a match, by the formula of the client's match-setup.test.ts and the e2e rows:
  * the end tick when the budget was set, plus two rounds of `round` ticks and one sudden-death
- * round of 7000, rounded up to 1000. The round term is 1000 for a 2v2 and 1600 for a 3v3.
+ * round of 7000, rounded up to 1000. The round term is the longest round that did not go to sudden
+ * death, rounded up to 100: 1626 ticks in the 2v2 runs here (1700), and 3331 in the client's 3v3 of
+ * the same roster (3400; the 3v3 runs here have 1969 at most, with other seeds). A run whose longest
+ * round passes its term fails, so the term follows the rounds and not the old figures.
  */
 function budgetOf(endTick: number, round: number): number {
   return Math.ceil((endTick + 2 * round + 7000) / 1000) * 1000;
@@ -46,8 +49,8 @@ const ROWS: Row[] = [
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
     endTick: 6409,
-    round: 1000,
-    budget: 16_000,
+    round: 1700,
+    budget: 17_000,
   },
   {
     name: 'a 2v2 on arena02',
@@ -56,8 +59,8 @@ const ROWS: Row[] = [
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
     endTick: 4860,
-    round: 1000,
-    budget: 14_000,
+    round: 1700,
+    budget: 16_000,
   },
   {
     name: 'a 3v3 on arena01',
@@ -66,8 +69,8 @@ const ROWS: Row[] = [
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
     endTick: 11167,
-    round: 1600,
-    budget: 22_000,
+    round: 3400,
+    budget: 25_000,
   },
   {
     name: 'a 3v3 on arena02',
@@ -76,8 +79,8 @@ const ROWS: Row[] = [
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
     endTick: 7373,
-    round: 1600,
-    budget: 18_000,
+    round: 3400,
+    budget: 22_000,
   },
 ];
 
@@ -109,6 +112,8 @@ describe('a match of bots with Lumeth, played to matchEnd', () => {
     // Strictly: play stops at matchEnd, and a run that went on would end on the budget.
     expect(state.tick, result.summary).toBeLessThan(row.budget);
     expect(budgetOf(row.endTick, row.round)).toBe(row.budget);
+    // The term holds for the rounds of this run: none that ended before sudden death ran longer.
+    expect(Math.max(...result.rounds), result.summary).toBeLessThanOrEqual(row.round);
     expect(result.tally.blockedEscapes, result.summary).toBe(0);
     expectNoStall(result);
   });

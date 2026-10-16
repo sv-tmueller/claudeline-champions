@@ -329,12 +329,12 @@ export class AbilityWatcher {
           after.get(e.projectileId) ??
           this.flagsFromCast(state, e.ownerId);
         if (!flags) {
-          this.check(false, `projectile ${e.projectileId} hit champion ${e.targetId} and no flags are known`, state);
+          this.check(false, `projectile ${e.projectileId} of champion ${e.ownerId} hit champion ${e.targetId} and no flags are known`, state);
         } else if (owner.team === target.team) {
-          this.check(flags.ally, `projectile ${e.projectileId} hit an ally of its owner with no allyEffects`, state);
-          this.check(e.targetId !== e.ownerId, `projectile ${e.projectileId} hit its owner`, state);
+          this.check(flags.ally, `projectile ${e.projectileId} of champion ${e.ownerId} hit its ally ${e.targetId} with no allyEffects`, state);
+          this.check(e.targetId !== e.ownerId, `projectile ${e.projectileId} of champion ${e.ownerId} hit its owner`, state);
         } else {
-          this.check(flags.enemy, `projectile ${e.projectileId} hit an enemy with empty effects`, state);
+          this.check(flags.enemy, `projectile ${e.projectileId} of champion ${e.ownerId} hit an enemy with empty effects (champion ${e.targetId})`, state);
         }
       } else if (e.type === 'energyGained') {
         const caster = state.champions[e.championId] as ChampionState;
@@ -343,8 +343,8 @@ export class AbilityWatcher {
         const healed = state.events.some(
           (h) => h.type === 'heal' && h.targetId === e.targetId && h.sourceId === e.championId,
         );
-        this.check(kitOf(state, caster)?.support === true, `energy for a heal of an ally by a kit that is not support (champion ${e.championId})`, state);
-        this.check(healed, `energy for ally ${e.targetId} with no heal that restored health to it in the step`, state);
+        this.check(kitOf(state, caster)?.support === true, `champion ${e.championId} earned energy for a heal of ally ${e.targetId} with a kit that is not support`, state);
+        this.check(healed, `champion ${e.championId} earned energy for ally ${e.targetId} with no heal that restored health to it in the step`, state);
       }
     }
   }
