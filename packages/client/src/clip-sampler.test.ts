@@ -165,6 +165,17 @@ describe('the rig of a view', () => {
     expect(Array.from(rig.rest.subarray(0, 24))).toEqual(rest.slice(0, 24));
   });
 
+  it('primes the sampler at load and leaves the bones exactly where the model had them', async () => {
+    const gltf = await model('lumeth');
+    const root = cloneSkinned(gltf.scene);
+    const before = readPose(root);
+    const rig = createClipRig(root, gltf.animations);
+    expect(readPose(root)).toEqual(before);
+    expect(Array.from(rig.cursor).every((cursor) => cursor === 1)).toBe(true);
+    expect(Array.from(rig.time)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(rig.from).every((value) => value === 0)).toBe(true);
+  });
+
   it.each(['Attack', 'Cast', 'Hit'] as const)('leaves the legs and Hips at rest for %s alone, and moves the spine and arms', async (name) => {
     const { root, rig } = await view('quillon');
     const rest = readPose(root);

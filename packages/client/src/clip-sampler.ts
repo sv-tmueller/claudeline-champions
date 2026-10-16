@@ -14,6 +14,7 @@ import {
   D_XF_W,
   OV_CLIP,
   OV_NONE,
+  scriptAnims,
   type ChampionAnim,
 } from './champion-anim';
 
@@ -159,6 +160,15 @@ export function createClipRig(root: Object3D, clips: readonly AnimationClip[]): 
     pair: new Float64Array(8),
     alpha: new Float64Array(1),
   };
+  // Primes the sampler: the script of champion-anim.ts poses every state once, a crossfade between
+  // two overlays included, so V8 has the type feedback of every branch before the first frame (see
+  // there). The bones go back to rest after.
+  scriptAnims((anim) => poseChampion(rig, anim));
+  writePose(rig, rest);
+  rig.cursor.fill(1);
+  rig.time.fill(0);
+  rig.from.fill(0);
+  rig.cur.fill(0);
   return rig;
 }
 

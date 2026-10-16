@@ -553,3 +553,110 @@ function stepDeath(anim: ChampionAnim): void {
   if (w >= 1 - EPS) d[D_DEATH_W] = 1;
   else d[D_DEATH_W] = w;
 }
+
+// The priming script. V8 compiles a hot function with the type feedback it has seen, and a
+// branch it has never run is compiled as a deopt: the first stop, dash, Cast or death that
+// reached the frame loop threw the optimized code of `stepRun` or `poseChampion` away, and the
+// function ran in the interpreter for hundreds of calls, which boxes a double per operation
+// (7 to 25 KB per probe window on the first run of this module, and 2 to 10 KB when the first
+// crossfade between two overlays came inside a window). So every branch runs once at
+// load, on a record of its own, and the feedback exists before the first frame. Each row is
+// [ticks, vx, vy, facing, dx, event]: the champion walks at (vx, vy), moves by dx per tick (a
+// dash has no walk velocity) and the event, if any, is triggered on the row's first tick.
+const EVENT_NONE = 0;
+const EVENT_ATTACK = 1;
+const EVENT_CAST = 2;
+const EVENT_INTERRUPT = 3;
+const EVENT_HIT = 4;
+const EVENT_DASH_ON = 5;
+const EVENT_DASH_OFF = 6;
+const EVENT_DEATH = 7;
+const EVENT_SNAP = 8;
+const SCRIPT: readonly (readonly number[])[] = [
+  [20, 0, 0, 0, 0, EVENT_NONE],
+  // A walk and a stop, at every phase it can stop at, in both directions and at a slow pace.
+  [25, 5.5, 0, 0, 0, EVENT_NONE],
+  [30, 0, 0, 0, 0, EVENT_NONE],
+  [3, 5.5, 2, 0.5, 0, EVENT_NONE],
+  [30, 0, 0, 0.5, 0, EVENT_NONE],
+  [25, -5.5, 0, 0, 0, EVENT_NONE],
+  [30, 0, 0, 0, 0, EVENT_NONE],
+  [7, 1, 0, 0, 0, EVENT_NONE],
+  [30, 0, 0, 0, 0, EVENT_NONE],
+  [9, 0, 6, 1.5, 0, EVENT_NONE],
+  [30, 0, 0, 1.5, 0, EVENT_NONE],
+  [11, 8.25, 0, 0, 0, EVENT_NONE],
+  [30, 0, 0, 0, 0, EVENT_NONE],
+  // Overlays over a walk and over Idle, replacing, interrupted and cut short.
+  [6, 5.5, 0, 0, 0, EVENT_ATTACK],
+  [10, 5.5, 0, 0, 0, EVENT_CAST],
+  [4, 5.5, 0, 0, 0, EVENT_HIT],
+  [10, 5.5, 0, 0, 0, EVENT_INTERRUPT],
+  [30, 0, 0, 0, 0, EVENT_NONE],
+  [9, 0, 0, 0, 0, EVENT_ATTACK],
+  [30, 0, 0, 0, 0, EVENT_ATTACK],
+  [4, 0, 0, 0, 0, EVENT_CAST],
+  [10, 0, 0, 0, 0, EVENT_ATTACK],
+  [10, 5.5, 0, 0, 0, EVENT_CAST],
+  [6, 5.5, 0, 0, 0, EVENT_ATTACK],
+  [30, 0, 0, 0, 0, EVENT_NONE],
+  [30, 0, 0, 0, 0, EVENT_INTERRUPT],
+  [20, 0, 0, 0, 0, EVENT_HIT],
+  [5, 0, 0, 0, 0, EVENT_HIT],
+  [30, 5.5, 0, 0, 0, EVENT_HIT],
+  // A dash forward, a dash against the facing, and the end.
+  [12, 0, 0, 0, 0.5, EVENT_DASH_ON],
+  [12, 0, 0, 0, -0.5, EVENT_NONE],
+  [20, 0, 0, 0, 0, EVENT_DASH_OFF],
+  [10, 5.5, 0, 0, 0, EVENT_DASH_ON],
+  [10, 5.5, 0, 0, 0, EVENT_DASH_OFF],
+  // A death over a walk and an Attack, held, then the next round, and a death from Idle.
+  [6, 5.5, 0, 0, 0, EVENT_ATTACK],
+  [3, 5.5, 0, 0, 0, EVENT_DEATH],
+  [90, 0, 0, 0, 0, EVENT_NONE],
+  [6, 0, 0, 0, 0, EVENT_SNAP],
+  [20, 0, 0, 0, 0, EVENT_NONE],
+  [4, 0, 0, 0, 0, EVENT_HIT],
+  [90, 0, 0, 0, 0, EVENT_DEATH],
+  [6, 0, 0, 0, 0, EVENT_SNAP],
+];
+
+/**
+ * Runs the priming script through a record of its own, calling `visit` after every update: the
+ * caller poses a rig from it, which primes the sampler. Allocates, since it runs once at load.
+ */
+export function scriptAnims(visit: (anim: ChampionAnim) => void): void {
+  const anim = createAnim();
+  const champion: AnimChampion = { x: 0, y: 0, vx: 0, vy: 0, aimX: 1000, aimY: 0 };
+  const state = { tick: 0, champions: [champion] };
+  const clock = { alpha: 0 };
+  const anims = [anim];
+  for (const row of SCRIPT) {
+    const [ticks, vx, vy, facing, dx, event] = row as [number, number, number, number, number, number];
+    champion.vx = vx;
+    champion.vy = vy;
+    // The aim point is 10 m away in the facing direction, from the origin the champion starts at.
+    champion.aimX = Math.round(Math.cos(facing) * 1000);
+    champion.aimY = Math.round(Math.sin(facing) * 1000);
+    for (let tick = 0; tick < ticks; tick++) {
+      if (tick === 0) triggerEvent(anim, event);
+      champion.x += dx;
+      state.tick += 1;
+      clock.alpha = (tick % 4) / 4;
+      updateAnims(anims, state, clock);
+      visit(anim);
+    }
+  }
+}
+
+function triggerEvent(anim: ChampionAnim, event: number): void {
+  if (event === EVENT_ATTACK) triggerCast(anim, CAST_ATTACK);
+  else if (event === EVENT_CAST) triggerCast(anim, CAST_OTHER);
+  else if (event === EVENT_INTERRUPT) triggerInterrupt(anim);
+  else if (event === EVENT_HIT) triggerHit(anim);
+  else if (event === EVENT_DASH_ON) triggerDash(anim, 1);
+  else if (event === EVENT_DASH_OFF) triggerDash(anim, 0);
+  else if (event === EVENT_DEATH) triggerDeath(anim);
+  else if (event === EVENT_SNAP) triggerSnap(anim);
+  else if (event !== EVENT_NONE) throw new Error(`unknown event ${event} in the priming script`);
+}

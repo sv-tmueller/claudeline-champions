@@ -14,6 +14,7 @@ import {
   D_XF_W,
   D_RUN_W,
   RUN_MAX_SCALE,
+  scriptAnims,
   createAnim,
   triggerCast,
   triggerDash,
@@ -594,6 +595,34 @@ describe('the clock', () => {
     w.again();
     expect(w.anim.d[D_IDLE_T]).toBeLessThanOrEqual(2);
     expect(w.anim.d[D_IDLE_T]).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('the priming script', () => {
+  it('visits every state of the machine, so V8 has seen every branch before the first frame', () => {
+    const codes = new Set<number>();
+    const modes = new Set<number>();
+    const held = new Set<number>();
+    const signs = new Set<number>();
+    const dashing = new Set<number>();
+    const xfades = new Set<number>();
+    let frames = 0;
+    scriptAnims((anim) => {
+      frames++;
+      codes.add(anim.code);
+      modes.add(anim.mode);
+      held.add(anim.held);
+      signs.add(Math.sign(anim.d[D_RUN_SCALE] as number));
+      dashing.add(anim.dashing);
+      xfades.add(anim.xfade);
+    });
+    expect([...codes].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect([...modes].sort()).toEqual([0, 1, 2]);
+    expect([...held].sort()).toEqual([0, 1]);
+    expect([...signs].sort()).toEqual([-1, 0, 1]);
+    expect([...dashing].sort()).toEqual([0, 1]);
+    expect([...xfades].sort()).toEqual([0, 1]);
+    expect(frames).toBeGreaterThan(300);
   });
 });
 
