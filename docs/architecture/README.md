@@ -43,9 +43,11 @@ first.
   Skerrow's wait at 6 to 8 m and her Quiet Dart opener, and no dash pressed on
   an escape think for any kit (#98); aim leading and three tiers. A think
   allocates nothing in the steady state and a plan search only its path
-  (`packages/bots/test/allocation.test.ts`). Lumeth's rules so far are Binding
-  Sigil beside an ally and the 3 m escape trigger with Lantern Burst and Glide;
-  her ally slots are not built yet.
+  (`packages/bots/test/allocation.test.ts`). Lumeth has Binding Sigil beside an
+  ally, the 3 m escape trigger with Lantern Burst and Glide, and her ally
+  slots: Mend Bolt, Soothing Surge, Aegis Veil and Dawnbloom pressed at the
+  ally that needs them, with the bolts aimed at it through their windup. Her
+  leash to an ally and the EX variants of M2 and R are not built.
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
   any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
