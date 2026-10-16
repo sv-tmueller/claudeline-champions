@@ -535,16 +535,16 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   The four rows of #111, each applied alone on f67a490 with 3 attempts per
   scene: the first three fail 6 of 6 (the object and the table name
   `clip-sampler.ts:poseChampion` at 2.9 to 3.5 KB a window, and the argument
-  names `main.ts:draw`, which V8 inlines `updateAnims` into, at 1.0 to 1.2 KB),
-  and the closure passes 6 of 6, which is the expected reading: it is one
-  function object per transition, a few per window, so `stepRun` reads 28 to 140
-  B in the windows of the live scene and nothing in the sandbox, where no walk
-  stops in a window. It is recorded like the `createGain` row of the audio
-  (client.md, Audio). The existing rows rerun on the same head, all red 6 of 6:
-  the array in `frame` (sandbox 1512 to 1664 B, live 1628 to 1804 B), the
-  closure in `routeEvents` (1620 to 1744 B and 1712 to 1768 B) and the object in
-  the entity views' `draw` (3072 to 3120 B and 3000 to 3100 B), against clean
-  medians of 324 to 456 B and 432 to 576 B.
+  names `main.ts:draw` or `champion-anim.ts:updateAnims`, by where V8 inlines
+  it, at 1.0 to 1.2 KB), and the closure passes 6 of 6, which is the expected
+  reading: it is one function object per transition, a few per window, so
+  `stepRun` reads 28 to 140 B in the windows of the live scene and nothing in
+  the sandbox, where no walk stops in a window. It is recorded like the
+  `createGain` row of the audio (client.md, Audio). The existing rows rerun on
+  the same head, all red 6 of 6: the array in `frame` (sandbox 1512 to 1664 B,
+  live 1628 to 1804 B), the closure in `routeEvents` (1620 to 1744 B and 1712 to
+  1768 B) and the object in the entity views' `draw` (3072 to 3120 B and 3000 to
+  3100 B), against clean medians of 324 to 456 B and 432 to 576 B.
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure

@@ -304,6 +304,7 @@ The transitions are tuned constants in ticks at 60 Hz:
 | castStarted of M1, a champion or a bot | Attack from time 0; the next M1 restarts it | in 3, out over its last 6 of 24 |
 | castStarted of any other slot | Cast, 30 ticks | in 3, out over its last 6 |
 | castInterrupted | the Attack or Cast fades from its weight | 6 |
+| a cast while an overlay plays | the new overlay, entered from the weight the last frame showed, with Spine and both arms crossfaded from the pose last drawn | 3 |
 | damage with `sourceId >= 0`, when no Attack or Cast plays and no Hit runs | Hit, 18 ticks | in 2, out over its last 6 |
 | death, the ring's included | Death, held on its last frame | in 6, from the pose of the moment |
 | roundStarted | Idle at time 0 | snap |
@@ -312,9 +313,11 @@ Run's time scale is `speed * 2 / 5.5`, so it is 2 at 5.5 m/s: a step covers
 1.83 m of ground against 0.92 m of foot travel in the clip, and the feet would
 slide at scale 1. It is at most 3 (a haste at its cap) and a dash plays at that
 cap. It is negative, so Run plays backward, when the velocity opposes the
-facing (for a dash, the displacement of the frame does). The facing is the
-direction to the aim point, which the sim turns it to every tick, so the sign
-needs no trigonometry. There are no strafe clips.
+facing (for a dash, the displacement of the frame does, and a frame with no step
+keeps the sign of the last one that had a direction). A dash ends with the sim's
+dashEnded, and with the round's end, which freezes a dash and emits none. The
+facing is the direction to the aim point, which the sim turns it to every tick,
+so the sign needs no trigonometry. There are no strafe clips.
 
 The blend has no additive part anywhere:
 
@@ -323,8 +326,12 @@ The blend has no additive part anywhere:
 - The upper overlay (Attack, Cast or Hit) replaces the channels its clip keys,
   Spine and both arms, with `slerp(base, overlay, w)`. At w = 1 the strike
   reads fully while the legs and Hips keep Run's. A cast that replaces an
-  Attack that plays goes on from the weight the Attack had, and its first pose
-  is the rest pose, so a cast started halfway through an Attack jumps there.
+  overlay that plays goes on from the weight the last frame showed (the clip's
+  last 6 ticks cut it, so a held M1 restarts in 3 ticks and not in one), and
+  Spine and both arms crossfade over 3 ticks from the pose last drawn to the
+  new overlay's, since its first key is the rest pose: Quillon's Cast over an
+  Attack at its 8th tick turned Arm_R 77 degrees in one tick before, and now at
+  most 27.6 degrees a tick.
 - Death goes over everything. Its five channels (Hips rotation and translation,
   Spine and both arms) blend from the pose of the moment by its weight, and the
   legs, which it does not key, blend to rest. Its time stops at the clip's end
