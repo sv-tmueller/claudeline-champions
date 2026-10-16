@@ -46,6 +46,7 @@ function recorder(): { handlers: FeedbackHandlers; calls: Call[]; records: SimEv
     interrupt: (tick, event) => calls.push({ kind: 'interrupt', args: [tick, event.championId] }),
     dash: (tick, championId, active) => calls.push({ kind: 'dash', args: [tick, championId, active] }),
     roundStarted: (tick) => calls.push({ kind: 'roundStarted', args: [tick] }),
+    roundEnded: (tick) => calls.push({ kind: 'roundEnded', args: [tick] }),
     hit: (tick, event) => {
       calls.push({ kind: 'hit', args: [tick, event.x, event.y] });
       records.push(event);
@@ -104,6 +105,7 @@ describe('routeEvents', () => {
         { type: 'castInterrupted', championId: 1, castId: 6, slot: 'Q', ex: true, reason: 'stun' },
         { type: 'dashStarted', championId: 2, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
         { type: 'dashEnded', championId: 2, x: 4, y: 0, reason: 'complete' },
+        { type: 'roundEnded', round: 1, winner: 'A', scoreA: 1, scoreB: 0 },
         { type: 'roundStarted', round: 2 },
       ]),
       handlers,
@@ -114,6 +116,7 @@ describe('routeEvents', () => {
       { kind: 'interrupt', args: [12, 1] },
       { kind: 'dash', args: [12, 2, 1] },
       { kind: 'dash', args: [12, 2, 0] },
+      { kind: 'roundEnded', args: [12] },
       { kind: 'roundStarted', args: [12] },
     ]);
   });
@@ -598,6 +601,20 @@ describe('the animation triggers', () => {
     );
     expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 1]);
     routeEvents(fakeState(13, [{ type: 'dashEnded', championId: 3, x: 4, y: 0, reason: 'complete' }]), feedback);
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('ends every dash when a round ends: the sim freezes them and emits no dashEnded', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [
+        { type: 'dashStarted', championId: 1, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+        { type: 'dashStarted', championId: 3, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+      ]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 1, 0, 1]);
+    routeEvents(fakeState(9, [{ type: 'roundEnded', round: 1, winner: 'A', scoreA: 1, scoreB: 0 }]), feedback);
     expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 0]);
   });
 

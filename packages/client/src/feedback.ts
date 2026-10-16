@@ -38,6 +38,8 @@ export interface FeedbackHandlers {
   dash(tick: number, championId: number, active: number): void;
   /** A round began: the champions stand at their spawns again. */
   roundStarted(tick: number): void;
+  /** A round ended: the sim freezes a running dash and emits no dashEnded for it. */
+  roundEnded(tick: number): void;
   /** A projectile touched a champion. */
   hit(tick: number, event: ProjectileHitEvent): void;
   /** A projectile ended on an obstacle, the boundary or its lifetime. */
@@ -73,6 +75,9 @@ export function routeEvents(state: GameState, handlers: FeedbackHandlers): void 
         break;
       case 'roundStarted':
         handlers.roundStarted(tick);
+        break;
+      case 'roundEnded':
+        handlers.roundEnded(tick);
         break;
       case 'projectileHit':
         handlers.hit(tick, event);
@@ -160,6 +165,10 @@ export class CombatFeedback implements FeedbackHandlers {
   dash(_tick: number, championId: number, active: number): void {
     const anim = this.anims[championId];
     if (anim !== undefined) triggerDash(anim, active);
+  }
+
+  roundEnded(): void {
+    for (let i = 0; i < this.anims.length; i++) triggerDash(this.anims[i] as ChampionAnim, 0);
   }
 
   roundStarted(): void {

@@ -219,7 +219,7 @@ function slerpFlat(
   dst[dstOffset + 3] = w0;
 }
 
-/** The linear mix of three's `PropertyMixer._lerp`, for the Hips translation: dst = a (1 - t) + b t. */
+/** The linear mix of three's `PropertyMixer._lerp` for the Hips translation: a (1 - t) + b t. */
 function lerpPosition(
   dst: Float64Array,
   dstOffset: number,

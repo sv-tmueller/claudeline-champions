@@ -56,7 +56,10 @@ const RUN_MIN_SPEED_SQUARED = RUN_MIN_SPEED * RUN_MIN_SPEED;
 export const RUN_REFERENCE_SPEED = 5.5;
 export const RUN_FOOT_FACTOR = 2;
 const RUN_SCALE_PER_SPEED = RUN_FOOT_FACTOR / RUN_REFERENCE_SPEED;
-/** The most the clip is scaled: a dash plays at it, and so does a hasted walk (8.25 m/s at the cap). */
+/**
+ * The most the clip is scaled: a dash plays at it, and so does a hasted walk (8.25 m/s at the
+ * cap).
+ */
 export const RUN_MAX_SCALE = 3;
 const IDLE_SECONDS = 2;
 const RUN_SECONDS = 20 / 30;
@@ -89,9 +92,9 @@ export const D_RUN_SCALE = 6;
 export const D_RUN_REMAIN = 7;
 export const D_RUN_KEY = 8;
 export const D_OV_T = 9;
-/** The overlay weight before the clip's end fades it: it moves up, or down after an interrupt. */
+/** The overlay weight before the clip's end fades it: up, or down after an interrupt. */
 export const D_OV_RAW = 10;
-/** The weight the sampler uses: the raw weight, cut by the fade over the last 6 ticks of the clip. */
+/** The weight the sampler uses: the raw weight, cut by the fade of the clip's last 6 ticks. */
 export const D_OV_W = 11;
 export const D_DEATH_T = 12;
 export const D_DEATH_W = 13;
@@ -129,8 +132,10 @@ export interface ChampionAnim {
   held: number;
   /** 1 when the Run of the last frame sat on a passing key: a stop then holds at once. */
   atKey: number;
-  /** 1 between the sim's dashStarted and dashEnded events of this champion. */
+  /** 1 between the sim's dashStarted and dashEnded events of this champion (and a round end). */
   dashing: number;
+  /** 1 or -1: the direction Run plays, from the last frame that had one (a dot of 0 keeps it). */
+  sign: number;
   /** 1 until the first update, which has no frame before it to measure a displacement from. */
   fresh: number;
   /** 1 when the champion walks or dashes, 0 when it is idle: the base clip it is heading for. */
@@ -160,6 +165,7 @@ export function createAnim(): ChampionAnim {
     held: 0,
     atKey: 0,
     dashing: 0,
+    sign: 1,
     fresh: 1,
     want: 0,
     ov: OV_NONE,
@@ -295,8 +301,10 @@ function takeTriggers(anim: ChampionAnim): void {
     anim.pendCast = 0;
     anim.ovFade = 0;
     d[D_OV_T] = 0;
-    // The weight goes on from where it is: a restarted Attack does not drop out and rise again.
+    // The weight goes on from the weight the last frame showed, which the last 6 ticks of the
+    // clip had cut: a restart in that tail rises in 3 ticks, it does not jump to the raw weight.
     // A cast wins over a Hit of the same frame.
+    d[D_OV_RAW] = d[D_OV_W] as number;
     anim.pendHit = 0;
   }
   if (anim.pendHit !== 0) {
@@ -317,6 +325,7 @@ function snap(anim: ChampionAnim): void {
   anim.held = 0;
   anim.atKey = 0;
   anim.dashing = 0;
+  anim.sign = 1;
   anim.want = 0;
   anim.ov = OV_NONE;
   anim.ovFade = 0;
@@ -370,11 +379,12 @@ function stepRun(anim: ChampionAnim, champion: AnimChampion): void {
     }
     anim.mode = RUN_ON;
     anim.held = 0;
-    // Forward unless the champion walks or dashes against its facing. The facing is the direction to
-    // the aim point (the sim turns it there every tick), so the dot product needs no trig: only its
-    // sign matters. A dash has no walk velocity, so its motion is the displacement since the last
-    // frame. The choice between the two is arithmetic on 0 or 1, not a branch or a select: a double
-    // that comes out of a branch is a phi, which V8's Maglev may box.
+    // Forward unless the champion walks or dashes against its facing. The facing is the
+    // direction to the aim point (the sim turns it there every tick), so the dot product needs
+    // no trig: only its sign matters. A dash has no walk velocity, so its motion is the
+    // displacement since the last frame. The choice between the two is arithmetic on 0 or 1,
+    // not a branch or a select: a double that comes out of a branch is a phi, which V8's Maglev
+    // may box.
     const toAimX = champion.aimX / 100 - x;
     const toAimY = champion.aimY / 100 - y;
     const dash = anim.dashing;
@@ -383,10 +393,14 @@ function stepRun(anim: ChampionAnim, champion: AnimChampion): void {
     const walkScale = d[D_RUN_SCALE] as number;
     let scale = walkScale + (RUN_MAX_SCALE - walkScale) * dash;
     const dot = (dx * toAimX + dy * toAimY) * dash + (vx * toAimX + vy * toAimY) * (1 - dash);
-    // The sign is an integer, 1 or -1, and the scale is multiplied: a double negated under a branch was boxed.
-    scale *= dot < 0 ? -1 : 1;
+    // The sign is an integer, 1 or -1, and the scale is multiplied: a double negated under a
+    // branch was boxed. A frame with no step has no displacement, so a dot of 0 keeps the sign of
+    // the last frame that had a direction.
+    if (dot !== 0) anim.sign = dot < 0 ? -1 : 1;
+    scale *= anim.sign;
     d[D_RUN_SCALE] = scale;
-    // A step of the clip clock, at most MAX_DT times the scale cap, is shorter than the clip: one wrap.
+    // A step of the clip clock, at most MAX_DT times the scale cap, is shorter than the clip:
+    // one wrap.
     let t = (d[D_RUN_T] as number) + dt * scale;
     if (t >= RUN_SECONDS) t -= RUN_SECONDS;
     else if (t < 0) t += RUN_SECONDS;

@@ -127,9 +127,15 @@ describe('Idle and Run', () => {
     w.run(1);
     for (let tick = 0; tick < 3; tick++) {
       w.champion.x -= 0.5;
+      w.clock.alpha = 0;
       w.run(1);
+      // A frame between two ticks sees no step, so no displacement: the direction of the last one stays.
+      w.clock.alpha = 0.5;
+      w.again();
+      expect(w.anim.d[D_RUN_SCALE]).toBe(-RUN_MAX_SCALE);
     }
     expect(w.anim.d[D_RUN_SCALE]).toBe(-RUN_MAX_SCALE);
+    w.clock.alpha = 0;
     w.champion.x += 0.5;
     w.run(1);
     expect(w.anim.d[D_RUN_SCALE]).toBe(RUN_MAX_SCALE);
@@ -358,6 +364,20 @@ describe('Attack and Cast', () => {
     expect(w.anim.d[D_OV_T]).toBe(0);
     expect(w.text()).toBe('Idle+Attack');
     expect(w.anim.d[D_OV_W]).toBe(1);
+  });
+
+  it('restarts Attack in its last 6 ticks from the weight it showed, in 3 ticks and not in one', () => {
+    const w = world();
+    triggerCast(w.anim, CAST_ATTACK);
+    w.run(23);
+    const shown = w.anim.d[D_OV_W] as number;
+    expect(shown).toBeCloseTo(1 / 6, 6);
+    triggerCast(w.anim, CAST_ATTACK);
+    w.run(1);
+    expect((w.anim.d[D_OV_W] as number) - shown).toBeLessThanOrEqual(1 / 3 + 1e-9);
+    expect(w.anim.d[D_OV_W]).toBeGreaterThan(shown);
+    w.run(2);
+    expect(w.anim.d[D_OV_W]).toBeCloseTo(1, 6);
   });
 
   it('plays Cast for any other slot, 15 frames, in 3 ticks and out 6', () => {
