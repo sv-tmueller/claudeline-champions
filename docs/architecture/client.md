@@ -139,13 +139,17 @@ sim's constant, 3):
   the first team A spawn, (-12, 2) on arena01 and (-11, 2) on arena02, and the
   e2e coordinates hold.
 - Team B is one row of `ENEMY_ROSTER` by team size: Hargrim and Quillon in a
-  2v2, Hargrim and two Quillons in a 3v3. Team A is the pick plus that row
+  2v2, Hargrim, Quillon and Lumeth in a 3v3. Team A is the pick plus that row
   without the pick's own entry, or without its first entry when the pick is not
   in the row. So the 2v2 ally is the other of Quillon and Hargrim (Quillon for
   Hargrim, Skerrow and Lumeth, Hargrim for Quillon), and in a 3v3 the Hargrim
-  pick has two Quillon allies, which is the bots package's headless `config3v3`
-  (`packages/bots/test/headless-kits.test.ts`, mirrored as a literal in
-  `match-setup.test.ts`, since the client cannot import a bots test).
+  pick has a Quillon and a Lumeth ally, which is the bots package's headless
+  `lumeth3v3` (`configLumeth3v3` in `packages/bots/test/helpers.ts`, mirrored
+  as a literal in `match-setup.test.ts`, since the client cannot import a bots
+  test). The 2v2 row has no healer, so the 2v2 matches and the live scene do
+  not move. The 3v3 tests pass the Lumeth kit with the other two
+  (`LUMETH_KIT` in `test-kits.ts`): `createMatch` accepts a champion with no
+  kit, so a test that left it out would play a Lumeth with no abilities.
 - Every champion has a kit. The bots are champions 1 to 2n-1 for n a side:
   three in a 2v2 and five in a 3v3. The local team is always A, so the score
   reads local against enemy.

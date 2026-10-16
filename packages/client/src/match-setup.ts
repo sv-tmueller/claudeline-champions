@@ -32,11 +32,12 @@ const SANDBOX_BOT_IDS: readonly number[] = [3];
 
 // Team B of each size, in champion order. Team A is team B with the pick in place of its
 // own entry, or of the first entry when the pick is not in the row. The 3v3 of the Hargrim
-// pick is the headless 3v3 of the bots package (hargrim and two quillons a side). The pick
-// stays champion 0, first on team A.
+// pick is the headless 3v3 of the bots package, its `lumeth3v3` row (hargrim, quillon and
+// lumeth a side). The 2v2 row has no healer, so the 2v2 matches and the live scene do not
+// move. The pick stays champion 0, first on team A.
 const ENEMY_ROSTER: Readonly<Record<2 | 3, readonly string[]>> = {
   2: ['hargrim', 'quillon'],
-  3: ['hargrim', 'quillon', 'quillon'],
+  3: ['hargrim', 'quillon', 'lumeth'],
 };
 
 /**

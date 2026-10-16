@@ -14,7 +14,7 @@ import arena02Json from '../../../data/arenas/arena02.json';
 import { createBotDriver } from './bot-driver';
 import type { Launch } from './launch';
 import { LOCAL_SEED, createLocalMatch, playableTeamSize } from './match-setup';
-import { HARGRIM_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
+import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
@@ -32,18 +32,23 @@ function launch3(champion: string, arenaId = 'arena01'): Launch {
 // The kit of a roster id the test kits do not load, so a pick of it still builds a match.
 const SKERROW_KIT: KitDef = { ...QUILLON_KIT, id: 'skerrow' };
 
-// The 3v3 of the bots package, copied from packages/bots/test/headless-kits.test.ts, function
-// config3v3 (lines 31 to 43 on 9612bff; docs/architecture/bots.md names it too). The client cannot
-// import a bots test, so the Hargrim pick must equal this literal by an assertion, not by import.
+// The kits of the 3v3 roster: Lumeth is in it, and `createMatch` accepts a champion with no kit, so a
+// test that leaves hers out would quietly play a Lumeth with no abilities and wrong figures.
+const KITS_3V3: readonly KitDef[] = [...TEST_KITS, LUMETH_KIT];
+
+// The 3v3 of the bots package, copied from packages/bots/test/helpers.ts, function configLumeth3v3
+// (the `lumeth3v3` row of the identity harness; docs/architecture/bots.md names it too). The client
+// cannot import a bots test, so the Hargrim pick must equal this literal by an assertion, not by
+// import.
 const BOTS_CONFIG_3V3: MatchConfig = {
   teamSize: 3,
   players: [
     { championId: 'hargrim', team: 'A' },
     { championId: 'quillon', team: 'A' },
-    { championId: 'quillon', team: 'A' },
+    { championId: 'lumeth', team: 'A' },
     { championId: 'hargrim', team: 'B' },
     { championId: 'quillon', team: 'B' },
-    { championId: 'quillon', team: 'B' },
+    { championId: 'lumeth', team: 'B' },
   ],
 };
 
@@ -103,34 +108,52 @@ describe('createLocalMatch', () => {
 
   describe('3v3', () => {
     it('plays the 3v3 of the bots package for the hargrim pick', () => {
-      const { state } = createLocalMatch(launch3('hargrim'), arena, TEST_KITS);
+      const { state } = createLocalMatch(launch3('hargrim'), arena, KITS_3V3);
       expect(state.champions.map((c) => ({ championId: c.championId, team: c.team }))).toEqual(BOTS_CONFIG_3V3.players);
     });
 
-    it('gives the quillon pick the hargrim and a quillon ally against the same enemy row', () => {
-      const { state } = createLocalMatch(launch3('quillon'), arena, TEST_KITS);
+    it('gives every champion of the 3v3 its kit, Lumeth included', () => {
+      const { state } = createLocalMatch(launch3('hargrim'), arena, KITS_3V3);
+      expect(state.kits.map((kit) => kit.id).sort()).toEqual(['hargrim', 'lumeth', 'quillon']);
+      expect(state.champions.map((c) => c.maxHealth)).toEqual([160, 120, 120, 160, 120, 120]);
+    });
+
+    it('gives the quillon pick the hargrim and the lumeth as allies against the same enemy row', () => {
+      const { state } = createLocalMatch(launch3('quillon'), arena, KITS_3V3);
       expect(state.champions.map((c) => [c.championId, c.team])).toEqual([
         ['quillon', 'A'],
+        ['hargrim', 'A'],
+        ['lumeth', 'A'],
+        ['hargrim', 'B'],
+        ['quillon', 'B'],
+        ['lumeth', 'B'],
+      ]);
+    });
+
+    it('gives the lumeth pick the hargrim and the quillon as allies', () => {
+      const { state } = createLocalMatch(launch3('lumeth'), arena, KITS_3V3);
+      expect(state.champions.map((c) => [c.championId, c.team])).toEqual([
+        ['lumeth', 'A'],
         ['hargrim', 'A'],
         ['quillon', 'A'],
         ['hargrim', 'B'],
         ['quillon', 'B'],
-        ['quillon', 'B'],
+        ['lumeth', 'B'],
       ]);
     });
 
-    it('gives a pick outside the enemy row two quillon allies', () => {
-      const { state } = createLocalMatch(launch3('skerrow'), arena, [...TEST_KITS, SKERROW_KIT]);
-      expect(state.champions.filter((c) => c.team === 'A').map((c) => c.championId)).toEqual(['skerrow', 'quillon', 'quillon']);
-      expect(state.champions.filter((c) => c.team === 'B').map((c) => c.championId)).toEqual(['hargrim', 'quillon', 'quillon']);
+    it('gives a pick outside the enemy row the quillon and the lumeth as allies, in place of the hargrim', () => {
+      const { state } = createLocalMatch(launch3('skerrow'), arena, [...KITS_3V3, SKERROW_KIT]);
+      expect(state.champions.filter((c) => c.team === 'A').map((c) => c.championId)).toEqual(['skerrow', 'quillon', 'lumeth']);
+      expect(state.champions.filter((c) => c.team === 'B').map((c) => c.championId)).toEqual(['hargrim', 'quillon', 'lumeth']);
     });
 
     it('makes champions 1 to 5 bots and leaves champion 0 to the human', () => {
-      expect(createLocalMatch(launch3('hargrim'), arena, TEST_KITS).botIds).toEqual([1, 2, 3, 4, 5]);
+      expect(createLocalMatch(launch3('hargrim'), arena, KITS_3V3).botIds).toEqual([1, 2, 3, 4, 5]);
     });
 
     it('stands the three of each team on the three spawns of arena01, team B mirrored', () => {
-      const { state } = createLocalMatch(launch3('hargrim'), arena, TEST_KITS);
+      const { state } = createLocalMatch(launch3('hargrim'), arena, KITS_3V3);
       expect(state.champions.map((c) => [c.x, c.y])).toEqual([
         [-12, 2],
         [-12, -2],
@@ -142,7 +165,7 @@ describe('createLocalMatch', () => {
     });
 
     it('stands the three of each team on the three spawns of arena02, team B mirrored', () => {
-      const { state } = createLocalMatch(launch3('hargrim', 'arena02'), arena02, TEST_KITS);
+      const { state } = createLocalMatch(launch3('hargrim', 'arena02'), arena02, KITS_3V3);
       expect(state.champions.map((c) => [c.x, c.y])).toEqual([
         [-11, 2],
         [-11, -2],
@@ -156,7 +179,7 @@ describe('createLocalMatch', () => {
 
     it('plays 2v2 on an arena with two spawns on one team, where the sim would throw', () => {
       const twoSpawns: ArenaDef = { ...arena, spawns: { teamA: arena.spawns.teamA, teamB: arena.spawns.teamB.slice(0, 2) } };
-      const { state, botIds } = createLocalMatch(launch3('hargrim'), twoSpawns, TEST_KITS);
+      const { state, botIds } = createLocalMatch(launch3('hargrim'), twoSpawns, KITS_3V3);
       expect(state.champions.map((c) => [c.championId, c.team])).toEqual([
         ['hargrim', 'A'],
         ['quillon', 'A'],
@@ -214,7 +237,7 @@ function playToTheEnd(
   played: ArenaDef = arena,
   teamSize: 2 | 3 = 2,
 ): { state: GameState; winner: string | undefined; matchEnded: number } {
-  const { state, botIds } = createLocalMatch({ ...launch('hargrim'), arena: played.id, teamSize }, played, TEST_KITS, roundsToWin);
+  const { state, botIds } = createLocalMatch({ ...launch('hargrim'), arena: played.id, teamSize }, played, KITS_3V3, roundsToWin);
   const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
   const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
   let matchEnded = 0;
@@ -306,18 +329,20 @@ describe('playableTeamSize', () => {
 });
 
 // The tick budgets of the 3v3 rows of e2e/match-end.spec.ts: the end tick of the match when the
-// budget was set (measured through this setup and the client's bot driver on 57dd52f, the bots of
-// #98; 10631 and 7119 on 9612bff), plus two rounds and one sudden-death round of about 7000,
-// rounded up to 1000. The round term is 1600, the longest non-sudden 3v3 round measured (1557
-// ticks, arena02, on both), where the 2v2 rows assume 1000. arena01: ceil((12431 + 2 * 1600 +
-// 7000) / 1000) * 1000 = 23000. arena02: ceil((7125 + 2 * 1600 + 7000) / 1000) * 1000 = 18000.
-// Every bots change moves the end tick, the console line reports the current one, and a match
-// that ends past the budget fails here before the e2e does.
-const THREE_V_THREE_ROUND_TICKS = 1600;
-const ARENA01_3V3_END_TICK = 12_431;
-const ARENA01_3V3_BUDGET_TICKS = 23_000;
-const ARENA02_3V3_END_TICK = 7125;
-const ARENA02_3V3_BUDGET_TICKS = 18_000;
+// budget was set (measured through this setup and the client's bot driver on the bots of #112, with
+// Lumeth on both teams; 12431 and 7125 with two Quillons a side on 57dd52f, the bots of #98), plus
+// two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is 3400,
+// the longest non-sudden 3v3 round measured (3331 ticks, arena01, round 3; 3227 and 2045 are the
+// next), rounded up to 100: a healer keeps a round going, where the longest was 1557 with two
+// Quillons and the 2v2 rows assume 1000. arena01: ceil((10378 + 2 * 3400 + 7000) / 1000) * 1000 =
+// 25000. arena02: ceil((11683 + 2 * 3400 + 7000) / 1000) * 1000 = 26000. Every bots change moves the
+// end tick, the console line reports the current one, and a match that ends past the budget fails
+// here before the e2e does.
+const THREE_V_THREE_ROUND_TICKS = 3400;
+const ARENA01_3V3_END_TICK = 10_378;
+const ARENA01_3V3_BUDGET_TICKS = 25_000;
+const ARENA02_3V3_END_TICK = 11_683;
+const ARENA02_3V3_BUDGET_TICKS = 26_000;
 
 describe('a 3v3 match of bots from setup to the result', () => {
   it('ends on arena01 with a winner on 3 within the budget of the e2e', { timeout: 120_000 }, () => {
