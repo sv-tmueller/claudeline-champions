@@ -416,21 +416,22 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
 - The rest of the frame path reads 0 B too (#117). On 13dab62 plus the carries,
   `main.ts:draw`, `entity-views.ts:draw`,
   `debug-overlay.ts:updateChampionCircles`, `feedback.ts:routeEvents` and
-  `impact-rings.ts:spawn` read 0 B in all 60 windows of the 12 local attempts of each scene (4 batches of 3 repeats, none
-  blind). `draw` places the champion views through `placeChampion` (position
-  fields, the facing through `rotation.fromArray`), the overlay's circles group
-  is handed back once from the build, the draw calls take the clock record and
-  `routeEvents` passes the event records. One lesson came from the rings: a hit
-  is rare, so its code runs in V8's interpreter, where every load of a double
-  field allocates a heap number. With the record passed on, `spawn` still read
-  24 to 252 B in the windows that hold a hit, because it loaded `x` and `y`;
-  it now keeps the record and the rings' `draw` (hot) reads the coordinates, and
-  the colour is copied only when a ring's tint changes. Before the carries
-  `routeEvents` read 24 to 132 B and `spawn` 24 to 108 B in those windows. The
-  counted medians stayed in the old range: 336 to 456 B on the sandbox and 408
-  to 552 B live. Logged, not asserted: `impact-rings.ts:draw` reads 24 B in
-  window 1 of the sandbox in 5 of 12 attempts (the first ring it draws), and
-  one-off spikes of `interpolate.ts:placeChampion` (4332 B, once, sandbox) and
+  `impact-rings.ts:spawn` read 0 B in all 60 windows of the 12 local attempts of
+  each scene (4 batches of 3 repeats, none blind). `draw` places the champion
+  views through `placeChampion` (position fields, the facing through
+  `rotation.fromArray`), the overlay's circles group is handed back once from
+  the build, the draw calls take the clock record and `routeEvents` passes the
+  event records. One lesson came from the rings: a hit is rare, so its code runs
+  in V8's interpreter, where every load of a double field allocates a heap
+  number. With the record passed on, `spawn` still read 24 to 252 B in the
+  windows that hold a hit, because it loaded `x` and `y`; it now keeps the
+  record and the rings' `draw` (hot) reads the coordinates, and the colour is
+  copied only when a ring's tint changes. Before the carries `routeEvents` read
+  24 to 132 B and `spawn` 24 to 108 B in those windows. The counted medians
+  stayed in the old range: 336 to 456 B on the sandbox and 408 to 552 B live.
+  Logged, not asserted: `impact-rings.ts:draw` reads 24 B in window 1 of the
+  sandbox in 5 of 12 attempts (the first ring it draws), and one-off spikes of
+  `interpolate.ts:placeChampion` (4332 B, once, sandbox) and
   `audio.ts:routeSounds` (1944 B, once, live) fell in one window each.
 - To read the per-function figures, read the "combat code allocated" line of a
   failure message, or the per-window lines `heap probe <scene> attempt N window
