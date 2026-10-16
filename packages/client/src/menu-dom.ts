@@ -25,6 +25,7 @@ export interface MenuButtons {
   restart: EventTarget;
   select: EventTarget;
   keys: EventTarget;
+  mute: EventTarget;
   backFromSelect: EventTarget;
   backFromKeys: EventTarget;
   reset: EventTarget;
@@ -35,7 +36,7 @@ export interface MenuButtons {
  * Builds the menu under `root`, once at startup, hidden. The panel is
  * `data-menu="panel"` with `data-visible` and `data-view` (`main`, `select` or
  * `keys`), and each view is a `data-section`. The buttons carry `data-action`
- * (`resume`, `restart`, `select`, `keys`, `back`, `reset`), a binding row is
+ * (`resume`, `restart`, `select`, `keys`, `mute`, `back`, `reset`), a binding row is
  * `data-binding=<action>` with a `data-rebind` button, and the select view is
  * the select of the result panel, built by `buildSelect`. Nothing here is
  * written again except through `Menu`, on events.
@@ -52,8 +53,10 @@ export function buildMenu(
   const main = make(panel, 'div', { 'data-section': 'main' });
   const resume = make(main, 'button', { 'data-action': 'resume' }, 'Resume');
   const restart = make(main, 'button', { 'data-action': 'restart' }, 'Restart');
-  const select = make(main, 'button', { 'data-action': 'select' }, 'Champion, arena and teams');
+  const select = make(main, 'button', { 'data-action': 'select' }, 'Champion, arena, teams and difficulty');
   const keys = make(main, 'button', { 'data-action': 'keys' }, 'Keys');
+  // `Menu` writes its `data-muted` and its text, since the settings load after the build.
+  const mute = make(main, 'button', { 'data-action': 'mute', 'data-muted': 'false' });
 
   const selectSection = make(panel, 'div', { 'data-section': 'select' });
   buildSelect(selectSection, kitIds, arenas, launch, 'Play as');
@@ -76,8 +79,8 @@ export function buildMenu(
   const backFromKeys = make(keysSection, 'button', { 'data-action': 'back' }, 'Back');
 
   return {
-    handles: { panel: panel as HudElement, keys: keysSection as HudElement, rows },
-    buttons: { resume, restart, select, keys, backFromSelect, backFromKeys, reset, rebind },
+    handles: { panel: panel as HudElement, keys: keysSection as HudElement, rows, mute: mute as HudElement },
+    buttons: { resume, restart, select, keys, mute, backFromSelect, backFromKeys, reset, rebind },
   };
 }
 
@@ -97,6 +100,7 @@ export function bindMenu(win: EventTarget, menu: Menu, buttons: MenuButtons): ()
     [buttons.restart, 'click', () => menu.restart()],
     [buttons.select, 'click', () => menu.showSelect()],
     [buttons.keys, 'click', () => menu.showKeys()],
+    [buttons.mute, 'click', () => menu.toggleMute()],
     [buttons.backFromSelect, 'click', () => menu.showMain()],
     [buttons.backFromKeys, 'click', () => menu.showMain()],
     [buttons.reset, 'click', () => menu.resetBindings()],

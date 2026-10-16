@@ -3,7 +3,8 @@ import { ACTIONS, DEFAULT_BINDINGS, type Bindings } from './bindings';
 import { SETTINGS_KEY, createBrowserPlatform, readSettings, type Settings } from './platform';
 
 const CUSTOM: Bindings = { ...DEFAULT_BINDINGS, right: 'KeyL', Q: 'KeyT' };
-const DEFAULTS: Settings = { version: 1, bindings: DEFAULT_BINDINGS };
+const DEFAULTS: Settings = { version: 2, bindings: DEFAULT_BINDINGS, muted: false };
+const MUTED: Settings = { version: 2, bindings: CUSTOM, muted: true };
 
 function memory(): { store: Map<string, string>; storage: { getItem(key: string): string | null; setItem(key: string, value: string): void } } {
   const store = new Map<string, string>();
@@ -16,13 +17,27 @@ function memory(): { store: Map<string, string>; storage: { getItem(key: string)
   };
 }
 
-function text(version: unknown, bindings: unknown): string {
-  return JSON.stringify({ version, bindings });
+/** A stored text. `muted` is left out of the text when it is undefined, as a version 1 text has none. */
+function text(version: unknown, bindings: unknown, muted?: unknown): string {
+  return JSON.stringify({ version, bindings, muted });
 }
 
 describe('readSettings', () => {
   it('reads what the platform writes, whole', () => {
-    expect(readSettings(text(1, CUSTOM))).toEqual({ version: 1, bindings: CUSTOM });
+    expect(readSettings(text(2, CUSTOM, false))).toEqual({ version: 2, bindings: CUSTOM, muted: false });
+    expect(readSettings(text(2, CUSTOM, true))).toEqual(MUTED);
+  });
+
+  it('migrates a version 1 text, keeping its bindings and reading sound as on', () => {
+    expect(readSettings(text(1, CUSTOM))).toEqual({ version: 2, bindings: CUSTOM, muted: false });
+  });
+
+  it('reads the defaults for a version 1 text with unusable bindings', () => {
+    expect(readSettings(text(1, { ...CUSTOM, up: 'KeyL' }))).toEqual(DEFAULTS);
+  });
+
+  it.each([undefined, 'true', 'false', 1, 0, null, [], {}])('reads the defaults, not the bindings, for a version 2 text with muted %j', (muted) => {
+    expect(readSettings(text(2, CUSTOM, muted))).toEqual(DEFAULTS);
   });
 
   it('reads the defaults when nothing is stored', () => {
@@ -33,47 +48,49 @@ describe('readSettings', () => {
     expect(readSettings(bad)).toEqual(DEFAULTS);
   });
 
-  it.each([0, 2, '1', null, true, 1.5])('reads the defaults for the version %j', (version) => {
-    expect(readSettings(text(version, CUSTOM))).toEqual(DEFAULTS);
+  it.each([0, 3, '1', '2', null, true, 1.5])('reads the defaults for the version %j', (version) => {
+    expect(readSettings(text(version, CUSTOM, true))).toEqual(DEFAULTS);
   });
 
   it('reads the defaults when the version is missing', () => {
-    expect(readSettings(JSON.stringify({ bindings: CUSTOM }))).toEqual(DEFAULTS);
+    expect(readSettings(JSON.stringify({ bindings: CUSTOM, muted: true }))).toEqual(DEFAULTS);
   });
 
   it.each(ACTIONS)('reads the defaults, not a merge, when %s is missing', (action) => {
     const rest: Record<string, string> = { ...CUSTOM };
     delete rest[action];
+    expect(readSettings(text(2, rest, true))).toEqual(DEFAULTS);
     expect(readSettings(text(1, rest))).toEqual(DEFAULTS);
   });
 
   it('reads the defaults when the bindings are not an object', () => {
-    for (const bad of [null, 'KeyW', 7, [], ['KeyW']]) expect(readSettings(text(1, bad)), JSON.stringify(bad)).toEqual(DEFAULTS);
+    for (const bad of [null, 'KeyW', 7, [], ['KeyW']]) expect(readSettings(text(2, bad, true)), JSON.stringify(bad)).toEqual(DEFAULTS);
+    expect(readSettings(JSON.stringify({ version: 2, muted: true }))).toEqual(DEFAULTS);
     expect(readSettings(JSON.stringify({ version: 1 }))).toEqual(DEFAULTS);
   });
 
   it('reads the defaults when two actions share a code', () => {
-    expect(readSettings(text(1, { ...CUSTOM, up: 'KeyL' }))).toEqual(DEFAULTS);
+    expect(readSettings(text(2, { ...CUSTOM, up: 'KeyL' }, true))).toEqual(DEFAULTS);
   });
 
   it.each(['', 'Escape', 'Tab', 'F3', 'F4', 'ShiftLeft', 'ControlLeft', 'AltRight', 'MetaLeft'])(
     'reads the defaults when an action holds the reserved %j',
     (code) => {
-      expect(readSettings(text(1, { ...CUSTOM, F: code }))).toEqual(DEFAULTS);
+      expect(readSettings(text(2, { ...CUSTOM, F: code }, true))).toEqual(DEFAULTS);
     },
   );
 
   it('reads the defaults when a code is not a string', () => {
     for (const bad of [7, null, true, ['KeyW'], { code: 'KeyW' }]) {
-      expect(readSettings(text(1, { ...CUSTOM, E: bad })), JSON.stringify(bad)).toEqual(DEFAULTS);
+      expect(readSettings(text(2, { ...CUSTOM, E: bad }, true)), JSON.stringify(bad)).toEqual(DEFAULTS);
     }
   });
 
-  it('reads no inherited key as an action', () => {
-    // JSON.parse makes "__proto__" an own property, so the actions are inherited, not stored.
-    const inherited = `{"version":1,"bindings":{"__proto__":${JSON.stringify(CUSTOM)}}}`;
+  it('reads no inherited key as an action or as muted', () => {
+    // JSON.parse makes "__proto__" an own property, so the fields are inherited, not stored.
+    const inherited = `{"version":2,"muted":true,"bindings":{"__proto__":${JSON.stringify(CUSTOM)}}}`;
     expect(readSettings(inherited)).toEqual(DEFAULTS);
-    const outer = `{"__proto__":{"version":1,"bindings":${JSON.stringify(CUSTOM)}}}`;
+    const outer = `{"__proto__":{"version":2,"muted":true,"bindings":${JSON.stringify(CUSTOM)}}}`;
     expect(readSettings(outer)).toEqual(DEFAULTS);
   });
 
@@ -86,18 +103,26 @@ describe('the browser platform', () => {
   it('loads what it saved', async () => {
     const { storage } = memory();
     const platform = createBrowserPlatform(storage);
-    await platform.saveSettings({ version: 1, bindings: CUSTOM });
-    expect(await platform.loadSettings()).toEqual({ version: 1, bindings: CUSTOM });
+    await platform.saveSettings(MUTED);
+    expect(await platform.loadSettings()).toEqual(MUTED);
     // A second platform on the same storage, as after a page reload.
-    expect(await createBrowserPlatform(storage).loadSettings()).toEqual({ version: 1, bindings: CUSTOM });
+    expect(await createBrowserPlatform(storage).loadSettings()).toEqual(MUTED);
   });
 
-  it('saves under the settings key, as JSON carrying schema version 1', async () => {
+  it('saves under the settings key, as JSON carrying schema version 2 and muted', async () => {
     const { store, storage } = memory();
-    await createBrowserPlatform(storage).saveSettings({ version: 1, bindings: CUSTOM });
+    await createBrowserPlatform(storage).saveSettings(MUTED);
     expect([...store.keys()]).toEqual([SETTINGS_KEY]);
     expect(SETTINGS_KEY).toBe('claudeline-champions.settings');
-    expect(JSON.parse(store.get(SETTINGS_KEY) ?? 'null')).toEqual({ version: 1, bindings: CUSTOM });
+    expect(JSON.parse(store.get(SETTINGS_KEY) ?? 'null')).toEqual({ version: 2, bindings: CUSTOM, muted: true });
+  });
+
+  it('loads a version 1 text as version 2 and writes nothing until the next change', async () => {
+    const { store, storage } = memory();
+    const old = text(1, CUSTOM);
+    store.set(SETTINGS_KEY, old);
+    expect(await createBrowserPlatform(storage).loadSettings()).toEqual({ version: 2, bindings: CUSTOM, muted: false });
+    expect(store.get(SETTINGS_KEY)).toBe(old);
   });
 
   it('loads the defaults from an empty store, and writes nothing', async () => {
@@ -108,7 +133,7 @@ describe('the browser platform', () => {
 
   it('loads the defaults when the stored text is unusable', async () => {
     const { store, storage } = memory();
-    store.set(SETTINGS_KEY, text(2, CUSTOM));
+    store.set(SETTINGS_KEY, text(3, CUSTOM, true));
     expect(await createBrowserPlatform(storage).loadSettings()).toEqual(DEFAULTS);
   });
 
@@ -133,7 +158,7 @@ describe('the browser platform', () => {
           throw new Error('quota');
         },
       });
-      await expect(platform.saveSettings({ version: 1, bindings: CUSTOM })).resolves.toBeUndefined();
+      await expect(platform.saveSettings(MUTED)).resolves.toBeUndefined();
     } finally {
       console.warn = warn;
     }
@@ -143,6 +168,42 @@ describe('the browser platform', () => {
   it('loads the defaults and saves nothing without a storage', async () => {
     const platform = createBrowserPlatform(undefined);
     expect(await platform.loadSettings()).toEqual(DEFAULTS);
-    await expect(platform.saveSettings({ version: 1, bindings: CUSTOM })).resolves.toBeUndefined();
+    await expect(platform.saveSettings(MUTED)).resolves.toBeUndefined();
+  });
+});
+
+describe('the platform sound', () => {
+  it('does not call the audio factory when the platform is created or the settings load', async () => {
+    let made = 0;
+    const platform = createBrowserPlatform(memory().storage, () => {
+      made += 1;
+      throw new Error('no audio here');
+    });
+    await platform.loadSettings();
+    await platform.saveSettings(DEFAULTS);
+    platform.sound.setMuted(true);
+    platform.sound.play(0);
+    expect(made).toBe(0);
+  });
+
+  it('calls the factory on the first unlock', () => {
+    let made = 0;
+    const platform = createBrowserPlatform(undefined, () => {
+      made += 1;
+      throw new Error('no audio here');
+    });
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      platform.sound.unlock();
+    } finally {
+      console.warn = warn;
+    }
+    expect(made).toBe(1);
+  });
+
+  it('is one sound for the life of the platform', () => {
+    const platform = createBrowserPlatform(undefined);
+    expect(platform.sound).toBe(platform.sound);
   });
 });

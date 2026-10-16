@@ -1,20 +1,26 @@
+import { browserAudioContext, createWebSound, type SoundOutput } from './audio';
 import { DEFAULT_BINDINGS, parseBindings, type Bindings } from './bindings';
 
-/** What the platform stores. Only the key bindings so far; `version` is the schema. */
+/** What the platform stores: the key bindings and the sound mute. `version` is the schema. */
 export interface Settings {
-  version: 1;
+  version: 2;
   bindings: Bindings;
+  /** Whether the sound is off. */
+  muted: boolean;
 }
 
 /**
  * The part of the platform interface that is built (spec section 5, client.md).
  * `identity`, `unlockAchievement` and `openUrl` join with their first user. The
- * methods are asynchronous so an Electron renderer can reach files over IPC with
- * no change of signature (milestone 8).
+ * settings methods are asynchronous so an Electron renderer can reach files
+ * over IPC with no change of signature (milestone 8). `sound` is a sub-object
+ * (an amendment under spec section 5) so a desktop build can swap it.
  */
 export interface Platform {
   loadSettings(): Promise<Settings>;
   saveSettings(settings: Settings): Promise<void>;
+  /** The sound output. Reaches no audio until its first `unlock`. See audio.ts. */
+  readonly sound: SoundOutput;
 }
 
 /** The part of `localStorage` the browser platform uses, so a test passes its own. */
@@ -26,14 +32,17 @@ export interface SettingsStorage {
 export const SETTINGS_KEY = 'claudeline-champions.settings';
 
 function defaults(): Settings {
-  return { version: 1, bindings: DEFAULT_BINDINGS };
+  return { version: 2, bindings: DEFAULT_BINDINGS, muted: false };
 }
 
 /**
  * Reads the stored text. Anything unusable reads as the defaults, whole: no text,
- * bad JSON, a version other than exactly the number 1, or bindings that
- * `parseBindings` refuses. JSON.parse makes `__proto__` an own property, so no
- * inherited key can stand in for a field.
+ * bad JSON, a version other than exactly the number 1 or 2, bindings that
+ * `parseBindings` refuses, or a version 2 text whose `muted` is not a boolean.
+ * A version 1 text (bindings only) migrates: its bindings stay and `muted` is
+ * false. Reading never writes, so the store becomes version 2 on its first
+ * change. JSON.parse makes `__proto__` an own property, so no inherited key can
+ * stand in for a field.
  */
 export function readSettings(text: string | null): Settings {
   if (text === null) return defaults();
@@ -44,9 +53,11 @@ export function readSettings(text: string | null): Settings {
     return defaults();
   }
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return defaults();
-  if ((value as { version: unknown }).version !== 1) return defaults();
+  const { version, muted } = value as { version: unknown; muted: unknown };
+  if (version !== 1 && version !== 2) return defaults();
+  if (version === 2 && typeof muted !== 'boolean') return defaults();
   const bindings = parseBindings((value as { bindings: unknown }).bindings);
-  return bindings === undefined ? defaults() : { version: 1, bindings };
+  return bindings === undefined ? defaults() : { version: 2, bindings, muted: version === 2 && muted === true };
 }
 
 /**
@@ -55,8 +66,12 @@ export function readSettings(text: string | null): Settings {
  * nothing. A storage that throws never fails the game: a read gives the defaults,
  * and a write warns on the console (a console error would fail every e2e spec).
  */
-export function createBrowserPlatform(storage: SettingsStorage | undefined): Platform {
+export function createBrowserPlatform(
+  storage: SettingsStorage | undefined,
+  makeContext: () => AudioContext = browserAudioContext,
+): Platform {
   return {
+    sound: createWebSound(makeContext),
     loadSettings(): Promise<Settings> {
       let text: string | null;
       try {

@@ -45,7 +45,12 @@ port 5173, which Playwright starts itself.
   checks `data-arena` and the human's position, (-1100, 200), which proves the
   sim got arena02 and not only the hook, and the arena links. A row on
   `/?teamsize=3` reads `data-bar0` to `data-bar5` at 100 and no `data-bar6`, the
-  human at (-1200, 200), 3v3 current and the links carrying `teamsize=3`.
+  human at (-1200, 200), 3v3 current and the links carrying `teamsize=3`. The
+  default test also reads the difficulty row (easy, normal and hard, normal
+  current, the three hrefs written out). A row on
+  `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
+  and every link of the other three rows carrying `difficulty=hard`, and
+  `/?difficulty=brutal` reads normal as current.
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.
@@ -97,7 +102,22 @@ port 5173, which Playwright starts itself.
   link reloads to six bars with the menu hidden and Restart keeps it, and a
   rebinding of right to KeyL is refused on a second action as a duplicate,
   survives `page.reload()`, moves the champion east on KeyL and not on KeyD, and
-  is reset. The menu is clicked at 1280x720 and the frames run at 320x180.
+  is reset. The menu is clicked at 1280x720 and the frames run at 320x180. The
+  menu's select reads the difficulty row (normal current, the three hrefs), its
+  hard link reloads to
+  `?champion=hargrim&difficulty=hard&arena=arena01&teamsize=2` with hard current
+  in the menu, and Restart keeps it. A sound test replaces
+  `window.AudioContext` with a counting fake through `page.addInitScript`
+  (a play is one `cancelScheduledValues` on a voice, voices in `SOUNDS` order,
+  and the fake's `currentTime` throws) and runs on `/?timescale=100` in 96-tick
+  frames: a key press in the warmup is the gesture, the mouse is held for one
+  frame of the round, and at the end of round 1 the round-start plays equal
+  `data-round`, the round-end plays are 1, the death plays equal `data-deaths`,
+  the hit plays are at least `data-hits` and more than 0, and the cast plays at
+  least 1. Mute from the menu: the button reads "Sound: off" and no count moves
+  through the next round start. After `page.reload()` the settings hold
+  version 2 and a true `muted`, the button reads muted and the round start is
+  silent; unmuting plays the next round start once and the round end before it.
 
 - Run them with `CI=1`. Without it Playwright reuses whatever listens on 5173,
   which can be a sibling session's dev server serving other code. With `CI=1`
@@ -258,8 +278,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   aim (`camera.ts`), the HUD writer and its views, the kill feed, the champion
   names, the result screen's writer (`result-screen.ts`), the text tables of
   the hooks and the HUD (`hook-text.ts`), the client's bot-driving glue
-  (`bot-driver.ts`) and everything in `main.ts`, including the hook's
-  `frameMany`. Three's `onAnimationFrame` is logged and not counted: no frame
+  (`bot-driver.ts`), the sound (`audio.ts`: `routeSounds` and `play` run on
+  every step's events, and both probe specs unlock the audio with a real
+  gesture before the first measured window, so the counted calls reach real
+  Web Audio) and everything in `main.ts`, including the hook's `frameMany`.
+  Three's `onAnimationFrame` is logged and not counted: no frame
   of a measured window runs through it. A new module on the frame path goes
   into the pattern. The bots package is not counted, and its bytes are the
   sixth figure of the probe line; the live scene bounds them apart: the median

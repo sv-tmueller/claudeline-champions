@@ -12,7 +12,11 @@ This document defines how a match plays and how it is controlled. The sim, the c
 - `[tuned]` marks a value this document chose, either inside a range the spec gives or where the spec is silent. These values may move in balance passes.
 - The sim counts time in integer ticks at 60 Hz (`TICK_RATE = 60`, `DT = 1 / 60`). Seconds in this document convert to ticks once, at match creation: `ticks = seconds * 60`.
 - Where this document and the issue acceptance criteria seem to disagree, the spec governs. One such case is in section 3.2.
-- Difficulty tiers for bots (easy, normal, hard) change only reaction delay, aim error and dodge probability. They do not change any rule in this document `[spec]`.
+- Difficulty tiers for bots (easy, normal, hard) change only reaction delay,
+  aim error and dodge probability. They do not change any rule in this
+  document `[spec]`. The select in the result panel and in the menu offers
+  the three tiers, and the address (`?difficulty=`) picks one, normal by
+  default `[tuned]`.
 
 ## 1. Match and round flow
 
@@ -251,8 +255,20 @@ Default controls `[spec]`:
 | Escape | Menu |
 
 - Rebinding arrives in milestone 5 `[spec]`. The nine keys of the movement and the slots can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R and F `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
+- Sound is generated in code, with no sound files and no music `[tuned]`. It
+  plays a hit (a projectile that touches a champion, and a melee arc with at
+  least one target), a cast (the local champion's casts only), a death
+  (every death), a round start and a round end, and nothing for the match
+  end `[tuned]`. The browser starts it on the first key press or mouse press
+  `[tuned]`. The menu's sound toggle mutes all of it, and the mute is saved
+  through the platform with the bindings and read back on the next launch
+  `[tuned]`.
 - Tab shows the scoreboard while it is held `[tuned]`. The scoreboard lists every champion with its team, its champion, alive or dead, kills and deaths.
-- In local matches the menu pauses the sim `[tuned]`. It opens in every phase and has three actions: Resume (Escape again does the same), Restart the match with the same champion, difficulty, arena and team size, and back to the champion, arena and team size select `[tuned]`. Pausing online is decided in milestone 6.
+- In local matches the menu pauses the sim `[tuned]`. It opens in every phase
+  and has these actions: Resume (Escape again does the same), Restart the
+  match with the same champion, difficulty, arena and team size, back to the
+  champion, arena, team size and difficulty select, the keys view and the
+  sound toggle `[tuned]`. Pausing online is decided in milestone 6.
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
 - The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.

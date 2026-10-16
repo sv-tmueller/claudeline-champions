@@ -12,16 +12,21 @@ function setup() {
     panel: fake(),
     keys: fake(),
     rows: Object.fromEntries(ACTIONS.map((action) => [action, { row: fake(), key: fake() }])) as never,
+    mute: fake(),
   };
   const menu = new Menu(
     handles,
     input,
-    { saveSettings: () => Promise.resolve() },
+    {
+      saveSettings: () => Promise.resolve(),
+      sound: { unlock: () => true, setMuted: (on) => calls.push(`setMuted:${on}`), play: () => undefined },
+    },
     {
       setPaused: (on) => calls.push(`paused:${on}`),
       restart: () => calls.push('restart'),
       releaseInput: () => calls.push('release'),
     },
+    false,
   );
   const win = new EventTarget();
   const buttons: MenuButtons = {
@@ -29,6 +34,7 @@ function setup() {
     restart: new EventTarget(),
     select: new EventTarget(),
     keys: new EventTarget(),
+    mute: new EventTarget(),
     backFromSelect: new EventTarget(),
     backFromKeys: new EventTarget(),
     reset: new EventTarget(),
@@ -74,6 +80,18 @@ describe('bindMenu', () => {
     calls.length = 0;
     buttons.restart.dispatchEvent(click());
     expect(calls).toEqual(['restart']);
+  });
+
+  it('flips the sound on the Mute button, and only while the menu is open', () => {
+    const { calls, win, buttons } = setup();
+    buttons.mute.dispatchEvent(click());
+    expect(calls).toEqual([]);
+    win.dispatchEvent(keydown('Escape'));
+    calls.length = 0;
+    buttons.mute.dispatchEvent(click());
+    expect(calls).toEqual(['setMuted:true']);
+    buttons.mute.dispatchEvent(click());
+    expect(calls).toEqual(['setMuted:true', 'setMuted:false']);
   });
 
   it('shows the select and the keys views and goes back from each', () => {

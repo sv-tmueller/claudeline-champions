@@ -10,23 +10,25 @@ interface Rig {
   panel: Fake;
   keys: Fake;
   rows: Record<Action, { row: Fake; key: Fake }>;
+  mute: Fake;
   calls: string[];
   saved: Settings[];
   input: ReturnType<typeof createInputCore>;
 }
 
-function rig(stored: Bindings = DEFAULT_BINDINGS): Rig {
+function rig(stored: Bindings = DEFAULT_BINDINGS, muted = false): Rig {
   const panel = fake();
   const keys = fake();
   const rows = Object.fromEntries(ACTIONS.map((action) => [action, { row: fake(), key: fake() }])) as Record<
     Action,
     { row: Fake; key: Fake }
   >;
+  const mute = fake();
   const calls: string[] = [];
   const saved: Settings[] = [];
   const input = createInputCore();
   input.setBindings(stored);
-  const handles: MenuHandles = { panel, keys, rows };
+  const handles: MenuHandles = { panel, keys, rows, mute };
   const menu = new Menu(
     handles,
     input,
@@ -36,14 +38,16 @@ function rig(stored: Bindings = DEFAULT_BINDINGS): Rig {
         saved.push(settings);
         return Promise.resolve();
       },
+      sound: { unlock: () => true, setMuted: (on) => calls.push(`setMuted:${on}`), play: () => undefined },
     },
     {
       setPaused: (on) => calls.push(`paused:${on}`),
       restart: () => calls.push('restart'),
       releaseInput: () => calls.push('release'),
     },
+    muted,
   );
-  return { menu, panel, keys, rows, calls, saved, input };
+  return { menu, panel, keys, rows, mute, calls, saved, input };
 }
 
 /** The last value written to an attribute, or undefined. */
@@ -170,7 +174,7 @@ describe('the keys view', () => {
     expect(attribute(rows.right.row, 'data-capturing')).toBe('true');
     menu.capture('KeyL');
     expect(input.bindings).toEqual({ ...DEFAULT_BINDINGS, right: 'KeyL' });
-    expect(saved).toEqual([{ version: 1, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' } }]);
+    expect(saved).toEqual([{ version: 2, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' }, muted: false }]);
     expect(rows.right.key.textContent).toBe('L');
     expect(menu.capturing).toBeUndefined();
     expect(attribute(keys, 'data-capturing')).toBe('none');
@@ -235,8 +239,21 @@ describe('the keys view', () => {
     expect(rows.right.key.textContent).toBe('L');
     menu.resetBindings();
     expect(input.bindings).toEqual(DEFAULT_BINDINGS);
-    expect(saved).toEqual([{ version: 1, bindings: DEFAULT_BINDINGS }]);
+    expect(saved).toEqual([{ version: 2, bindings: DEFAULT_BINDINGS, muted: false }]);
     expect(rows.right.key.textContent).toBe('D');
+  });
+
+  it('keeps the stored mute in the settings a rebind and a reset save', () => {
+    const { menu, saved } = rig(DEFAULT_BINDINGS, true);
+    menu.toggle();
+    menu.showKeys();
+    menu.startCapture('right');
+    menu.capture('KeyL');
+    menu.resetBindings();
+    expect(saved).toEqual([
+      { version: 2, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' }, muted: true },
+      { version: 2, bindings: DEFAULT_BINDINGS, muted: true },
+    ]);
   });
 
   it('ends a capture when the menu closes', () => {
@@ -252,6 +269,63 @@ describe('the keys view', () => {
     const { menu } = rig();
     menu.startCapture('F');
     expect(menu.capturing).toBeUndefined();
+  });
+});
+
+describe('the mute toggle', () => {
+  it('writes the button from the stored mute when the menu is built, and calls nothing', () => {
+    const on = rig();
+    expect(attribute(on.mute, 'data-muted')).toBe('false');
+    expect(on.mute.textContent).toBe('Sound: on');
+    expect(on.calls).toEqual([]);
+    const off = rig(DEFAULT_BINDINGS, true);
+    expect(attribute(off.mute, 'data-muted')).toBe('true');
+    expect(off.mute.textContent).toBe('Sound: off');
+    expect(off.calls).toEqual([]);
+  });
+
+  it('flips the mute, tells the sound, writes the button and saves once with the current bindings', () => {
+    const { menu, mute, calls, saved, input } = rig({ ...DEFAULT_BINDINGS, right: 'KeyL' });
+    menu.toggle();
+    calls.length = 0;
+    menu.toggleMute();
+    expect(calls).toEqual(['setMuted:true', 'save']);
+    expect(saved).toEqual([{ version: 2, bindings: { ...DEFAULT_BINDINGS, right: 'KeyL' }, muted: true }]);
+    expect(input.bindings.right).toBe('KeyL');
+    expect(attribute(mute, 'data-muted')).toBe('true');
+    expect(mute.textContent).toBe('Sound: off');
+  });
+
+  it('flips back on the second toggle', () => {
+    const { menu, mute, calls, saved } = rig();
+    menu.toggle();
+    menu.toggleMute();
+    calls.length = 0;
+    menu.toggleMute();
+    expect(calls).toEqual(['setMuted:false', 'save']);
+    expect(saved.at(-1)).toEqual({ version: 2, bindings: DEFAULT_BINDINGS, muted: false });
+    expect(attribute(mute, 'data-muted')).toBe('false');
+    expect(mute.textContent).toBe('Sound: on');
+  });
+
+  it('keeps the new mute in the settings a rebind and a reset save afterwards', () => {
+    const { menu, saved } = rig();
+    menu.toggle();
+    menu.toggleMute();
+    menu.showKeys();
+    menu.startCapture('right');
+    menu.capture('KeyL');
+    menu.resetBindings();
+    expect(saved.map((settings) => settings.muted)).toEqual([true, true, true]);
+  });
+
+  it('does nothing while the menu is closed', () => {
+    const { menu, mute, calls, saved } = rig();
+    const writes = mute.log.length;
+    menu.toggleMute();
+    expect(calls).toEqual([]);
+    expect(saved).toEqual([]);
+    expect(mute.log).toHaveLength(writes);
   });
 });
 

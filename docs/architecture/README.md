@@ -50,14 +50,17 @@ first.
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
   any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
   the arena. The HUD has the ring warning and the kill feed, and the result
-  screen has the champion, arena and team size select. Escape opens a menu that
-  pauses the match (Resume, Restart, the select again, and a keys view that
-  rebinds the nine movement and slot keys). The `Platform` interface has its
-  two settings methods, asynchronous, and the browser platform keeps the
-  bindings in `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
+  screen has the champion, arena, team size and difficulty select. Escape
+  opens a menu that pauses the match (Resume, Restart, the select again, a
+  keys view that rebinds the nine movement and slot keys, and a sound
+  toggle). The first-pass sound is generated in code (a hit, a cast, a death,
+  a round start and a round end) and is counted by the heap probe. The
+  `Platform` interface has its two settings methods, asynchronous, and a
+  `sound` sub-object; the browser platform keeps the bindings and the mute in
+  `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
   the `__runProbeFrames` hook. The heap probe measures two scenes, the
   sandbox and the live match with a moving pointer, and bounds the bots' bytes
-  in the live match. Not built: a pre-match screen, audio, the scoreboard, the
+  in the live match. Not built: a pre-match screen, music, the scoreboard, the
   other three `Platform` methods (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
@@ -124,6 +127,13 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   files over IPC without a signature change, and only those two are built:
   [batch #80 decision 15](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012436842).
   Recorded in [Client](client.md#platform-interface).
+- `Platform` gains a `sound` sub-object, `SoundOutput`, so a desktop build can
+  swap it, with a dated amendment line under the design spec's section 5, and
+  sound runs as a second allocation-free pass, `routeSounds`, right after
+  `routeEvents`:
+  [batch #105 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6140641300).
+  Recorded in [Client](client.md#platform-interface) and its
+  [audio](client.md#audio).
 - One rig and six clips for every champion model, the placeholder included,
   each clip keying only the channels it moves, checked by the validator against
   the tables, the floor held at 0 between keys by two pose rules:

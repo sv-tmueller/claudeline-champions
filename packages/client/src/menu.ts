@@ -14,6 +14,8 @@ export interface MenuHandles {
   keys: HudElement;
   /** One row per action: the row carries `data-capturing`, the key element shows the key text. */
   rows: Readonly<Record<Action, { row: HudElement; key: HudElement }>>;
+  /** The mute button of the main view: `data-muted` and the text "Sound: on" or "Sound: off". */
+  mute: HudElement;
 }
 
 /** What the page does for the menu. The menu holds no renderer, clock or location itself. */
@@ -57,9 +59,13 @@ export class Menu {
   constructor(
     private readonly handles: MenuHandles,
     private readonly input: Pick<InputCore, 'bindings' | 'setBindings'>,
-    private readonly platform: Pick<Platform, 'saveSettings'>,
+    private readonly platform: Pick<Platform, 'saveSettings' | 'sound'>,
     private readonly actions: MenuActions,
-  ) {}
+    /** Whether the sound is off: the stored value at startup, then what the toggle flips. Every save carries it. */
+    private muted: boolean,
+  ) {
+    this.writeMute();
+  }
 
   get isOpen(): boolean {
     return this.open;
@@ -151,6 +157,18 @@ export class Menu {
     this.save();
   }
 
+  /**
+   * Flips the sound mute from the main view: tells the sound, writes the button and
+   * saves with the current bindings. Does nothing while the menu is closed.
+   */
+  toggleMute(): void {
+    if (!this.open) return;
+    this.muted = !this.muted;
+    this.platform.sound.setMuted(this.muted);
+    this.writeMute();
+    this.save();
+  }
+
   /** Puts the default keys back and saves them. */
   resetBindings(): void {
     this.endCapture();
@@ -199,7 +217,12 @@ export class Menu {
     }
   }
 
+  private writeMute(): void {
+    this.handles.mute.setAttribute('data-muted', this.muted ? TRUE : FALSE);
+    this.handles.mute.textContent = this.muted ? 'Sound: off' : 'Sound: on';
+  }
+
   private save(): void {
-    void this.platform.saveSettings({ version: 1, bindings: this.input.bindings });
+    void this.platform.saveSettings({ version: 2, bindings: this.input.bindings, muted: this.muted });
   }
 }

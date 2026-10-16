@@ -66,6 +66,16 @@ describe('summarise', () => {
     expect(result.combatByFunction).toEqual({ 'bot-driver.ts:think': 16 });
   });
 
+  it('counts the sound module, routeSounds and play, and not a module that only starts with its name', () => {
+    const root = node('', '(root)', 0, [
+      node(`${CLIENT}audio.ts`, 'play', 32, [node(`${CLIENT}audio.ts`, 'routeSounds', 64)]),
+      node(`${CLIENT}audio-extra.ts`, 'other', 500),
+    ]);
+    const result = summarise(root);
+    expect(result.combat).toBe(96);
+    expect(result.combatByFunction).toEqual({ 'audio.ts:play': 32, 'audio.ts:routeSounds': 64 });
+  });
+
   it('leaves the sweep files of the sim out of the bytes outside them', () => {
     const root = node('', '(root)', 0, [
       node(`${SIM}projectile.ts`, 'sweep', 10_000),

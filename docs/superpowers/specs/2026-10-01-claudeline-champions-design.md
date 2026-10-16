@@ -242,6 +242,10 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
   saveSettings(), unlockAchievement(id), openUrl(url) }`. `BrowserPlatform` is
   the only implementation until milestone 8. Game code only talks to the
   interface.
+  Amended 2026-10-16 by [batch #105 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6140641300):
+  `Platform` also has a `sound` sub-object (`SoundOutput { unlock(),
+  setMuted(on), play(sound) }`), so a desktop build can swap the sound, and
+  `Settings` carries the mute.
 - Assets load relative to the app base path, never from absolute URLs.
 - Rendering scales from a browser tab to a fullscreen 4K desktop window:
   resolution-independent camera framing, device-pixel-ratio aware canvas.

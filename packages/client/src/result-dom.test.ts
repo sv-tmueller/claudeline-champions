@@ -1,6 +1,6 @@
 import type { ArenaDef } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
-import { arenaEntries, selectEntries, teamEntries } from './result-dom';
+import { arenaEntries, difficultyEntries, selectEntries, teamEntries } from './result-dom';
 
 const ARENAS = [
   { id: 'arena01', name: 'Arena 1' },
@@ -118,5 +118,35 @@ describe('team select entries', () => {
     for (const entry of teamEntries('hargrim', 'normal', 'arena01', 2, { spawns: THREE_SPAWNS })) {
       expect(entry.href === null || entry.href.startsWith('?')).toBe(true);
     }
+  });
+});
+
+describe('difficulty select entries', () => {
+  it('lists easy, normal and hard in that order, with their labels', () => {
+    const entries = difficultyEntries('hargrim', 'normal', 'arena01', 2);
+    expect(entries.map((entry) => [entry.tier, entry.label])).toEqual([
+      ['easy', 'Easy'],
+      ['normal', 'Normal'],
+      ['hard', 'Hard'],
+    ]);
+  });
+
+  it('flags the launch tier as current and no other', () => {
+    expect(difficultyEntries('hargrim', 'easy', 'arena01', 2).map((entry) => entry.current)).toEqual([true, false, false]);
+    expect(difficultyEntries('hargrim', 'normal', 'arena01', 2).map((entry) => entry.current)).toEqual([false, true, false]);
+    expect(difficultyEntries('hargrim', 'hard', 'arena01', 2).map((entry) => entry.current)).toEqual([false, false, true]);
+  });
+
+  it('links each tier to the whole setup with its own tier, the arena and the asked team size', () => {
+    const entries = difficultyEntries('quillon', 'hard', 'arena02', 3);
+    expect(entries.map((entry) => entry.href)).toEqual([
+      '?champion=quillon&difficulty=easy&arena=arena02&teamsize=3',
+      '?champion=quillon&difficulty=normal&arena=arena02&teamsize=3',
+      '?champion=quillon&difficulty=hard&arena=arena02&teamsize=3',
+    ]);
+  });
+
+  it('builds relative hrefs, so the build works under a subdirectory', () => {
+    for (const entry of difficultyEntries('hargrim', 'normal', 'arena01', 2)) expect(entry.href.startsWith('?')).toBe(true);
   });
 });
