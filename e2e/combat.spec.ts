@@ -45,7 +45,7 @@ const TARGET = 2;
 const SHOTS = 8;
 // RING_TICKS in the client's impact-rings.ts: how long a ring lives, in sim ticks.
 const RING_TICKS = 18;
-// The Attack clip is 24 ticks long (0.4 s) and the Death clip 60 (1 s).
+// The Attack clip is 24 ticks long (0.4 s), and Idle returns within 6 more; the Death clip is 60 (1 s).
 const ATTACK_TICKS = 24;
 const DEATH_TICKS = 60;
 // Ticks of slack after a ring's life, for the frame that retires it.
@@ -187,11 +187,10 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     hooks = await runUntil(page, 'the Attack', 3, (h) => h.anims[0] === 'Idle+Attack');
     await page.mouse.up();
     expect(hooks.anims[0]).toBe('Idle+Attack');
-    hooks = await runUntil(page, 'the end of the Attack', 30, (h) => h.anims[0] === 'Idle');
+    hooks = await runUntil(page, 'the end of the Attack', ATTACK_TICKS + 6, (h) => h.anims[0] === 'Idle');
     expect(hooks.anims[0]).toBe('Idle');
     // The two champions without a kit or a bot stood in Idle all along (champion 3 is a bot, which walks).
     expect(hooks.anims.slice(1, 3)).toEqual(['Idle', 'Idle']);
-    expect(ATTACK_TICKS).toBeLessThanOrEqual(30);
 
     // 3. F4 spawns between steps, so only the array diff can show the shot.
     await page.keyboard.press('F4');

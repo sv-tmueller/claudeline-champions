@@ -103,6 +103,16 @@ describe('the sampler against three\'s mixer', () => {
     expect(CLIP_NAMES).toEqual(['Idle', 'Run', 'Attack', 'Cast', 'Hit', 'Death']);
   });
 
+  it.each(MODEL_IDS)('has the lengths of CLIP_SECONDS in every clip of %s', async (id) => {
+    const gltf = await model(id);
+    CLIP_NAMES.forEach((name, i) => {
+      const clip = gltf.animations.find((candidate) => candidate.name === name);
+      expect(clip, `${id} ${name}`).toBeDefined();
+      // The glb stores times as float32.
+      expect(clip?.duration, `${id} ${name}`).toBeCloseTo(CLIP_SECONDS[i] as number, 6);
+    });
+  });
+
   it.each(MODEL_IDS)('gives the pose of three\'s mixer, bit for bit, for every clip of %s at 60 times', async (id) => {
     const { root, rig, gltf } = await view(id);
     for (let clip = 0; clip < CLIP_NAMES.length; clip++) {
@@ -459,7 +469,7 @@ const WALKS: { speed: number; facing: number; name: string }[] = [
 ];
 
 describe('the floor and the top through every transition', () => {
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.90 m, entering and leaving Run at every phase', async (id) => {
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m, entering and leaving Run at every phase', async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const { speed, facing, name } of WALKS) {
@@ -486,7 +496,7 @@ describe('the floor and the top through every transition', () => {
     expect(w.figures().low).toBeGreaterThanOrEqual(FLOOR);
   });
 
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.90 m with Attack, Cast and Hit over Idle and over Run', async (id) => {
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m with Attack, Cast and Hit over Idle and over Run', async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const kind of ['attack', 'cast', 'hit'] as const) {
@@ -528,7 +538,7 @@ describe('the floor and the top through every transition', () => {
     runLooking(c, w, 40, 'Cast replaces Attack');
   });
 
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.90 m when a cast is interrupted at any tick', async (id) => {
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m when a cast is interrupted at any tick', async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const kind of [CAST_ATTACK, CAST_OTHER]) {
@@ -543,7 +553,7 @@ describe('the floor and the top through every transition', () => {
     }
   });
 
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.90 m through Death from every state, and the snap back', async (id) => {
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m through Death from every state, and the snap back', async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const moving of [false, true]) {
@@ -565,7 +575,7 @@ describe('the floor and the top through every transition', () => {
     }
   });
 
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.90 m through a dash', async (id) => {
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m through a dash', async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (let lead = 0; lead <= 12; lead += 4) {
