@@ -174,6 +174,9 @@ describe('the rig of a view', () => {
     expect(Array.from(rig.cursor).every((cursor) => cursor === 1)).toBe(true);
     expect(Array.from(rig.time)).toEqual([0, 0, 0, 0]);
     expect(Array.from(rig.from).every((value) => value === 0)).toBe(true);
+    // The script sampled Death and an overlay: without the priming call these stay zero.
+    expect(Array.from(rig.death).some((value) => value !== 0)).toBe(true);
+    expect(Array.from(rig.over).some((value) => value !== 0)).toBe(true);
   });
 
   it.each(['Attack', 'Cast', 'Hit'] as const)('leaves the legs and Hips at rest for %s alone, and moves the spine and arms', async (name) => {
@@ -340,21 +343,33 @@ describe('the blend', () => {
     for (const bone of [4, 5]) expectSameTurn(pose, rest, bone, 'Death legs');
   });
 
-  it('crossfades a Cast that replaces a playing Attack over 3 ticks, Arm_R turning 27.6 degrees a tick at most', async () => {
+  it('crossfades a cast that replaces a playing overlay, Arm_R turning 42 degrees a tick at most, for every pair', async () => {
+    // Measured without the crossfade: Attack then Cast 77 degrees in one tick, and with it Attack then
+    // Cast 27.6, Cast then Attack 41.0, Attack then Attack 39.3 and Cast then Cast 27.3 at the worst offset.
     const { root, rig } = await view('quillon');
-    const c = crew(root, rig);
-    triggerCast(c.anim, CAST_ATTACK);
-    c.run(8);
-    let before = bone(root, 'Arm_R').quaternion.clone();
-    triggerCast(c.anim, CAST_OTHER);
-    let worst = 0;
-    for (let tick = 0; tick < 8; tick++) {
-      c.run(1);
-      const after = bone(root, 'Arm_R').quaternion.clone();
-      worst = Math.max(worst, (before.angleTo(after) * 180) / Math.PI);
-      before = after;
+    for (const [first, second] of [
+      [CAST_ATTACK, CAST_OTHER],
+      [CAST_OTHER, CAST_ATTACK],
+      [CAST_ATTACK, CAST_ATTACK],
+      [CAST_OTHER, CAST_OTHER],
+    ] as const) {
+      for (let offset = 1; offset <= 30; offset++) {
+        const c = crew(root, rig);
+        triggerCast(c.anim, first);
+        c.run(offset);
+        let before = bone(root, 'Arm_R').quaternion.clone();
+        triggerCast(c.anim, second);
+        for (let tick = 0; tick < 8; tick++) {
+          c.run(1);
+          const after = bone(root, 'Arm_R').quaternion.clone();
+          expect(
+            (before.angleTo(after) * 180) / Math.PI,
+            `cast ${first} then ${second} after ${offset} ticks, tick ${tick}`,
+          ).toBeLessThanOrEqual(42);
+          before = after;
+        }
+      }
     }
-    expect(worst).toBeLessThanOrEqual(27.6);
   });
 
   it('holds the last Death frame for good', async () => {

@@ -131,7 +131,8 @@ describe('Idle and Run', () => {
       w.champion.x -= 0.5;
       w.clock.alpha = 0;
       w.run(1);
-      // A frame between two ticks sees no step, so no displacement: the direction of the last one stays.
+      // A frame between two ticks sees no step, so no displacement: the direction of the last
+      // one stays.
       w.clock.alpha = 0.5;
       w.again();
       expect(w.anim.d[D_RUN_SCALE]).toBe(-RUN_MAX_SCALE);

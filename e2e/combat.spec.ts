@@ -45,7 +45,8 @@ const TARGET = 2;
 const SHOTS = 8;
 // RING_TICKS in the client's impact-rings.ts: how long a ring lives, in sim ticks.
 const RING_TICKS = 18;
-// The Attack clip is 24 ticks long (0.4 s), and Idle returns within 6 more; the Death clip is 60 (1 s).
+// The Attack clip is 24 ticks long (0.4 s), and Idle returns within 6 more; the Death clip is 60
+// ticks (1 s).
 const ATTACK_TICKS = 24;
 const DEATH_TICKS = 60;
 // Ticks of slack after a ring's life, for the frame that retires it.
