@@ -10,7 +10,9 @@ import type { CDPSession, Page } from '@playwright/test';
 // module, the pose and overlay helpers that run each frame, the loop clock, the
 // input sampler, the pointer aim (camera.ts), the HUD writer with its views and the
 // kill feed, the text tables of the hooks and the HUD (hook-text.ts), the champion
-// names, the result screen's writer, the client's bot-driving glue (bot-driver.ts)
+// names, the result screen's writer, the client's bot-driving glue (bot-driver.ts),
+// the sound (audio.ts: routeSounds and play run on every step's events, and both
+// probe specs unlock the audio with a real gesture before the first measured window)
 // and every function in main.ts (stepSim, sampleAim, draw and the hook writers). The
 // HUD builder, hud-dom.ts, the result panel's builder, result-dom.ts, and the setup
 // modules run once at startup and are not counted.
@@ -31,7 +33,7 @@ import type { CDPSession, Page } from '@playwright/test';
 // callee V8 inlines into it land on it, so excluding it would hide a regression
 // (the escaping array in frame passed with the hook excluded).
 export const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|hook-text|kill-feed|roster|bot-driver|result-screen|camera)\.ts:|^main\.ts:/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|hook-text|kill-feed|roster|bot-driver|result-screen|camera|audio)\.ts:|^main\.ts:/;
 // Three's own animation callback. It is logged and never counted.
 const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // The sweep files of the sim. Their garbage was huge (about 790 KB per window, in

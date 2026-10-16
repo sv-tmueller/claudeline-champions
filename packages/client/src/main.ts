@@ -11,6 +11,7 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { arenaById } from './arenas';
+import { bindSoundUnlock, routeSounds } from './audio';
 import { createBotDriver } from './bot-driver';
 import {
   CAMERA_VERTICAL_FOV_DEG,
@@ -165,9 +166,11 @@ function browserStorage(): SettingsStorage | undefined {
 
 const input = createInputCore();
 const platform = createBrowserPlatform(browserStorage());
-// The saved keys apply before the first key is read.
+// The saved keys and the mute apply before the first key is read; the first gesture unlocks the sound.
 const settings = await platform.loadSettings();
 input.setBindings(settings.bindings);
+platform.sound.setMuted(settings.muted);
+bindSoundUnlock(window, platform.sound);
 bindInput(window, renderer.domElement, input);
 // Dev builds only: Vite replaces the flag with false in a build, and the module
 // goes with it, so a production page has no time scale.
@@ -282,6 +285,7 @@ function stepSim(steps: number): void {
     step(state, inputs);
     // Every step: the sim clears its events at the start of the next one.
     routeEvents(state, feedback);
+    routeSounds(state, platform.sound, HUMAN_ID);
   }
   // `step` replaces the projectile and area arrays, so read them fresh here.
   projectileViews.sync(state.projectiles);
