@@ -146,10 +146,10 @@ function findLanding(
  * On an escape think, the first slot of the escape order that passes its gates is chosen: the cast
  * delay run (an escape slot counts the trigger, see `updateRuns`), the cooldown at most 1, no
  * windup in progress unless it fires on this tick, no stun or silence, no root for a dash, and for
- * a teleport or a dash a landing. Writes the slot into `choice` (never an EX variant) and returns true; the
- * landing is in `scratch.land` with `scratch.landed` set. Every slot of the order is marked in
- * `scratch.tried`, so the main walk of `chooseCast` skips it: a teleport that found no landing must
- * not be pressed there, and the dash hold of `chooseCast` never reaches Glide.
+ * a teleport or a dash a landing. Writes the slot into `choice` (never an EX variant) and returns
+ * true; the landing is in `scratch.land` with `scratch.landed` set. Every slot of the order is
+ * marked in `scratch.tried`, so the main walk of `chooseCast` skips it: a teleport that found no
+ * landing must not be pressed there, and the dash hold of `chooseCast` never reaches Glide.
  *
  * There is no energy gate, unlike `chooseCast`: every escape row costs nothing (a base press that
  * is not F), and a row with an EX variant or F would need the cost check added with its test.

@@ -31,9 +31,9 @@ const KIT_RULES = new Map<string, number>([
 
 /**
  * The preferred range of a champion. With a kit of the same id, a champion that has a rule gets
- * rangeMax = the top of its base M1 band minus `RANGE_MARGIN` (Lumeth's M1 reaches 12 m, so 11). The table applies instead when
- * there is no rule, no kit or another kit, M1 has no band, or the derived maximum is at most
- * 1 m or at most rangeMin.
+ * rangeMax = the top of its base M1 band minus `RANGE_MARGIN` (Lumeth's M1 reaches 12 m, so 11).
+ * The table applies instead when there is no rule, no kit or another kit, M1 has no band, or the
+ * derived maximum is at most 1 m or at most rangeMin.
  */
 export function profileFor(championId: string, kit?: KitDef): BotProfile {
   const table = PROFILES.get(championId) ?? DEFAULT_PROFILE;
@@ -104,9 +104,10 @@ export interface ChampionRules {
   readonly wait: WaitRule | null;
   /**
    * The escape trigger of the champion, or null for the common one. A number is a distance in
-   * metres, inclusive: any acted intent but idle with the acted target that close is an escape think
-   * (see `computeCues` in casting.ts). With null the common trigger holds, for Hargrim, Quillon and
-   * Skerrow: a retreat with the target within `ESCAPE_RANGE`, or a kite inside rangeMin.
+   * metres, inclusive: any acted intent but idle with the acted target that close is an escape
+   * think (see `computeCues` in casting.ts). With null the common trigger holds, for Hargrim,
+   * Quillon and Skerrow: a retreat with the target within `ESCAPE_RANGE`, or a kite inside
+   * rangeMin.
    */
   readonly escapeWithin: number | null;
 }
@@ -134,8 +135,8 @@ const NO_RULES: ChampionRules = Object.freeze({
  * ticks left, bounded so a long cooldown is no stall (the roster: "waits at 6 to 8 m for the
  * opening"; decision 3 of batch #91 fixes the bound).
  * Lumeth's Binding Sigil keeps its kit band and needs a target within 6 m of an ally (the roster:
- * "Q on a target inside 6 m of an ally"). Lantern Burst, then Glide, are her escapes on a trigger of
- * her own: any acted intent but idle with the target within 3 m (the roster: "an enemy inside
+ * "Q on a target inside 6 m of an ally"). Lantern Burst, then Glide, are her escapes on a trigger
+ * of her own: any acted intent but idle with the target within 3 m (the roster: "an enemy inside
  * 3 m"; decision 5 of batch #105). Glide is a dash: its landing is a dash end, see `findLanding`
  * in escape.ts.
  */
