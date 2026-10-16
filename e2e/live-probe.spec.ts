@@ -46,6 +46,8 @@ interface Hooks {
   bars: string[];
   /** `data-ready` of the M1 icon. */
   m1Ready: string | null;
+  /** `data-anim0` to `data-anim3`: what each champion's clips play, one of the nine texts. */
+  anims: string[];
 }
 
 // The clock is paused far ahead of the page's own clock, which starts at 0, before
@@ -114,6 +116,7 @@ async function readHooks(page: Page): Promise<Hooks> {
       f0: d['f0'] ?? '',
       bars: [0, 1, 2, 3].map((id) => d[`bar${id}`] ?? ''),
       m1Ready: document.querySelector('[data-slot="M1"]')?.getAttribute('data-ready') ?? null,
+      anims: [0, 1, 2, 3].map((id) => d[`anim${id}`] ?? ''),
     };
   });
 }
@@ -283,6 +286,20 @@ test('the live match: the writes of a changing match allocate under the limit', 
     });
     // M1 cast: its icon is on cooldown in at least one read.
     expect(reads.some((read) => read.m1Ready === 'false'), 'M1 never went on cooldown, so no cast ran').toBe(true);
+    // The clips follow the match: the human walks in every window, so its clips start with Run at
+    // every read (Run or Run+Attack, since M1 is held), a bot is casting in some read and some
+    // champion is staggered by a hit in some read. The bots are deterministic and the windows are
+    // paced by the hook, so these reads are the same on every attempt.
+    for (const read of reads) expect(read.anims[0], `the human's clips at tick ${read.tick}`).toMatch(/^Run/);
+    console.log(`heap probe live clips: ${reads.map((read) => `${read.tick} ${read.anims.join('/')}`).join(' | ')}`);
+    expect(
+      reads.some((read) => read.anims.slice(1).some((text) => text.endsWith('+Cast'))),
+      'a bot casting in some measured read',
+    ).toBe(true);
+    expect(
+      reads.some((read) => read.anims.some((text) => text.endsWith('+Hit'))),
+      'a champion staggered by a hit in some measured read',
+    ).toBe(true);
     const lastTick = hooks.tick;
     expect(measured.lowestOutsideSweep, 'the profiler saw too few allocations outside the sweep files').toBeGreaterThan(
       PROFILER_SANITY_BYTES,
@@ -311,6 +328,10 @@ test('the live match: the writes of a changing match allocate under the limit', 
     expect(hooks.tick - lastTick, 'the first death of the round came too soon after the measured windows').toBeGreaterThanOrEqual(
       FIRST_DEATH_MARGIN_TICKS,
     );
+    // The victim of the first death lies in Death: its bar is hidden, and its clips read Death.
+    const victims = hooks.bars.flatMap((bar, id) => (bar === 'x' ? [id] : []));
+    expect(victims, 'one champion died').toHaveLength(1);
+    expect(hooks.anims[victims[0] as number], `the clips of the victim, champion ${victims[0]}`).toBe('Death');
   } finally {
     expect(problems).toEqual([]);
   }

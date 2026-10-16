@@ -27,6 +27,8 @@ interface Hooks {
   m1Ready: string | null;
   /** The visible kill-feed lines, "killer > victim", oldest first. */
   killFeed: string[];
+  /** `data-anim0` to `data-anim3`: what each champion's clips play, one of the nine texts. */
+  anims: string[];
 }
 
 // Playwright's clock fires a frame every 16 ms of fake time and the sim ticks
@@ -43,6 +45,10 @@ const TARGET = 2;
 const SHOTS = 8;
 // RING_TICKS in the client's impact-rings.ts: how long a ring lives, in sim ticks.
 const RING_TICKS = 18;
+// The Attack clip is 24 ticks long (0.4 s), and Idle returns within 6 more; the Death clip is 60
+// ticks (1 s).
+const ATTACK_TICKS = 24;
+const DEATH_TICKS = 60;
 // Ticks of slack after a ring's life, for the frame that retires it.
 const RING_SLACK_TICKS = 4;
 
@@ -66,6 +72,7 @@ async function readHooks(page: Page): Promise<Hooks> {
       debugShots: Number(d['debugShots']),
       phase: d['phase'] ?? '',
       m1Ready: document.querySelector('[data-slot="M1"]')?.getAttribute('data-ready') ?? null,
+      anims: [0, 1, 2, 3].map((id) => d[`anim${id}`] ?? ''),
       killFeed: [...document.querySelectorAll('[data-line][data-visible="true"]')].map(
         (line) =>
           `${line.querySelector('[data-part="killer"]')?.textContent} > ${line.querySelector('[data-part="victim"]')?.textContent}`,
@@ -171,6 +178,20 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.projectiles).toBe(0);
     expect(hooks.hits).toBe(0);
     expect(hooks.bars).toEqual(['100', '100', '100', '100']);
+    // Nobody has moved or cast yet. The bot (champion 3) may already be walking.
+    expect(hooks.anims.slice(0, 3)).toEqual(['Idle', 'Idle', 'Idle']);
+
+    // 2b. M1 once, before the probe hook runs: Hargrim's arc is an Attack, which the clips play
+    // from the tick of the cast (within 3 ticks of the press) and which is over within 30. The
+    // button goes up right after, so the 36-tick cooldown allows no second cast.
+    await page.mouse.down();
+    hooks = await runUntil(page, 'the Attack', 3, (h) => h.anims[0] === 'Idle+Attack');
+    await page.mouse.up();
+    expect(hooks.anims[0]).toBe('Idle+Attack');
+    hooks = await runUntil(page, 'the end of the Attack', ATTACK_TICKS + 6, (h) => h.anims[0] === 'Idle');
+    expect(hooks.anims[0]).toBe('Idle');
+    // The two champions without a kit or a bot stood in Idle all along (champion 3 is a bot, which walks).
+    expect(hooks.anims.slice(1, 3)).toEqual(['Idle', 'Idle']);
 
     // 3. F4 spawns between steps, so only the array diff can show the shot.
     await page.keyboard.press('F4');
@@ -197,6 +218,9 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.flashing).toContain(String(TARGET));
     expect(hooks.bars[TARGET]).toBe(String(100 - 25 * hooks.hits));
     expect(hooks.rings, 'a ring shows right after the hit').toBeGreaterThanOrEqual(1);
+    // The shot of champion 0 staggers the target, which stands in Idle: Hit.
+    expect(hooks.anims[TARGET], 'the first hit plays Hit').toBe('Idle+Hit');
+    expect(hooks.anims[1]).toBe('Idle');
 
     // 5. The fourth hit kills it, and its bar goes away.
     hooks = await runUntil(page, 'the death', 60, (h) => h.deaths >= 1);
@@ -204,6 +228,8 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.bars[TARGET]).toBe('x');
     // The kill feed names the killer (champion 0, Hargrim) and the victim (champion 2, Lumeth).
     expect(hooks.killFeed).toEqual(['Hargrim > Lumeth']);
+    expect(hooks.anims[TARGET], 'the death plays Death').toBe('Death');
+    expect(hooks.anims[1]).toBe('Idle');
     const deathTick = hooks.tick;
 
     // 6. The other shots pass through the dead champion and end at the east
@@ -218,6 +244,12 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     expect(hooks.rings, 'a ring shows for the last shot').toBeGreaterThanOrEqual(1);
     hooks = await runUntil(page, 'the rings to end', RING_TICKS + RING_SLACK_TICKS, (h) => h.rings === 0);
     expect(hooks.rings).toBe(0);
+
+    // 7b. The corpse lies on its last frame, drawn although it is outside the bind pose's
+    // bounding sphere (culling is off), and never gets up.
+    if (hooks.tick - deathTick < DEATH_TICKS) hooks = await runTicks(page, DEATH_TICKS - (hooks.tick - deathTick));
+    expect(hooks.anims[TARGET]).toBe('Death');
+    await page.screenshot({ path: test.info().outputPath('death.png') });
 
     // 8. Steady state: eight shots in flight and nothing to hit, the loop at
     // its busiest. The shots pass through the dead champion 2. Code warmed up
@@ -250,6 +282,8 @@ test('the F4 debug shot hits, flashes, rings, kills and leaves no views behind',
     // The death line is long gone: the kill feed expires after 300 ticks.
     expect(hooks.tick - deathTick).toBeGreaterThanOrEqual(300);
     expect(hooks.killFeed).toEqual([]);
+    expect(hooks.anims[TARGET], 'still Death 300 ticks on').toBe('Death');
+    expect(hooks.anims[1]).toBe('Idle');
     expect(hooks.hits).toBe(4);
     expect(hooks.projectiles, 'every shot of the volley is still in flight').toBe(SHOTS);
     // Nothing else happened to the match: still the same round, one death, the

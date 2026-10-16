@@ -1,9 +1,12 @@
 import {
+  Button,
+  RING_SOURCE_ID,
   createMatch,
   debug,
   parseArenaDef,
   step,
   type GameState,
+  type PlayerInput,
   type ProjectileEndReason,
   type SimEvent,
   type TeamId,
@@ -11,6 +14,7 @@ import {
 import type { Mesh, MeshBasicMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
+import { CAST_ATTACK, CAST_OTHER, createAnims } from './champion-anim';
 import { PROJECTILE_ALLY_COLOUR, PROJECTILE_ENEMY_COLOUR } from './entity-views';
 import {
   CombatFeedback,
@@ -22,6 +26,7 @@ import {
 } from './feedback';
 import { RING_COLOUR, createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
+import { TEST_KITS } from './test-kits';
 
 /** Champions 0 and 1 on team A, 2 and 3 on team B, like the real 2v2. */
 const TEAMS_2V2: readonly { readonly team: TeamId }[] = [{ team: 'A' }, { team: 'A' }, { team: 'B' }, { team: 'B' }];
@@ -36,7 +41,12 @@ function recorder(): { handlers: FeedbackHandlers; calls: Call[]; records: SimEv
   // The event records the hit and expire handlers were given, in call order.
   const records: SimEvent[] = [];
   const handlers: FeedbackHandlers = {
-    damage: (tick, targetId) => calls.push({ kind: 'damage', args: [tick, targetId] }),
+    damage: (tick, targetId, sourceId) => calls.push({ kind: 'damage', args: [tick, targetId, sourceId] }),
+    cast: (tick, event) => calls.push({ kind: 'cast', args: [tick, event.championId, event.slot === 'M1' ? 1 : 2] }),
+    interrupt: (tick, event) => calls.push({ kind: 'interrupt', args: [tick, event.championId] }),
+    dash: (tick, championId, active) => calls.push({ kind: 'dash', args: [tick, championId, active] }),
+    roundStarted: (tick) => calls.push({ kind: 'roundStarted', args: [tick] }),
+    roundEnded: (tick) => calls.push({ kind: 'roundEnded', args: [tick] }),
     hit: (tick, event) => {
       calls.push({ kind: 'hit', args: [tick, event.x, event.y] });
       records.push(event);
@@ -71,7 +81,7 @@ describe('routeEvents', () => {
     );
     expect(calls).toEqual([
       { kind: 'hit', args: [40, 5, 6] },
-      { kind: 'damage', args: [40, 2] },
+      { kind: 'damage', args: [40, 2, 0] },
       { kind: 'death', args: [40, 2, 0] },
     ]);
   });
@@ -84,6 +94,43 @@ describe('routeEvents', () => {
     expect(records).toHaveLength(2);
     expect(records[0]).toBe(hit);
     expect(records[1]).toBe(end);
+  });
+
+  it('routes the starts and the interrupts of casts and the start of a round', () => {
+    const { handlers, calls } = recorder();
+    routeEvents(
+      fakeState(12, [
+        { type: 'castStarted', championId: 3, castId: 5, slot: 'M1', ex: false, windupTicks: 6, cost: 0 },
+        { type: 'castStarted', championId: 1, castId: 6, slot: 'Q', ex: true, windupTicks: 9, cost: 25 },
+        { type: 'castInterrupted', championId: 1, castId: 6, slot: 'Q', ex: true, reason: 'stun' },
+        { type: 'dashStarted', championId: 2, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+        { type: 'dashEnded', championId: 2, x: 4, y: 0, reason: 'complete' },
+        { type: 'roundEnded', round: 1, winner: 'A', scoreA: 1, scoreB: 0 },
+        { type: 'roundStarted', round: 2 },
+      ]),
+      handlers,
+    );
+    expect(calls).toEqual([
+      { kind: 'cast', args: [12, 3, 1] },
+      { kind: 'cast', args: [12, 1, 2] },
+      { kind: 'interrupt', args: [12, 1] },
+      { kind: 'dash', args: [12, 2, 1] },
+      { kind: 'dash', args: [12, 2, 0] },
+      { kind: 'roundEnded', args: [12] },
+      { kind: 'roundStarted', args: [12] },
+    ]);
+  });
+
+  it('never writes to the events: the sound pass reads the same records after it', () => {
+    const { handlers } = recorder();
+    const events: SimEvent[] = [
+      { type: 'castStarted', championId: 3, castId: 5, slot: 'M1', ex: false, windupTicks: 6, cost: 0 },
+      { type: 'damage', targetId: 2, sourceId: 0, amount: 30, health: 90 },
+    ];
+    const before = JSON.stringify(events);
+    routeEvents(fakeState(12, events), handlers);
+    expect(events).toHaveLength(2);
+    expect(JSON.stringify(events)).toBe(before);
   });
 
   it.each(['obstacle', 'boundary', 'lifetime'] as const)('rings for a %s expiry', (reason) => {
@@ -128,8 +175,8 @@ describe('routeEvents', () => {
 
 describe('combat feedback', () => {
   it('flashes for exactly FLASH_TICKS ticks from the tick of the damage', () => {
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed());
-    feedback.damage(100, 2);
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), createAnims(4));
+    feedback.damage(100, 2, 0);
     expect(FLASH_TICKS).toBe(8);
     let flashing = 0;
     for (let tick = 100; tick < 120; tick++) if (feedback.isFlashing(2, tick)) flashing++;
@@ -140,15 +187,15 @@ describe('combat feedback', () => {
   });
 
   it('restarts the flash on a second hit', () => {
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed());
-    feedback.damage(100, 2);
-    feedback.damage(105, 2);
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), createAnims(4));
+    feedback.damage(100, 2, 0);
+    feedback.damage(105, 2, 0);
     expect(feedback.isFlashing(2, 112)).toBe(true);
     expect(feedback.isFlashing(2, 113)).toBe(false);
   });
 
   it('counts hits and deaths', () => {
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed());
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), createAnims(4));
     feedback.hit(1, { type: 'projectileHit', projectileId: 1, ownerId: 0, targetId: 2, x: 0, y: 0 });
     feedback.hit(1, { type: 'projectileHit', projectileId: 1, ownerId: 0, targetId: 2, x: 0, y: 0 });
     feedback.death(1, 2, 0);
@@ -157,17 +204,17 @@ describe('combat feedback', () => {
 
   it('pushes a death onto the kill feed as killer then victim', () => {
     const feed = createKillFeed();
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), feed);
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), feed, createAnims(4));
     feedback.death(40, 2, 0);
     expect(feed.count).toBe(1);
     expect(feed.line(0)).toEqual({ tick: 40, killerId: 0, victimId: 2 });
   });
 
   it('lists flashing ids as a mask and as text', () => {
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed());
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), createAnims(4));
     expect(feedback.flashMask(100)).toBe(0);
-    feedback.damage(100, 2);
-    feedback.damage(100, 0);
+    feedback.damage(100, 2, 0);
+    feedback.damage(100, 0, 2);
     expect(feedback.flashMask(100)).toBe(0b101);
     expect(flashText(0b101)).toBe('0,2');
     expect(flashText(0)).toBe('');
@@ -184,8 +231,8 @@ describe('combat feedback', () => {
   });
 
   it('ignores a champion id it does not know', () => {
-    const feedback = new CombatFeedback(TEAMS_2V2.slice(0, 2), 'A', createImpactRings(), createKillFeed());
-    expect(() => feedback.damage(1, 9)).not.toThrow();
+    const feedback = new CombatFeedback(TEAMS_2V2.slice(0, 2), 'A', createImpactRings(), createKillFeed(), createAnims(4));
+    expect(() => feedback.damage(1, 9, 0)).not.toThrow();
     expect(feedback.isFlashing(9, 1)).toBe(false);
   });
 });
@@ -197,7 +244,7 @@ describe('the ring of a projectile hit', () => {
 
   function make(localTeam: TeamId) {
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(TEAMS_2V2, localTeam, rings, createKillFeed());
+    const feedback = new CombatFeedback(TEAMS_2V2, localTeam, rings, createKillFeed(), createAnims(4));
     const colours = (): string[] =>
       (rings.group.children as Mesh[])
         .filter((mesh) => mesh.visible)
@@ -279,7 +326,7 @@ describe('the ring of a projectile hit', () => {
       allyEffects: [{ type: 'heal', amount: 5 }],
     });
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(state.champions, 'A', rings, createKillFeed());
+    const feedback = new CombatFeedback(state.champions, 'A', rings, createKillFeed(), createAnims(4));
     for (let i = 0; i < 60; i++) {
       step(state, []);
       routeEvents(state, feedback);
@@ -327,7 +374,7 @@ describe('routing real sim events', () => {
 
   function run(state: GameState, ticks: number, feed = createKillFeed()): CombatFeedback {
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(state.champions, 'A', rings, feed);
+    const feedback = new CombatFeedback(state.champions, 'A', rings, feed, createAnims(4));
     for (let i = 0; i < ticks; i++) {
       step(state, []);
       routeEvents(state, feedback);
@@ -342,7 +389,7 @@ describe('routing real sim events', () => {
     shoot(state, 10, 2, 1, 0);
     shoot(state, 10, -2, 1, 0);
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(state.champions, 'A', rings, createKillFeed());
+    const feedback = new CombatFeedback(state.champions, 'A', rings, createKillFeed(), createAnims(4));
     const hits: { x: number; y: number }[] = [];
     for (let i = 0; i < 30 && hits.length < 2; i++) {
       step(state, []);
@@ -367,7 +414,7 @@ describe('routing real sim events', () => {
     const state = match();
     shoot(state, 10, 2, 1, 0);
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', rings, createKillFeed());
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', rings, createKillFeed(), createAnims(4));
     let flashAtHit = -1;
     for (let i = 0; i < 30; i++) {
       step(state, []);
@@ -388,7 +435,7 @@ describe('routing real sim events', () => {
     const state = match();
     shoot(state, x as number, y as number, dirX as number, dirY as number, lifetime as number);
     const rings = createImpactRings();
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', rings, createKillFeed());
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', rings, createKillFeed(), createAnims(4));
     for (let i = 0; i < 60; i++) {
       step(state, []);
       routeEvents(state, feedback);
@@ -462,7 +509,7 @@ describe('routing the end of a round', () => {
 
     const rings = createImpactRings();
     const feed = createKillFeed();
-    const feedback = new CombatFeedback(TEAMS_2V2, 'A', rings, feed);
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', rings, feed, createAnims(4));
     let endedWithRound = 0;
     for (let i = 0; i < 40; i++) {
       step(state, []);
@@ -482,5 +529,199 @@ describe('routing the end of a round', () => {
       expect.objectContaining({ killerId: 1, victimId: 3 }),
     ]);
     expect(rings.visibleCount, 'one ring per hit and none for the two roundEnd expiries').toBe(8);
+  });
+});
+
+describe('the animation triggers', () => {
+  function make() {
+    const anims = createAnims(4);
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), anims);
+    return { anims, feedback };
+  }
+
+  function started(championId: number, slot: 'M1' | 'M2' | 'SPACE' | 'Q' | 'E' | 'R' | 'F'): SimEvent {
+    return { type: 'castStarted', championId, castId: 1, slot, ex: false, windupTicks: 6, cost: 0 };
+  }
+
+  it('makes an Attack of the first slot, for any champion, the local one or a bot', () => {
+    const { anims, feedback } = make();
+    routeEvents(fakeState(5, [started(0, 'M1'), started(3, 'M1')]), feedback);
+    expect(anims.map((anim) => anim.pendCast)).toEqual([CAST_ATTACK, 0, 0, CAST_ATTACK]);
+  });
+
+  it.each(['M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const)('makes a Cast of a start in the %s slot', (slot) => {
+    const { anims, feedback } = make();
+    routeEvents(fakeState(5, [started(2, slot)]), feedback);
+    expect(anims.map((anim) => anim.pendCast)).toEqual([0, 0, CAST_OTHER, 0]);
+  });
+
+  it('interrupts the champion whose cast was cut off', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [{ type: 'castInterrupted', championId: 1, castId: 1, slot: 'M1', ex: false, reason: 'stun' }]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.pendInterrupt)).toEqual([0, 1, 0, 0]);
+  });
+
+  it('staggers the target of damage from a champion', () => {
+    const { anims, feedback } = make();
+    routeEvents(fakeState(5, [{ type: 'damage', targetId: 2, sourceId: 0, amount: 30, health: 90 }]), feedback);
+    expect(anims.map((anim) => anim.pendHit)).toEqual([0, 0, 1, 0]);
+  });
+
+  it('does not stagger from the damage of the sudden death ring', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [{ type: 'damage', targetId: 2, sourceId: RING_SOURCE_ID, amount: 5, health: 90 }]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.pendHit)).toEqual([0, 0, 0, 0]);
+    // It still flashes, as any damage does.
+    expect(feedback.isFlashing(2, 5)).toBe(true);
+  });
+
+  it('kills the animation of the victim of a death, from the ring too', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [
+        { type: 'death', targetId: 1, sourceId: 3 },
+        { type: 'death', targetId: 2, sourceId: RING_SOURCE_ID },
+      ]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.pendDeath)).toEqual([0, 1, 1, 0]);
+  });
+
+  it('flags the champion whose dash starts and clears it when the dash ends', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [{ type: 'dashStarted', championId: 3, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 }]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 1]);
+    routeEvents(fakeState(13, [{ type: 'dashEnded', championId: 3, x: 4, y: 0, reason: 'complete' }]), feedback);
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('ends every dash when a round ends: the sim freezes them and emits no dashEnded', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [
+        { type: 'dashStarted', championId: 1, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+        { type: 'dashStarted', championId: 3, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+      ]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 1, 0, 1]);
+    routeEvents(fakeState(9, [{ type: 'roundEnded', round: 1, winner: 'A', scoreA: 1, scoreB: 0 }]), feedback);
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('snaps every champion when a round starts', () => {
+    const { anims, feedback } = make();
+    routeEvents(fakeState(5, [{ type: 'roundStarted', round: 3 }]), feedback);
+    expect(anims.map((anim) => anim.pendSnap)).toEqual([1, 1, 1, 1]);
+  });
+
+  it('ignores a champion id it does not know', () => {
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), createAnims(2));
+    expect(() =>
+      routeEvents(
+        fakeState(5, [
+          started(3, 'M1'),
+          { type: 'damage', targetId: 3, sourceId: 0, amount: 1, health: 9 },
+          { type: 'death', targetId: 3, sourceId: 0 },
+          { type: 'castInterrupted', championId: 3, castId: 1, slot: 'M1', ex: false, reason: 'stun' },
+          { type: 'dashStarted', championId: 3, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+        ]),
+        feedback,
+      ),
+    ).not.toThrow();
+  });
+
+  it('reads nothing but the champion id and the slot of a castStarted, and the champion id of an interrupt', () => {
+    const { anims, feedback } = make();
+    const reads: string[] = [];
+    const spy = <T extends object>(record: T): T =>
+      new Proxy(record, {
+        get(target, key, receiver) {
+          reads.push(String(key));
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+      });
+    feedback.cast(1, spy(started(0, 'M1') as Extract<SimEvent, { type: 'castStarted' }>));
+    expect(reads.sort()).toEqual(['championId', 'slot']);
+    reads.length = 0;
+    feedback.interrupt(
+      1,
+      spy({ type: 'castInterrupted', championId: 0, castId: 1, slot: 'M1', ex: false, reason: 'stun' } as Extract<
+        SimEvent,
+        { type: 'castInterrupted' }
+      >),
+    );
+    expect(reads).toEqual(['championId']);
+    expect(anims[0]?.pendCast).toBe(CAST_ATTACK);
+  });
+});
+
+// The triggers from the real sim: the first slot of Hargrim is its arc, and a projectile
+// of champion 0 hurts champion 2.
+describe('the animation triggers of real sim events', () => {
+  function kitMatch(): GameState {
+    return createMatch(
+      {
+        teamSize: 2,
+        players: [
+          { championId: 'hargrim', team: 'A' },
+          { championId: 'quillon', team: 'A' },
+          { championId: 'hargrim', team: 'B' },
+          { championId: 'quillon', team: 'B' },
+        ],
+      },
+      parseArenaDef(arena01Json),
+      1,
+      TEST_KITS,
+    );
+  }
+
+  function press(buttons: number[]): PlayerInput[] {
+    return buttons.map((button) => ({ moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: button }));
+  }
+
+  it('sees an Attack of champion 0 and a Cast of champion 1 as they begin', () => {
+    const state = kitMatch();
+    const anims = createAnims(4);
+    const feedback = new CombatFeedback(state.champions, 'A', createImpactRings(), createKillFeed(), anims);
+    step(state, press([Button.M1, Button.Q, 0, 0]));
+    routeEvents(state, feedback);
+    expect(anims[0]?.pendCast).toBe(CAST_ATTACK);
+    expect(anims[1]?.pendCast).toBe(CAST_OTHER);
+    expect(anims[2]?.pendCast).toBe(0);
+  });
+
+  it('staggers the target of a projectile of champion 0, from the sim damage event', () => {
+    const state = kitMatch();
+    const target = state.champions[2];
+    if (!target) throw new Error('no champion 2');
+    debug.spawnProjectile(state, {
+      ownerId: 0,
+      x: target.x - 3,
+      y: target.y,
+      dirX: 1,
+      dirY: 0,
+      speed: 10,
+      radius: 0.25,
+      lifetimeTicks: 180,
+      pierce: false,
+      effects: [{ type: 'damage', amount: 30 }],
+    });
+    const anims = createAnims(4);
+    const feedback = new CombatFeedback(state.champions, 'A', createImpactRings(), createKillFeed(), anims);
+    for (let i = 0; i < 60 && anims[2]?.pendHit === 0; i++) {
+      step(state, []);
+      routeEvents(state, feedback);
+    }
+    expect(anims.map((anim) => anim.pendHit)).toEqual([0, 0, 1, 0]);
   });
 });

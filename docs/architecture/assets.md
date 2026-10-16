@@ -74,8 +74,8 @@ The commands and file list are in `tools/blender/README.md`.
   `rotation.y = aimAngle` directly, so the front must stay on +X.
 - The origin is at the feet. The footprint stays inside a 0.5 m radius and the
   model is about 1.7 m tall.
-- Flat colours only. Every champion model is rigged and has six clips, and
-  the client plays none of them yet.
+- Flat colours only. Every champion model is rigged and has six clips, which
+  the client plays through its own sampler ([client](client.md#animation)).
 - Each of the four roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
   in body colour and one silhouette cue that stays below 1.9 m.
@@ -113,11 +113,12 @@ The scene rate is 30 fps. Every clip keys only the channels in its Channels
 column, at each listed frame, all with LINEAR interpolation. The exporter
 writes only the channels an action keys, so an unkeyed channel is absent from
 the glb, and `key_clip` asserts that such a channel is at rest at every key. The
-client's mixer restores an unkeyed bone to rest, so played alone `Attack`,
-`Cast` and `Hit` show the legs and `Hips` at rest. The last key of a looping
-clip equals its first. The pose values are constants in `gen_champion.py`, with
-nothing random and nothing time-based. No pose puts a model above 1.90 m or any
-vertex below the floor (by more than 0.1 mm), at a key or between keys.
+client's sampler gives an unkeyed bone its rest pose, as three's mixer does, so
+played alone `Attack`, `Cast` and `Hit` show the legs and `Hips` at rest. The
+last key of a looping clip equals its first. The pose values are constants in
+`gen_champion.py`, with nothing random and nothing time-based. No pose puts a
+model above 1.90 m or any vertex below the floor (by more than 0.1 mm), at a key
+or between keys.
 
 The floor holds between keys by two rules. The client's interpolation lerps
 `Hips` and slerps each turn, and a rigid 0.8 m leg with a 0.09 m half width

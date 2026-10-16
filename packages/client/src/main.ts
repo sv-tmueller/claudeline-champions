@@ -21,7 +21,9 @@ import {
   refreshCanvasRect,
   type GroundAim,
 } from './camera';
+import { ANIM_TEXTS, createAnims, updateAnims } from './champion-anim';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
+import { createClipRig, poseChampion, type ClipRig } from './clip-sampler';
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
 import { readDevLaunch } from './dev-launch';
 import { createAreaViews, createProjectileViews } from './entity-views';
@@ -109,7 +111,9 @@ const areaViews = createAreaViews(human.team);
 const impactRings = createImpactRings();
 const healthBars = createHealthBars(state.champions, human.team);
 const killFeed = createKillFeed();
-const feedback = new CombatFeedback(state.champions, human.team, impactRings, killFeed);
+// The state of each champion's clips: the event pass writes its triggers, draw plays it.
+const anims = createAnims(state.champions.length);
+const feedback = new CombatFeedback(state.champions, human.team, impactRings, killFeed, anims);
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 // Built before the models load, so the HUD shows while they do.
@@ -200,10 +204,14 @@ function sampleAim(): void {
 // builds no string. A dataset write allocated about 100 B per window in the heap
 // probe, and a String(), a template or a toFixed() leaves garbage on every
 // change. The position is two hooks, p0x and p0y, since one "x,y" text cannot
-// come from a table, and so is every bar (data-bar0 to data-barN).
+// come from a table, and so is every bar (data-bar0 to data-barN) and every
+// champion's clip state (data-anim0 to data-animN, one of the nine ANIM_TEXTS).
 const canvas = renderer.domElement;
 const BAR_ATTRIBUTES = state.champions.map((_, id) => `data-bar${id}`);
 const FLASH_TEXTS = flashTexts(state.champions.length);
+const ANIM_ATTRIBUTES = state.champions.map((_, id) => `data-anim${id}`);
+// The last anim code written to each champion's hook, -1 before the first write.
+const wroteAnim = new Int8Array(state.champions.length).fill(-1);
 
 // The last value written to each of these hooks, so a steady frame builds no
 // strings. Fields of an object, not `let`s: a number in a closure slot is a new
@@ -298,6 +306,8 @@ function stepSim(steps: number): void {
 
 // Created after the champion views exist, in loadModels. draw never runs before then.
 let looks: ChampionLooks | undefined;
+// One per champion view, in id order: the sampler that poses the view's bones.
+const rigs: ClipRig[] = [];
 
 /**
  * Draws interpolated poses. Never steps the sim. The fraction of the tick is the
@@ -312,6 +322,19 @@ function draw(): void {
     placeChampion(view, pose);
     const champion = state.champions[i];
     if (champion) looks?.set(i, lookMode(feedback.isFlashing(i, state.tick), champion.alive));
+  }
+  // The clips: the state machine takes the triggers and moves on to the drawn time, read from
+  // state.tick and the clock record inside, then the sampler poses each view's bones.
+  updateAnims(anims, state, clock);
+  for (let i = 0; i < rigs.length; i++) {
+    const rig = rigs[i];
+    const anim = anims[i];
+    if (!rig || !anim) continue;
+    poseChampion(rig, anim);
+    if (anim.code !== wroteAnim[i]) {
+      wroteAnim[i] = anim.code;
+      canvas.setAttribute(ANIM_ATTRIBUTES[i] as string, ANIM_TEXTS[anim.code] as string);
+    }
   }
   projectileViews.draw(clock);
   areaViews.draw(clock);
@@ -373,7 +396,11 @@ async function loadModels(): Promise<void> {
     const gltf = championGltfs[urls.indexOf(championModelUrl(champion.championId))];
     if (!gltf) throw new Error(`no model loaded for ${champion.championId}`);
     // SkeletonUtils.clone gives each view its own skeleton; Object3D.clone shares one.
-    champions.add(cloneSkinned(gltf.scene));
+    const view = cloneSkinned(gltf.scene);
+    // The rig binds the six clips of the model to this view's bones, by name, and turns culling
+    // off on its skinned meshes. A model without one of the clips is a page error here.
+    rigs.push(createClipRig(view, gltf.animations));
+    champions.add(view);
   }
   looks = createChampionLooks(champions.children);
 }

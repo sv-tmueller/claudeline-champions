@@ -63,13 +63,17 @@ first.
   the `__runProbeFrames` hook. The heap probe measures two scenes, the
   sandbox and the live match with a moving pointer, and bounds the bots' bytes
   in the live match. No raw double crosses a call in the aim sampling, the
-  champion placing, the entity drawing, the overlay circles or the ring records,
-  and a heal bolt's ring takes the projectile colour of its team. Not built: a
-  pre-match screen, music, the scoreboard, the other three `Platform` methods
+  champion placing, the entity drawing, the overlay circles, the ring records,
+  the animation state machine or the clip sampler, and a heal bolt's ring takes
+  the projectile colour of its team. The six clips play: a state machine per
+  champion (Idle and Run, an Attack, Cast or Hit over the upper body, Death
+  held) and a sampler of our own on the clip data, with `data-anim0` to
+  `data-animN` hooks, both counted by the heap probe. Not built: a pre-match
+  screen, music, the scoreboard, the other three `Platform` methods
   (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
-  placeholder, each rigged, with six clips the client does not play yet.
+  placeholder, each rigged, with six clips the client plays.
 - `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
 
 ## Index
@@ -153,6 +157,13 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [batch #91 decision 5](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015194380).
   Recorded in [Client](client.md#launch-and-match) and its
   [select](client.md#result-screen-and-champion-select).
+
+- The six clips play through our own LINEAR sampler on the clip data, counted
+  by the heap probe, with three's `AnimationMixer` as the test oracle and not
+  the frame path; the state machine's transitions are tuned constants in ticks,
+  its triggers ride `routeEvents`' pass and its doubles live in typed arrays:
+  [batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811).
+  Recorded in [Client](client.md#animation) and [Assets](assets.md#clips).
 
 Planning:
 

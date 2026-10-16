@@ -68,12 +68,31 @@ describe('summarise', () => {
 
   it('counts the sound module, routeSounds and play, and not a module that only starts with its name', () => {
     const root = node('', '(root)', 0, [
-      node(`${CLIENT}audio.ts`, 'play', 32, [node(`${CLIENT}audio.ts`, 'routeSounds', 64)]),
+      node(`${CLIENT}audio.ts`, 'routeSounds', 64, [node(`${CLIENT}audio.ts`, 'play', 32)]),
       node(`${CLIENT}audio-extra.ts`, 'other', 500),
     ]);
     const result = summarise(root);
     expect(result.combat).toBe(96);
     expect(result.combatByFunction).toEqual({ 'audio.ts:play': 32, 'audio.ts:routeSounds': 64 });
+  });
+
+  it('counts the animation state machine and the clip sampler, and not a module that only starts with their names', () => {
+    const root = node('', '(root)', 0, [
+      node(`${CLIENT}main.ts`, 'draw', 0, [
+        node(`${CLIENT}champion-anim.ts`, 'updateAnims', 16, [node(`${CLIENT}champion-anim.ts`, 'stepRun', 8)]),
+        node(`${CLIENT}clip-sampler.ts`, 'poseChampion', 24, [node(`${CLIENT}clip-sampler.ts`, 'slerpFlat', 40)]),
+      ]),
+      node(`${CLIENT}champion-anim-extra.ts`, 'other', 500),
+      node(`${CLIENT}clip-sampler.test.ts`, 'other', 700),
+    ]);
+    const result = summarise(root);
+    expect(result.combat).toBe(88);
+    expect(result.combatByFunction).toEqual({
+      'champion-anim.ts:updateAnims': 16,
+      'champion-anim.ts:stepRun': 8,
+      'clip-sampler.ts:poseChampion': 24,
+      'clip-sampler.ts:slerpFlat': 40,
+    });
   });
 
   it('leaves the sweep files of the sim out of the bytes outside them', () => {

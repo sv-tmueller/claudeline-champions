@@ -1,4 +1,15 @@
 import type { GameState, SimEvent, TeamId } from '@claudeline/sim';
+import {
+  CAST_ATTACK,
+  CAST_OTHER,
+  triggerCast,
+  triggerDash,
+  triggerDeath,
+  triggerHit,
+  triggerInterrupt,
+  triggerSnap,
+  type ChampionAnim,
+} from './champion-anim';
 import { RING_TINT_ALLY, RING_TINT_ENEMY, RING_TINT_YELLOW, type ImpactRings, type RingTint } from './impact-rings';
 import type { KillFeed } from './kill-feed';
 
@@ -7,14 +18,28 @@ export const FLASH_TICKS = 8;
 
 export type ProjectileHitEvent = Extract<SimEvent, { type: 'projectileHit' }>;
 export type ProjectileExpiredEvent = Extract<SimEvent, { type: 'projectileExpired' }>;
+export type CastStartedEvent = Extract<SimEvent, { type: 'castStarted' }>;
+export type CastInterruptedEvent = Extract<SimEvent, { type: 'castInterrupted' }>;
 
 /**
  * Every handler gets the sim tick the events belong to, as `state.tick` after the step.
- * `hit` and `expire` get the sim's event record and read its fields: a raw double passed
- * to a call is boxed where V8 does not inline it (issue #89).
+ * `hit`, `expire`, `cast` and `interrupt` get the sim's event record and read its fields: a
+ * raw double passed to a call is boxed where V8 does not inline it (issue #89). The handlers
+ * run cold, a few times per window, so they load no double field: `cast` and `interrupt`
+ * read the champion id and the slot, and store integers.
  */
 export interface FeedbackHandlers {
-  damage(tick: number, targetId: number): void;
+  damage(tick: number, targetId: number, sourceId: number): void;
+  /** A cast began its windup. */
+  cast(tick: number, event: CastStartedEvent): void;
+  /** A cast in its windup was cut off. */
+  interrupt(tick: number, event: CastInterruptedEvent): void;
+  /** A champion's dash began (`active` 1) or ended (0). */
+  dash(tick: number, championId: number, active: number): void;
+  /** A round began: the champions stand at their spawns again. */
+  roundStarted(tick: number): void;
+  /** A round ended: the sim freezes a running dash and emits no dashEnded for it. */
+  roundEnded(tick: number): void;
   /** A projectile touched a champion. */
   hit(tick: number, event: ProjectileHitEvent): void;
   /** A projectile ended on an obstacle, the boundary or its lifetime. */
@@ -34,7 +59,25 @@ export function routeEvents(state: GameState, handlers: FeedbackHandlers): void 
     if (!event) continue;
     switch (event.type) {
       case 'damage':
-        handlers.damage(tick, event.targetId);
+        handlers.damage(tick, event.targetId, event.sourceId);
+        break;
+      case 'castStarted':
+        handlers.cast(tick, event);
+        break;
+      case 'castInterrupted':
+        handlers.interrupt(tick, event);
+        break;
+      case 'dashStarted':
+        handlers.dash(tick, event.championId, 1);
+        break;
+      case 'dashEnded':
+        handlers.dash(tick, event.championId, 0);
+        break;
+      case 'roundStarted':
+        handlers.roundStarted(tick);
+        break;
+      case 'roundEnded':
+        handlers.roundEnded(tick);
         break;
       case 'projectileHit':
         handlers.hit(tick, event);
@@ -48,7 +91,7 @@ export function routeEvents(state: GameState, handlers: FeedbackHandlers): void 
         handlers.death(tick, event.targetId, event.sourceId);
         break;
       default:
-        // Heal, area and spawn events have no feedback yet.
+        // Heal, area and the other spawn events have no feedback yet.
         break;
     }
   }
@@ -71,7 +114,10 @@ export function flashTexts(championCount: number): string[] {
   return texts;
 }
 
-/** Flash windows, hit and death counters, the impact rings and the kill feed. */
+/**
+ * Flash windows, hit and death counters, the impact rings, the kill feed and the triggers
+ * of the champions' animations.
+ */
 export class CombatFeedback implements FeedbackHandlers {
   /** Running total of projectile hits. */
   hits = 0;
@@ -81,21 +127,52 @@ export class CombatFeedback implements FeedbackHandlers {
 
   /**
    * `champions` is the match's champion array (read for teams, so a hit's ring can tell a
-   * heal bolt from a damage shot) and `localTeam` the team whose projectiles are ally-coloured.
+   * heal bolt from a damage shot), `localTeam` the team whose projectiles are ally-coloured
+   * and `anims` the animation record of each champion, which the handlers write the pending
+   * triggers of (champion-anim.ts takes them in `draw`).
    */
   constructor(
     private readonly champions: readonly { readonly team: TeamId }[],
     private readonly localTeam: TeamId,
     private readonly rings: ImpactRings,
     private readonly killFeed: KillFeed,
+    private readonly anims: readonly ChampionAnim[],
   ) {
     this.flashEndTick = Array.from({ length: champions.length }, () => 0);
   }
 
-  damage(tick: number, targetId: number): void {
+  damage(tick: number, targetId: number, sourceId: number): void {
     if (targetId >= 0 && targetId < this.flashEndTick.length) {
       this.flashEndTick[targetId] = tick + FLASH_TICKS;
     }
+    // The round's ring (`RING_SOURCE_ID`, -1) hurts but does not stagger.
+    if (sourceId >= 0) {
+      const anim = this.anims[targetId];
+      if (anim !== undefined) triggerHit(anim);
+    }
+  }
+
+  cast(_tick: number, event: CastStartedEvent): void {
+    const anim = this.anims[event.championId];
+    if (anim !== undefined) triggerCast(anim, event.slot === 'M1' ? CAST_ATTACK : CAST_OTHER);
+  }
+
+  interrupt(_tick: number, event: CastInterruptedEvent): void {
+    const anim = this.anims[event.championId];
+    if (anim !== undefined) triggerInterrupt(anim);
+  }
+
+  dash(_tick: number, championId: number, active: number): void {
+    const anim = this.anims[championId];
+    if (anim !== undefined) triggerDash(anim, active);
+  }
+
+  roundEnded(): void {
+    for (let i = 0; i < this.anims.length; i++) triggerDash(this.anims[i] as ChampionAnim, 0);
+  }
+
+  roundStarted(): void {
+    for (let i = 0; i < this.anims.length; i++) triggerSnap(this.anims[i] as ChampionAnim);
   }
 
   hit(tick: number, event: ProjectileHitEvent): void {
@@ -118,6 +195,8 @@ export class CombatFeedback implements FeedbackHandlers {
   death(tick: number, targetId: number, sourceId: number): void {
     this.deaths += 1;
     this.killFeed.push(tick, sourceId, targetId);
+    const anim = this.anims[targetId];
+    if (anim !== undefined) triggerDeath(anim);
   }
 
   isFlashing(id: number, tick: number): boolean {
