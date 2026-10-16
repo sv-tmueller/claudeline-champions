@@ -38,12 +38,15 @@ export const RUN_BLEND_TICKS = 9;
 const IN_TICKS = [0, 3, 3, 2];
 /** ... and out over the last 6 ticks of their clip, or 6 ticks after an interrupt. */
 export const OVERLAY_OUT_TICKS = 6;
+/** A cast that replaces a playing overlay crossfades from the last drawn pose over these ticks. */
+export const OVERLAY_CROSSFADE_TICKS = 3;
 /** Death blends in over these ticks, from the pose of the moment. */
 export const DEATH_BLEND_TICKS = 6;
 const TICKS_PER_SECOND = 60;
 const RUN_BLEND_RATE = TICKS_PER_SECOND / RUN_BLEND_TICKS;
 const OVERLAY_OUT_RATE = TICKS_PER_SECOND / OVERLAY_OUT_TICKS;
 const DEATH_BLEND_RATE = TICKS_PER_SECOND / DEATH_BLEND_TICKS;
+const OVERLAY_CROSSFADE_RATE = TICKS_PER_SECOND / OVERLAY_CROSSFADE_TICKS;
 const OVERLAY_IN_RATE = new Float64Array(IN_TICKS.map((ticks) => (ticks === 0 ? 0 : TICKS_PER_SECOND / ticks)));
 
 /** Below this speed, in m/s, a champion is in Idle. */
@@ -101,7 +104,9 @@ export const D_DEATH_W = 13;
 /** The position of the last frame, for the direction of a dash. */
 export const D_LAST_X = 14;
 export const D_LAST_Y = 15;
-const D_COUNT = 16;
+/** The weight of the crossfade from the last drawn pose to the new overlay's, 0 to 1. */
+export const D_XF_W = 16;
+const D_COUNT = 17;
 
 /**
  * What the hook of a champion says, by `code`: the base clip, plus the overlay that plays
@@ -134,6 +139,11 @@ export interface ChampionAnim {
   atKey: number;
   /** 1 between the sim's dashStarted and dashEnded events of this champion (and a round end). */
   dashing: number;
+  /**
+   * A cast replaced a playing overlay: 1 until the sampler has copied the last drawn pose of
+   * Spine and both arms, 2 while it crossfades from it, 0 when it is over.
+   */
+  xfade: number;
   /** 1 or -1: the direction Run plays, from the last frame that had one (a dot of 0 keeps it). */
   sign: number;
   /** 1 until the first update, which has no frame before it to measure a displacement from. */
@@ -166,6 +176,7 @@ export function createAnim(): ChampionAnim {
     atKey: 0,
     dashing: 0,
     sign: 1,
+    xfade: 0,
     fresh: 1,
     want: 0,
     ov: OV_NONE,
@@ -267,6 +278,7 @@ function updateAnim(anim: ChampionAnim, champion: AnimChampion): void {
   stepIdle(d);
   stepRun(anim, champion);
   stepOverlay(anim);
+  stepCrossfade(anim);
   stepDeath(anim);
   anim.code = anim.dead !== 0 ? CODE_DEATH : anim.want + 2 * anim.ov;
 }
@@ -297,6 +309,13 @@ function takeTriggers(anim: ChampionAnim): void {
     if (anim.ov === OV_ATTACK || anim.ov === OV_CAST) anim.ovFade = 1;
   }
   if (anim.pendCast !== 0) {
+    // A cast that replaces a playing overlay would cut from its pose to the new clip's first
+    // key (Arm_R 77 degrees in one tick, Attack to Cast): the sampler crossfades from the pose
+    // last drawn, over OVERLAY_CROSSFADE_TICKS.
+    if (anim.ov !== OV_NONE) {
+      anim.xfade = 1;
+      d[D_XF_W] = 0;
+    }
     anim.ov = anim.pendCast === CAST_ATTACK ? OV_ATTACK : OV_CAST;
     anim.pendCast = 0;
     anim.ovFade = 0;
@@ -326,6 +345,7 @@ function snap(anim: ChampionAnim): void {
   anim.atKey = 0;
   anim.dashing = 0;
   anim.sign = 1;
+  anim.xfade = 0;
   anim.want = 0;
   anim.ov = OV_NONE;
   anim.ovFade = 0;
@@ -510,6 +530,14 @@ function stepOverlay(anim: ChampionAnim): void {
     return;
   }
   d[D_OV_W] = w;
+}
+
+function stepCrossfade(anim: ChampionAnim): void {
+  if (anim.xfade === 0) return;
+  const d = anim.d;
+  const w = (d[D_XF_W] as number) + (d[D_DT] as number) * OVERLAY_CROSSFADE_RATE;
+  if (w >= 1 - EPS) d[D_XF_W] = 1;
+  else d[D_XF_W] = w;
 }
 
 function stepDeath(anim: ChampionAnim): void {

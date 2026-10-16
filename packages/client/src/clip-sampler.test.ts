@@ -319,6 +319,23 @@ describe('the blend', () => {
     for (const bone of [4, 5]) expectSameTurn(pose, rest, bone, 'Death legs');
   });
 
+  it('crossfades a Cast that replaces a playing Attack over 3 ticks, Arm_R turning 27.6 degrees a tick at most', async () => {
+    const { root, rig } = await view('quillon');
+    const c = crew(root, rig);
+    triggerCast(c.anim, CAST_ATTACK);
+    c.run(8);
+    let before = bone(root, 'Arm_R').quaternion.clone();
+    triggerCast(c.anim, CAST_OTHER);
+    let worst = 0;
+    for (let tick = 0; tick < 8; tick++) {
+      c.run(1);
+      const after = bone(root, 'Arm_R').quaternion.clone();
+      worst = Math.max(worst, (before.angleTo(after) * 180) / Math.PI);
+      before = after;
+    }
+    expect(worst).toBeLessThanOrEqual(27.6);
+  });
+
   it('holds the last Death frame for good', async () => {
     const { root, rig } = await view('lumeth');
     const c = crew(root, rig);
@@ -483,6 +500,19 @@ describe('the floor and the top through every transition', () => {
             else triggerHit(c.anim);
             runLooking(c, w, 40, `${kind} over ${moving ? name : 'Idle'} after ${offset}`);
           }
+        }
+      }
+    }
+    // A cast that replaces an overlay at every tick of it: the 3-tick crossfade between the two.
+    for (const [first, second] of [[CAST_ATTACK, CAST_OTHER], [CAST_OTHER, CAST_ATTACK], [CAST_ATTACK, CAST_ATTACK]] as const) {
+      for (const moving of [false, true]) {
+        for (let offset = 0; offset <= 30; offset += 1) {
+          const c = crew(root, rig, moving ? { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 } : {});
+          runLooking(c, w, 9, 'before the casts');
+          triggerCast(c.anim, first);
+          runLooking(c, w, offset, `first cast ${first}`);
+          triggerCast(c.anim, second);
+          runLooking(c, w, 12, `second cast ${second} after ${offset}`);
         }
       }
     }

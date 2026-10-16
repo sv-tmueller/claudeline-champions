@@ -11,6 +11,7 @@ import {
   D_OV_W,
   D_RUN_T,
   D_RUN_W,
+  D_XF_W,
   OV_CLIP,
   OV_NONE,
   type ChampionAnim,
@@ -77,6 +78,8 @@ export interface ClipRig {
   readonly run: Float64Array;
   readonly over: Float64Array;
   readonly death: Float64Array;
+  /** The Spine and arm poses last drawn, kept for the crossfade into a replacing overlay. */
+  readonly from: Float64Array;
   readonly scratch: Float64Array;
   /** The two keys of a rotation being sampled, widened to doubles. */
   readonly pair: Float64Array;
@@ -151,6 +154,7 @@ export function createClipRig(root: Object3D, clips: readonly AnimationClip[]): 
     run: new Float64Array(STRIDE),
     over: new Float64Array(STRIDE),
     death: new Float64Array(STRIDE),
+    from: new Float64Array(STRIDE),
     scratch: new Float64Array(STRIDE),
     pair: new Float64Array(8),
     alpha: new Float64Array(1),
@@ -328,6 +332,12 @@ export function poseChampion(rig: ClipRig, anim: ChampionAnim): void {
   const time = rig.time;
   const cur = rig.cur;
   const deathWeight = d[D_DEATH_W] as number;
+  // A cast replaced a playing overlay: `cur` still holds the last drawn pose, kept for the
+  // crossfade.
+  if (anim.xfade === 1) {
+    for (let i = 4; i < 16; i++) rig.from[i] = cur[i] as number;
+    anim.xfade = 2;
+  }
   if (anim.dead !== 0 && deathWeight >= 1) {
     time[SLOT_DEATH] = d[D_DEATH_T] as number;
     sampleClip(rig, CLIP_DEATH, SLOT_DEATH, cur);
@@ -368,6 +378,13 @@ export function poseChampion(rig: ClipRig, anim: ChampionAnim): void {
     time[SLOT_DEATH] = d[D_DEATH_T] as number;
     sampleClip(rig, CLIP_DEATH, SLOT_DEATH, rig.death);
     for (let channel = 0; channel < CHANNELS; channel++) blendChannel(cur, cur, rig.death, channel, d, D_DEATH_W);
+  }
+  // The crossfade from the pose drawn before the replacing cast: Spine and both arms, over 3 ticks.
+  if (anim.xfade !== 0) {
+    for (let channel = 1; channel < 4; channel++) {
+      slerpFlat(cur, channel * 4, rig.from, channel * 4, cur, channel * 4, d, D_XF_W);
+    }
+    if ((d[D_XF_W] as number) >= 1) anim.xfade = 0;
   }
   writePose(rig, cur);
 }

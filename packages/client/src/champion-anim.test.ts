@@ -11,6 +11,7 @@ import {
   D_OV_W,
   D_RUN_SCALE,
   D_RUN_T,
+  D_XF_W,
   D_RUN_W,
   RUN_MAX_SCALE,
   createAnim,
@@ -378,6 +379,19 @@ describe('Attack and Cast', () => {
     expect(w.anim.d[D_OV_W]).toBeGreaterThan(shown);
     w.run(2);
     expect(w.anim.d[D_OV_W]).toBeCloseTo(1, 6);
+  });
+
+  it('marks a crossfade only for a cast that replaces a playing overlay, 3 ticks long', () => {
+    const w = world();
+    triggerCast(w.anim, CAST_ATTACK);
+    w.run(1);
+    expect(w.anim.xfade).toBe(0);
+    triggerCast(w.anim, CAST_OTHER);
+    w.run(1);
+    expect(w.anim.xfade).toBe(1);
+    expect(w.anim.d[D_XF_W]).toBeCloseTo(1 / 3, 9);
+    w.run(2);
+    expect(w.anim.d[D_XF_W]).toBe(1);
   });
 
   it('plays Cast for any other slot, 15 frames, in 3 ticks and out 6', () => {
