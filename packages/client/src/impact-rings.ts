@@ -1,4 +1,5 @@
-import { Group, Mesh, MeshBasicMaterial, RingGeometry } from 'three';
+import { Color, Group, Mesh, MeshBasicMaterial, RingGeometry } from 'three';
+import { PROJECTILE_ALLY_COLOUR, PROJECTILE_ENEMY_COLOUR } from './entity-views';
 import type { AlphaClock } from './interpolate';
 
 export const RING_COLOUR = '#ffd23f';
@@ -7,6 +8,18 @@ export const RING_POOL_SIZE = 16;
 export const RING_TICKS = 18;
 /** Above the area discs at 0.03. */
 export const RING_Y = 0.04;
+/** A ring's colour: yellow, or the ally or enemy projectile colour (a heal bolt that landed on a champion). */
+export type RingTint = 0 | 1 | 2;
+export const RING_TINT_YELLOW = 0;
+export const RING_TINT_ALLY = 1;
+export const RING_TINT_ENEMY = 2;
+// Indexed by the tint. A ring copies one of these into its own colour, so a spawn
+// writes three fields and a recycled ring never keeps the tint of its last use.
+const TINT_COLOURS: readonly Color[] = [
+  new Color(RING_COLOUR),
+  new Color(PROJECTILE_ALLY_COLOUR),
+  new Color(PROJECTILE_ENEMY_COLOUR),
+];
 const START_RADIUS = 0.5;
 const END_RADIUS = 1.2;
 
@@ -45,12 +58,20 @@ export class ImpactRings {
     }
   }
 
-  /** Starts a ring at sim position (x, y) in meters on `tick`. */
-  spawn(x: number, y: number, tick: number): void {
+  /**
+   * Starts a ring at the sim position (x, y), in meters, of `at` on `tick`, yellow
+   * unless `tint` says otherwise. It takes the sim's event record and writes the fields
+   * of the ring's position and colour: no raw double crosses a call (issue #89).
+   */
+  spawn(at: { readonly x: number; readonly y: number }, tick: number, tint: RingTint = RING_TINT_YELLOW): void {
     const index = this.next;
     this.next = (index + 1) % RING_POOL_SIZE;
     const mesh = this.meshes[index] as Mesh;
-    mesh.position.set(x, RING_Y, -y);
+    const position = mesh.position;
+    position.x = at.x;
+    position.y = RING_Y;
+    position.z = -at.y;
+    (this.materials[index] as MeshBasicMaterial).color.copy(TINT_COLOURS[tint] as Color);
     mesh.visible = true;
     this.startTicks[index] = tick;
     // Taking the oldest ring while it still shows leaves the count as it was.

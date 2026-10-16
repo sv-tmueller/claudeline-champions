@@ -1,7 +1,10 @@
 import { MeshBasicMaterial, type Mesh } from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { PROJECTILE_ALLY_COLOUR, PROJECTILE_ENEMY_COLOUR } from './entity-views';
 import {
   RING_COLOUR,
+  RING_TINT_ALLY,
+  RING_TINT_ENEMY,
   RING_POOL_SIZE,
   RING_TICKS,
   RING_Y,
@@ -35,7 +38,7 @@ describe('impact rings', () => {
 
   it('puts a ring at the contact point on the ground', () => {
     const impact = createImpactRings();
-    impact.spawn(3, 4, 100);
+    impact.spawn({ x: 3, y: 4 }, 100);
     impact.draw(100, { alpha: 0 });
     const [mesh] = shown(impact.group) as [Mesh];
     expect(mesh.position.toArray()).toEqual([3, RING_Y, -4]);
@@ -43,7 +46,7 @@ describe('impact rings', () => {
 
   it('grows from 0.5 m to 1.2 m and fades out over RING_TICKS', () => {
     const impact = createImpactRings();
-    impact.spawn(0, 0, 10);
+    impact.spawn({ x: 0, y: 0 }, 10);
     impact.draw(10, { alpha: 0 });
     const [mesh] = shown(impact.group) as [Mesh];
     expect(mesh.scale.x).toBeCloseTo(0.5, 12);
@@ -61,7 +64,7 @@ describe('impact rings', () => {
 
   it('hides a finished ring', () => {
     const impact = createImpactRings();
-    impact.spawn(0, 0, 10);
+    impact.spawn({ x: 0, y: 0 }, 10);
     impact.draw(10 + RING_TICKS - 1, { alpha: 0.9 });
     expect(shown(impact.group)).toHaveLength(1);
     impact.draw(10 + RING_TICKS, { alpha: 0 });
@@ -70,23 +73,23 @@ describe('impact rings', () => {
 
   it('reuses the oldest ring when the pool is full', () => {
     const impact = createImpactRings();
-    for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn(i, 0, 1);
+    for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 1);
     const first = rings(impact.group)[0] as Mesh;
     expect(first.position.x).toBe(0);
-    impact.spawn(100, 0, 2);
+    impact.spawn({ x: 100, y: 0 }, 2);
     impact.draw(2, { alpha: 0 });
     expect(first.position.x).toBe(100);
     expect(shown(impact.group)).toHaveLength(RING_POOL_SIZE);
     // The second ring is now the oldest.
-    impact.spawn(101, 0, 2);
+    impact.spawn({ x: 101, y: 0 }, 2);
     expect((rings(impact.group)[1] as Mesh).position.x).toBe(101);
   });
 
   it('counts the rings that are showing, for the data-rings hook', () => {
     const impact = createImpactRings();
     expect(impact.visibleCount).toBe(0);
-    impact.spawn(0, 0, 10);
-    impact.spawn(1, 0, 12);
+    impact.spawn({ x: 0, y: 0 }, 10);
+    impact.spawn({ x: 1, y: 0 }, 12);
     expect(impact.visibleCount).toBe(2);
     impact.draw(10 + RING_TICKS, { alpha: 0 });
     expect(impact.visibleCount).toBe(1);
@@ -96,10 +99,51 @@ describe('impact rings', () => {
 
   it('does not count a reused ring twice', () => {
     const impact = createImpactRings();
-    for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn(i, 0, 1);
-    impact.spawn(100, 0, 2);
+    for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 1);
+    impact.spawn({ x: 100, y: 0 }, 2);
     expect(impact.visibleCount).toBe(RING_POOL_SIZE);
     impact.draw(2 + RING_TICKS, { alpha: 0 });
     expect(impact.visibleCount).toBe(0);
+  });
+
+  it('writes the fields of the ring position and does not call set', () => {
+    const impact = createImpactRings();
+    const spies = rings(impact.group).map((mesh) => vi.spyOn(mesh.position, 'set'));
+    impact.spawn({ x: 1.5, y: -2.5 }, 10);
+    spies.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    expect((rings(impact.group)[0] as Mesh).position.toArray()).toEqual([1.5, RING_Y, 2.5]);
+  });
+
+  describe('tints', () => {
+    function hex(mesh: Mesh): string {
+      return `#${(mesh.material as MeshBasicMaterial).color.getHexString()}`;
+    }
+
+    it('spawns yellow without a tint', () => {
+      const impact = createImpactRings();
+      impact.spawn({ x: 0, y: 0 }, 1);
+      expect(hex(rings(impact.group)[0] as Mesh)).toBe(RING_COLOUR);
+    });
+
+    it('spawns in the ally projectile colour and in the enemy one on the tint', () => {
+      const impact = createImpactRings();
+      impact.spawn({ x: 0, y: 0 }, 1, RING_TINT_ALLY);
+      impact.spawn({ x: 1, y: 0 }, 1, RING_TINT_ENEMY);
+      expect(rings(impact.group).slice(0, 2).map(hex)).toEqual([PROJECTILE_ALLY_COLOUR, PROJECTILE_ENEMY_COLOUR]);
+    });
+
+    it('turns yellow again when a tinted ring slot is recycled', () => {
+      const impact = createImpactRings();
+      for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 1, i % 2 === 0 ? RING_TINT_ALLY : RING_TINT_ENEMY);
+      impact.spawn({ x: 100, y: 0 }, 2);
+      impact.spawn({ x: 101, y: 0 }, 2);
+      expect(rings(impact.group).slice(0, 3).map(hex)).toEqual([RING_COLOUR, RING_COLOUR, PROJECTILE_ALLY_COLOUR]);
+    });
+
+    it('gives each ring its own colour: tinting one leaves the others', () => {
+      const impact = createImpactRings();
+      impact.spawn({ x: 0, y: 0 }, 1, RING_TINT_ALLY);
+      expect(rings(impact.group).slice(1).every((mesh) => hex(mesh) === RING_COLOUR)).toBe(true);
+    });
   });
 });

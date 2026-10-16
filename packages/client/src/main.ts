@@ -109,7 +109,7 @@ const areaViews = createAreaViews(human.team);
 const impactRings = createImpactRings();
 const healthBars = createHealthBars(state.champions, human.team);
 const killFeed = createKillFeed();
-const feedback = new CombatFeedback(state.champions.length, impactRings, killFeed);
+const feedback = new CombatFeedback(state.champions, human.team, impactRings, killFeed);
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 // Built before the models load, so the HUD shows while they do.
