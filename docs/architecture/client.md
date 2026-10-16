@@ -81,7 +81,8 @@ later platform layer can pass its own arguments instead.
 - `?champion=<id>`: the champion the human plays. It must be an id with a loaded
   kit; anything else reads as the first kit in roster order (Hargrim).
 - `?difficulty=easy|normal|hard`: the tier of every bot. Anything else
-  reads as normal.
+  reads as normal. The select offers the three tiers and every link writes
+  the one it keeps (see Result screen and champion select).
 - `?arena=<id>`: the arena of the match, an id with a loaded definition (arena01
   and arena02); anything else reads as arena01, or as the first loaded id when
   arena01 is missing. The sandbox ignores it and always plays arena01, since the
@@ -189,6 +190,8 @@ sim steps first and the views read its state afterwards.
   and the faded dead grey.
 - `debug-shot.ts`: the dev-only F4 shot above.
 - `bot-driver.ts`, `match-setup.ts` and `launch.ts`: see Launch and match.
+- `audio.ts`: the first-pass sound, `routeSounds` over the step's events
+  after `routeEvents`, and the unlock on the first gesture; see Audio.
 - Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's position
   in centimetres), `data-f0` (its facing in radians, three decimals),
   `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
@@ -307,8 +310,15 @@ link writes `teamsize`, 2 included, so the address stays the whole setup; the
 champion and arena links keep the size the address asked for, which on an arena
 that cannot play 3v3 is not the size played. That arena's 3v3 entry is greyed
 (`data-available="false"`, no link, as for a champion without a kit) and 2v2 is
-the current one. There is no pre-match screen. Only the visible panel takes
-pointer events; the HUD takes none.
+the current one. The difficulty row follows (`data-part="difficulty-select"`,
+label "Difficulty"): an Easy, a Normal and a Hard entry (`data-difficulty`, from
+`difficultyEntries`, in `DIFFICULTIES` order), each linking to the whole setup
+with its own tier and the champion, arena and asked size kept. The launch's
+tier carries `data-current="true"`. A tier needs no file, so an entry is always
+a link and has no `data-available`. The tier reaches the bots through
+`createBotDriver` as before; the row only writes the address. There is no
+pre-match screen. Only the visible panel takes pointer events; the HUD takes
+none.
 
 `e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
 `/?timescale=100` (see Launch and match), once per arena and team size (arena02
@@ -378,14 +388,21 @@ the key of a capture) and a plain DOM click on each button.
 - **Resume** is Escape again or the button. **Restart** is `location.reload()`: the
   address is the setup (champion, difficulty, arena, team size and the dev time
   scale), and the tick still never goes back to 0 within a page. **Back to
-  select** (the button reads "Champion, arena and teams") shows the menu's own
-  select view, the champion, arena and team links of the result panel built by
-  `buildSelect`, with the match still paused; a pick follows a link and
-  reloads.
+  select** (the button reads "Champion, arena, teams and difficulty") shows the
+  menu's own select view, the champion, arena, team and difficulty links of the
+  result panel built by `buildSelect`, with the match still paused; a pick
+  follows a link and reloads.
 - **Views.** The panel carries `data-visible` and `data-view` (`main`, `select` or
   `keys`), the sections are `data-section`, and the buttons carry `data-action`
-  (`resume`, `restart`, `select`, `keys`, `back`, `reset`). The panel always opens
-  on the main view.
+  (`resume`, `restart`, `select`, `keys`, `mute`, `back`, `reset`). The panel
+  always opens on the main view.
+- **Sound.** The main view has a button, `data-action="mute"`, whose
+  `data-muted` and text ("Sound: on" or "Sound: off") the `Menu` constructor
+  writes from the stored mute, since the DOM is built before the settings load.
+  `toggleMute()` works only while the menu is open: it flips the mute, calls
+  `platform.sound.setMuted`, rewrites the button and saves once, with the
+  current bindings. Every save carries both `bindings` and `muted`, so a rebind
+  after a mute keeps it.
 - **Keys view.** One row per action (`data-binding=<action>`, `data-part="key"`
   and a `data-rebind` button) built at startup and written only when its text
   changes. A click on a rebind button waits for the next key (`data-capturing` on
@@ -404,22 +421,89 @@ The menu pauses in local matches only. Pausing online is milestone 6.
 ## Platform interface
 
 Steam readiness: `Platform { identity(), loadSettings(), saveSettings(),
-unlockAchievement(id), openUrl(url) }`. `BrowserPlatform` is the only
+unlockAchievement(id), openUrl(url), sound }`. `BrowserPlatform` is the only
 implementation until milestone 8.
 
-Only the two settings methods are built, in `platform.ts`; `identity`,
-`unlockAchievement` and `openUrl` join with their first user. They return
-Promises, so an Electron renderer reaches files over IPC with no change of
-signature. `Settings` is `{ version: 1, bindings }`. `createBrowserPlatform`
-takes an injected `getItem`/`setItem` pair (`main.ts` passes `window.localStorage`
-from inside a try, since reading it can throw) and keeps one JSON text under the
-key `claudeline-champions.settings`. The store is written only on a rebind or a
-reset, and `main.ts` awaits `loadSettings` and applies the bindings before it
-binds the input. `readSettings` reads the defaults, whole, when the stored text is
-unusable, since a per-field merge could create a duplicate: no text, bad JSON, a
-version other than the number 1, a missing action, or a code that is not a string,
-is reserved or is shared. A throwing `getItem` reads the defaults, and a throwing
-`setItem` resolves after a `console.warn`, because a console error fails every e2e.
+Only the two settings methods and `sound` are built, in `platform.ts`;
+`identity`, `unlockAchievement` and `openUrl` join with their first user. The
+settings methods return Promises, so an Electron renderer reaches files over IPC
+with no change of signature. `sound` is a sub-object, `SoundOutput` (see Audio),
+so a desktop build can swap it; it is an amendment under spec section 5, and
+`createBrowserPlatform(storage, makeContext = browserAudioContext)` builds the
+browser one. `Settings` is `{ version: 2, bindings, muted }`.
+`createBrowserPlatform` takes an injected `getItem`/`setItem` pair (`main.ts`
+passes `window.localStorage` from inside a try, since reading it can throw) and
+keeps one JSON text under the key `claudeline-champions.settings`. The store is
+written only on a rebind, a reset or a mute toggle, and `main.ts` awaits
+`loadSettings` and applies the bindings and the mute before it binds the input.
+`readSettings` reads the defaults, whole (`muted: false`), when the stored text
+is unusable, since a per-field merge could create a duplicate: no text, bad
+JSON, a version other than the numbers 1 and 2, a version 2 text whose `muted`
+is not a boolean (`"true"` and `1` are refused), a missing action, or a code
+that is not a string, is reserved or is shared. A version 1 text, which has
+bindings only, migrates: its bindings stay and `muted` is false. Loading never
+writes, so a version 1 store becomes version 2 on its first change. A throwing
+`getItem` reads the defaults, and a throwing `setItem` resolves after a
+`console.warn`, because a console error fails every e2e.
+
+## Audio
+
+The first-pass sound is generated in code, with Web Audio oscillators and no
+sound files, so there is no license question. It lives in `audio.ts`, behind the
+`SoundOutput { unlock(), setMuted(on), play(sound) }` of `Platform.sound`.
+What plays (tuned values, rules.md section 6; no music, and nothing on
+`matchEnded`, which follows the last `roundEnded`):
+
+| Event | Sound (`SOUNDS`) | Voice, decay |
+|-------|------------------|--------------|
+| `projectileHit`, and a `meleeArc` with at least one target | hit, 0 | square 220 Hz, 30 ms |
+| `castStarted` of the local champion only | cast, 1 | triangle 520 Hz, 50 ms |
+| every `death` | death, 2 | sawtooth 110 Hz, 120 ms |
+| `roundStarted` | round start, 3 | sine 660 Hz, 80 ms |
+| `roundEnded` | round end, 4 | sine 330 Hz, 140 ms |
+
+The cast is the local champion's only, which keeps a 3v3 from turning into
+noise. The master gain is 0.2 and a voice peaks at 0.6.
+
+- **The second event pass.** `routeSounds(state, sound, localId)` is an indexed
+  loop over `state.events` with a switch, called by `stepSim` right after
+  `routeEvents`, in the step loop, so it sees the same events in the same step.
+  `feedback.ts` is not touched. Unlocking and muting are checked inside `play`.
+- **No allocation per play.** `unlock()` builds one persistent voice per sound,
+  an oscillator into an envelope gain into a master gain into the destination,
+  and starts each oscillator once. A `play` is then `cancelScheduledValues(0)`,
+  a set to the peak and a `setTargetAtTime(0, 0, decay)` on that voice's gain.
+  It creates no node and reads no `currentTime` (a time of 0 is now), and every
+  argument is a literal or a module constant, since a computed double or a
+  double field crossing a call that V8 does not inline is boxed (the rule of
+  the aim sampling above). `SOUNDS` are small integers for the same reason.
+- **The unlock.** A context made at load would start suspended, and Chrome
+  refuses to resume it without a gesture, so nothing is built until one.
+  `bindSoundUnlock(window, sound)` listens for `keydown` and `pointerdown`;
+  each calls `unlock()`, which makes the context on first use and resumes it
+  while it is suspended, and the listeners go once the context is running.
+  Chrome does not count Escape as a gesture, so a first Escape press alone
+  leaves it suspended and the next key or click unlocks it.
+- **Failures are warnings.** The factory is lazy (`browserAudioContext` reads
+  `globalThis.AudioContext` at the first unlock, never at load). A factory or a
+  node that throws becomes one `console.warn` and the sound stays off, and a
+  rejected `resume()` is caught: a console error fails every e2e, and a browser
+  with no audio device must still play.
+- **The probe counts it.** `audio.ts` is frame-path code and is in the heap
+  probe's `COMBAT_CODE` (see [testing](testing.md)), so the limits of 600 B
+  and 780 B apply to it. Both probe specs unlock the audio with a real
+  gesture before their measured windows (`live-probe.spec.ts` presses the
+  mouse, and the sandbox spec's F4 presses are key gestures), so the counted
+  `play` calls reach real Web Audio nodes. The nodes are native, so a
+  `createGain` per play stays off the JS heap and the probe does not see it;
+  the unit test of `audio.test.ts` (a fake context that counts nodes) is that
+  mutation's gate.
+- **The e2e fake.** `menu.spec.ts` replaces `window.AudioContext` with a
+  counting fake through `page.addInitScript`: a play is one
+  `cancelScheduledValues` on a voice, in `SOUNDS` order, and its `currentTime`
+  throws. The fake lives in the spec, so a build contains no `__fakeAudio`;
+  `grep -r __fakeAudio packages/client/dist` must print nothing, next to the
+  dist grep above.
 
 ## Steam readiness rules
 
