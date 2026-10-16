@@ -59,7 +59,7 @@ first.
   other three `Platform` methods (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
-  placeholder, each rigged, with four clips the client does not play yet.
+  placeholder, each rigged, with six clips the client does not play yet.
 - `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
 
 ## Index
@@ -122,11 +122,13 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   files over IPC without a signature change, and only those two are built:
   [batch #80 decision 15](https://github.com/sv-tmueller/claudeline-champions/issues/80#issuecomment-6012436842).
   Recorded in [Client](client.md#platform-interface).
-- One rig and four clips for every champion model, the placeholder included,
-  checked by the validator against the tables, the floor bounded between keys:
+- One rig and six clips for every champion model, the placeholder included,
+  each clip keying only the channels it moves, checked by the validator against
+  the tables, the floor held at 0 between keys by two pose rules:
   [batch #91 decision 6](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015246696),
   [batch #91 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6015774432),
-  [batch #91 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6019098915).
+  [batch #91 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/91#issuecomment-6019098915),
+  [batch #105 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6031281041).
   Recorded in [Assets](assets.md#rig) and its [clips](assets.md#clips).
 - The address is the whole setup, the team size included: every select link
   writes `teamsize`, 2 too, and the arena decides what plays

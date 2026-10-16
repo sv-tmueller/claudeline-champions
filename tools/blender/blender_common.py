@@ -129,31 +129,53 @@ def set_scene_rate(fps):
     scene.render.fps_base = 1.0
 
 
-def key_clip(rig, name, frames, key_poses, loops):
-    """Key every bone's rotation and the first bone's location at each frame.
+def key_clip(rig, name, frames, key_poses, loops, channels):
+    """Key exactly the `channels` at every frame of the clip.
 
-    `key_poses` maps a frame to {bone name: (Euler degrees, move in metres)}.
-    A bone missing there is at rest. The keys are set to LINEAR one by one:
-    the factory default is BEZIER, which exports as CUBICSPLINE, and Python's
-    `keyframe_insert` ignores the `keyframe_new_interpolation_type`
-    preference. The action is kept alive by a fake user and unassigned
-    afterwards, so the export finds it by ACTIONS mode.
+    `channels` lists (bone name, path) pairs, the path being "rotation" or
+    "translation". `key_poses` maps a frame to {bone name: (Euler degrees, move
+    in metres)}. A bone missing there is at rest, and a channel that is not
+    listed must be at rest at every key, which is asserted: an unkeyed channel
+    is exported as nothing, and the client's mixer restores it to rest. The keys
+    are set to LINEAR one by one: the factory default is BEZIER, which exports
+    as CUBICSPLINE, and Python's `keyframe_insert` ignores the
+    `keyframe_new_interpolation_type` preference. The action is kept alive by a
+    fake user and unassigned afterwards, so the export finds it by ACTIONS mode.
     """
     assert frames == max(key_poses), "the last key must be the clip length"
     assert not loops or key_poses[0] == key_poses[frames], "a loop must close"
+    channels = tuple(channels)
+    assert len(set(channels)) == len(channels), "a channel is listed twice"
+    bone_names = [pose_bone.name for pose_bone in rig.pose.bones]
+    for bone, path in channels:
+        assert bone in bone_names, "no bone %s" % bone
+        assert path in ("rotation", "translation"), "bad path %s" % path
+        assert path == "rotation" or bone == bone_names[0], "only the root translates"
+    for frame, key in key_poses.items():
+        unknown = sorted(set(key) - set(bone_names))
+        assert not unknown, "frame %d poses bones the rig lacks: %s" % (frame, unknown)
+        for bone in bone_names:
+            degrees, metres = key.get(bone, ((0, 0, 0), (0, 0, 0)))
+            for path, value in (("rotation", degrees), ("translation", metres)):
+                if (bone, path) not in channels:
+                    assert not any(value), "%s %s moves at frame %d but is not keyed" % (
+                        bone,
+                        path,
+                        frame,
+                    )
     action = bpy.data.actions.new(name)
     assert action.name == name, "action name clash: %s" % action.name
     action.use_fake_user = True
     rig.animation_data_create()
     rig.animation_data.action = action
-    root = rig.pose.bones[0]
     for frame in sorted(key_poses):
         for pose_bone in rig.pose.bones:
             degrees, metres = key_poses[frame].get(pose_bone.name, ((0, 0, 0), (0, 0, 0)))
             pose_bone.rotation_mode = "QUATERNION"
-            pose_bone.rotation_quaternion = local_rotation(pose_bone.bone, degrees)
-            pose_bone.keyframe_insert("rotation_quaternion", frame=frame)
-            if pose_bone == root:
+            if (pose_bone.name, "rotation") in channels:
+                pose_bone.rotation_quaternion = local_rotation(pose_bone.bone, degrees)
+                pose_bone.keyframe_insert("rotation_quaternion", frame=frame)
+            if (pose_bone.name, "translation") in channels:
                 pose_bone.location = local_offset(pose_bone.bone, metres)
                 pose_bone.keyframe_insert("location", frame=frame)
     for layer in action.layers:

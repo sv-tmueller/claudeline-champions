@@ -85,7 +85,27 @@ RIG_PARENTS = {
     "Leg_L": "Hips",
     "Leg_R": "Hips",
 }
-CLIP_TABLE = {"Idle": (60, 3), "Run": (20, 5), "Cast": (15, 4), "Death": (30, 4)}
+CLIP_TABLE = {
+    "Idle": (60, 3),
+    "Run": (20, 9),
+    "Attack": (12, 4),
+    "Cast": (15, 4),
+    "Hit": (9, 3),
+    "Death": (30, 4),
+}
+# The channels each clip keys: (joint, path). A clip keys only what it moves.
+# assets.md's Channels column and the validator's CHANNELS must both agree.
+UPPER = (("Spine", "rotation"), ("Arm_L", "rotation"), ("Arm_R", "rotation"))
+HIPS_MOVE = (("Hips", "translation"),)
+LEGS = (("Leg_L", "rotation"), ("Leg_R", "rotation"))
+CHANNEL_TABLE = {
+    "Idle": frozenset(UPPER + HIPS_MOVE),
+    "Run": frozenset(UPPER + LEGS + HIPS_MOVE),
+    "Attack": frozenset(UPPER),
+    "Cast": frozenset(UPPER),
+    "Hit": frozenset(UPPER),
+    "Death": frozenset(UPPER + (("Hips", "rotation"),) + HIPS_MOVE),
+}
 
 
 def rigged_champion_doc(name="Champion"):
@@ -94,8 +114,8 @@ def rigged_champion_doc(name="Champion"):
     Nodes: the six joints, the skinned mesh `Champion` and `Rig`, whose
     children are the mesh and Hips. Accessor 0 is the inverse bind matrices,
     1 to 3 are the Champion primitive's attributes, and every clip adds one
-    input accessor, with a sampler per channel: a rotation for every joint and
-    a translation for Hips.
+    input accessor, then a sampler and an output accessor (VEC4 for a rotation,
+    VEC3 for a translation, one element per key) per channel of CHANNEL_TABLE.
     """
     joints = list(RIG_PARENTS)
     nodes = [{"name": joint} for joint in joints]
@@ -113,6 +133,7 @@ def rigged_champion_doc(name="Champion"):
     ]
     animations = []
     for clip, (frames, keys) in CLIP_TABLE.items():
+        input_index = len(accessors)
         accessors.append(
             {
                 "componentType": 5126,
@@ -122,14 +143,27 @@ def rigged_champion_doc(name="Champion"):
                 "max": [frames / 30],
             }
         )
-        targets = [(index[j], "rotation") for j in joints] + [(index["Hips"], "translation")]
+        targets = [(index[joint], path) for joint, path in sorted(CHANNEL_TABLE[clip])]
+        samplers = []
+        for _, path in targets:
+            accessors.append(
+                {
+                    "componentType": 5126,
+                    "type": "VEC4" if path == "rotation" else "VEC3",
+                    "count": keys,
+                }
+            )
+            samplers.append(
+                {
+                    "input": input_index,
+                    "interpolation": "LINEAR",
+                    "output": len(accessors) - 1,
+                }
+            )
         animations.append(
             {
                 "name": clip,
-                "samplers": [
-                    {"input": len(accessors) - 1, "interpolation": "LINEAR", "output": 1}
-                    for _ in targets
-                ],
+                "samplers": samplers,
                 "channels": [
                     {"sampler": i, "target": {"node": node, "path": path}}
                     for i, (node, path) in enumerate(targets)
@@ -385,6 +419,15 @@ def joint_index(doc, name):
     return doc["nodes"].index(node_named(doc, name))
 
 
+def clip_named(doc, name):
+    return next(a for a in doc["animations"] if a["name"] == name)
+
+
+def channel_of(doc, clip, joint, path):
+    target = {"node": joint_index(doc, joint), "path": path}
+    return next(c for c in clip_named(doc, clip)["channels"] if c["target"] == target)
+
+
 class RigRuleTests(ValidatorCase):
     """One rejection per rule of the rig and the clips, against the synthetic document."""
 
@@ -476,29 +519,28 @@ class RigRuleTests(ValidatorCase):
         self.rejects(mutate, "animations")
 
     def test_rejects_a_renamed_clip(self):
-        self.rejects(lambda d: d["animations"][1].update(name="Walk"), "animations")
+        self.rejects(lambda d: clip_named(d, "Run").update(name="Walk"), "animations")
 
     def test_rejects_a_duplicate_clip(self):
         self.rejects(lambda d: d["animations"].append(dict(d["animations"][0])), "animations")
 
     def test_rejects_a_clip_one_frame_too_long(self):
         def mutate(d):
-            run = next(a for a in d["animations"] if a["name"] == "Run")
-            accessor = d["accessors"][run["samplers"][0]["input"]]
+            accessor = d["accessors"][clip_named(d, "Run")["samplers"][0]["input"]]
             accessor["max"] = [21 / 30]
 
         self.rejects(mutate, "Run")
 
     def test_rejects_a_clip_that_does_not_start_at_zero(self):
         def mutate(d):
-            idle = next(a for a in d["animations"] if a["name"] == "Idle")
+            idle = clip_named(d, "Idle")
             d["accessors"][idle["samplers"][0]["input"]]["min"] = [1 / 30]
 
         self.rejects(mutate, "Idle")
 
     def test_rejects_channels_that_do_not_share_their_key_times(self):
         def mutate(d):
-            cast = next(a for a in d["animations"] if a["name"] == "Cast")
+            cast = clip_named(d, "Cast")
             shifted = dict(d["accessors"][cast["samplers"][0]["input"]])
             d["accessors"].append(shifted)
             cast["samplers"][2]["input"] = len(d["accessors"]) - 1
@@ -507,33 +549,33 @@ class RigRuleTests(ValidatorCase):
 
     def test_rejects_a_key_count_that_is_off(self):
         def mutate(d):
-            cast = next(a for a in d["animations"] if a["name"] == "Cast")
+            cast = clip_named(d, "Cast")
             d["accessors"][cast["samplers"][0]["input"]]["count"] = 3
 
         self.rejects(mutate, "Cast")
 
     def test_rejects_a_channel_that_targets_the_champion(self):
         def mutate(d):
-            channel = d["animations"][0]["channels"][0]
+            channel = clip_named(d, "Idle")["channels"][0]
             channel["target"]["node"] = d["nodes"].index(node_named(d, "Champion"))
 
         self.rejects(mutate, "joints")
 
     def test_rejects_a_channel_that_scales(self):
         def mutate(d):
-            d["animations"][0]["channels"][0]["target"]["path"] = "scale"
+            clip_named(d, "Idle")["channels"][0]["target"]["path"] = "scale"
 
         self.rejects(mutate, "path")
 
     def test_rejects_cubic_spline_interpolation(self):
         def mutate(d):
-            d["animations"][2]["samplers"][3]["interpolation"] = "CUBICSPLINE"
+            clip_named(d, "Run")["samplers"][3]["interpolation"] = "CUBICSPLINE"
 
         self.rejects(mutate, "LINEAR")
 
     def test_rejects_step_interpolation(self):
         def mutate(d):
-            d["animations"][2]["samplers"][3]["interpolation"] = "STEP"
+            clip_named(d, "Run")["samplers"][3]["interpolation"] = "STEP"
 
         self.rejects(mutate, "LINEAR")
 
@@ -551,31 +593,96 @@ class RigRuleTests(ValidatorCase):
 
     def test_rejects_hips_without_a_translation_channel(self):
         def mutate(d):
-            hips = joint_index(d, "Hips")
-            d["animations"][3]["channels"] = [
-                c
-                for c in d["animations"][3]["channels"]
-                if not (c["target"]["node"] == hips and c["target"]["path"] == "translation")
-            ]
+            death = clip_named(d, "Death")
+            death["channels"].remove(channel_of(d, "Death", "Hips", "translation"))
 
         self.rejects(mutate, "translation")
 
+    def test_rejects_a_clip_that_lacks_one_of_its_channels(self):
+        def mutate(d):
+            clip_named(d, "Run")["channels"].remove(channel_of(d, "Run", "Leg_R", "rotation"))
+
+        self.rejects(mutate, "missing channel Leg_R rotation")
+
+    def test_rejects_a_clip_with_a_channel_the_table_does_not_list(self):
+        def mutate(d):
+            attack = clip_named(d, "Attack")
+            attack["channels"].append(
+                {"sampler": 0, "target": {"node": joint_index(d, "Leg_L"), "path": "rotation"}}
+            )
+
+        self.rejects(mutate, "unexpected channel Leg_L rotation")
+
+    def test_rejects_a_duplicate_channel(self):
+        def mutate(d):
+            idle = clip_named(d, "Idle")
+            idle["channels"].append(dict(idle["channels"][0]))
+
+        self.rejects(mutate, "duplicate channel")
+
+    def test_rejects_a_translation_on_a_joint_other_than_hips(self):
+        def mutate(d):
+            run = clip_named(d, "Run")
+            target = {"node": joint_index(d, "Spine"), "path": "translation"}
+            run["channels"].append({"sampler": 0, "target": target})
+
+        self.rejects(mutate, "only Hips may translate")
+
+    def test_rejects_a_rotation_channel_where_the_table_lists_a_translation(self):
+        def mutate(d):
+            channel_of(d, "Idle", "Hips", "translation")["target"]["path"] = "rotation"
+
+        self.rejects(mutate, "Hips")
+
+    def output_of(self, doc, clip, joint, path):
+        channel = channel_of(doc, clip, joint, path)
+        return clip_named(doc, clip)["samplers"][channel["sampler"]]
+
+    def test_rejects_a_rotation_channel_pointed_at_a_translation_output(self):
+        def mutate(d):
+            hips = self.output_of(d, "Idle", "Hips", "translation")
+            self.output_of(d, "Idle", "Spine", "rotation")["output"] = hips["output"]
+
+        self.rejects(mutate, "rotation output must be a FLOAT VEC4")
+
+    def test_rejects_a_translation_channel_pointed_at_a_rotation_output(self):
+        def mutate(d):
+            spine = self.output_of(d, "Idle", "Spine", "rotation")
+            self.output_of(d, "Idle", "Hips", "translation")["output"] = spine["output"]
+
+        self.rejects(mutate, "translation output must be a FLOAT VEC3")
+
+    def test_rejects_an_output_that_is_not_float(self):
+        def mutate(d):
+            sampler = self.output_of(d, "Run", "Leg_L", "rotation")
+            d["accessors"][sampler["output"]]["componentType"] = 5123
+
+        self.rejects(mutate, "FLOAT VEC4")
+
+    def test_rejects_an_output_with_one_key_too_few(self):
+        def mutate(d):
+            sampler = self.output_of(d, "Run", "Leg_L", "rotation")
+            d["accessors"][sampler["output"]]["count"] -= 1
+
+        self.rejects(mutate, "needs 9 elements")
+
     def test_rejects_a_sampler_that_does_not_exist(self):
         def mutate(d):
-            d["animations"][0]["channels"][0]["sampler"] = 99
+            clip_named(d, "Idle")["channels"][0]["sampler"] = 99
 
         self.rejects(mutate, "sampler")
 
     def test_a_malformed_document_fails_with_a_reason_not_a_crash(self):
+        def list_input(d):
+            clip_named(d, "Idle")["samplers"][0]["input"] = [4]
+
         for label, mutate in {
             "skins is not a list": lambda d: d.update(skins=5),
             "no accessors": lambda d: d.pop("accessors"),
             "animation is not an object": lambda d: d["animations"].__setitem__(0, 7),
             "no meshes": lambda d: d.pop("meshes"),
             "a joint node without a name": lambda d: node_named(d, "Spine").pop("name"),
-            "a sampler input that is a list": lambda d: d["animations"][0]["samplers"][0].update(
-                input=[4]
-            ),
+            "a sampler input that is a list": list_input,
         }.items():
             doc = rigged_champion_doc()
             mutate(doc)
@@ -601,6 +708,16 @@ def table_rows(text, header):
     return rows
 
 
+def parse_channels(cell):
+    """The (joint, path) set of a Channels cell: `Spine, Hips translation`."""
+    pairs = []
+    for item in cell.split(","):
+        joint, _, path = item.strip().partition(" ")
+        pairs.append((joint, path or "rotation"))
+    assert len(set(pairs)) == len(pairs), "a channel is listed twice in %r" % cell
+    return frozenset(pairs)
+
+
 class ContractDriftTests(unittest.TestCase):
     """assets.md's rig and clip tables and the validator's constants must agree."""
 
@@ -617,15 +734,27 @@ class ContractDriftTests(unittest.TestCase):
         rows = table_rows(self.text, "| Clip | Frames |")
         clips = {row[0]: (int(row[1]), len(row[3].split(","))) for row in rows}
         self.assertEqual(clips, validate_glb.CLIPS)
+        self.assertEqual(list(clips), list(validate_glb.CLIPS))
         for row in rows:
             self.assertAlmostEqual(float(row[2]), int(row[1]) / validate_glb.FPS, places=3)
             keys = [int(k) for k in row[3].split(",")]
             self.assertEqual((keys[0], keys[-1]), (0, int(row[1])))
 
+    def test_the_channels_column_matches_the_validator_constant(self):
+        rows = table_rows(self.text, "| Clip | Frames |")
+        channels = {row[0]: parse_channels(row[4]) for row in rows}
+        self.assertEqual(channels, validate_glb.CHANNELS)
+
     def test_the_validator_constants_match_the_tests_literals(self):
         self.assertEqual(validate_glb.RIG, RIG_PARENTS)
         self.assertEqual(validate_glb.CLIPS, CLIP_TABLE)
+        self.assertEqual(validate_glb.CHANNELS, CHANNEL_TABLE)
         self.assertEqual(validate_glb.FPS, 30)
+
+    def test_only_hips_translates_in_the_table(self):
+        for clip, pairs in CHANNEL_TABLE.items():
+            for joint, path in pairs:
+                self.assertTrue(path == "rotation" or joint == "Hips", (clip, joint, path))
 
 
 class ArenaJsonTests(unittest.TestCase):

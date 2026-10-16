@@ -1,4 +1,4 @@
-"""Build a low-poly rigged champion glb with four animation clips.
+"""Build a low-poly rigged champion glb with six animation clips.
 
 Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
     --champion placeholder --out assets/models/champions/placeholder.glb
@@ -10,10 +10,10 @@ body colour and one silhouette cue, listed in tools/blender/README.md.
 The glb holds a node `Rig` with the six bones as joints and the skinned mesh
 node `Champion`. The mesh origin is at the feet and it faces +X in both Blender
 and glTF, so the client can set `rotation.y = aimAngle` directly. Every part
-is rigid on one bone. The clips are Idle, Run, Cast and Death, keyed at 30 fps
-from the pose tables below. The bones, the keys and the contract are in
-docs/architecture/assets.md. Attack and Hit come with the client animation
-state machine.
+is rigid on one bone. The clips are Idle, Run, Attack, Cast, Hit and Death,
+keyed at 30 fps from the pose tables below, each on only the channels it moves.
+The bones, the keys, the channels and the contract are in
+docs/architecture/assets.md.
 """
 import argparse
 import math
@@ -57,14 +57,27 @@ FPS = 30
 # The poses are constants in armature space: an Euler XYZ turn in degrees about
 # a bone's head, and for Hips also a move in metres. A positive turn about Y
 # swings a hanging limb backward, and a positive turn about X lifts a left limb
-# outward. Nothing is random and nothing reads a clock. At every key the top of
-# the model is at or under 1.90 m (Hips rises at most 0.01 m, in Idle, and in
-# Cast the arms stay at or below horizontal) and no vertex is below the floor
-# (Run drops Hips 0.093 m at the contact keys, Death drops it further).
-# test_champion_models.py checks both at every key. Between keys the top holds
-# too, but the floor dips by up to 0.04 m (0.0365 m in Run, 0.0343 m in Death),
-# because three slerps the leg turn while it lerps the Hips drop. The animation
-# work in batch 10 may rework the poses to remove it.
+# outward. Nothing is random and nothing reads a clock. A clip keys only the
+# channels it moves (CLIPS lists them), so the legs and Hips of Attack, Cast and
+# Hit stay unkeyed and the client's mixer restores them to rest; key_clip asserts
+# that an unkeyed channel is at rest at every key.
+#
+# The top of the model stays at or under 1.90 m at every key and between keys,
+# and no vertex is below the floor (by more than 0.1 mm), at the keys and
+# between them. test_champion_models.py checks all of it, sampling every key
+# interval. Between keys three lerps Hips and slerps each turn, and a rigid 0.8 m
+# leg with a 0.09 m half width lifts its lowest corner by 0.8 (1 - cos a) -
+# 0.09 sin |a| at leg angle a. That lift is convex in a while Hips is linear, so
+# a foot planted at both ends of a key interval sinks in between, by about
+# 0.1 a^2 (a in radians). Two rules keep the floor at 0:
+#   R1: no key interval has a foot planted at both ends while its leg turns.
+#   R2: leaving or entering a planted key, Hips rises at least as fast as the
+#       foot's corner sinks. For a vertical leg that is 0.09 m per radian (the
+#       corner dips 5 mm by 6.4 degrees).
+# The planted keys are the Run passing keys and the rest keys. Run lifts Hips
+# 0.022 m over 13 degrees (0.097 m per radian) and Death lifts it 0.035 m over
+# 20 degrees (0.100 m per radian), both at least 0.09. The rig has no knee, and
+# the flight phase of Run is at the splits.
 
 
 def pose(turns=None, move=(0.0, 0.0, 0.0)):
@@ -74,55 +87,91 @@ def pose(turns=None, move=(0.0, 0.0, 0.0)):
     return key
 
 
-# Run. A leg of 0.8 m and a 0.09 m half width, turned 35 degrees about the hip,
-# has its lowest corner 0.8 - (0.8 cos 35 + 0.09 sin 35) = 0.093 m above the
-# floor, so the contact keys drop Hips by 0.093 m and the feet plant. The legs
-# are straight at the passing keys and Hips is at rest.
-RUN_DROP = (0.0, 0.0, -0.093)
-RUN_A = pose(
-    {
-        "Spine": (0, 10, 0),
-        "Arm_L": (0, -40, 0),
-        "Arm_R": (0, 40, 0),
-        "Leg_L": (0, 35, 0),
-        "Leg_R": (0, -35, 0),
-    },
-    move=RUN_DROP,
-)
-RUN_PASS = pose({"Spine": (0, 10, 0)})
-RUN_B = pose(
-    {
-        "Spine": (0, 10, 0),
-        "Arm_L": (0, 40, 0),
-        "Arm_R": (0, -40, 0),
-        "Leg_L": (0, -35, 0),
-        "Leg_R": (0, 35, 0),
-    },
-    move=RUN_DROP,
-)
+# The channels a clip keys, (bone, path) pairs. assets.md's Clips table lists
+# the same sets and a unit test fails if they drift apart.
+UPPER = (("Spine", "rotation"), ("Arm_L", "rotation"), ("Arm_R", "rotation"))
+LEGS = (("Leg_L", "rotation"), ("Leg_R", "rotation"))
+HIPS_MOVE = (("Hips", "translation"),)
 
-# Death. Hips turns about Y and drops so the lowest leg corner just reaches the
-# floor at key 10 (0.8 - (0.8 cos 30 + 0.09 sin 30) = 0.062 m) and at key 20 (the
-# same at 70 degrees, 0.442 m, rounded down to 0.44). At key 30 the body lies on
-# its back.
-DEATH_FALL = {10: (0, -30, 0), 20: (0, -70, 0), 30: (0, -85, 0)}
+# Run, 20 frames at 30 fps. Eight key intervals alternate the planted passing
+# key M (legs and arms at 0, Hips at 0) with the split S (legs 35 degrees, arms
+# 40, Hips +0.035 m, the flight phase: the feet are 0.128 m up) and the lift-off
+# L (legs 13 degrees, arms 15, Hips +0.022 m, the feet 22 mm up). The
+# order is S+ L+ M L- S- L- M L+ S+, the minus keys mirroring the plus keys, and
+# only M is planted, so R1 holds. R2 at M: 0.022 m over 13 degrees (0.227 rad)
+# is 0.097 m per radian. Past 13 degrees the corner is at or above the floor.
+
+
+def run_pose(side, leg, arm, rise):
+    """A Run key. `side` is 1 when Leg_L is forward and -1 when Leg_R is."""
+    turns = {
+        "Spine": (0, 10, 0),
+        "Leg_L": (0, side * leg, 0),
+        "Leg_R": (0, -side * leg, 0),
+        "Arm_L": (0, -side * arm, 0),
+        "Arm_R": (0, side * arm, 0),
+    }
+    return pose(turns, move=(0.0, 0.0, rise))
+
+
+RUN_PASS = pose({"Spine": (0, 10, 0)})
+RUN = {
+    0: run_pose(1, 35, 40, 0.035),
+    3: run_pose(1, 13, 15, 0.022),
+    5: RUN_PASS,
+    7: run_pose(-1, 13, 15, 0.022),
+    10: run_pose(-1, 35, 40, 0.035),
+    13: run_pose(-1, 13, 15, 0.022),
+    15: RUN_PASS,
+    17: run_pose(1, 13, 15, 0.022),
+    20: run_pose(1, 35, 40, 0.035),
+}
+
+# Attack, 12 frames (0.4 s), once, rest to rest. It is built for the first
+# slot's cast: the strike at 0.133 s falls between the 0.1 s and 0.15 s windups
+# of M1, and the clip ends inside the shortest M1 cooldown. The staff and the
+# blade ride Arm_R, which swings from +30 to -80 degrees about Y (turned past
+# about 105 degrees from hanging, it would lift Quillon's staff over 1.90 m);
+# the shoulder blocks and the halo ride Spine, which yaws. Legs and Hips stay at
+# rest.
+ATTACK_WIND = pose({"Spine": (0, 0, -25), "Arm_R": (-10, 30, 0), "Arm_L": (0, -20, 0)})
+ATTACK_STRIKE = pose({"Spine": (0, 5, 30), "Arm_R": (0, -80, 0), "Arm_L": (0, 20, 0)})
+
+# Hit, 9 frames (0.3 s), once, rest to rest: the spine leans back and the arms
+# fly outward, which lifts the staff 25 degrees outward. Legs and Hips stay at
+# rest.
+HIT_FLINCH = pose({"Spine": (0, -15, 0), "Arm_L": (25, 0, 0), "Arm_R": (-25, 0, 0)})
+
+# Death. Hips turns about Y and the body jolts up at key 10 (R2), sinks at key
+# 20, and lies on its back at key 30, its lowest vertex 0.6 mm above the floor.
+DEATH_FALL = {10: (0, -20, 0), 20: (0, -60, 0), 30: (0, -85, 0)}
 DEATH_ARMS = {10: 20, 20: 40, 30: 40}
-DEATH_DROP = {10: -0.062, 20: -0.44, 30: -0.6}
+DEATH_DROP = {10: 0.035, 20: -0.15, 30: -0.64}
+DEATH_SPINE = {10: (0, -10, 0), 20: (0, 0, 0), 30: (0, 0, 0)}
 
 
 def death_pose(key):
     arms = {"Arm_L": (DEATH_ARMS[key], 0, 0), "Arm_R": (-DEATH_ARMS[key], 0, 0)}
-    return pose({"Hips": DEATH_FALL[key], **arms}, move=(0.0, 0.0, DEATH_DROP[key]))
+    turns = {"Hips": DEATH_FALL[key], "Spine": DEATH_SPINE[key], **arms}
+    return pose(turns, move=(0.0, 0.0, DEATH_DROP[key]))
 
 
 IDLE_BREATH = pose(
     {"Spine": (0, 2, 0), "Arm_L": (3, 0, 0), "Arm_R": (-3, 0, 0)}, move=(0.0, 0.0, 0.01)
 )
 
-# (name, frames, loops, {frame: key}). The frames are the clip length at 30 fps.
+# (name, frames, loops, {frame: key}, channels). The frames are the clip length
+# at 30 fps.
 CLIPS = (
-    ("Idle", 60, True, {0: pose(), 30: IDLE_BREATH, 60: pose()}),
-    ("Run", 20, True, {0: RUN_A, 5: RUN_PASS, 10: RUN_B, 15: RUN_PASS, 20: RUN_A}),
+    ("Idle", 60, True, {0: pose(), 30: IDLE_BREATH, 60: pose()}, UPPER + HIPS_MOVE),
+    ("Run", 20, True, RUN, UPPER + LEGS + HIPS_MOVE),
+    (
+        "Attack",
+        12,
+        False,
+        {0: pose(), 2: ATTACK_WIND, 4: ATTACK_STRIKE, 12: pose()},
+        UPPER,
+    ),
     (
         "Cast",
         15,
@@ -133,12 +182,15 @@ CLIPS = (
             9: pose({"Spine": (0, 6, 0), "Arm_L": (0, -85, 0), "Arm_R": (0, -85, 0)}),
             15: pose(),
         },
+        UPPER,
     ),
+    ("Hit", 9, False, {0: pose(), 2: HIT_FLINCH, 9: pose()}, UPPER),
     (
         "Death",
         30,
         False,
         {0: pose(), 10: death_pose(10), 20: death_pose(20), 30: death_pose(30)},
+        UPPER + (("Hips", "rotation"),) + HIPS_MOVE,
     ),
 )
 
@@ -276,8 +328,8 @@ def build(champion_id):
     mesh = common.new_object("Champion", bm, materials)
     common.skin_to_rig(mesh, rig, BONE_NAMES)
     common.set_scene_rate(FPS)
-    for name, frames, loops, keys in CLIPS:
-        common.key_clip(rig, name, frames, keys, loops)
+    for name, frames, loops, keys, channels in CLIPS:
+        common.key_clip(rig, name, frames, keys, loops, channels)
     return rig
 
 
