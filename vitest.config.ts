@@ -27,6 +27,13 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'tools',
+          environment: 'node',
+          include: ['tools/**/*.test.ts'],
+        },
+      },
+      {
+        test: {
           name: 'repo',
           environment: 'node',
           include: ['tests/**/*.test.ts'],

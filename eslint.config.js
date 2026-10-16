@@ -162,6 +162,22 @@ export default defineConfig(
     languageOptions: { globals: globals.browser },
   },
   {
+    // The balance tool plays the shipped bots through the two entry points. It reads data/ and
+    // the node: builtins, never a package's own files, node_modules, tests or e2e.
+    files: ['tools/balance/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': boundaryRule([
+        {
+          regex: '^(?!\\.{1,2}(/|$)|node:|(@claudeline/sim|@claudeline/bots|vitest)(/|$))',
+          message: 'The balance tool imports relative paths, node: builtins, vitest and the entry points of @claudeline/sim and @claudeline/bots only.',
+        },
+        outOfPackage,
+      ]),
+      'no-restricted-syntax': noDynamicImport,
+    },
+  },
+  {
     files: ['packages/sim/src/**'],
     // An inline eslint-disable must not silence the determinism bans.
     linterOptions: { noInlineConfig: true },
