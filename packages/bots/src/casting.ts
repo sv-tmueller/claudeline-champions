@@ -6,7 +6,15 @@ import {
   TICK_RATE,
   ULTIMATE_ENERGY_COST,
 } from '@claudeline/sim';
-import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
+import type {
+  AbilitySpec,
+  ChampionState,
+  Effect,
+  GameState,
+  KitDef,
+  Slot,
+  StatusType,
+} from '@claudeline/sim';
 import type { NavGrid } from './grid';
 import { distanceInto } from './hypot';
 import type { Measure } from './hypot';
@@ -140,15 +148,13 @@ export interface KitCache {
    * reach in metres before the margin: speed times lifetime over 60, or the radius plus 0.5.
    * `allyNeed` is the health an ally must be missing: the sum of the `heal` amounts of what the
    * slot does to allies, without a heal the shield's absorb (no overheal). `allyClearance` is the
-   * width of the shot of a bolt, 0 for an area (no shot test). `anyAlly` is true when some slot is
-   * one. An area ally slot (kind 2) has no enemy band: `hasBase` is 0 for it, so a support
+   * width of the shot of a bolt, 0 for an area (no shot test). An area ally slot (kind 2) has no enemy band: `hasBase` is 0 for it, so a support
    * ultimate that reaches allies only reads as one (see `computeCues`); a bolt keeps its band.
    */
   allyKind: Int8Array;
   allyMax: Float64Array;
   allyNeed: Float64Array;
   allyClearance: Float64Array;
-  anyAlly: boolean;
   /**
    * True when F is held for a low or cornered target (see `ChampionRules.holdF`), and the health
    * at or below which a target is low: the sum of the `damage` amounts of F's effects. A double
@@ -253,7 +259,6 @@ export function createKitCache(): KitCache {
     allyMax: new Float64Array(SLOTS.length),
     allyNeed: new Float64Array(SLOTS.length),
     allyClearance: new Float64Array(SLOTS.length),
-    anyAlly: false,
     holdF: false,
     lowHealth: 0.5,
   };
@@ -316,7 +321,6 @@ export function refreshKitCache(
       cache.exClearance[i] = clearanceOf(variant);
     }
   }
-  cache.anyAlly = false;
   for (const slot of rules.allies) {
     if (kit === undefined) break;
     const i = SLOTS.indexOf(slot);
@@ -326,7 +330,6 @@ export function refreshKitCache(
     cache.allyMax[i] = shape.max;
     cache.allyNeed[i] = shape.need;
     cache.allyClearance[i] = shape.clearance;
-    cache.anyAlly = true;
     // An area on allies reaches no enemy: its other effects (Dawnbloom's slow) are no band.
     if (shape.kind === 2) cache.hasBase[i] = 0;
   }
@@ -408,13 +411,12 @@ function allyShape(
 }
 
 /** The health an ally must be missing for these effects to land whole: the heals, else the shield. */
-function healIn(effects: readonly { type: string }[]): number {
+function healIn(effects: readonly Effect[]): number {
   let heal = 0;
   let absorb = 0;
   for (const effect of effects) {
-    const node = effect as { type: string; amount?: number; absorb?: number };
-    if (node.type === 'heal' && typeof node.amount === 'number') heal += node.amount;
-    if (node.type === 'shield' && typeof node.absorb === 'number') absorb += node.absorb;
+    if (effect.type === 'heal') heal += effect.amount;
+    else if (effect.type === 'shield') absorb += effect.absorb;
   }
   return heal > 0 ? heal : absorb;
 }
@@ -677,7 +679,8 @@ function allyForSlot(
  * An ally slot (see `allyForSlot`) counts while some ally qualifies, whoever it is: another ally
  * taking over does not restart the run, and a change of the acted target does (`runs.fill` in the
  * bot). A bolt (M1) with no ally to heal falls through to its enemy band. The ally scan overwrites
- * `dist`, so the loop works with `d`, taken once at the top, and measures the target again after.
+ * `dist`, so the loop works with `d`, taken once at the top; nothing after `updateRuns` reads `dist`
+ * without measuring first (`awayFromInto` of the escape landing does).
  */
 export function updateRuns(
   runs: number[],
@@ -727,7 +730,6 @@ export function updateRuns(
     }
     runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
   }
-  if (cache.anyAlly) distanceInto(dist, me, target);
 }
 
 /**

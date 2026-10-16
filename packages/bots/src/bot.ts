@@ -383,13 +383,13 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
 
   /**
    * Writes the aim into `input`, at `subject`: the acted target, or the ally a bolt is pressed at
-   * or winds up for. The one rng draw of a think is here. The lead and the error
-   * turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the
-   * same operations in the same order (the tests compare the two bit for bit): a call with a
-   * double argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite
-   * tests are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8
-   * 14.6 (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation
-   * a think; Node 22's V8 12.4 does not reproduce that. No committed test checks it again (see
+   * or winds up for. The one rng draw of a think is here. The lead and the error turn are
+   * `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the same
+   * operations in the same order (the tests compare the two bit for bit): a call with a double
+   * argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite tests
+   * are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8 14.6
+   * (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation a
+   * think; Node 22's V8 12.4 does not reproduce that. No committed test checks it again (see
    * bots.md, Allocation, In the browser).
    */
   function aim(
