@@ -1,4 +1,6 @@
-import { Group, Mesh, MeshBasicMaterial, RingGeometry } from 'three';
+import { Color, Group, Mesh, MeshBasicMaterial, RingGeometry } from 'three';
+import { PROJECTILE_ALLY_COLOUR, PROJECTILE_ENEMY_COLOUR } from './entity-views';
+import type { AlphaClock } from './interpolate';
 
 export const RING_COLOUR = '#ffd23f';
 export const RING_POOL_SIZE = 16;
@@ -6,6 +8,25 @@ export const RING_POOL_SIZE = 16;
 export const RING_TICKS = 18;
 /** Above the area discs at 0.03. */
 export const RING_Y = 0.04;
+/** A ring's colour: yellow, or the ally or enemy projectile colour (a heal bolt that landed on a champion). */
+export type RingTint = 0 | 1 | 2;
+export const RING_TINT_YELLOW = 0;
+export const RING_TINT_ALLY = 1;
+export const RING_TINT_ENEMY = 2;
+// Indexed by the tint. A ring copies one of these into its own colour when its tint
+// changes, so a recycled ring never keeps the tint of its last use and a spawn in
+// the same tint copies nothing.
+const TINT_COLOURS: readonly Color[] = [
+  new Color(RING_COLOUR),
+  new Color(PROJECTILE_ALLY_COLOUR),
+  new Color(PROJECTILE_ENEMY_COLOUR),
+];
+/** Anything with a sim position, such as the sim's hit and expiry events. */
+export interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+const ORIGIN: Point = { x: 0, y: 0 };
 const START_RADIUS = 0.5;
 const END_RADIUS = 1.2;
 
@@ -21,6 +42,14 @@ export class ImpactRings {
   private readonly meshes: Mesh[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
   private readonly startTicks: number[] = [];
+  /**
+   * Where each ring is, as the sim's event record: spawn keeps it and draw reads it.
+   * The sim never writes to a record after pushing it (its events are fresh literals
+   * and the next step only truncates the array), so a kept record stays what it was.
+   */
+  private readonly at: Point[] = [];
+  /** The tint each ring's colour has now. */
+  private readonly tints: RingTint[] = [];
   private readonly active: boolean[] = [];
   private next = 0;
 
@@ -40,28 +69,45 @@ export class ImpactRings {
       this.meshes.push(mesh);
       this.materials.push(material);
       this.startTicks.push(0);
+      this.at.push(ORIGIN);
+      this.tints.push(RING_TINT_YELLOW);
       this.active.push(false);
     }
   }
 
-  /** Starts a ring at sim position (x, y) in meters on `tick`. */
-  spawn(x: number, y: number, tick: number): void {
+  /**
+   * Starts a ring at the sim position of `at` (the sim's event record) on `tick`, yellow
+   * unless `tint` says otherwise. A hit is rare, so this runs in V8's interpreter, where
+   * loading a double field allocates a heap number: spawn keeps the record and `draw`,
+   * which runs every frame and is optimized, reads its coordinates. The colour is
+   * written only when it changes, so a yellow ring spawns without reading a colour.
+   */
+  spawn(at: Point, tick: number, tint: RingTint = RING_TINT_YELLOW): void {
     const index = this.next;
     this.next = (index + 1) % RING_POOL_SIZE;
-    const mesh = this.meshes[index] as Mesh;
-    mesh.position.set(x, RING_Y, -y);
-    mesh.visible = true;
+    this.at[index] = at;
+    if (this.tints[index] !== tint) {
+      this.tints[index] = tint;
+      (this.materials[index] as MeshBasicMaterial).color.copy(TINT_COLOURS[tint] as Color);
+    }
+    (this.meshes[index] as Mesh).visible = true;
     this.startTicks[index] = tick;
     // Taking the oldest ring while it still shows leaves the count as it was.
     if (!this.active[index]) this.visibleCount += 1;
     this.active[index] = true;
   }
 
-  /** `tick` is the sim tick and `alpha` the fraction of the next one already elapsed. */
-  draw(tick: number, alpha: number): void {
+  /** `tick` is the sim tick; the clock record holds the fraction of the next one already elapsed. */
+  draw(tick: number, clock: AlphaClock): void {
+    const alpha = clock.alpha;
     for (let i = 0; i < RING_POOL_SIZE; i++) {
       if (!this.active[i]) continue;
       const mesh = this.meshes[i] as Mesh;
+      const at = this.at[i] as Point;
+      const position = mesh.position;
+      position.x = at.x;
+      position.y = RING_Y;
+      position.z = -at.y;
       const age = tick - (this.startTicks[i] as number) + alpha;
       if (age >= RING_TICKS) {
         this.active[i] = false;

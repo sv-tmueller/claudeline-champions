@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { capturePoses, createPoses, interpolatePoses, lerpAngle, type Pose } from './interpolate';
+import { describe, expect, it, vi } from 'vitest';
+import { Object3D } from 'three';
+import { capturePoses, createPoses, interpolatePoses, lerpAngle, placeChampion, type Pose } from './interpolate';
 
 const DEG = Math.PI / 180;
 
@@ -73,14 +74,14 @@ describe('interpolatePoses', () => {
 
   it('equals the previous pose at alpha 0', () => {
     const out = createPoses(2);
-    interpolatePoses(previous, current, 0, out);
+    interpolatePoses(previous, current, { alpha: 0 }, out);
     expect(out[0]).toEqual(previous[0]);
     expect(out[1]).toEqual(previous[1]);
   });
 
   it('is halfway at alpha 0.5, with facing along the shortest arc', () => {
     const out = createPoses(2);
-    interpolatePoses(previous, current, 0.5, out);
+    interpolatePoses(previous, current, { alpha: 0.5 }, out);
     expect(out[0]?.x).toBeCloseTo(1, 12);
     expect(out[0]?.y).toBeCloseTo(3, 12);
     expect(out[0]?.facing).toBeCloseTo(Math.PI / 4, 12);
@@ -91,7 +92,7 @@ describe('interpolatePoses', () => {
 
   it('equals the current pose at alpha 1, facing modulo 2 pi', () => {
     const out = createPoses(2);
-    interpolatePoses(previous, current, 1, out);
+    interpolatePoses(previous, current, { alpha: 1 }, out);
     for (const [i, pose] of out.entries()) {
       expect(pose.x).toBeCloseTo(current[i]?.x ?? NaN, 12);
       expect(pose.y).toBeCloseTo(current[i]?.y ?? NaN, 12);
@@ -102,7 +103,48 @@ describe('interpolatePoses', () => {
   it('writes into the given buffer without replacing its objects', () => {
     const out = createPoses(2);
     const first = out[0];
-    interpolatePoses(previous, current, 0.5, out);
+    interpolatePoses(previous, current, { alpha: 0.5 }, out);
     expect(out[0]).toBe(first);
+  });
+});
+
+describe('placeChampion', () => {
+  const poses: Pose[] = [
+    champion(0, 0, 0),
+    champion(3.25, -7.5, 1),
+    champion(-12, 2, -2.5),
+    champion(14.5, 0.25, Math.PI),
+    // Facing is not wrapped: a lerp can leave (-pi, pi].
+    champion(1, 1, 3.5 * Math.PI),
+  ];
+
+  it.each(poses)('puts the view where set and the rotation.y setter would, for pose %#', (pose) => {
+    const placed = new Object3D();
+    placeChampion(placed, pose);
+    const expected = new Object3D();
+    expected.position.set(pose.x, 0, -pose.y);
+    expected.rotation.y = pose.facing;
+    // Object.is per component: -0 and 0 differ, and so would a different axis order.
+    const same = (a: number[], b: number[]): boolean[] => a.map((v, i) => Object.is(v, b[i]));
+    expect(same(placed.position.toArray(), expected.position.toArray())).toEqual([true, true, true]);
+    expect(same(placed.quaternion.toArray(), expected.quaternion.toArray())).toEqual([true, true, true, true]);
+    expect(placed.rotation.toArray()).toEqual(expected.rotation.toArray());
+  });
+
+  it('turns about the vertical axis only, whatever the view had', () => {
+    const view = new Object3D();
+    view.rotation.set(0.3, 0.4, 0.5);
+    placeChampion(view, champion(0, 0, 1));
+    expect([view.rotation.x, view.rotation.z]).toEqual([0, 0]);
+    expect(view.rotation.y).toBe(1);
+  });
+
+  it('does not call the position set or the rotation setter, which take raw doubles', () => {
+    const view = new Object3D();
+    const set = vi.spyOn(view.position, 'set');
+    const setY = vi.spyOn(view.rotation, 'y', 'set');
+    placeChampion(view, champion(1, 2, 3));
+    expect(set).not.toHaveBeenCalled();
+    expect(setY).not.toHaveBeenCalled();
   });
 });

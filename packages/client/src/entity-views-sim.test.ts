@@ -89,7 +89,7 @@ describe('entity views against the real sim', () => {
     expect(views.areas.count).toBe(1);
     const [disc] = pool(views.areas).filter((mesh) => mesh.visible) as [Mesh];
     // The area is flat on the ground at its sim position, scaled by its radius.
-    views.areas.draw(0);
+    views.areas.draw({ alpha: 0 });
     expect(disc.position.x).toBeCloseTo(3, 12);
     expect(disc.position.z).toBeCloseTo(8, 12);
     expect(disc.scale.x).toBe(1.5);

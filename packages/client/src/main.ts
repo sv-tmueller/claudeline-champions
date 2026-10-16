@@ -35,7 +35,7 @@ import { createKillFeed } from './kill-feed';
 import { parseLaunch } from './launch';
 import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { bindInput, createInputCore } from './input';
-import { capturePoses, createPoses, interpolatePoses } from './interpolate';
+import { capturePoses, createPoses, interpolatePoses, placeChampion } from './interpolate';
 import { createFixedStepClock, STEP_MS } from './loop';
 import { Menu } from './menu';
 import { bindMenu, buildMenu } from './menu-dom';
@@ -100,7 +100,7 @@ const champions = new Group();
 champions.name = 'Champions';
 scene.add(champions);
 const overlay = buildDebugOverlay(arena, state.champions.length);
-scene.add(overlay);
+scene.add(overlay.group);
 
 const human = state.champions[HUMAN_ID];
 if (!human) throw new Error('match has no human champion');
@@ -109,7 +109,7 @@ const areaViews = createAreaViews(human.team);
 const impactRings = createImpactRings();
 const healthBars = createHealthBars(state.champions, human.team);
 const killFeed = createKillFeed();
-const feedback = new CombatFeedback(state.champions.length, impactRings, killFeed);
+const feedback = new CombatFeedback(state.champions, human.team, impactRings, killFeed);
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
 
 // Built before the models load, so the HUD shows while they do.
@@ -150,9 +150,9 @@ renderer.domElement.dataset['overlay'] = 'off';
 window.addEventListener('keydown', (event) => {
   if (event.code !== 'F3' || event.repeat) return;
   event.preventDefault();
-  overlay.visible = !overlay.visible;
+  overlay.group.visible = !overlay.group.visible;
   render();
-  renderer.domElement.dataset['overlay'] = overlay.visible ? 'on' : 'off';
+  renderer.domElement.dataset['overlay'] = overlay.group.visible ? 'on' : 'off';
 });
 
 /** The browser's storage, or undefined where the browser denies it (reading it can throw). */
@@ -299,21 +299,23 @@ function stepSim(steps: number): void {
 // Created after the champion views exist, in loadModels. draw never runs before then.
 let looks: ChampionLooks | undefined;
 
-/** Draws interpolated poses. Never steps the sim. */
-function draw(alpha: number): void {
-  interpolatePoses(previousPoses, state.champions, alpha, drawnPoses);
+/**
+ * Draws interpolated poses. Never steps the sim. The fraction of the tick is the
+ * clock's `alpha`, read by field in each callee: no raw double crosses a call here.
+ */
+function draw(): void {
+  interpolatePoses(previousPoses, state.champions, clock, drawnPoses);
   for (let i = 0; i < drawnPoses.length; i++) {
     const pose = drawnPoses[i];
     const view = champions.children[i];
     if (!pose || !view) continue;
-    view.position.set(pose.x, 0, -pose.y);
-    view.rotation.y = pose.facing;
+    placeChampion(view, pose);
     const champion = state.champions[i];
     if (champion) looks?.set(i, lookMode(feedback.isFlashing(i, state.tick), champion.alive));
   }
-  projectileViews.draw(alpha);
-  areaViews.draw(alpha);
-  impactRings.draw(state.tick, alpha);
+  projectileViews.draw(clock);
+  areaViews.draw(clock);
+  impactRings.draw(state.tick, clock);
   // Only draw retires a ring, so the count is written here.
   if (impactRings.visibleCount !== written.rings) {
     written.rings = impactRings.visibleCount;
@@ -331,7 +333,7 @@ function draw(alpha: number): void {
 function frame(now: number): void {
   const steps = clock.advance(now);
   if (steps > 0) stepSim(steps);
-  draw(clock.alpha);
+  draw();
 }
 
 // The timestamp of the dev-only probe hook below, in the same closure as frame.
@@ -394,7 +396,7 @@ if (import.meta.env.DEV) {
   };
 }
 // Draw once so the arena and champions are on the canvas before the hook.
-draw(0);
+draw();
 renderer.domElement.dataset['arena'] = arena.id;
 
 // The Escape menu pauses by stopping the animation loop: no frame runs, so the sim,

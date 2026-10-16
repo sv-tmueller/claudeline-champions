@@ -8,6 +8,7 @@ import {
   type BufferGeometry,
   type Vector3,
 } from 'three';
+import type { AlphaClock } from './interpolate';
 
 /** Centre height of a projectile sphere above the ground. */
 export const PROJECTILE_Y = 1.0;
@@ -109,9 +110,12 @@ export class EntityViews {
    * of the mesh's position are written directly: a `position.set(x, y, z)` call
    * passes three raw doubles, which V8 boxes into heap numbers wherever the
    * optimizing tier does not inline it (a cold branch with few live views), and
-   * the live heap probe read 228 to 912 B per window of that (issue #89).
+   * the live heap probe read 228 to 912 B per window of that (issue #89). The
+   * fraction of the tick comes in the clock record, read by field, for the same
+   * reason.
    */
-  draw(alpha: number): void {
+  draw(clock: AlphaClock): void {
+    const alpha = clock.alpha;
     const slots = this.slots;
     const y = this.options.y;
     for (let i = 0; i < slots.length; i++) {

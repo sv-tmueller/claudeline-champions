@@ -38,12 +38,19 @@ function footprint(obstacle: Obstacle): Vector3[] {
   return circlePoints(obstacle.x, obstacle.y, obstacle.r);
 }
 
+/** The overlay's scene group and, handed back once, the group of its champion circles. */
+export interface DebugOverlay {
+  readonly group: Group;
+  /** One circle per champion, in id order. `updateChampionCircles` writes their positions. */
+  readonly circles: Group;
+}
+
 /**
  * The sim footprints (boundary first, then one loop per obstacle) as lines in
  * the scene. depthTest is off so tall obstacles and walls cannot hide a line
  * and near edges do not z-fight with side faces.
  */
-export function buildDebugOverlay(arena: ArenaDef, championCount: number): Group {
+export function buildDebugOverlay(arena: ArenaDef, championCount: number): DebugOverlay {
   const material = new LineBasicMaterial({ color: '#ff00ff', depthTest: false, depthWrite: false });
   const group = new Group();
   group.name = 'DebugOverlay';
@@ -69,17 +76,24 @@ export function buildDebugOverlay(arena: ArenaDef, championCount: number): Group
     circles.add(loop);
   }
   group.add(circles);
-  return group;
+  return { group, circles };
 }
 
-/** Moves each champion circle to its (interpolated) pose. Allocates nothing. */
-export function updateChampionCircles(overlay: Group, poses: readonly Pose[]): void {
-  const circles = overlay.getObjectByName('ChampionCircles');
-  if (!circles) throw new Error('overlay has no ChampionCircles group');
+/**
+ * Moves each champion circle to its (interpolated) pose. Allocates nothing: the
+ * group comes from the build, not from a lookup by name, and the fields of each
+ * position are written, since `position.set(x, 0, z)` passes raw doubles (issue #89).
+ */
+export function updateChampionCircles(overlay: DebugOverlay, poses: readonly Pose[]): void {
+  const circles = overlay.circles.children;
   for (let i = 0; i < poses.length; i++) {
     const pose = poses[i];
-    if (!pose) continue;
+    const circle = circles[i];
+    if (!pose || !circle) continue;
     // Same mapping as simToThree, written in place.
-    circles.children[i]?.position.set(pose.x, 0, -pose.y);
+    const position = circle.position;
+    position.x = pose.x;
+    position.y = 0;
+    position.z = -pose.y;
   }
 }
