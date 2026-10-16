@@ -343,15 +343,17 @@ describe('the blend', () => {
     for (const bone of [4, 5]) expectSameTurn(pose, rest, bone, 'Death legs');
   });
 
-  it('crossfades a cast that replaces a playing overlay, Arm_R turning 42 degrees a tick at most, for every pair', async () => {
-    // Measured without the crossfade: Attack then Cast 77 degrees in one tick, and with it Attack then
-    // Cast 27.6, Cast then Attack 41.0, Attack then Attack 39.3 and Cast then Cast 27.3 at the worst offset.
+  it('crossfades a cast that replaces a playing overlay, Arm_R turning a bounded angle a tick, for every pair', async () => {
+    // Without the crossfade Attack then Cast turns 77 degrees in one tick. With it the worst offset
+    // turns Attack then Cast 25.7, Cast then Attack 41.0, Attack then Attack 39.3 and Cast then
+    // Cast 27.3 degrees. The bounds: 27.6 for the first pair (Attack's own fastest tick), 42 for
+    // the other three.
     const { root, rig } = await view('quillon');
-    for (const [first, second] of [
-      [CAST_ATTACK, CAST_OTHER],
-      [CAST_OTHER, CAST_ATTACK],
-      [CAST_ATTACK, CAST_ATTACK],
-      [CAST_OTHER, CAST_OTHER],
+    for (const [first, second, bound] of [
+      [CAST_ATTACK, CAST_OTHER, 27.6],
+      [CAST_OTHER, CAST_ATTACK, 42],
+      [CAST_ATTACK, CAST_ATTACK, 42],
+      [CAST_OTHER, CAST_OTHER, 42],
     ] as const) {
       for (let offset = 1; offset <= 30; offset++) {
         const c = crew(root, rig);
@@ -365,7 +367,7 @@ describe('the blend', () => {
           expect(
             (before.angleTo(after) * 180) / Math.PI,
             `cast ${first} then ${second} after ${offset} ticks, tick ${tick}`,
-          ).toBeLessThanOrEqual(42);
+          ).toBeLessThanOrEqual(bound);
           before = after;
         }
       }
