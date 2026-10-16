@@ -452,15 +452,18 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   after its fix round), `champion-anim.ts` and `clip-sampler.ts` read 0 B in all
   75 sandbox windows and in 74 of 75 live windows of the 15 local attempts of
   each scene (5 batches of 3 repeats, none blind), the exception being one
-  window of 468 B in `clip-sampler.ts:blendChannel`. The counted medians stayed
-  in the old range: 336 to 432 B on the sandbox and 432 to 588 B live, against
-  600 B and 780 B, so no limit moves. The bots' medians were 6608 to 7728 B.
-  Logged, not asserted: `impact-rings.ts:draw` read 24 B in window 1 of the
-  sandbox in 11 of 15 attempts, and one-off spikes of `main.ts:draw` (6672 B,
-  sandbox, once) and `main.ts:writeCombatHooks` (1944 B, live, once) fell in one
-  window each. The fix round added a 3-tick crossfade when a cast replaces an
-  overlay, and without a priming script the live scene read one-off 2 to 10 KB
-  spikes in `slerpFlat` and `writePose` in 5 of 12 attempts (0 of 6 without the
+  window of 468 B in `clip-sampler.ts:blendChannel`. Across the 27 attempts per
+  scene of the round's reruns the modules read 0 B but for one-off windows: 1 of
+  135 sandbox and 2 of 135 live windows, 144 to 468 B each, in `blendChannel` or
+  `slerpFlat`, with no median moved. The counted medians stayed in the old
+  range: 336 to 432 B on the sandbox and 432 to 588 B live, against 600 B and
+  780 B, so no limit moves. The bots' medians were 6608 to 7728 B. Logged, not
+  asserted: `impact-rings.ts:draw` read 24 B in window 1 of the sandbox in 11 of
+  15 attempts, and one-off spikes of `main.ts:draw` (6672 B, sandbox, once) and
+  `main.ts:writeCombatHooks` (1944 B, live, once) fell in one window each. The
+  fix round added a 3-tick crossfade when a cast replaces an overlay, and
+  without a priming script the live scene read one-off 2 to 10 KB spikes in
+  `slerpFlat` and `writePose` in 5 of 12 attempts (0 of 6 without the
   crossfade): the first replacement of a playing overlay was a branch V8 had no
   feedback for. `createClipRig` now poses a scripted match (`scriptAnims`, every
   state of the machine, a crossfade included) through the new rig at load and

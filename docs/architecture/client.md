@@ -244,9 +244,11 @@ every window, so the aim sampling and the entity drawing are counted:
 `sampleAim` used to allocate about 2.5 KB per window whenever a pointer existed
 (issue #87) and `EntityViews.draw` boxed the three doubles of `position.set` on
 the runner (issue #89), and both now read 0 B, as do the two animation modules
-in every window of both scenes. The HUD writes its state with
-`setAttribute` and not `dataset`: in the probe a `dataset` write allocated about
-100 B per window whenever a slot changed, and `setAttribute` allocated none.
+but for one-off windows (1 of 135 sandbox and 2 of 135 live windows, 144 to 468
+B, in `blendChannel` or `slerpFlat`; no median moved). The HUD writes its state
+with `setAttribute` and not `dataset`: in the probe a `dataset` write allocated
+about 100 B per window whenever a slot changed, and `setAttribute` allocated
+none.
 
 The colours that the world view draws are constants in these files. Champion
 model colours must stay clear of them, and `tools/blender/test_champion_models.py`
@@ -330,8 +332,11 @@ The blend has no additive part anywhere:
   last 6 ticks cut it, so a held M1 restarts in 3 ticks and not in one), and
   Spine and both arms crossfade over 3 ticks from the pose last drawn to the
   new overlay's, since its first key is the rest pose: Quillon's Cast over an
-  Attack at its 8th tick turned Arm_R 77 degrees in one tick before, and now at
-  most 27.6 degrees a tick.
+  Attack at its 8th tick turned Arm_R 77 degrees in one tick before, and now
+  turns it 27.6 degrees a tick at most. That figure is that pair's: at the
+  worst replacement tick Cast then Attack turns 41.0 degrees, Attack then
+  Attack 39.3 and Cast then Cast 27.3, so the pin bounds every Attack and Cast
+  pair at 42.
 - Death goes over everything. Its five channels (Hips rotation and translation,
   Spine and both arms) blend from the pose of the moment by its weight, and the
   legs, which it does not key, blend to rest. Its time stops at the clip's end
@@ -378,8 +383,7 @@ in the frame that is hot, so a stop flips two integers.
 `createClipRig` also primes both modules at load: a scripted match through a
 throwaway record (`scriptAnims`) poses every state once, a crossfade included,
 and the bones go back to rest, so V8 has seen every branch before the first
-frame and the first stop, dash or replaced overlay in a match does not
-deoptimize the frame path.
+frame, which makes such a deopt in a measured window rare, not impossible.
 
 One rule came out of the probe for every function of these modules. V8's Maglev
 gives a double that is the result of a branch merge with an integer constant
