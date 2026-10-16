@@ -33,6 +33,7 @@ interface HudRead {
     entries: { champion: string | null; available: string | null; href: string | null; text: string }[];
     arenas: { id: string | null; current: string | null; href: string | null; text: string }[];
     teams: { size: string | null; current: string | null; available: string | null; href: string | null; text: string }[];
+    difficulties: { tier: string | null; current: string | null; href: string | null; text: string }[];
   };
 }
 
@@ -80,6 +81,12 @@ async function readHud(page: Page): Promise<HudRead> {
           size: entry.getAttribute('data-team-size'),
           current: entry.getAttribute('data-current'),
           available: entry.getAttribute('data-available'),
+          href: entry.getAttribute('href'),
+          text: entry.textContent ?? '',
+        })),
+        difficulties: [...document.querySelectorAll<HTMLElement>('[data-result="panel"] [data-difficulty]')].map((entry) => ({
+          tier: entry.getAttribute('data-difficulty'),
+          current: entry.getAttribute('data-current'),
           href: entry.getAttribute('href'),
           text: entry.textContent ?? '',
         })),
@@ -137,7 +144,9 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     // lists the roster in order: the champions with a kit link to a relaunch on the
     // arena being played, the others are greyed and have no link. The arena row
     // lists both arenas in id order, each linking with the current champion. Every
-    // link writes the team size, 2 included, and the team row has 2v2 as the current.
+    // link writes the team size, 2 included, and the team row has 2v2 as the current. The
+    // difficulty row lists the three tiers with normal as the current, each link writing
+    // the whole setup with its own tier.
     expect(hud.result.visible).toBe('false');
     expect(hud.result.entries).toEqual([
       { champion: 'hargrim', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: 'Hargrim' },
@@ -152,6 +161,11 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     expect(hud.result.teams).toEqual([
       { size: '2', current: 'true', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: '2v2' },
       { size: '3', current: 'false', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3', text: '3v3' },
+    ]);
+    expect(hud.result.difficulties).toEqual([
+      { tier: 'easy', current: 'false', href: '?champion=hargrim&difficulty=easy&arena=arena01&teamsize=2', text: 'Easy' },
+      { tier: 'normal', current: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: 'Normal' },
+      { tier: 'hard', current: 'false', href: '?champion=hargrim&difficulty=hard&arena=arena01&teamsize=2', text: 'Hard' },
     ]);
     expect(await page.locator('[data-result="panel"]').isVisible()).toBe(false);
 
@@ -254,6 +268,42 @@ test('starts a 3v3 from the launch address', async ({ page }) => {
     expect(hud.result.teams.map((entry) => entry.href)).toEqual([
       '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2',
       '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3',
+    ]);
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('starts on the hard tier from the launch address, and reads an unknown tier as normal', async ({ page }) => {
+  const { problems, failed } = watchProblems(page);
+  try {
+    await page.goto('/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3');
+    await orFail(page.waitForSelector('canvas[data-arena="arena02"][data-bar5]'), failed);
+    // Hard is the current tier, and every link outside the difficulty row carries it, with the
+    // rest of the setup.
+    const hud = await readHud(page);
+    expect(hud.result.difficulties.map((entry) => [entry.tier, entry.current])).toEqual([
+      ['easy', 'false'],
+      ['normal', 'false'],
+      ['hard', 'true'],
+    ]);
+    const outside = [...hud.result.entries, ...hud.result.arenas, ...hud.result.teams].map((entry) => entry.href);
+    expect(outside).toHaveLength(8);
+    for (const href of outside) expect(href, 'a link keeps the tier').toContain('difficulty=hard');
+    // The difficulty row's own links write each tier, with the champion, the arena and the size kept.
+    expect(hud.result.difficulties.map((entry) => entry.href)).toEqual([
+      '?champion=quillon&difficulty=easy&arena=arena02&teamsize=3',
+      '?champion=quillon&difficulty=normal&arena=arena02&teamsize=3',
+      '?champion=quillon&difficulty=hard&arena=arena02&teamsize=3',
+    ]);
+
+    await page.goto('/?difficulty=brutal');
+    await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
+    const unknown = await readHud(page);
+    expect(unknown.result.difficulties.map((entry) => [entry.tier, entry.current])).toEqual([
+      ['easy', 'false'],
+      ['normal', 'true'],
+      ['hard', 'false'],
     ]);
   } finally {
     expect(problems).toEqual([]);
