@@ -20,6 +20,12 @@ const TINT_COLOURS: readonly Color[] = [
   new Color(PROJECTILE_ALLY_COLOUR),
   new Color(PROJECTILE_ENEMY_COLOUR),
 ];
+/** Anything with a sim position, such as the sim's hit and expiry events. */
+export interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+const ORIGIN: Point = { x: 0, y: 0 };
 const START_RADIUS = 0.5;
 const END_RADIUS = 1.2;
 
@@ -35,6 +41,10 @@ export class ImpactRings {
   private readonly meshes: Mesh[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
   private readonly startTicks: number[] = [];
+  /** Where each ring is, as the sim's record: spawn keeps it and draw reads it. */
+  private readonly at: Point[] = [];
+  /** The tint each ring's colour has now. */
+  private readonly tints: number[] = [];
   private readonly active: boolean[] = [];
   private next = 0;
 
@@ -54,25 +64,28 @@ export class ImpactRings {
       this.meshes.push(mesh);
       this.materials.push(material);
       this.startTicks.push(0);
+      this.at.push(ORIGIN);
+      this.tints.push(RING_TINT_YELLOW);
       this.active.push(false);
     }
   }
 
   /**
-   * Starts a ring at the sim position (x, y), in meters, of `at` on `tick`, yellow
-   * unless `tint` says otherwise. It takes the sim's event record and writes the fields
-   * of the ring's position and colour: no raw double crosses a call (issue #89).
+   * Starts a ring at the sim position of `at` (the sim's event record) on `tick`, yellow
+   * unless `tint` says otherwise. A hit is rare, so this runs in V8's interpreter, where
+   * loading a double field allocates a heap number: spawn keeps the record and `draw`,
+   * which runs every frame and is optimized, reads its coordinates. The colour is
+   * written only when it changes, so a yellow ring spawns without reading a colour.
    */
-  spawn(at: { readonly x: number; readonly y: number }, tick: number, tint: RingTint = RING_TINT_YELLOW): void {
+  spawn(at: Point, tick: number, tint: RingTint = RING_TINT_YELLOW): void {
     const index = this.next;
     this.next = (index + 1) % RING_POOL_SIZE;
-    const mesh = this.meshes[index] as Mesh;
-    const position = mesh.position;
-    position.x = at.x;
-    position.y = RING_Y;
-    position.z = -at.y;
-    (this.materials[index] as MeshBasicMaterial).color.copy(TINT_COLOURS[tint] as Color);
-    mesh.visible = true;
+    this.at[index] = at;
+    if (this.tints[index] !== tint) {
+      this.tints[index] = tint;
+      (this.materials[index] as MeshBasicMaterial).color.copy(TINT_COLOURS[tint] as Color);
+    }
+    (this.meshes[index] as Mesh).visible = true;
     this.startTicks[index] = tick;
     // Taking the oldest ring while it still shows leaves the count as it was.
     if (!this.active[index]) this.visibleCount += 1;
@@ -85,6 +98,11 @@ export class ImpactRings {
     for (let i = 0; i < RING_POOL_SIZE; i++) {
       if (!this.active[i]) continue;
       const mesh = this.meshes[i] as Mesh;
+      const at = this.at[i] as Point;
+      const position = mesh.position;
+      position.x = at.x;
+      position.y = RING_Y;
+      position.z = -at.y;
       const age = tick - (this.startTicks[i] as number) + alpha;
       if (age >= RING_TICKS) {
         this.active[i] = false;

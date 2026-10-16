@@ -75,6 +75,7 @@ describe('impact rings', () => {
     const impact = createImpactRings();
     for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 1);
     const first = rings(impact.group)[0] as Mesh;
+    impact.draw(1, { alpha: 0 });
     expect(first.position.x).toBe(0);
     impact.spawn({ x: 100, y: 0 }, 2);
     impact.draw(2, { alpha: 0 });
@@ -82,6 +83,7 @@ describe('impact rings', () => {
     expect(shown(impact.group)).toHaveLength(RING_POOL_SIZE);
     // The second ring is now the oldest.
     impact.spawn({ x: 101, y: 0 }, 2);
+    impact.draw(2, { alpha: 0 });
     expect((rings(impact.group)[1] as Mesh).position.x).toBe(101);
   });
 
@@ -110,8 +112,32 @@ describe('impact rings', () => {
     const impact = createImpactRings();
     const spies = rings(impact.group).map((mesh) => vi.spyOn(mesh.position, 'set'));
     impact.spawn({ x: 1.5, y: -2.5 }, 10);
+    impact.draw(10, { alpha: 0 });
     spies.forEach((spy) => expect(spy).not.toHaveBeenCalled());
     expect((rings(impact.group)[0] as Mesh).position.toArray()).toEqual([1.5, RING_Y, 2.5]);
+  });
+
+  // A hit is rare, so spawn runs in V8's interpreter, where loading a double field
+  // allocates a heap number. draw runs every frame and is optimized, so it reads the
+  // record's coordinates and spawn only keeps the record (testing.md, the heap probe).
+  it('reads the coordinates of the record in draw, not in spawn', () => {
+    const impact = createImpactRings();
+    let reads = 0;
+    const at = {
+      get x(): number {
+        reads++;
+        return 2;
+      },
+      get y(): number {
+        reads++;
+        return 3;
+      },
+    };
+    impact.spawn(at, 10);
+    expect(reads).toBe(0);
+    impact.draw(10, { alpha: 0 });
+    expect(reads).toBeGreaterThan(0);
+    expect((rings(impact.group)[0] as Mesh).position.toArray()).toEqual([2, RING_Y, -3]);
   });
 
   describe('tints', () => {
