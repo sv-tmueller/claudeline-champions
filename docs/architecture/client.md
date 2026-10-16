@@ -375,6 +375,11 @@ the first dash, and the first dash of a live match deoptimized the frame path
 and cost 25 KB per window for four windows. `draw` runs `updateAnims` and then
 `poseChampion` for each view, and writes the hooks. Run and its hold are decided
 in the frame that is hot, so a stop flips two integers.
+`createClipRig` also primes both modules at load: a scripted match through a
+throwaway record (`scriptAnims`) poses every state once, a crossfade included,
+and the bones go back to rest, so V8 has seen every branch before the first
+frame and the first stop, dash or replaced overlay in a match does not
+deoptimize the frame path.
 
 One rule came out of the probe for every function of these modules. V8's Maglev
 gives a double that is the result of a branch merge with an integer constant
