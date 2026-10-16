@@ -5,7 +5,7 @@ import { SLOTS } from '@claudeline/sim';
 import { WITHIN } from './escape-oracle';
 import { configMirror, configLumeth, configSkerrow, createRun, rosterKits } from './helpers';
 import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, TICKS, expectNoStall, play } from './press-oracle';
-import type { KitSet } from './press-oracle';
+import type { AllyRow, KitSet } from './press-oracle';
 
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
 // after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3.
@@ -113,8 +113,8 @@ describe('a headless match with Lumeth on the four shipped kits', () => {
   const NORMAL = ['normal', 'normal', 'normal', 'normal'] as const;
 
   // Free play, 3600 ticks, pinned seeds: a miss after a change to the bots, the sim or the Node
-  // version is governed by batch #53 decision 8.3. Her ally presses are not in this package, so the
-  // oracle has no row for them and a run that presses one fails.
+  // version is governed by batch #53 decision 8.3. Her ally presses (heals, the shield, Dawnbloom)
+  // pass through the ally rows of the oracle, and a press that has no row or no ally fails the run.
   it('Hargrim and Lumeth against Hargrim and Quillon: every press passes the oracle', () => {
     const run = createRun(SEEDS, NORMAL, 7, { config: configLumeth(), kits: LUMETH_SET.kits() });
     const played = play(LUMETH_SET, run);
@@ -298,13 +298,61 @@ describe('the band and clearance tables of the shipped kits', () => {
     expect(shipped.bands['lumeth:E']).toEqual({ min: 0, max: burst.radius + 0.5 });
     expect(ESCAPES['lumeth:E']).toEqual({ slot: 'E', teleport: null, after: null });
     expect(WITHIN['lumeth']).toBe(3);
-    // Dawnbloom, read from its slow on enemies, the second area.
-    const slow = slotOf('lumeth', 'F').effects[1];
-    if (slow === undefined || slow.type !== 'area' || slow.targets !== 'enemies') {
-      throw new Error('no area on enemies');
+    // Glide: the dash of the row is the kit's, and it goes after Lantern Burst.
+    const glide = slotOf('lumeth', 'SPACE').effects[0];
+    if (glide === undefined || glide.type !== 'dash') throw new Error('no dash');
+    expect(ESCAPES['lumeth:SPACE']).toEqual({
+      slot: 'SPACE',
+      teleport: null,
+      dash: glide.distance,
+      after: { slot: 'E', teleport: null },
+    });
+    // Soothing Surge, Aegis Veil and Dawnbloom reach allies only: no enemy band, whatever else the
+    // kit lists (Dawnbloom's slow on enemies is no reason to press it).
+    for (const key of ['M2', 'M2:ex', 'R', 'R:ex', 'F']) {
+      expect(shipped.bands[`lumeth:${key}`], key).toBeUndefined();
     }
-    expect(shipped.bands['lumeth:F']).toEqual({ min: 0, max: slow.radius + 0.5 });
-    // Soothing Surge has no enemy effect and so no band row.
-    expect(shipped.bands['lumeth:M2']).toBeUndefined();
+  });
+
+  it('has the reach, the need, the width and the speed of every Lumeth ally row', () => {
+    const shipped = KIT_SETS[1] as KitSet;
+    // What a slot does to allies: the allyEffects of its bolt, or the effects of its area on allies.
+    const toAllies = (slot: Slot) => {
+      const first = slotOf('lumeth', slot).effects[0];
+      if (first === undefined) throw new Error('no effect');
+      if (first.type === 'projectile') {
+        return { bolt: first, area: undefined, effects: first.allyEffects ?? [] };
+      }
+      if (first.type === 'area' && first.targets === 'allies') {
+        return { bolt: undefined, area: first, effects: first.effects };
+      }
+      throw new Error('reaches no ally');
+    };
+    const given = (effects: readonly { type: string; amount?: number; absorb?: number }[]) => {
+      const heals = effects.flatMap((e) => (e.type === 'heal' ? [e.amount ?? 0] : []));
+      const shields = effects.flatMap((e) => (e.type === 'shield' ? [e.absorb ?? 0] : []));
+      return heals.length > 0 ? heals.reduce((a, b) => a + b, 0) : shields.reduce((a, b) => a + b, 0);
+    };
+    expect(Object.keys(shipped.allies).sort()).toEqual(['lumeth:F', 'lumeth:M1', 'lumeth:M2', 'lumeth:R']);
+    for (const slot of ['M1', 'M2', 'R', 'F'] as const) {
+      const { bolt, area, effects } = toAllies(slot);
+      const row = shipped.allies[`lumeth:${slot}`] as AllyRow;
+      expect(row.bolt, slot).toBe(bolt !== undefined);
+      // A bolt reaches speed times lifetime over 60 (multiplied first), an area its radius plus 0.5.
+      expect(row.reach, slot).toBe(
+        bolt !== undefined ? (bolt.speed * bolt.lifetimeTicks) / 60 : (area?.radius ?? NaN) + 0.5,
+      );
+      expect(row.need, slot).toBe(given(effects));
+      expect(row.clearance, slot).toBe(bolt !== undefined ? bolt.radius : 0);
+      expect(row.speed, slot).toBe(bolt !== undefined ? bolt.speed : 0);
+    }
+    // The numbers of the roster and of the sub-plan: needs 10, 14, 30 and 30; reaches 12 (11 with
+    // the margin), 10.133 (9.133), and 5.5 (4.5); clearances 0.35 and 0.5.
+    expect(shipped.allies['lumeth:M1']).toMatchObject({ need: 10, reach: 12, clearance: 0.35 });
+    expect(shipped.allies['lumeth:M2']).toMatchObject({ need: 14, clearance: 0.5 });
+    expect(shipped.allies['lumeth:R']).toMatchObject({ need: 30, reach: 5.5 });
+    expect(shipped.allies['lumeth:F']).toMatchObject({ need: 30, reach: 5.5 });
+    // Her M1 is also pressed at an enemy, so it keeps its band beside its ally row.
+    expect(shipped.bands['lumeth:M1']).toBeDefined();
   });
 });

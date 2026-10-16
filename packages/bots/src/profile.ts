@@ -110,6 +110,12 @@ export interface ChampionRules {
    * rangeMin.
    */
   readonly escapeWithin: number | null;
+  /**
+   * The slots pressed at an ally, listed by champion: only these get the ally arrays of the kit
+   * cache (see `allyKind` in casting.ts), so a kit's area on allies that the champion places on
+   * itself (Hargrim's Rally Cry) is no ally slot. Empty for Hargrim, Quillon and Skerrow.
+   */
+  readonly allies: readonly Slot[];
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
@@ -119,6 +125,7 @@ const NO_RULES: ChampionRules = Object.freeze({
   holdF: false,
   wait: null,
   escapeWithin: null,
+  allies: Object.freeze([]),
 });
 
 /**
@@ -137,8 +144,10 @@ const NO_RULES: ChampionRules = Object.freeze({
  * Lumeth's Binding Sigil keeps its kit band and needs a target within 6 m of an ally (the roster:
  * "Q on a target inside 6 m of an ally"). Lantern Burst, then Glide, are her escapes on a trigger
  * of her own: any acted intent but idle with the target within 3 m (the roster: "an enemy inside
- * 3 m"; decision 5 of batch #105). Glide is a dash: its landing is a dash end, see `findLanding`
- * in escape.ts.
+ * 3 m"; decision 1 of batch #105). Glide is a dash: its landing is a dash end, see `findLanding`
+ * in escape.ts. She presses Dawnbloom, Aegis Veil, Soothing Surge and Mend Bolt at an ally that
+ * needs them: the `allies` list (the roster: "M1 on the lowest-health ally"; see `allyKind` in
+ * casting.ts).
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -176,6 +185,7 @@ const RULES = new Map<string, ChampionRules>([
       false,
       null,
       3,
+      ['F', 'R', 'M2', 'M1'],
     ),
   ],
 ]);
@@ -187,6 +197,7 @@ function rule(
   holdF: boolean,
   wait: WaitRule | null = null,
   escapeWithin: number | null = null,
+  allies: Slot[] = [],
 ): ChampionRules {
   const frozen = openers.map((opener) =>
     Object.freeze({
@@ -206,6 +217,7 @@ function rule(
         ? null
         : Object.freeze({ ...wait, band: Object.freeze([wait.band[0], wait.band[1]] as const) }),
     escapeWithin,
+    allies: Object.freeze([...allies]),
   });
 }
 

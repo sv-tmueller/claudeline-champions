@@ -33,6 +33,10 @@ export interface Options {
    * this option: a scene is a duel otherwise.
    */
   ally?: readonly [number, number];
+  /** Health points the ally lacks (the ally has the default maximum, 120). Default: 0. */
+  allyMissing?: number;
+  /** Health points the champion under test lacks. Default: 0. */
+  missing?: number;
   /** The enemy's velocity along x, in m/s: positive is away from the champion under test. */
   enemyVx?: number;
   /** The champion id of the enemy (champion 2). Default: `dummy`, which has no kit and no rule. */
@@ -65,6 +69,7 @@ export function sceneOf(championId: string, distance: number, options: Options =
     ally.alive = true;
     ally.x = options.ally[0];
     ally.y = options.ally[1];
+    ally.health = ally.maxHealth - (options.allyMissing ?? 0);
   }
   const me = state.champions[0] as ChampionState;
   const enemy = state.champions[2] as ChampionState;
@@ -75,6 +80,7 @@ export function sceneOf(championId: string, distance: number, options: Options =
   enemy.vx = options.enemyVx ?? 0;
   me.energy = options.energy ?? 0;
   if (options.health !== undefined) me.health = options.health * me.maxHealth;
+  if (options.missing !== undefined) me.health = me.maxHealth - options.missing;
   if (options.enemyHealth !== undefined) enemy.health = options.enemyHealth * enemy.maxHealth;
   if (options.ready !== undefined) {
     me.cooldowns.fill(600);

@@ -54,6 +54,27 @@ export interface KitSet {
   kits: () => KitDef[];
   bands: Record<string, Band>;
   clearances: Record<string, number>;
+  /** The ally rows: the slots a champion presses at an ally, see `AllyRow`. */
+  allies: Record<string, AllyRow>;
+}
+
+/**
+ * An ally slot, written from the kit file (docs/architecture/bots.md, Allies): the slot is pressed
+ * at an alive ally of the champion that is missing at least `need` health (no overheal), within
+ * `reach` less the 1 m margin of it, and for a bolt with a clear shot of `clearance`. A bolt never
+ * hits its owner (the champion is not an ally of itself) and is aimed at the ally; an area on
+ * allies is placed on the champion and counts the champion itself. Of several allies the one with
+ * the lowest health fraction is the one, a tie going to the lower id.
+ */
+export interface AllyRow {
+  bolt: boolean;
+  /** Speed times lifetime over 60 for a bolt; the radius plus 0.5 for an area. */
+  reach: number;
+  need: number;
+  /** The width of the shot of a bolt; unused for an area. */
+  clearance: number;
+  /** The speed of a bolt, which the aim leads with. */
+  speed: number;
 }
 
 /**
@@ -154,24 +175,32 @@ const SKERROW_CLEARANCES: Record<string, number> = {
   'skerrow:F': 0.5,
 };
 
-// data/kits/lumeth.json, in the shipped set only: Soothing Bolt is a bolt of 20 m/s for 36 ticks
-// (12 m); Binding Sigil is an area at the aim, range 9 plus radius 1.5 plus 0.5, an opener at a
-// target beside an ally; Lantern Burst is an area around her, radius 3 plus 0.5, which she presses
-// as an escape (the row in `ESCAPES`; the band is the kit's and is never what presses it, because
-// her trigger reaches farther than its top); Dawnbloom is read from its second area, the slow on
-// enemies (radius 5 plus 0.5). Her ally presses (M2, R, and Dawnbloom and the bolt at an ally) have
-// no row yet: none of them is pressed, and one that is fails the run.
+// data/kits/lumeth.json, in the shipped set only. The enemy bands: Mend Bolt is a bolt of 20 m/s for
+// 36 ticks (12 m), which she also presses at an enemy when no ally needs it; Binding Sigil is an area
+// at the aim, range 9 plus radius 1.5 plus 0.5, an opener at a target beside an ally; Lantern Burst
+// is an area around her, radius 3 plus 0.5, which she presses as an escape (the row in `ESCAPES`;
+// the band is the kit's and is never what presses it, because her trigger reaches farther than its
+// top). Soothing Surge, Aegis Veil and Dawnbloom reach allies only (Dawnbloom's slow on enemies is
+// no reason to press it), so they have no band: they are pressed through the ally rows below, and
+// without an ally that qualifies a press of them fails the run.
 const LUMETH_BANDS: Record<string, Band> = {
   'lumeth:M1': { min: 0, max: (20 * 36) / 60 },
   'lumeth:Q': { min: 0, max: 11, needs: 'nearAlly' },
   'lumeth:E': { min: 0, max: 3.5 },
-  'lumeth:F': { min: 0, max: 5.5 },
 };
 const LUMETH_CLEARANCES: Record<string, number> = {
   'lumeth:M1': 0.35,
   'lumeth:Q': 0.5,
   'lumeth:E': 0.5,
-  'lumeth:F': 0.5,
+};
+// Her ally rows: Mend Bolt heals 10 (20 m/s, 36 ticks, 0.35 m); Soothing Surge 14 (16 m/s, 38 ticks,
+// 0.5 m); Aegis Veil shields 30 and Dawnbloom heals 30, both on allies within 5 m of her plus 0.5.
+// The EX variants of M2 and R have no row: they have no enemy band and are never pressed.
+const LUMETH_ALLIES: Record<string, AllyRow> = {
+  'lumeth:M1': { bolt: true, reach: (20 * 36) / 60, need: 10, clearance: 0.35, speed: 20 },
+  'lumeth:M2': { bolt: true, reach: (16 * 38) / 60, need: 14, clearance: 0.5, speed: 16 },
+  'lumeth:R': { bolt: false, reach: 5.5, need: 30, clearance: 0, speed: 0 },
+  'lumeth:F': { bolt: false, reach: 5.5, need: 30, clearance: 0, speed: 0 },
 };
 
 export const KIT_SETS: KitSet[] = [
@@ -200,6 +229,7 @@ export const KIT_SETS: KitSet[] = [
       'quillon:E:ex': 0.2,
       'quillon:F': 0.6,
     },
+    allies: {},
   },
   {
     // data/kits/hargrim.json and quillon.json: speed times lifetime in ticks over 60 for each bolt.
@@ -229,6 +259,7 @@ export const KIT_SETS: KitSet[] = [
       ...SKERROW_CLEARANCES,
       ...LUMETH_CLEARANCES,
     },
+    allies: LUMETH_ALLIES,
   },
 ];
 
@@ -255,8 +286,8 @@ interface Press {
   gates: string;
   /** Where the oracle says an escape teleport or dash lands, for the check after the step. */
   landing: OracleLanding | null;
-  /** True for a dash escape (Glide): no teleport event follows, a `dashStarted` does. */
-  dash: boolean;
+  /** The distance of a dash escape (Glide): no teleport event follows, a `dashStarted` does. Else null. */
+  dash: number | null;
   /** Where the champion stood when it pressed, which the direction of the dash is read from. */
   from: { x: number; y: number };
 }
@@ -271,6 +302,44 @@ function pressedSlot(input: PlayerInput): { slot: Slot; ex: boolean } | null {
   const slot = SLOTS.find((s) => (input.buttons & Button[s]) !== 0);
   return slot === undefined ? null : { slot, ex: (input.buttons & Button.SHIFT) !== 0 };
 }
+
+/**
+ * The ally a press of an ally row is at, written from the definition and not from src: of the alive
+ * champions of the team of `c` (not `c` itself for a bolt) that are missing at least `need` health,
+ * within `reach` less the margin and, for a bolt, in a clear shot, the one with the lowest health
+ * fraction, the lower id on a tie. Null when none.
+ */
+function oracleAlly(state: GameState, c: ChampionState, row: AllyRow): ChampionState | null {
+  let best: ChampionState | null = null;
+  for (const o of state.champions) {
+    if (!o.alive || o.team !== c.team) continue;
+    if (row.bolt && o.id === c.id) continue;
+    if (o.maxHealth - o.health < row.need) continue;
+    if (Math.hypot(o.x - c.x, o.y - c.y) > row.reach - MARGIN) continue;
+    if (row.bolt && !clearShotOracle(state, c, o, row.clearance)) continue;
+    if (best === null || o.health / o.maxHealth < best.health / best.maxHealth) best = o;
+  }
+  return best;
+}
+
+/**
+ * Where a bolt of `speed` aimed from `from` meets `to` walking at its velocity: the positive root
+ * of (v.v - s^2) t^2 + 2 (d.v) t + d.d = 0, and the target's own point when there is none.
+ */
+function oracleLead(from: ChampionState, to: ChampionState, speed: number): { x: number; y: number } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const a = to.vx * to.vx + to.vy * to.vy - speed * speed;
+  const b = 2 * (dx * to.vx + dy * to.vy);
+  const c = dx * dx + dy * dy;
+  if (c === 0 || !(a < 0)) return { x: to.x, y: to.y };
+  const root = Math.sqrt(b * b - 4 * a * c);
+  const t = b >= 0 ? (b + root) / (-2 * a) : (2 * c) / (root - b);
+  return t > 0 && Number.isFinite(t) ? { x: to.x + to.vx * t, y: to.y + to.vy * t } : { x: to.x, y: to.y };
+}
+
+/** The widest aim error of any tier, in degrees (easy: 12), and a little for the whole centimetres. */
+const AIM_TOLERANCE = 12.1;
 
 /** The reasons a press of this input on this state breaks a documented gate; empty when none. */
 function pressProblems(
@@ -293,6 +362,8 @@ function pressProblems(
     `d ${d}, cooldown ${cooldown}, energy ${c.energy}, windupLeft ${c.cast?.windupLeft ?? 'none'}, ` +
     `statuses ${c.statuses.map((s) => s.type).join(',') || 'none'}`;
   const band = set.bands[key];
+  const allyRow = pressed.ex ? undefined : set.allies[key];
+  const ally = allyRow === undefined ? null : oracleAlly(state, c, allyRow);
   const held = pressed.ex ? undefined : HELD[key];
   if (
     held !== undefined &&
@@ -301,7 +372,7 @@ function pressProblems(
   ) {
     problems.push(`${key} pressed at a target with ${target.health} health that is not cornered`);
   }
-  if (band === undefined && escape === undefined) {
+  if (band === undefined && escape === undefined && allyRow === undefined) {
     problems.push(`${key} has no reach band in the oracle table`);
   }
   if (target === undefined || !target.alive || target.team === c.team) {
@@ -334,6 +405,24 @@ function pressProblems(
         (teleport === null || oracleLanding(state, c, target, firstSlot, teleport) !== null)
       ) {
         problems.push(`${key} pressed with ${firstSlot} ready${teleport === null ? '' : ' and a landing'}`);
+      }
+    }
+  } else if (allyRow !== undefined && (band === undefined || ally !== null)) {
+    // An ally press: some ally qualifies (a bolt with a band, Mend Bolt, is also pressed at an enemy
+    // when none does, which the branch below tests). The enemy is the acted target all the same: she
+    // never heals on an idle think, which the first branch above tests.
+    if (ally === null) problems.push(`${key} pressed with no ally that qualifies`);
+    // A bolt is aimed at the ally, led with its speed, within the widest aim error; a press that
+    // fires a cast on this very tick (a cast in progress) aims for that cast instead.
+    else if (allyRow.bolt && c.cast === null) {
+      const lead = oracleLead(c, ally, allyRow.speed);
+      const ax = input.aimX / 100 - c.x;
+      const ay = input.aimY / 100 - c.y;
+      const px = lead.x - c.x;
+      const py = lead.y - c.y;
+      const off = (Math.abs(Math.atan2(ax * py - ay * px, ax * px + ay * py)) * 180) / Math.PI;
+      if (!(off <= AIM_TOLERANCE)) {
+        problems.push(`aim ${input.aimX},${input.aimY} is ${off} degrees off ally ${ally.id}`);
       }
     }
   } else if (band !== undefined) {
@@ -462,7 +551,7 @@ export function play(set: KitSet, run: MatchRun): Played {
       presses[id] = (presses[id] ?? 0) + 1;
       const { problems, key, gates, landing } = pressProblems(state, c, pressed, acted, input, set);
       expect(problems, `tick ${t} champion ${id} pressed ${key}: ${gates}`).toEqual([]);
-      const dash = !pressed.ex && ESCAPES[key]?.dash !== undefined;
+      const dash = pressed.ex ? null : (ESCAPES[key]?.dash ?? null);
       pending.push({
         id,
         slot: pressed.slot,
@@ -488,7 +577,7 @@ export function play(set: KitSet, run: MatchRun): Played {
     // Only the escape teleports are pinned to a landing and to never being blocked: Reaper's Dance
     // teleports after an 18 tick windup, aimed at where the target is when it fires, and may be
     // blocked legitimately, so the tally counts it apart.
-    const escapes = pending.filter((press) => press.landing !== null && !press.dash);
+    const escapes = pending.filter((press) => press.landing !== null && press.dash === null);
     const found = tallyTeleports(
       tally,
       state.events,
@@ -510,7 +599,7 @@ export function play(set: KitSet, run: MatchRun): Played {
     // found, which leaves the target (the landing is on the far side of the champion).
     let dashEscapes = 0;
     for (const press of pending) {
-      if (!press.dash || press.landing === null) continue;
+      if (press.dash === null || press.landing === null) continue;
       const dashEvent = state.events.find(
         (e) => e.type === 'dashStarted' && e.championId === press.id,
       );
@@ -521,7 +610,7 @@ export function play(set: KitSet, run: MatchRun): Played {
       const length = Math.hypot(vx, vy);
       expect(Math.abs(dashEvent.dirX - vx / length), `tick ${tick} dash direction x`).toBeLessThan(1e-9);
       expect(Math.abs(dashEvent.dirY - vy / length), `tick ${tick} dash direction y`).toBeLessThan(1e-9);
-      expect(dashEvent.distance).toBe(4);
+      expect(dashEvent.distance).toBe(press.dash);
     }
     glides += dashEscapes;
     for (const e of state.events) {
