@@ -232,3 +232,35 @@ Each pairing has a plan and a weakness. No pairing is a flat loss against anothe
 | Quillon and Lumeth | Binding Sigil and Snare Orb chain roots, and Aegis Veil protects Quillon from a dive. | Hargrim pulling Lumeth out of position. |
 | Quillon and Skerrow | Bind Shot slows the target and Skerrow dives onto it, with Lance as the follow-up. | Two low-health champions with no shield beyond Hush Ward. |
 | Lumeth and Skerrow | Skerrow dives behind the shield and haste of Aegis Veil EX, and Lumeth keeps her up with Soothing Surge. | Both are fragile, so focus fire ends the round. |
+
+## 6. Balance notes
+
+Status: the baseline of batch #105 (issue #109). No row of this document has
+changed. The method, the band (40 to 60 percent per cell) and the full report
+are in [balance](balance.md); the tuning pass is issue #121.
+
+The six intended counters above, measured as bot against bot at the normal tier
+over 100 seeds on both arenas, with the same fill on both teams (2v2: each
+other champion in turn; 3v3: the other two). The rates are the favoured
+champion's win rate in percent, 2v2 on arena01 and arena02, then 3v3 on arena01
+and arena02, from the report in balance.md.
+
+| Counter | Favoured | 2v2 arena01 | 2v2 arena02 | 3v3 arena01 | 3v3 arena02 | Reading |
+|---------|----------|-------------|-------------|-------------|-------------|---------|
+| Hargrim beats Skerrow | Hargrim | 31.0 | 35.5 | 65.0 | 11.0 | Inverted in three cells, 5 over in one. |
+| Hargrim beats Lumeth | Hargrim | 0.5 | 3.0 | 0.0 | 0.0 | Inverted: Lumeth wins. |
+| Quillon beats Hargrim | Quillon | 100.0 | 99.0 | 98.0 | 100.0 | Right way, too strong. |
+| Skerrow beats Quillon | Skerrow | 0.0 | 0.0 | 1.0 | 11.0 | Inverted: Quillon wins. |
+| Lumeth beats Quillon | Lumeth | 62.5 | 6.0 | 46.0 | 29.0 | Right way in one cell, 2.5 over; in band in one; inverted in two. |
+| Skerrow beats Lumeth | Skerrow | 0.0 | 4.5 | 0.0 | 2.0 | Inverted: Lumeth wins. |
+
+- One cell of 24 is in the band. Three counters are inverted outright
+  (Hargrim over Lumeth, Skerrow over Quillon, Skerrow over Lumeth), one is too
+  strong (Quillon over Hargrim), and two are mixed.
+- By champion, over all the cells it is in: Hargrim 12 percent, Skerrow 23,
+  Lumeth 77 and Quillon 87.
+- The 3v3 rates depend on the order of the fill (balance.md, section 3), so the
+  3v3 columns are for the order of the kit files.
+- Every number above is for these bots, which do not dodge, always target the
+  nearest enemy and never press some abilities (bots.md). A kit change in #121
+  is checked against this table before this document's rows change.
