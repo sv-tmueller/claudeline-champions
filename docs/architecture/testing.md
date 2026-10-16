@@ -66,8 +66,8 @@ port 5173, which Playwright starts itself.
   in a 3v3), a projectile and a hit within tick budgets, the timer and the
   hidden result panel. It asserts budgets only, never an exact tick, because
   any bots change can move the ticks: the 3v3 rows log the headless ticks next
-  to the ones they read (projectile 267 and 275, hit 301 and 307, the same on
-  9612bff and on 57dd52f: the dash hold of #98 moves none of them) and assert
+  to the ones they read (projectile 267 and 271, hit 290 and 319, with a Lumeth
+  on each team; 267 and 275, 301 and 307 with two Quillons a side) and assert
   the budgets of the 2v2 rows.
 - `match-end.spec.ts`: tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run
@@ -77,22 +77,23 @@ port 5173, which Playwright starts itself.
   the 3v3 rows), within a budget of ticks and frames per row: 15 000 and 182 on
   arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5184 in the e2e and 5053 in
   a headless run, on 57dd52f), 14 000 and 171 on arena02 (tick 4198 headless and
-  4224 in the e2e, a Defeat 0 : 3), and 23 000 and 265 on the 3v3 of arena01 (it
-  ends at tick 12 431 headless and 12 864 in the e2e, a Defeat 2 : 3) and 18 000
-  and 213 on the 3v3 of arena02 (tick 7125 headless and 7584 in the e2e, a
-  Defeat 2 : 3). A headless run through the client's setup and driver gives each
+  4224 in the e2e, a Defeat 0 : 3), and 25 000 and 286 on the 3v3 of arena01 (it
+  ends at tick 10 378 headless and 10 464 in the e2e, a Defeat 1 : 3) and 26 000
+  and 296 on the 3v3 of arena02 (tick 11 683 headless and 11 904 in the e2e, a
+  Defeat 0 : 3). A headless run through the client's setup and driver gives each
   row's tick, in `match-setup.test.ts`. The budget is that tick plus two rounds
   of about 1000 and one round to sudden death of about 7000, rounded up to 1000,
   and the frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their
-  rows use 1600 for a round (the longest measured is 1557). Each row logs its
-  wall time, and a row over 40 s gets its own timeout. The test follows the
-  Quillon link of the result panel, which keeps the arena and the team size. The
-  other plays the sandbox to the red edge: the ring warning hidden until 600
-  ticks before the ring, the countdown, the radius text equal to the sim's
-  within 0.1 m and falling, and the red edge (`ring.png`, counted as red pixels
-  against a picture without the edge). These assert budgets and tick relations
-  from the rules, and the frame budget makes a page without the scale fail at
-  once, however fast the machine is.
+  rows use 3400 for a round (the longest measured is 3331, with a Lumeth on each
+  team; it was 1557 with two Quillons a side). Each row logs its wall time, and
+  a row over 40 s gets its own timeout. The test follows the Quillon link of the
+  result panel, which keeps the arena and the team size. The other plays the
+  sandbox to the red edge: the ring warning hidden until 600 ticks before the
+  ring, the countdown, the radius text equal to the sim's within 0.1 m and
+  falling, and the red edge (`ring.png`, counted as red pixels against a picture
+  without the edge). These assert budgets and tick relations from the rules, and
+  the frame budget makes a page without the scale fail at once, however fast the
+  machine is.
 - `menu.spec.ts`: the Escape menu on a paused clock in frames of 16 ms
   (`menu.png`). The pause: 60 frames under the open menu leave the tick as it
   was, and the 10 frames after Resume run at most 10 ticks (8 with the clock

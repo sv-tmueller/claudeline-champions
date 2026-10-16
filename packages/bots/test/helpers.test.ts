@@ -4,6 +4,8 @@ import type { GameState, PlayerInput, SimEvent } from '@claudeline/sim';
 import type { Bot } from '../src/bot';
 import {
   arena01,
+  arena02,
+  configLumeth3v3,
   configMirror,
   createRun,
   createTeleportTally,
@@ -29,6 +31,24 @@ function reusingBot(): Bot {
     inspect: () => ({ intent: 'idle', targetId: -1 }),
   };
 }
+
+describe('createRun on another arena', () => {
+  it('plays on arena01 unless asked, and on the arena it is given', () => {
+    const seeds = [1, 2, 3, 4, 5, 6];
+    const tiers = ['easy', 'easy', 'easy', 'easy', 'easy', 'easy'] as const;
+    expect(createRun(seeds, tiers, 7, { config: configLumeth3v3() }).state.arena.id).toBe('arena01');
+    const run = createRun(seeds, tiers, 7, { config: configLumeth3v3(), arena: arena02 });
+    expect(run.state.arena.id).toBe('arena02');
+    expect(run.state.champions.map((c) => [c.championId, c.team])).toEqual([
+      ['hargrim', 'A'],
+      ['quillon', 'A'],
+      ['lumeth', 'A'],
+      ['hargrim', 'B'],
+      ['quillon', 'B'],
+      ['lumeth', 'B'],
+    ]);
+  });
+});
 
 describe('createRun', () => {
   it('records a copy of each bot input, so a bot that reuses its record does not alias the stream', () => {

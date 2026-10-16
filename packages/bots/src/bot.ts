@@ -234,6 +234,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   // written to a variable of this closure, in the engines measured (see aim below).
   const aimError = { aimU: 0.5 };
   let aimAge = 0;
+  // The id of the ally a bolt is aimed at through its windup, or -1 (see `think`). An integer in a
+  // field: no double is held.
+  const aimHold = { allyAim: -1 };
   // Per slot (in SLOTS order), the consecutive thinks the acted target was in sight and in reach
   // of the ability the slot would cast. Allocated once; see casting.ts.
   const runs: number[] = SLOTS.map(() => 0);
@@ -379,18 +382,19 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   }
 
   /**
-   * Writes the aim into `input`; the one rng draw of a think is here. The lead and the error
-   * turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the
-   * same operations in the same order (the tests compare the two bit for bit): a call with a
-   * double argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite
-   * tests are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8
-   * 14.6 (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation
-   * a think; Node 22's V8 12.4 does not reproduce that. No committed test checks it again (see
+   * Writes the aim into `input`, at `subject`: the acted target, or the ally a bolt is pressed at
+   * or winds up for. The one rng draw of a think is here. The lead and the error turn are
+   * `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the same
+   * operations in the same order (the tests compare the two bit for bit): a call with a double
+   * argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite tests
+   * are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8 14.6
+   * (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation a
+   * think; Node 22's V8 12.4 does not reproduce that. No committed test checks it again (see
    * bots.md, Allocation, In the browser).
    */
   function aim(
     me: ChampionState,
-    target: ChampionState,
+    subject: ChampionState,
     kit: KitDef | undefined,
     pressed: boolean,
   ): void {
@@ -420,21 +424,21 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     }
 
     // leadPoint: the time a projectile of this speed needs to meet the target.
-    const dx = target.x - me.x;
-    const dy = target.y - me.y;
-    const vx = target.vx;
-    const vy = target.vy;
+    const dx = subject.x - me.x;
+    const dy = subject.y - me.y;
+    const vx = subject.vx;
+    const vy = subject.vy;
     const a = vx * vx + vy * vy - speed * speed;
     const b = 2 * (dx * vx + dy * vy);
     const c = dx * dx + dy * dy;
-    let leadX = target.x;
-    let leadY = target.y;
+    let leadX = subject.x;
+    let leadY = subject.y;
     if (!(c === 0 || !(a < 0))) {
       const root = Math.sqrt(b * b - 4 * a * c);
       const t = b >= 0 ? (b + root) / (-2 * a) : (2 * c) / (root - b);
       if (t - t === 0 && t > 0) {
-        leadX = target.x + vx * t;
-        leadY = target.y + vy * t;
+        leadX = subject.x + vx * t;
+        leadY = subject.y + vy * t;
       }
     }
 
@@ -482,7 +486,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       }
 
       const kit = findKit(state, me.championId);
-      refreshKitCache(kitCache, kit, me.championId);
+      // A rebuild means another kit or champion id: the ally held for the windup of the old one is
+      // an id in another match, and must not be aimed at.
+      if (refreshKitCache(kitCache, kit, me.championId)) aimHold.allyAim = -1;
       const profile = kitCache.profile;
       decide(state, me, profile);
 
@@ -513,6 +519,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         cues.escapeThink = false;
         cues.escapeReady = false;
         cues.nearAlly = false;
+        cues.allyFor.fill(-1);
         sight.standClearance = SIGHT_CLEARANCE;
       }
       move(state, me, profile);
@@ -563,9 +570,32 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       } else {
         runs.fill(0);
       }
+      // The subject of the aim. A bolt (kind 1 of the ally slots, never herself) is aimed at the ally
+      // it is pressed at, and `aimHold` keeps that ally for every think of its windup: the sim fires
+      // at the aim of the firing tick. A cast in progress holds its own ally, or the target when the
+      // ally has died; with none in progress the hold is cleared. The areas (R, F) keep the target,
+      // since an aim at her own centre is a zero-length vector.
+      if (me.cast === null) aimHold.allyAim = -1;
+      let subject = target;
+      if (aimHold.allyAim >= 0) {
+        const held = state.champions[aimHold.allyAim];
+        if (held !== undefined && held.alive) subject = held;
+        else aimHold.allyAim = -1;
+      }
+      let allyId = -1;
+      if (pressed && !choice.ex) {
+        const index = SLOTS.indexOf(choice.slot);
+        if (kitCache.allyKind[index] === 1) allyId = cues.allyFor[index] as number;
+      }
+      // A press at an ally while no cast is in progress starts the hold on this think; a press
+      // that fires a cast on this very tick (windupLeft 1) aims for the cast it fires.
+      if (allyId >= 0 && me.cast === null) subject = state.champions[allyId] as ChampionState;
       // aim() runs on every think, an escape press included, so the draw cadence of the aim error
-      // does not change; a teleport press then overwrites the aim with its landing, with no error.
-      aim(me, target, kit, pressed);
+      // does not change; a teleport or dash press (an escape with a landing) then overwrites the aim
+      // with its landing, with no error, whatever ally the aim was held on.
+      aim(me, subject, kit, pressed);
+      // The press starts the next cast: it holds its ally, or none.
+      if (pressed) aimHold.allyAim = allyId;
       if (pressed && escapeScratch.landed) {
         input.aimX = escapeScratch.land.aimX;
         input.aimY = escapeScratch.land.aimY;

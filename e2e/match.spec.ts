@@ -3,7 +3,7 @@ import { orFail, watchProblems } from './support';
 
 // The default match: the local Hargrim and an ally Quillon against an enemy
 // Hargrim and Quillon, all three bots on normal. The 3v3 rows play the same round
-// with an ally Quillon more and an enemy Quillon more, five bots. The clock is paused and the
+// with a Lumeth more on each team, five bots. The clock is paused and the
 // test runs it in window-sized steps at the probe viewport, reading the hooks
 // between steps only, so a slow machine changes the time the test takes and
 // never what it sees. Any bots change can move the ticks of the round, so every
@@ -105,15 +105,16 @@ async function runUntil(
 
 // The same round on each arena and each team size. The arena02 row proves the bots and the sim play it
 // from the address, not only that the page loads it: its first death is a tick budget like arena01's.
-// The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on 57dd52f, the
-// same figures as the log lines of these rows. They are logged and never asserted: the 2v2 rows assert
-// budgets only too, and every bots change moves them. arena01 267 and 301, arena02 275 and 307, as on
-// 9612bff: the dash hold of #98 changes no first projectile or hit. The budgets stay 600 and 1800.
+// The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on the bots of
+// #112 (a Lumeth on each team), the same figures as the log lines of these rows. They are logged and
+// never asserted: the 2v2 rows assert budgets only too, and every bots change moves them. arena01 267
+// and 290, arena02 271 and 319 (267 and 301, 275 and 307 with two Quillons a side). The budgets are
+// the 2v2 ones, 600 and 1800: the latest first hit, 319, is 139 ticks into the round.
 const ROWS = [
   { id: 'arena01', size: 2, address: '/', picture: 'match.png' },
   { id: 'arena02', size: 2, address: '/?arena=arena02', picture: 'match-arena02.png' },
-  { id: 'arena01', size: 3, address: '/?teamsize=3', picture: 'match-3v3.png', projectile: 267, hit: 301 },
-  { id: 'arena02', size: 3, address: '/?arena=arena02&teamsize=3', picture: 'match-3v3-arena02.png', projectile: 275, hit: 307 },
+  { id: 'arena01', size: 3, address: '/?teamsize=3', picture: 'match-3v3.png', projectile: 267, hit: 290 },
+  { id: 'arena02', size: 3, address: '/?arena=arena02&teamsize=3', picture: 'match-3v3-arena02.png', projectile: 271, hit: 319 },
 ] as const;
 
 for (const arena of ROWS) {

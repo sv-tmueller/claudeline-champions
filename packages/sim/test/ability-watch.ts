@@ -13,6 +13,16 @@ const SHIFT = 128;
 export const PRIORITY: Slot[] = ['F', 'R', 'E', 'Q', 'SPACE', 'M2', 'M1'];
 const SLOT_INDEX: Record<Slot, number> = { M1: 0, M2: 1, SPACE: 2, Q: 3, E: 4, R: 5, F: 6 };
 
+/** What a projectile lands: on the owner's team (it has `allyEffects`), on enemies (a non-empty `effects`). */
+interface ProjectileFlags {
+  ally: boolean;
+  enemy: boolean;
+}
+
+function flagsOf(p: { allyEffects?: unknown; effects: readonly unknown[] }): ProjectileFlags {
+  return { ally: p.allyEffects !== undefined, enemy: p.effects.length > 0 };
+}
+
 /** What a step needs of the state before it: the champions only, which is cheap to copy. */
 export interface Champions {
   champions: ChampionState[];
@@ -241,6 +251,8 @@ export class Coverage {
 export class AbilityWatcher {
   problems: string[] = [];
   private before: Champions | null = null;
+  /** The projectiles alive at the start of the step, by id: what each lands on allies and on enemies. */
+  private projectilesBefore = new Map<number, ProjectileFlags>();
   private energy: number[];
   private statusOpen = new Map<string, number>();
   private dashOpen = new Map<number, number>();
@@ -259,6 +271,9 @@ export class AbilityWatcher {
 
   beforeStep(state: GameState): void {
     this.before = copyChampions(state);
+    // The champions and the projectiles: a projectile that hits and ends in the step is gone from
+    // the state after it, so what it landed is read from before the step or from the cast.
+    this.projectilesBefore = new Map(state.projectiles.map((p) => [p.id, flagsOf(p)]));
   }
 
   afterEnergySet(state: GameState): void {
@@ -272,6 +287,7 @@ export class AbilityWatcher {
     this.before = null;
     this.generic(state);
     this.events(state);
+    this.projectileRules(state);
     this.ledger(state);
     this.rules(state, before, inputs);
   }
@@ -291,6 +307,61 @@ export class AbilityWatcher {
     } catch (error) {
       this.problems.push(`tick ${state.tick}: checksum or JSON round trip failed: ${String(error)}`);
     }
+  }
+
+  /**
+   * What a projectile may land, by the kit rules (kit.ts): a hit on the owner's team needs
+   * `allyEffects` and a target that is not the owner, a hit on an enemy needs a non-empty `effects`
+   * (an empty list beside `allyEffects` makes the projectile pass enemies), and energy for a hit on
+   * an ally other than the caster needs a support kit and a heal that restored health to that
+   * ally in the same step (a heal of nothing earns none). The flags of a projectile are read from
+   * the state before the step, then after it, then, for a bolt that spawned and ended in this very
+   * step, from the ability its owner's castFired names.
+   */
+  private projectileRules(state: GameState): void {
+    const after = new Map(state.projectiles.map((p) => [p.id, flagsOf(p)]));
+    for (const e of state.events) {
+      if (e.type === 'projectileHit') {
+        const owner = state.champions[e.ownerId] as ChampionState;
+        const target = state.champions[e.targetId] as ChampionState;
+        const flags =
+          this.projectilesBefore.get(e.projectileId) ??
+          after.get(e.projectileId) ??
+          this.flagsFromCast(state, e.ownerId);
+        if (!flags) {
+          this.check(false, `projectile ${e.projectileId} of champion ${e.ownerId} hit champion ${e.targetId} and no flags are known`, state);
+        } else if (owner.team === target.team) {
+          this.check(flags.ally, `projectile ${e.projectileId} of champion ${e.ownerId} hit its ally ${e.targetId} with no allyEffects`, state);
+          this.check(e.targetId !== e.ownerId, `projectile ${e.projectileId} of champion ${e.ownerId} hit its owner`, state);
+        } else {
+          this.check(flags.enemy, `projectile ${e.projectileId} of champion ${e.ownerId} hit an enemy with empty effects (champion ${e.targetId})`, state);
+        }
+      } else if (e.type === 'energyGained') {
+        const caster = state.champions[e.championId] as ChampionState;
+        const target = state.champions[e.targetId] as ChampionState;
+        if (caster.team !== target.team || caster.id === target.id) continue;
+        const healed = state.events.some(
+          (h) => h.type === 'heal' && h.targetId === e.targetId && h.sourceId === e.championId,
+        );
+        this.check(kitOf(state, caster)?.support === true, `champion ${e.championId} earned energy for a heal of ally ${e.targetId} with a kit that is not support`, state);
+        this.check(healed, `champion ${e.championId} earned energy for ally ${e.targetId} with no heal that restored health to it in the step`, state);
+      }
+    }
+  }
+
+  /** The flags of the first projectile of the ability the owner fired in this step, if any. */
+  private flagsFromCast(state: GameState, ownerId: number): ProjectileFlags | null {
+    const fired = state.events.find((e) => e.type === 'castFired' && e.championId === ownerId);
+    const kit = kitOf(state, state.champions[ownerId] as ChampionState);
+    if (fired?.type !== 'castFired' || !kit) return null;
+    const spec = kit.slots[fired.slot];
+    const ability = fired.ex && spec.ex ? spec.ex : spec;
+    for (const effect of ability.effects) {
+      if (effect.type === 'projectile') {
+        return { ally: effect.allyEffects !== undefined, enemy: effect.effects.length > 0 };
+      }
+    }
+    return null;
   }
 
   /** Lifecycles: one close per status, one dash end per dash, one fire or interrupt per cast. */

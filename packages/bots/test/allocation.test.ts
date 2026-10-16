@@ -48,6 +48,8 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  *   skerrow engage       (new scene)     (new scene)     0              0
  *   skerrow wait         (new scene)     (new scene)     0              (not run)
  *   lumeth escape        (new scene)     (new scene)     0              (not run)
+ *   lumeth heal          (new scene)     (new scene)     0              (not run)
+ *   lumeth windup        (new scene)     (new scene)     0              (not run)
  *
  * The last five scenes have no main figure: they test paths main does not have. The unit job of
  * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
@@ -75,6 +77,11 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  * the lumeth escape scene on Node 22 and Node 26, in every round: in the dash landing search
  * (`findLanding` of a dash escape) and in the near-ally scan (`nearAllyOf`, run on every think of a
  * champion with Binding Sigil).
+ * The same object (six doubles) kept in a module variable on the paths of #112 reads 672 in the
+ * lumeth escape, heal and windup scenes in the ally scan (`allyForSlot`, 168 for each of her four
+ * ally slots a think), 168 in the lumeth heal scene in the aim at an ally that is pressed and 168 in
+ * the lumeth windup scene in the ally held through the windup (both in `think`), in every round on
+ * Node 22, Node 26 and Node 26 with Maglev alone, where the three scenes read 0 clean.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
@@ -363,7 +370,54 @@ function buildScenes(): Scene[] {
       },
       configLumeth(),
     ),
+    // A Lumeth heal: Lumeth 7 m from her Hargrim ally, who is missing 60 health, the enemy Hargrim 8.5
+    // m away on a clear lane, Soothing Surge ready and every other slot cooling down: the ally scan of
+    // every ally slot (four a think, the bolts with a clear shot each), the ally id kept in the cues
+    // and the aim at the ally with its lead are run on every think, and M2 is pressed on every one.
+    scene(
+      'lumeth heal',
+      1,
+      'engage',
+      true,
+      false,
+      (state) => {
+        arrangeHeal(state);
+      },
+      configLumeth(),
+    ),
+    // A Lumeth windup: the same, after the bot has pressed Soothing Surge, with its cast in progress
+    // (10 ticks of its 18 left, frozen) and the cooldown running: no press, and the aim is the ally
+    // held through the windup on every think.
+    scene(
+      'lumeth windup',
+      1,
+      'engage',
+      false,
+      false,
+      (state, bot) => {
+        arrangeHeal(state);
+        // The normal tier presses on its 24th think (a delay of 15 and a run of 9): settle twice.
+        settle(bot, state);
+        settle(bot, state);
+        const me = ch(state, 1);
+        me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 18, windupLeft: 10 };
+        me.cooldowns[SLOTS.indexOf('M2')] = 100;
+      },
+      configLumeth(),
+    ),
   ];
+}
+
+/** The Lumeth heal scenes: Lumeth at (-8, -3), her ally Hargrim at (-1, -3) missing 60, M2 ready. */
+function arrangeHeal(state: GameState): void {
+  put(state, 1, -8, -3);
+  put(state, 2, -2, 3);
+  ch(state, 0).alive = true;
+  put(state, 0, -1, -3);
+  ch(state, 0).health = ch(state, 0).maxHealth - 60;
+  const me = ch(state, 1);
+  me.cooldowns.fill(100);
+  me.cooldowns[SLOTS.indexOf('M2')] = 0;
 }
 
 describe('think allocation', () => {

@@ -1,5 +1,20 @@
-import { Button, CHAMPION_RADIUS, EX_ENERGY_COST, SLOTS, ULTIMATE_ENERGY_COST } from '@claudeline/sim';
-import type { AbilitySpec, ChampionState, GameState, KitDef, Slot, StatusType } from '@claudeline/sim';
+import {
+  Button,
+  CHAMPION_RADIUS,
+  EX_ENERGY_COST,
+  SLOTS,
+  TICK_RATE,
+  ULTIMATE_ENERGY_COST,
+} from '@claudeline/sim';
+import type {
+  AbilitySpec,
+  ChampionState,
+  Effect,
+  GameState,
+  KitDef,
+  Slot,
+  StatusType,
+} from '@claudeline/sim';
 import type { NavGrid } from './grid';
 import { distanceInto } from './hypot';
 import type { Measure } from './hypot';
@@ -127,6 +142,20 @@ export interface KitCache {
    */
   escapeDash: Uint8Array;
   /**
+   * The ally slots (see `ChampionRules.allies`; every array is 0 for a slot not on the list). Per
+   * slot, `allyKind` is 1 for a projectile with `allyEffects` (a bolt that never hits its owner),
+   * 2 for an area on allies placed on self (it includes the caster), 0 for none. `allyMax` is the
+   * reach in metres before the margin: speed times lifetime over 60, or the radius plus 0.5.
+   * `allyNeed` is the health an ally must be missing: the sum of the `heal` amounts of what the
+   * slot does to allies, without a heal the shield's absorb (no overheal). `allyClearance` is the
+   * width of the shot of a bolt, 0 for an area (no shot test). An area ally slot (kind 2) has no enemy band: `hasBase` is 0 for it, so a support
+   * ultimate that reaches allies only reads as one (see `computeCues`); a bolt keeps its band.
+   */
+  allyKind: Int8Array;
+  allyMax: Float64Array;
+  allyNeed: Float64Array;
+  allyClearance: Float64Array;
+  /**
    * True when F is held for a low or cornered target (see `ChampionRules.holdF`), and the health
    * at or below which a target is low: the sum of the `damage` amounts of F's effects. A double
    * field that starts as a double.
@@ -172,6 +201,12 @@ export interface CastCues {
    * worked out when the champion has an opener that reads it (`KitCache.anyNearAlly`), else false.
    */
   nearAlly: boolean;
+  /**
+   * Per slot, the id of the ally the slot would be pressed at, or -1 for none: the lowest health
+   * fraction among the allies that qualify (see `updateRuns`). Worked out for the ally slots of
+   * the kit only; -1 elsewhere. An Int32Array: an id is an integer and no double is held.
+   */
+  allyFor: Int32Array;
 }
 
 export function createCastCues(kite: KiteScratch): CastCues {
@@ -184,6 +219,7 @@ export function createCastCues(kite: KiteScratch): CastCues {
     escapeThink: false,
     escapeReady: false,
     nearAlly: false,
+    allyFor: new Int32Array(SLOTS.length).fill(-1),
   };
 }
 
@@ -219,18 +255,25 @@ export function createKitCache(): KitCache {
     escapeRange: new Float64Array(SLOTS.length),
     escapeFixed: new Uint8Array(SLOTS.length),
     escapeDash: new Uint8Array(SLOTS.length),
+    allyKind: new Int8Array(SLOTS.length),
+    allyMax: new Float64Array(SLOTS.length),
+    allyNeed: new Float64Array(SLOTS.length),
+    allyClearance: new Float64Array(SLOTS.length),
     holdF: false,
     lowHealth: 0.5,
   };
 }
 
-/** Rebuilds the cache when `kit` or `championId` differs from the one it was built for. */
+/**
+ * Rebuilds the cache when `kit` or `championId` differs from the one it was built for. Returns
+ * whether it rebuilt, so a bot can drop what it holds for the champion it served before.
+ */
 export function refreshKitCache(
   cache: KitCache,
   kit: KitDef | undefined,
   championId: string,
-): void {
-  if (cache.built && cache.kit === kit && cache.championId === championId) return;
+): boolean {
+  if (cache.built && cache.kit === kit && cache.championId === championId) return false;
   cache.built = true;
   cache.kit = kit;
   cache.championId = championId;
@@ -251,6 +294,10 @@ export function refreshKitCache(
     cache.escapeRange[i] = 0;
     cache.escapeFixed[i] = 0;
     cache.escapeDash[i] = 0;
+    cache.allyKind[i] = 0;
+    cache.allyMax[i] = 0;
+    cache.allyNeed[i] = 0;
+    cache.allyClearance[i] = 0;
     if (kit === undefined) continue;
     const slot = SLOTS[i] as Slot;
     const spec = kit.slots[slot];
@@ -273,6 +320,18 @@ export function refreshKitCache(
       }
       cache.exClearance[i] = clearanceOf(variant);
     }
+  }
+  for (const slot of rules.allies) {
+    if (kit === undefined) break;
+    const i = SLOTS.indexOf(slot);
+    const shape = allyShape(kit.slots[slot]);
+    if (shape === null) continue;
+    cache.allyKind[i] = shape.kind;
+    cache.allyMax[i] = shape.max;
+    cache.allyNeed[i] = shape.need;
+    cache.allyClearance[i] = shape.clearance;
+    // An area on allies reaches no enemy: its other effects (Dawnbloom's slow) are no band.
+    if (shape.kind === 2) cache.hasBase[i] = 0;
   }
   cache.anyEscapeCondition = false;
   cache.anyNearAlly = false;
@@ -322,6 +381,44 @@ export function refreshKitCache(
       cache.escapeDash[i] = 1;
     }
   }
+  return true;
+}
+
+/**
+ * What a slot does to allies, read from its first effect that reaches them: a projectile with
+ * `allyEffects` (kind 1, the first projectile of the ability, as `clearanceOf` reads it) or an area
+ * on allies placed on self (kind 2). Null when it has none. Run on a rebuild only, so it may
+ * allocate.
+ */
+function allyShape(
+  spec: AbilitySpec,
+): { kind: 1 | 2; max: number; need: number; clearance: number } | null {
+  for (const effect of spec.effects) {
+    if (effect.type === 'projectile' && effect.allyEffects !== undefined) {
+      return {
+        kind: 1,
+        // Multiplied first, as `effectReach` does: 16 x 38 / 60.
+        max: (effect.speed * effect.lifetimeTicks) / TICK_RATE,
+        need: healIn(effect.allyEffects),
+        clearance: effect.radius,
+      };
+    }
+    if (effect.type === 'area' && effect.targets === 'allies' && effect.placement.type === 'self') {
+      return { kind: 2, max: effect.radius + CHAMPION_RADIUS, need: healIn(effect.effects), clearance: 0 };
+    }
+  }
+  return null;
+}
+
+/** The health an ally must be missing for these effects to land whole: the heals, else the shield. */
+function healIn(effects: readonly Effect[]): number {
+  let heal = 0;
+  let absorb = 0;
+  for (const effect of effects) {
+    if (effect.type === 'heal') heal += effect.amount;
+    else if (effect.type === 'shield') absorb += effect.absorb;
+  }
+  return heal > 0 ? heal : absorb;
 }
 
 /**
@@ -500,8 +597,6 @@ export function computeCues(
       : (intent === 'retreat' && d <= ESCAPE_RANGE) || (intent === 'kite' && d < profile.rangeMin);
   cues.escapeReady = cache.anyEscapeCondition && targetEscapeReady(state, target);
   cues.nearAlly = cache.anyNearAlly && nearAllyOf(state, me, target, dist);
-  // The scan measured the allies: leave `dist` as the distance to the target.
-  if (cache.anyNearAlly) distanceInto(dist, me, target);
   // F's condition. Cornered: none of the five 1 m points away from the bot is free, the kite step
   // of the target seen from the bot's side. Only worked out for a healthy target of a held F.
   cues.fOk =
@@ -535,11 +630,57 @@ export function clearanceOf(spec: AbilitySpec): number {
 }
 
 /**
+ * Works out the ally the ally slot `i` would be pressed at and writes its id into `cues.allyFor[i]`
+ * (-1 for none): among the champions of the bot's team in id order, alive, not the bot itself for a
+ * bolt (kind 1), missing at least `allyNeed` health (no overheal), within `allyMax` less the range
+ * margin and, for a bolt, with a clear shot of `allyClearance`, the one with the lowest health
+ * fraction; a tie goes to the lower id (the comparison is strict). Returns whether there is one.
+ * Overwrites `dist`; allocates nothing.
+ */
+function allyForSlot(
+  cues: CastCues,
+  state: GameState,
+  cache: KitCache,
+  me: ChampionState,
+  i: number,
+  scratch: SightScratch,
+  dist: Measure,
+): boolean {
+  const kind = cache.allyKind[i] as number;
+  const { champions } = state;
+  cues.allyFor[i] = -1;
+  let lowest = Infinity;
+  for (let n = 0; n < champions.length; n++) {
+    const c = champions[n] as ChampionState;
+    if (!c.alive || c.team !== me.team) continue;
+    if (kind === 1 && c.id === me.id) continue;
+    if (c.maxHealth - c.health < (cache.allyNeed[i] as number)) continue;
+    const fraction = c.health / c.maxHealth;
+    if (!(fraction < lowest)) continue;
+    distanceInto(dist, me, c);
+    if (dist.metres > (cache.allyMax[i] as number) - RANGE_MARGIN) continue;
+    if (kind === 1) {
+      scratch.clearance = cache.allyClearance[i] as number;
+      if (!clearShotWith(state, me, c, scratch)) continue;
+    }
+    lowest = fraction;
+    cues.allyFor[i] = c.id;
+  }
+  return (cues.allyFor[i] as number) >= 0;
+}
+
+/**
  * Counts, per slot, the consecutive thinks on which the target was inside the band of the ability
  * the slot would cast, with a clear shot of that ability's width, this think included. Anything
  * else puts the count back to 0. It ignores cooldown, energy, status and windup, so a slot that
  * comes off cooldown while the target stays in reach is pressed on the first tick the sim would
  * cast it. Allocates nothing: the bands come from the cache and the shot uses `scratch`.
+ *
+ * An ally slot (see `allyForSlot`) counts while some ally qualifies, whoever it is: another ally
+ * taking over does not restart the run, and a change of the acted target does (`runs.fill` in the
+ * bot). A bolt (M1) with no ally to heal falls through to its enemy band. The ally scan overwrites
+ * `dist`, so the loop works with `d`, taken once at the top; nothing after `updateRuns` reads `dist`
+ * without measuring first (`awayFromInto` of the escape landing does).
  */
 export function updateRuns(
   runs: number[],
@@ -556,6 +697,10 @@ export function updateRuns(
   for (let i = 0; i < SLOTS.length; i++) {
     // An escape slot on an escape think counts the trigger: no band, no shot test.
     if (cues.escapeThink && cache.isEscape[i] === 1) {
+      runs[i] = (runs[i] as number) + 1;
+      continue;
+    }
+    if (cache.allyKind[i] !== 0 && allyForSlot(cues, state, cache, me, i, scratch, dist)) {
       runs[i] = (runs[i] as number) + 1;
       continue;
     }

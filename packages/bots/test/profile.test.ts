@@ -121,7 +121,7 @@ describe('rulesFor', () => {
 
   it('gives no rule without a kit or with a kit of another id', () => {
     const quillon = jsonKits().find((kit) => kit.id === 'quillon') as KitDef;
-    const none = { openers: [], escapes: [], holdF: false, wait: null, escapeWithin: null };
+    const none = { openers: [], escapes: [], holdF: false, wait: null, escapeWithin: null, allies: [] };
     expect(rulesFor('hargrim')).toEqual(none);
     expect(rulesFor('hargrim', quillon)).toEqual(none);
   });
@@ -154,6 +154,21 @@ describe('rulesFor', () => {
     for (const id of ['hargrim', 'quillon', 'skerrow']) {
       expect(rulesFor(id, kit(id)).escapeWithin, id).toBeNull();
     }
+  });
+
+  it('gives Lumeth the ally slots F, R, M2 and M1, frozen, and Hargrim, Quillon and Skerrow none', () => {
+    const kits = rosterKits();
+    const kit = (id: string) => kits.find((k) => k.id === id) as KitDef;
+    const lumeth = rulesFor('lumeth', kit('lumeth'));
+    expect(lumeth.allies).toEqual(['F', 'R', 'M2', 'M1']);
+    expect(Object.isFrozen(lumeth.allies)).toBe(true);
+    // Hargrim's Rally Cry is an area on allies too, but the rule does not list it.
+    for (const id of ['hargrim', 'quillon', 'skerrow']) {
+      expect(rulesFor(id, kit(id)).allies, id).toEqual([]);
+      expect(Object.isFrozen(rulesFor(id, kit(id)).allies), id).toBe(true);
+    }
+    // Without her kit she has no rule at all.
+    expect(rulesFor('lumeth').allies).toEqual([]);
   });
 
   it('gives Lumeth Binding Sigil beside an ally and Lantern Burst, then Glide, as her escapes, frozen', () => {

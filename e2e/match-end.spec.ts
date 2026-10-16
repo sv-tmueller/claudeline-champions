@@ -54,12 +54,14 @@ const TEST_TIMEOUT_MS = 60_000;
 // (13 000 and 161 with the 3474 of #86).
 // The 3v3 rows have their own headless runs (match-setup.test.ts, ARENA01_3V3_END_TICK and
 // ARENA02_3V3_END_TICK) and the same formula with a longer round, since the longest non-sudden 3v3
-// round measured is 1557 ticks, rounded to 1600: end tick + 2 * 1600 + 7000, rounded up to 1000.
-//   arena01: 12 431 + 3200 + 7000 = 22 631, so 23 000 ticks; frames = ceil(23 000 / 96) + 25 = 265.
-//   arena02:  7 125 + 3200 + 7000 = 17 325, so 18 000 ticks; frames = ceil(18 000 / 96) + 25 = 213.
-// (The figures of #86 and #96 were 10 631 with 21 000 and 244 on arena01, and 7 119 on arena02.)
-// The headless runs end in a Defeat 2 : 3 on arena01 (round 5, one sudden-death round) and a Defeat
-// 2 : 3 on arena02 (round 5). The rows read the result off the page and log it next to those
+// round measured is 3331 ticks (a healer on each team keeps a round going), rounded up to 3400: end
+// tick + 2 * 3400 + 7000, rounded up to 1000.
+//   arena01: 10 378 + 6800 + 7000 = 24 178, so 25 000 ticks; frames = ceil(25 000 / 96) + 25 = 286.
+//   arena02: 11 683 + 6800 + 7000 = 25 483, so 26 000 ticks; frames = ceil(26 000 / 96) + 25 = 296.
+// (With two Quillons a side the figures were 12 431 with 23 000 and 265 on arena01, and 7 125 with
+// 18 000 and 213 on arena02, and 10 631 with 21 000 and 244 and 7 119 in #86 and #96.)
+// The headless runs end in a Defeat 1 : 3 on arena01 (round 4) and a Defeat 0 : 3 on arena02 (round 3,
+// the first one a sudden-death round). The rows read the result off the page and log it next to those
 // figures. The exact outcome is not pinned: the 2v2 rows derive it from the score the same way, and
 // every bots change moves it. The headless match-setup tests log the end tick and fail once a match
 // passes its budget. Each row logs its wall time, and a row over 40 s gets its own
@@ -68,8 +70,8 @@ const TEST_TIMEOUT_MS = 60_000;
 const ROWS = [
   { id: 'arena01', size: 2, query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
   { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 14_000, budgetFrames: 171 },
-  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 23_000, budgetFrames: 265, expected: 'Defeat 2 : 3 at about tick 12 431' },
-  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 18_000, budgetFrames: 213, expected: 'Defeat 2 : 3 at about tick 7125' },
+  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 25_000, budgetFrames: 286, expected: 'Defeat 1 : 3 at about tick 10 378' },
+  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 26_000, budgetFrames: 296, expected: 'Defeat 0 : 3 at about tick 11 683' },
 ] as const;
 
 interface Hooks {

@@ -191,30 +191,32 @@ M1 reaches 12 m, so her `rangeMax` with her kit is 11. `KitDef` has no profile
 field and `createMatch` copies only the kit contract, so profiles stay in bots;
 the kit JSON must carry no bot fields.
 
-| Champion | rangeMin | rangeMax | rangeMax with a kit   | Note                                    |
-| -------- | -------- | -------- | --------------------- | --------------------------------------- |
-| hargrim  | 0        | 3        | M1 band top minus 1 m | melee, never kites                      |
-| quillon  | 6        | 13       | M1 band top minus 1 m | ranged, backs away inside 6 m           |
-| lumeth   | 6        | 10       | M1 band top minus 1 m | support, keeps range, no ally logic yet |
-| skerrow  | 0        | 2.5      | M1 band top minus 1 m | assassin, closes in and never kites     |
-| default  | 4        | 8        | the table             | any other champion id                   |
+| Champion | rangeMin | rangeMax | rangeMax with a kit   | Note                                |
+| -------- | -------- | -------- | --------------------- | ----------------------------------- |
+| hargrim  | 0        | 3        | M1 band top minus 1 m | melee, never kites                  |
+| quillon  | 6        | 13       | M1 band top minus 1 m | ranged, backs away inside 6 m       |
+| lumeth   | 6        | 10       | M1 band top minus 1 m | support, keeps range, heals allies  |
+| skerrow  | 0        | 2.5      | M1 band top minus 1 m | assassin, closes in and never kites |
+| default  | 4        | 8        | the table             | any other champion id               |
 
 Every `rangeMax` exceeds 1 m, so a bot never needs to stand inside another
 champion. With the test kits Hargrim stands at 2 m and Quillon at 13 m; Skerrow
 of the shipped kit (an arc of 2 m, band top 2.5 m) stands at 1.5 m.
 
-The rule table of the profile (`RULES` in profile.ts, applied under the same condition as
-`KIT_RULES`: a kit of the champion's own id) adds what no kit field holds. Roster-v1's bot
-profile sketches are its source; see Openers and escapes for what each row
-means. A row also has `escapeWithin`: null for Hargrim, Quillon and Skerrow, who
-keep the common escape trigger, and 3 for Lumeth, whose trigger is her own.
+The rule table of the profile (`RULES` in profile.ts, applied under the same
+condition as `KIT_RULES`: a kit of the champion's own id) adds what no kit field
+holds. Roster-v1's bot profile sketches are its source; see Openers and escapes
+for what each row means. A row also has `escapeWithin`: null for Hargrim,
+Quillon and Skerrow, who keep the common escape trigger, and 3 for Lumeth, whose
+trigger is her own; and `allies`, the slots the champion presses at an ally
+(Lumeth's F, R, M2 and M1, the others none: see Ally slots under Casting).
 
 | Champion | Openers                                                                                                                                               | Escapes                                                 | Ultimate F                        |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------- |
 | hargrim  | SPACE (Rush, the dash band); E (Chain Hook), 4 to 7 m, target walking away                                                                            | R (Iron Hide)                                           | pressed in reach                  |
 | quillon  | Q (Snare Orb), kit band, target walking toward her                                                                                                    | SPACE (Skip), then R (Hush Ward)                        | pressed in reach                  |
 | skerrow  | SPACE (Lunge, the dash band); Q (Quiet Dart), kit band, target with an escape ready; waits at 6 to 8 m while SPACE has 2 to 90 ticks of cooldown left | R (Vanish Step)                                         | held for a low or cornered target |
-| lumeth   | Q (Binding Sigil), kit band, target within 6 m of an ally                                                                                             | E (Lantern Burst), then SPACE (Glide), on a 3 m trigger | pressed in reach                  |
+| lumeth   | Q (Binding Sigil), kit band, target within 6 m of an ally                                                                                             | E (Lantern Burst), then SPACE (Glide), on a 3 m trigger | allies only, see Ally slots       |
 | other    | none                                                                                                                                                  | none                                                    | pressed in reach                  |
 
 ## Clear shot
@@ -295,40 +297,85 @@ choice already tried. A slot listed in `kit.ex` casts its EX variant
 is not holding the energy back; otherwise it casts its base ability without
 SHIFT. F always casts its base ability and is never sent with SHIFT.
 
-Energy reserve: F holds the energy back while F is ready (its cooldown is at most 1,
-as the cast gate reads it), its base ability has a reach band, the energy is at
-least 75, which is the 100 that F costs less the 25 of one EX press, the acted target is
-within F's reach (its band less the margin) and F's own condition holds (always, unless the
-profile holds F, see Openers and escapes). The EX variants are
-then not cast, and the band and the shot width the slot is tested with are those of
-its base ability, so a slot whose base reach is shorter than its EX reach waits for
-the target to come in. Why: greedy EX spending kept the energy of the kit headless
-run under 66, so the ultimate never fired. Only an ultimate with a band holds the
-reserve: a support ultimate that reaches allies only (no band) would otherwise keep
-every EX variant held for good at 75 energy or more. The reach clause lets a bot at 75
-energy or more spend EX while no enemy is in F's reach, and the condition clause lets a
-Skerrow do the same while no target is low or cornered. For the shipped Hargrim and Quillon
-every EX band top lies below F's, so the reach clause only changes a press where the target
-is beyond F's reach.
+Energy reserve: F holds the energy back while F is ready (its cooldown is at
+most 1, as the cast gate reads it), its base ability has a reach band, the
+energy is at least 75, which is the 100 that F costs less the 25 of one EX
+press, the acted target is within F's reach (its band less the margin) and F's
+own condition holds (always, unless the profile holds F, see Openers and
+escapes). The EX variants are then not cast, and the band and the shot width the
+slot is tested with are those of its base ability, so a slot whose base reach is
+shorter than its EX reach waits for the target to come in. Why: greedy EX
+spending kept the energy of the kit headless run under 66, so the ultimate never
+fired. Only an ultimate with a band holds the reserve: a support ultimate that
+reaches allies only (no band) would otherwise keep every EX variant held for
+good at 75 energy or more (Lumeth's Dawnbloom, whose slow on enemies is no band:
+see Ally slots). The reach clause lets a bot at 75 energy or more spend EX while
+no enemy is in F's reach, and the condition clause lets a Skerrow do the same
+while no target is low or cornered. For the shipped Hargrim and Quillon every EX
+band top lies below F's, so the reach clause only changes a press where the
+target is beyond F's reach.
 
 Cast delay: per slot, a run counts the consecutive thinks, this one included, on
-which the target was in reach with a clear shot of the ability the slot would cast (and
-the slot's condition held). On an escape think an escape slot's run counts the trigger
-instead, with no band and no shot test: one cast-delay rule for every press.
-The slot may be pressed when the run exceeds `castDelay`, so `castDelay` thinks
-after the first think of the run. The run restarts when the test fails, on an
-idle or dead think, and when the acted target changes. It ignores cooldown,
-energy, status and windup, so a slot that comes off cooldown while the target
-stays in reach is pressed on the first tick the sim would cast it.
+which the target was in reach with a clear shot of the ability the slot would
+cast (and the slot's condition held). On an escape think an escape slot's run
+counts the trigger instead, with no band and no shot test: one cast-delay rule
+for every press. The slot may be pressed when the run exceeds `castDelay`, so
+`castDelay` thinks after the first think of the run. The run restarts when the
+test fails, on an idle or dead think, and when the acted target changes. It
+ignores cooldown, energy, status and windup, so a slot that comes off cooldown
+while the target stays in reach is pressed on the first tick the sim would cast
+it. The run of an ally slot is the one of Ally slots below.
 
-Never pressed: an ability with no band that no rule presses (an ally ability:
-Hargrim Q, Lumeth's M2 and R, and their EX variants), and any slot of a champion
-without a kit. The rules press two kinds of slot that have no band: the
-base dash opener (Hargrim SPACE, Skerrow SPACE: its band is derived from the dash), and the
-escape slots (Hargrim R, Quillon SPACE and R, Skerrow R, Lumeth E and SPACE, on
-an escape think only). On an escape think the dash openers are not pressed
-either (see the dash
-hold under Openers and escapes).
+Ally slots: a champion's rule lists the slots it presses at an ally (`allies` in
+`RULES`; Lumeth's F, R, M2 and M1, the others none). The kit cache holds a kind,
+a reach, a need and a shot width for each slot of the list and for no other, so
+Hargrim's Rally Cry, an area on allies that he places on himself, is no ally
+slot. The numbers come from the kit once, on a rebuild:
+
+| Slot                | Kind            | Reach, less the 1 m margin | Need | Shot width |
+| ------------------- | --------------- | -------------------------- | ---- | ---------- |
+| M1 (Mend Bolt)      | bolt            | 12 - 1 = 11 m              | 10   | 0.35 m     |
+| M2 (Soothing Surge) | bolt            | 10.133 - 1 = 9.133 m       | 14   | 0.5 m      |
+| R (Aegis Veil)      | area on herself | 5.5 - 1 = 4.5 m            | 30   | none       |
+| F (Dawnbloom)       | area on herself | 5.5 - 1 = 4.5 m            | 30   | none       |
+
+- Kind 1 is a projectile with `allyEffects`: a bolt, which never hits its owner,
+  so it is never pressed at herself. Kind 2 is an area on allies placed on self,
+  which includes the caster. The reach is the bolt's speed times its lifetime
+  over 60, or the area's radius plus 0.5.
+- Hurt means missing at least what the slot gives (decision 1 of batch #105):
+  the sum of the `heal` amounts of what it does to allies, else its shield's
+  absorb. There is no overheal, and M1 keeps damaging enemies when no ally
+  needs it.
+- A scan per ally slot runs in `updateRuns`, over the champions in id order:
+  alive, on her team, not herself for a bolt, missing at least the need, within
+  the reach less the margin, and for a bolt with a clear shot of the bolt's
+  width (`clearShotWith`, the test of every cast). The lowest health fraction
+  wins, and a tie goes to the lower id, because the comparison is strict. The
+  id is a cue, `allyFor`, an Int32 per slot (-1 for none), so no object is made
+  and no double crosses a call.
+- A slot's run counts while some ally qualifies, whoever it is: switching to
+  another ally does not restart it. A change of the acted enemy restarts it, as
+  for every slot. M1 with no ally in need runs on its enemy band as before (the
+  kit band less the margin, a clear shot of 0.35), so M1 goes to an ally first
+  and to an enemy when none needs it.
+- An area ally slot (kind 2) has no enemy band: Dawnbloom's slow on enemies is
+  no reason to press it, so the cache sets its `hasBase` to 0, and the energy
+  reserve reads no band for it, which is the support ultimate that reaches
+  allies only. A projectile ally slot (kind 1, M1) keeps its band.
+- Ally presses still need an alive acted enemy, so she never heals on an idle
+  think. A press at an ally aims at the ally (see Aim), except R and F, which
+  keep the acted enemy as the aim point. The EX variants of M2 and R have no
+  enemy band and no ally row: they are never pressed.
+
+Never pressed: an ability with no band that no rule presses (an ally ability no
+rule lists: Hargrim Q, and the EX variants of Lumeth's M2 and R), and any slot
+of a champion without a kit. The rules press three kinds of slot that have no
+band: the base dash opener (Hargrim SPACE, Skerrow SPACE: its band is derived
+from the dash), the escape slots (Hargrim R, Quillon SPACE and R, Skerrow R,
+Lumeth E and SPACE, on an escape think only), and the ally slots (Lumeth M2, R
+and F, at an ally that needs them). On an escape think the dash openers are not
+pressed either (see the dash hold under Openers and escapes).
 
 ## Openers and escapes
 
@@ -406,7 +453,7 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   words it as "an enemy inside 3 m". A kite inside her `rangeMin` of 6 m or a
   retreat within 6 m is no escape think for her unless the target is that close,
   so a kite at 5 m presses neither Lantern Burst nor Glide. Any intent counts
-  because a dive can land inside her reaction delay (decision 5 of batch #105).
+  because a dive can land inside her reaction delay (decision 1 of batch #105).
   The field is a Float64Array of the kit cache, -1 for the common trigger.
 - On an escape think an escape slot's run counts the trigger, with no band and no shot test, and
   `chooseEscape` (escape.ts) tries the slots of the rule in order before the usual order: Hargrim
@@ -419,14 +466,17 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   there.
 - A slot whose first effect is a teleport needs a landing. The bot tries the five kite directions
   from the acted target (straight away, then +45, -45, +90, -90 degrees, the constants of the kite
-  step) and takes the first whose landing lies in a free grid cell and has a line of sight from
-  the bot. The landing is the point the sim's teleport moves to for the aim `range` metres off in
-  whole centimetres, worked out with the sim's own arithmetic (see Determinism); the reach is the
-  full range for a fixed teleport and `min(range, aim distance)` otherwise (Skip is 4 m and
-  fixed, Vanish Step 5 m and not). The line of sight is the one of Clear shot's `lineOfSight`: it
-  sees only obstacles that block projectiles, as the sim's teleport does, so a teleport may cross
-  a low wall. When no direction passes the slot is skipped and R comes next: a Quillon boxed in a
-  corner shields herself.
+  step) and takes the first whose landing lies in a free grid cell and has a line of sight from the
+  bot. The landing is the aim point `range` metres off in whole centimetres, worked out with the
+  sim's own arithmetic (see Determinism), and it is that raw point whose cell must be free: a raw
+  point in a blocked cell is skipped even where the sim would push its teleport clear of the wall
+  (the press oracle tests the same raw point, decision 16 of batch #105), while a point in a free
+  cell may still land within 0.5 m of a wall or on a champion, where the sim pushes the champion out
+  after the teleport; the reach is the full range for a fixed teleport and
+  `min(range, aim distance)` otherwise (Skip is 4 m and fixed, Vanish Step 5 m and not). The line of
+  sight is the one of Clear shot's `lineOfSight`: it sees only obstacles that block projectiles, as
+  the sim's teleport does, so a teleport may cross a low wall. When no direction passes the slot is
+  skipped and R comes next: a Quillon boxed in a corner shields herself.
 - A slot whose first effect is a dash (Lumeth's Glide, a dash of 4 m) needs a
   landing too: the end of the dash, which goes its whole distance along the aim
   (the same arithmetic as a fixed teleport, so `landingInto` gives it with the
@@ -440,19 +490,17 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   E is refused.
 - The dash hold: on an escape think no slot whose ability starts with a dash is
   pressed, base or EX variant (the one that would be cast), for every kit:
-  Hargrim's Rush, EX Rush and ultimate, Skerrow's Lunge and EX Lunge, and
-  Lumeth's Glide when it is not an escape (it has no band, so nothing else
-  presses it). A dash carries the bot along its aim, toward the target
-  it is leaving: a cornered Skerrow with Vanish Step cooling down used to Lunge
-  into the Hargrim she was fleeing, and Rush did the same. The kit cache holds a
-  flag per slot for each (`baseDash`, `exDash`), and the gate is in
-  `chooseCast`. Glide is the one escape slot that starts with a dash: it is
-  pressed by `chooseEscape`, which marks it tried, so the hold never reaches it
-  and aims it away from the target (see the landing above). A dash escape for
-  another kit (Lunge away) is not built. A press the hold withholds leaves the
-  slot unpressed on that think:
-  the walk goes on to the next slot, and a dash with an EX variant that would be
-  cast is not replaced by its base.
+  Hargrim's Rush, EX Rush and ultimate, and Skerrow's Lunge and EX Lunge. A dash
+  carries the bot along its aim, toward the target it is leaving: a cornered
+  Skerrow with Vanish Step cooling down used to Lunge into the Hargrim she was
+  fleeing, and Rush did the same. The kit cache holds a flag per slot for each
+  (`baseDash`, `exDash`), and the gate is in `chooseCast`. Glide is the one
+  escape slot that starts with a dash: `chooseEscape` marks it tried and aims it
+  away from the target (see the landing above), so the hold never reaches it,
+  and it has no band, so nothing else presses it. A dash escape for another kit
+  (Lunge away) is not built. A press the hold withholds leaves the slot
+  unpressed on that think: the walk goes on to the next slot, and a dash with an
+  EX variant that would be cast is not replaced by its base.
 - The aim: `aim()` runs on every think, so the draw cadence of the aim error does not change; an
   escape press with a landing then overwrites `aimX` and `aimY` with the landing's aim, with no
   error and no draw.
@@ -490,15 +538,17 @@ makes that true, and what stays outside it:
   there is one implementation of each and nothing to keep in step. The aim is the one
   place with two: `leadPoint`, `rotateByHalfTangent` and `roundAim` of aim.ts stay as the
   independent reference, and a seeded test compares `think`'s inlined aim with them.
-- The cache of the rules is typed arrays and double fields too: per slot `hasOpen`, `openMin`,
-  `openMax`, `motion` (Int8), `needsNearAlly`, `isEscape`, `escapeRange`,
-  `escapeFixed`, `escapeDash`, `escapeWithin` (one double) and `escapeOrder`
-  (Int8 ended by -1), and `lowHealth` (a double field) with `holdF`. They are
-  filled on a rebuild only. The cues of a think (`dot`, `escapeThink`,
-  `reserve`, `fOk`, `nearAlly`) are fields of one object, the
-  landing is a record of seven doubles and a boolean, and the kite points, the cornered test's
-  move and the landing are scratch the bot owns: the landing search and the cornered test allocate
-  nothing.
+- The cache of the rules is typed arrays and double fields too: per slot
+  `hasOpen`, `openMin`, `openMax`, `motion` (Int8), `needsNearAlly`, `isEscape`,
+  `escapeRange`, `escapeFixed`, `escapeDash`, `escapeWithin` (one double) and
+  `escapeOrder` (Int8 ended by -1), and `lowHealth` (a double field) with
+  `holdF`. They are filled on a rebuild only; so are the ally arrays, `allyKind`
+  (Int8) and `allyMax`, `allyNeed` and `allyClearance` (doubles), per slot. The
+  cues of a think (`dot`, `escapeThink`, `reserve`, `fOk`, `nearAlly`, and
+  `allyFor`, an Int32 per slot) are fields of one object, the landing is a
+  record of seven doubles and a boolean, and the kite points, the cornered
+  test's move and the landing are scratch the bot owns: the landing search and
+  the cornered test allocate nothing.
 - `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32 B per
   call, so a bot that measures a dozen distances allocated 400 B for them. A test
   compares it, bit for bit, with `Math.hypot`. That test pins the `Math.hypot` of current
@@ -676,6 +726,18 @@ error.
   `(b + sqrt(b^2 - 4ac)) / (-2a)` for `b >= 0` and `2c / (sqrt(b^2 - 4ac) - b)`
   otherwise, which avoids a cancelling subtraction. The aim point is the target
   position plus `V t`.
+- Subject: the point the lead aims at is the acted target, except for a bolt
+  pressed at an ally (kind 1 of the ally slots, never herself): that is aimed
+  at the ally, led with the bolt's own speed, and the error is the same single
+  draw, so the cadence is unchanged. R and F keep the acted enemy as the aim
+  point, since an aim at her own centre is a zero-length vector.
+- Held ally: the sim fires at the aim of the firing tick and Soothing Surge
+  winds up for 18, so the bot holds the ally for every think of the windup in
+  one integer field, `allyAim` (the ally's id, -1 for none; an integer in a
+  field, never a double in a closure variable). The press sets it, a press on
+  the tick that fires another cast (`windupLeft` 1) aims for that cast and then
+  holds its own ally, the aim falls back to the acted target when the held ally
+  dies, and the hold is cleared on a think with no cast in progress.
 - Speed: the first top-level projectile of the ability winding up, or else of the
   ability pressed on this think, or else the nominal 20 m/s (no kit, or no
   projectile in it).
@@ -687,9 +749,10 @@ error.
   ticks while the bot has a target.
 - Rounding: `Math.round(v * 100) + 0` gives whole centimetres and never `-0`.
 - Override: an escape press with a teleport or dash landing replaces the aim
-  with the landing's (see
-  Openers and escapes), after the draw and the lead have run, so the cadence of `u` is the one of
-  a think that does not escape.
+  with the landing's (see Openers and escapes), after the draw, the lead and the
+  subject have run, so the cadence of `u` is the one of a think that does not
+  escape, and a Glide pressed on the tick an ally-aimed Soothing Surge fires
+  still aims at its landing.
 
 ## Difficulty tiers
 
@@ -747,120 +810,141 @@ match replays exactly from its input stream.
 
 ## Not built yet
 
-- A full match must finish: it waits for match flow, so the headless test runs
-  a fixed 3600 ticks.
-- Local steering around champions and projectiles, dodging and ally logic.
-- Lumeth's ally play (#112): her heals and shield at allies and the aim at an
-  ally, staying within 8 m of an ally, her M1 finisher, and the EX variants of
-  M2 and R. Abilities that land on allies or on the caster that no rule presses
-  (Hargrim Q, and until #112 her M2 and R), and the rest of the roster's bot
-  sketches: a target choice by lowest health (the target is the nearest enemy),
-  and per-slot finishers (the one finisher is the rule above).
+- A full match to matchEnd in the headless runs of the other kits: they run a
+  fixed 3600 ticks of free play, and only Lumeth's four seeded runs play to the
+  end (see Testing).
+- Local steering around champions and projectiles, dodging, and ally logic
+  beyond Lumeth's ally slots (peeling for an ally).
+- The rest of Lumeth's ally play: staying within 8 m of an ally (the roster's
+  leash), her M1 finisher on an enemy at 10 health or less, and the EX variants
+  of M2 and R. Abilities that land on allies or on the caster that no rule
+  presses (Hargrim Q), and the rest of the roster's bot sketches: a target
+  choice by lowest health (the target is the nearest enemy), and per-slot
+  finishers (the one finisher is the rule above).
 - A dash away from the target for Skerrow (Lunge away): the dash hold leaves it
   unpressed on an escape think. Glide is built, see Openers and escapes.
 
 ## Testing
 
-Bot-versus-bot headless matches are integration tests: invariants must hold,
-and no `NaN` may appear. The headless test runs a 2v2 match of four bots on
-arena 1 for 3600 ticks with a mix of tiers, checks the sim invariants and the
-input rules every tick, and checks that `think` leaves the state's checksum
-unchanged. A second headless run puts a mirror 2v2 (Hargrim and Quillon on both
-teams) through the same checks, once on the bots-local test kits in
-`packages/bots/test/kits.ts` and once on the shipped kits `data/kits/hargrim.json` and
-`quillon.json`, with a press oracle: every press is checked on the state the bot thought
-on against a literal band and clearance table of the kit set (written from the kit files,
-not from src, and worked out again from the files by a test, since the run presses only
-some slots), the acted target, line of sight and a clear shot of the ability's width, the
-cooldown, the energy, stun, silence, root with a dash and the windup, and afterwards the sim
-must have started that cast, or a death, a stun, a silence or a root explains why not. The
-opener rows are the literal band with no margin (Rush [4, 5], Chain Hook [4, 7], Lunge [5, 6])
-and the motion of the target by the oracle's own sign. An escape row has no band and no shot: the
-oracle checks the trigger (a retreat within 6 m, or a kite inside the literal rangeMin of the
+Bot-versus-bot headless matches are integration tests: invariants must hold, and
+no `NaN` may appear. The headless test runs a 2v2 match of four bots on arena 1
+for 3600 ticks with a mix of tiers, checks the sim invariants and the input
+rules every tick, and checks that `think` leaves the state's checksum unchanged.
+A second headless run puts a mirror 2v2 (Hargrim and Quillon on both teams)
+through the same checks, once on the bots-local test kits in
+`packages/bots/test/kits.ts` and once on the shipped kits
+`data/kits/hargrim.json` and `quillon.json`, with a press oracle: every press is
+checked on the state the bot thought on against a literal band and clearance
+table of the kit set (written from the kit files, not from src, and worked out
+again from the files by a test, since the run presses only some slots), the
+acted target, line of sight and a clear shot of the ability's width, the
+cooldown, the energy, stun, silence, root with a dash and the windup, and
+afterwards the sim must have started that cast, or a death, a stun, a silence or
+a root explains why not. The opener rows are the literal band with no margin
+(Rush [4, 5], Chain Hook [4, 7], Lunge [5, 6]) and the motion of the target by
+the oracle's own sign. An escape row has no band and no shot: the oracle checks
+the trigger (a retreat within 6 m, or a kite inside the literal rangeMin of the
 champion; for Lumeth the literal 3 m of any intent but idle, a table of its
 own), and for a teleport its own first-of-five landing, found by casting the
-slot on a clone
-of the state, checked with `hasLineOfSight` and the clearance of the cell centre: the aim of the
-press must be that landing's and the sim must put the champion on it, and Hush Ward is pressed
-only when Skip is not ready or has no landing. Lumeth's rows are Lantern Burst
-(an escape row), Glide (a dash row: the oracle's own first-of-five 4 m dash
-landing, a free cell and a path `oracleSegmentViolates` finds clean, the aim
-equal to it, a `dashStarted` in that direction after the step, and E not ready),
-Binding Sigil (the kit band less the margin, a clear shot of 0.5, and the
-oracle's own check that the target is within 6 m of an alive ally of hers) and
-M1 and F on their enemy bands, which her ally presses will replace. A press of
-her M2 or R has no row and fails the run. The ultimate of Skerrow passes only
-for a target at
-40 health or less, or one the oracle finds cornered by its own walk of the five
-points. The dash rows (Rush, EX Rush, Hargrim's ultimate, Lunge, EX Lunge) fail
-a press on an escape think, and Quiet Dart's row fails a press at a target the
-oracle finds with no escape ready (its own table of escape slots, a cooldown of
-at most 1, no stun or silence). A tally (`tallyTeleports` in the test helpers)
-counts the escape teleports of the runs (a press with a landing) apart from
-every other teleport (Reaper's Dance), each with its blocked count: every escape
-teleport must be reported unblocked, and Reaper's Dance may be blocked
-legitimately. The run must end with a death from a cast, every champion must
-start a cast, and one cast must be an EX. The seeds are 101 to 104, the match
-seed 7 and the tiers easy, normal, hard, normal; they are pinned, and a miss
-after a change to the bots, the sim or the Node version is governed by batch #53
-decision 8.3. The ultimate has its own pinned run: the 2v2
-ends its fights by tick 700 with the energy bar at 75 at most, and 9000 matches of it on the
-shipped kits gave no F cast, so a 3v3 of Hargrim and two Quillons a side, seeds 101 to 106 at
-the hard tier, runs through the same checks and must start an F (decision 8 of #63 allows a
-separate set for this alone; it needed another size of match). The energy reserve is what
-lets it fire: without it the run starts none. A Skerrow 2v2 pins the Skerrow profile: Skerrow and
-Quillon against Hargrim and Quillon on the shipped kits in free play, seeds 101 to 104, every bot
-on normal, match seed 7; a team is eliminated by tick 3600 (a round is 5400 ticks in match flow,
-which would decide the same way), Skerrow starts a Lunge, every press passes the oracle and no bot
-stalls for more than 120 ticks. Hargrim and Lumeth against Hargrim and Quillon
-on the four shipped kits (seeds 101 to 104, normal, match seed 7, 3600 ticks)
-run the same checks, with two runs that declare a start edit because her escape
-never fires in free play: the enemy Hargrim 2 m east of her on tick 0, once with
-Lantern Burst ready (it is pressed) and once with it on cooldown (Glide is
-pressed, and the oracle checks its landing and the dash the sim starts). The
-same match with a start edit declared in the
-test, Skerrow at 100 energy and both enemies at 40 health, runs the oracle's F
-row on a real press: Skerrow starts Reaper's Dance, the tally counts a teleport
-of it apart, the escape teleports are exactly 2 and none is blocked. One run
-only, with the seeds above (a miss is governed by decision 8.3 of batch #53; the
-declared fallback is Skerrow against a Quillon at 40 health, the other two dead,
-9 m apart). `reaper.test.ts` also blocks it: a target at 40 health steps behind
-the pillar of arena 1 during F's 18 tick windup, the sim fires toward the
-current aim, reports the teleport blocked, Skerrow stays where the cast began,
-and the tally counts it apart with no blocked escape. A shadow-edge test on
-arena 1 pins that a position where the centre line is clear and a shifted line
-hits the pillar gets no press and is not chosen as a sight cell. The determinism
-test runs the same match twice, and two matches stepped in turn, on the test
-kits and on the shipped kits (the second one interleaved with a match on the
-test kits), and compares input streams and final checksums in memory; a Skerrow
-2v2 block does the same on the shipped kits, interleaved with a match on the
-test kits and against another match seed, each with the guard of one distinct
-record per bot per tick. See [testing](testing.md).
+slot on a clone of the state, checked with `hasLineOfSight` and the clearance of
+the cell centre: the aim of the press must be that landing's and the sim must
+put the champion on it, and Hush Ward is pressed only when Skip is not ready or
+has no landing. A direction whose raw point, the one the teleport aims at before
+the sim's collision pushes a champion off a wall, is not a free cell is skipped
+too, as the bot does: a match played to its end has a Skip that ends 2 cm inside
+the south wall, which the sim pushes clear and the bot passes over. Lumeth's
+rows are Lantern Burst (an escape row), Glide (a dash row: the oracle's own
+first-of-five 4 m dash landing, a free cell and a path `oracleSegmentViolates`
+finds clean, the aim equal to it, a `dashStarted` in that direction after the
+step, and E not ready), Binding Sigil (the kit band less the margin, a clear
+shot of 0.5, and the oracle's own check that the target is within 6 m of an
+alive ally of hers), Mend Bolt (its enemy band, or an ally row when an ally
+qualifies) and the ally rows of Soothing Surge, Aegis Veil and Dawnbloom, which
+have no enemy band: a press of them needs an ally. An ally row is written from
+the kit (a reach of the bolt's speed times its lifetime, or an area's radius
+plus 0.5, less the margin of 1 m; a need of 10, 14, 30 and 30; a shot width of
+0.35 and 0.5), and a table test works every literal out from `lumeth.json`
+again, so a change to the kit fails it. The oracle's own scan (alive, on her
+team, not herself for a bolt, missing at least the need, in reach, a clear shot
+for a bolt) picks the ally with the lowest health fraction, the lower id on a
+tie. A press with no ally that qualifies fails the run, and a bolt press must be
+aimed within 12.1 degrees (the widest tier error, 12, and the whole centimetres)
+of the lead point at that ally, unless a cast in progress fires on that tick.
+The EX variants of M2 and R have no row and fail the run. The ultimate of
+Skerrow passes only for a target at 40 health or less, or one the oracle finds
+cornered by its own walk of the five points. The dash rows (Rush, EX Rush,
+Hargrim's ultimate, Lunge, EX Lunge) fail a press on an escape think, and Quiet
+Dart's row fails a press at a target the oracle finds with no escape ready (its
+own table of escape slots, a cooldown of at most 1, no stun or silence). A tally
+(`tallyTeleports` in the test helpers) counts the escape teleports of the runs
+(a press with a landing) apart from every other teleport (Reaper's Dance), each
+with its blocked count: every escape teleport must be reported unblocked, and
+Reaper's Dance may be blocked legitimately. The run must end with a death from a
+cast, every champion must start a cast, and one cast must be an EX. The seeds
+are 101 to 104, the match seed 7 and the tiers easy, normal, hard, normal; they
+are pinned, and a miss after a change to the bots, the sim or the Node version
+is governed by batch #53 decision 8.3. The ultimate has its own pinned run: the
+2v2 ends its fights by tick 700 with the energy bar at 75 at most, and 9000
+matches of it on the shipped kits gave no F cast, so a 3v3 of Hargrim and two
+Quillons a side, seeds 101 to 106 at the hard tier, runs through the same checks
+and must start an F (decision 8 of #63 allows a separate set for this alone; it
+needed another size of match). The energy reserve is what lets it fire: without
+it the run starts none. A Skerrow 2v2 pins the Skerrow profile: Skerrow and
+Quillon against Hargrim and Quillon on the shipped kits in free play, seeds 101
+to 104, every bot on normal, match seed 7; a team is eliminated by tick 3600 (a
+round is 5400 ticks in match flow, which would decide the same way), Skerrow
+starts a Lunge, every press passes the oracle and no bot stalls for more than
+120 ticks. Hargrim and Lumeth against Hargrim and Quillon on the four shipped
+kits (seeds 101 to 104, normal, match seed 7, 3600 ticks) run the same checks,
+with two runs that declare a start edit because her escape never fires in free
+play: the enemy Hargrim 2 m east of her on tick 0, once with Lantern Burst ready
+(it is pressed) and once with it on cooldown (Glide is pressed, and the oracle
+checks its landing and the dash the sim starts). The same match with a start
+edit declared in the test, Skerrow at 100 energy and both enemies at 40 health,
+runs the oracle's F row on a real press: Skerrow starts Reaper's Dance, the
+tally counts a teleport of it apart, the escape teleports are exactly 2 and none
+is blocked. One run only, with the seeds above (a miss is governed by decision
+8.3 of batch #53; the declared fallback is Skerrow against a Quillon at 40
+health, the other two dead, 9 m apart). `reaper.test.ts` also blocks it: a
+target at 40 health steps behind the pillar of arena 1 during F's 18 tick
+windup, the sim fires toward the current aim, reports the teleport blocked,
+Skerrow stays where the cast began, and the tally counts it apart with no
+blocked escape. A shadow-edge test on arena 1 pins that a position where the
+centre line is clear and a shifted line hits the pillar gets no press and is not
+chosen as a sight cell. The determinism test runs the same match twice, and two
+matches stepped in turn, on the test kits and on the shipped kits (the second
+one interleaved with a match on the test kits), and compares input streams and
+final checksums in memory; a Skerrow 2v2 block does the same on the shipped
+kits, interleaved with a match on the test kits and against another match seed,
+each with the guard of one distinct record per bot per tick. See
+[testing](testing.md).
 
-The rules have their own pins on frozen states of the shipped kits (`openers.test.ts`,
-`escapes.test.ts`, `reserve.test.ts`, `reaper.test.ts`, with the scenes of `scenes.ts`), each
-tied to a mutation that turns it red: the bands of Rush and Lunge (and the derived dash band), the
-motion tests of Chain Hook and Snare Orb, the trigger of an escape (6 m inclusive, the kite
-clause), the order of an escape against F, the landing order and its line of sight (a pillar skips
-a direction, a low wall does not), the boxed-in Hush Ward, the draw cadence across an escape
-press, the reach and condition clauses of the reserve, the wide-ultimate stand and the hold of
-Reaper's Dance. A differential test compares the landing with the sim's teleport end bit for bit
-over 2000 seeded aims. The rules of #98 have theirs: `escapes.test.ts` pins the
-dash hold (Lunge at 5.5 m, EX Lunge at 4 m with 50 energy, Rush at 4.5 m and
-Hargrim's ultimate on a retreat are not pressed, and are pressed on a think that
-is no escape think; two edited kits tell the base flag from the EX flag),
-`openers.test.ts` Quiet Dart (Q at a Quillon with Skip or Hush Ward ready, M2
-with both cooling down, at a cooldown of 1 and of 2, at a silenced and at a
-stunned Quillon, Q at a Hargrim with Iron Hide ready, M2 at a champion with no
-rule) and `wait.test.ts` the wait (a stand at 6, 7 and 8 m and not at 5.95 or
-8.05, at a cooldown of 2 and 90 and not at 0, 1 or 91, no stand behind the
-pillar, none for a Hargrim, none on a retreat). Mutations that turn each red:
-the dash hold dropped, read from the base flag only or the EX flag only; the
-Quiet Dart condition dropped, inverted, ignoring silence, ignoring stun, with a
-cooldown test of below 1 or at most 2, and never worked out; each edge of the
-wait moved past the pin (the band at 5.9, 6.05, 7.95 and 8.1, the cooldown
-bounds at 1, 3, 89 and 91, each comparison made strict) and the clear shot
-dropped; the tally counting every teleport and every block.
+The rules have their own pins on frozen states of the shipped kits
+(`openers.test.ts`, `escapes.test.ts`, `reserve.test.ts`, `reaper.test.ts`, with
+the scenes of `scenes.ts`), each tied to a mutation that turns it red: the bands
+of Rush and Lunge (and the derived dash band), the motion tests of Chain Hook
+and Snare Orb, the trigger of an escape (6 m inclusive, the kite clause), the
+order of an escape against F, the landing order and its line of sight (a pillar
+skips a direction, a low wall does not), the boxed-in Hush Ward, the draw
+cadence across an escape press, the reach and condition clauses of the reserve,
+the wide-ultimate stand and the hold of Reaper's Dance. A differential test
+compares the landing with the sim's teleport end bit for bit over 2000 seeded
+aims. The rules of #98 have theirs: `escapes.test.ts` pins the dash hold (Lunge
+at 5.5 m, EX Lunge at 4 m with 50 energy, Rush at 4.5 m and Hargrim's ultimate
+on a retreat are not pressed, and are pressed on a think that is no escape
+think; two edited kits tell the base flag from the EX flag), `openers.test.ts`
+Quiet Dart (Q at a Quillon with Skip or Hush Ward ready, M2 with both cooling
+down, at a cooldown of 1 and of 2, at a silenced and at a stunned Quillon, Q at
+a Hargrim with Iron Hide ready, M2 at a champion with no rule) and
+`wait.test.ts` the wait (a stand at 6, 7 and 8 m and not at 5.95 or 8.05, at a
+cooldown of 2 and 90 and not at 0, 1 or 91, no stand behind the pillar, none for
+a Hargrim, none on a retreat). Mutations that turn each red: the dash hold
+dropped, read from the base flag only or the EX flag only; the Quiet Dart
+condition dropped, inverted, ignoring silence, ignoring stun, with a cooldown
+test of below 1 or at most 2, and never worked out; each edge of the wait moved
+past the pin (the band at 5.9, 6.05, 7.95 and 8.1, the cooldown bounds at 1, 3,
+89 and 91, each comparison made strict) and the clear shot dropped; the tally
+counting every teleport and every block.
 
 The rules of #106 (the trigger field, Binding Sigil and Glide):
 `escapes.test.ts` pins Lumeth's trigger (E at 3 m and not at 3.05 m on a kite
@@ -876,23 +960,87 @@ ending it 4 m off); `openers.test.ts` Binding Sigil (Q at 5.95, 6 and not at
 a champion of the other team) and Quiet Dart at a kitted Lumeth (Q while Lantern
 Burst or Glide is ready, M2 with both cooling down; a Lumeth with no kit still
 gets M2); `profile.test.ts` her profile (6 and 11 with her kit, 6 and 10
-without) and her row. Mutations that turn each red: each edge of the trigger
-(the comparison made strict, the intent clause dropped, the field read as the
-common trigger), the near-ally literal moved to 5 and to 7, the comparison made
-strict, herself or a dead ally or the other team counted, the condition dropped;
-the path test of Glide made the line of sight, its flag dropped, its range made
-0 or 5, the landing order reversed, the aim override dropped, the dash hold
-applied to it. Dropping the condition or the trigger field also turns the Lumeth
-headless runs red through the oracle.
+without) and her row; `reach.test.ts` the bolt with no `effects`. Mutations that
+turn each red (each applied alone to the head): the comparison of the trigger
+made strict, the intent clause dropped, the literal moved to 4, to 3.1 and to
+2.99, a kite at 5 m made an escape think by the literal 6, the common kite
+clause added to her trigger; the near-ally literal moved to 5 and to 7, its
+comparison made strict, the condition dropped, herself counted or a dead ally
+counted; the path test of Glide made the line of sight, the landing order
+reversed, `findLanding` true when none passes, the aim override dropped, the
+dash hold applied to Glide, the escape order `['SPACE', 'E']`, and the
+empty-effects line of `reach.ts` dropped.
 
-A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation section. It
-builds fourteen frozen scenes on arena 1 with the shipped kits (a press, an
-engage stand, a path follow past the age of the segment test, a kite with no clear shot, a
-kite step, a retreat, the deadlock rule's advance, flee and latched stand, an opener press, an
-escape press with its landing search, a Skerrow engage with F held, a Skerrow
-wait, the stand with its clear shot and the Quiet Dart cue on every think, and a
-Lumeth escape: the 3 m trigger, the near-ally scan, the dash landing and the aim
-override on every think),
+The rules of #112 (the ally slots and the aim at an ally): `ally.test.ts` pins
+them on frozen states of the shipped kits, with `scenes.ts` giving a scene an
+ally and its missing health. Soothing Surge (M2) is pressed at an ally 9 m off
+that is missing 14 and not at 13, within 9.133 m and not at 9.2, not behind the
+pillar and pressed where nothing is in the way, never at an enemy or at herself,
+not at a dead ally or one of the other team, and never on an idle think. Of two
+allies the one with the lowest health fraction is the one, a tie going to the
+lower id, and only among those that qualify. Mend Bolt (M1) goes at an ally that
+is missing 10 and at the enemy when it is missing 9, at an ally within 11 m and
+at the enemy past 11.05, at an ally with the enemy out of its band, and at the
+enemy when the ally is behind the pillar. Aegis Veil (R) and Dawnbloom (F) are
+pressed for an ally or for herself within 4.5 m that is missing 30, not at 4.55
+m or 29, F only at 100 energy, and never for an enemy 3 m away with nobody hurt;
+both aim at the enemy. The aim equals the reference chain of aim.ts at the ally,
+led with the bolt's own speed (16 and 20 m/s); a stepped scene shows the heal
+landing on the ally after the 18 tick windup; the aim falls back to the enemy
+when the ally dies during it and is the enemy's again once no cast is in
+progress; a Mend Bolt pressed on the tick Soothing Surge fires aims for the
+Surge and then holds its own ally; and a Glide pressed on that tick still aims
+at its landing. The run of an ally slot goes on when another ally takes over,
+and the cache holds the kind, the reach, the need and the shot width of the four
+slots, no enemy band for F, and no ally slot for the other three kits.
+`profile.test.ts` pins her `allies` list. Mutations that turn each red (each
+applied alone to the head): the need compared strictly, the margin dropped, the
+clear shot dropped, the highest health fraction chosen, the tie order flipped,
+herself allowed for a bolt, a dead ally counted or one of the other team; Mend
+Bolt aimed at the enemy first or its run ignoring allies; the windup hold
+dropped, never cleared or kept for a dead ally; a press on the firing tick
+re-aiming it, the areas aimed at the ally, the landing override dropped;
+the reach of R and F made 4.6 m, the need of R and F made 29, of M2 13, the
+reach of M2 made 10 m, the width of the bolts made 0.5; F's enemy band kept; an
+ally switch restarting the run; the ally arrays taken from the kit alone,
+whatever the rule lists; and the allies list emptied.
+
+The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
+Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
+`configLumeth3v3`), to matchEnd with 3 rounds to win on arena01 and arena02:
+seeds 101 to 104 (101 to 106), every bot on normal, match seed 7. They run
+through `play` of `press-oracle.ts` (the press oracle above, moved out of
+headless-kits.test.ts so that both files use it): every press passes the oracle
+(a press in the warmup or the pause between rounds is explained, because `step`
+ignores buttons there), the invariants hold, `think` leaves the checksum alone,
+no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
+match ends within a tick budget by the formula of the client's rows: the end
+tick when the budget was set (6409, 4860, 11167 and 7373), plus two rounds of
+the longest round that did not go to sudden death, rounded up to 100 (1700 in
+the 2v2 runs, whose longest is 1626, and 3400 in the 3v3 runs, the client's
+longest for the same roster), and one of 7000, rounded up to 1000 (17000, 16000,
+25000 and 22000); a run whose longest round passes its term fails. Every run has
+a Lumeth heal an ally; across the four, Soothing Surge heals an ally, Aegis Veil
+is cast, Mend Bolt hits an enemy, and Lantern Burst and Glide are pressed (both
+in the 3v3 on arena02). The two start-edit runs of headless-kits.test.ts stay as
+their declared fallback (a miss is governed by decision 8.3 of batch #53). The
+seeds, tiers and budgets are pinned. The sim's ability watcher has the matching
+rows: a projectile hit on the owner's team needs `allyEffects` and a target that
+is not the owner, a hit on an enemy a non-empty `effects`, and energy for an
+ally other than the caster a support kit and a heal that restored health in the
+same step.
+
+A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
+section. It builds sixteen frozen scenes on arena 1 with the shipped kits (a
+press, an engage stand, a path follow past the age of the segment test, a kite
+with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
+and latched stand, an opener press, an escape press with its landing search, a
+Skerrow engage with F held, a Skerrow wait, the stand with its clear shot and
+the Quiet Dart cue on every think, and a Lumeth escape: the 3 m trigger, the
+near-ally scan, the dash landing and the aim override on every think, a Lumeth
+heal: the ally scan of her four ally slots and the aim at the ally on every
+think with Soothing Surge pressed on each, and a Lumeth windup: the same with
+its cast in progress, so the ally is held through the windup on every think),
 warms each bot up with 20000 thinks and reads `process.memoryUsage().heapUsed`
 around one `think`, 600 samples per round. The figure of a round is the median
 delta minus the median delta of an empty pair of reads, and the lowest of three
@@ -910,45 +1058,46 @@ test helpers copy every input a bot returns, and a guard counts one distinct
 record per bot per tick, since a stream of aliases would compare a few objects
 with themselves.
 
-A plan check in the same file reads the median `heapUsed` delta around one
-plan step of the path follower, `followPathInto` on a fresh follower (the
-search, the string pull, `splitPath`, the goal copy and, at an end in a
-blocked cell, `nearestFreeCell`), over 600 start and goal pairs spread across
-arena 1, minus the empty pair, on two spreads: clear (both ends in free cells)
-and fallback (both ends at legal points inside blocked cells); all 600 pairs
-of each plan. The lowest of three rounds must be under 2950 B (clear) and 2300
-B (fallback). Before the scratch the search read 55980 to 56436 B (clear) and
-39288 to 39796 B (fallback) per plan on Node 22. It now reads, as the rounds
-read: clear 2784 to 2800 B on Node 22 and 2784 B on Node 26, fallback 2072 to
-2132 B on Node 22 and 1920 to 2064 B on Node 26. That is the output, about 46
-objects of 56 B for a path across the arena, in an array made at its final
-length: while `splitPath` grew its array by push and the fallback copied it
-with a spread, Node 26 (V8 14.6) read 2904 to 3176 B on the fallback spread
-against 2280 B on Node 22, and no one limit held on both. A fresh six-double
-object kept in a module variable goes over the limit on both Node majors
-(lowest round, clear and fallback, within 100 B between them) per edge test
-(44260 and 22792 B), per open push (25716 and 14224 B), per point of
-`splitPath` (7320 and 4920 B) and per segment of `splitPath` (3200 and 2400
-B), and per cell of `nearestFreeCell` (19636 B, fallback). Two mutations are
-at the edge and not guarded: per call of `plan`, `findPath` or `pullString`
-reads 2952 B on clear, 2 B over the limit on both majors (clean 2800 B on Node
-22, 2784 B on Node 26), and per call of `nearestFreeCell` is red on Node 22
-(2400 to 2408 B on the fallback spread, clean 2072 to 2132 B) but at the limit
-on Node 26 (2400 B in one run, 2256 B in another, against 2300 B; clean 1920
-to 2064 B), and invisible on clear. The fallback limit stays 2300 B: 2200 B
-would leave Node 22's clean figure a margin of 3 percent. A smaller object per
-plan or a typed array per search is not measured and is the limit of this
-check, as a two-double point is for the think bound. The steady-state scenes
-cannot see what only Maglev boxes (see Allocation, In the browser). A fresh
-six-double object kept in a module variable at each rewritten site of the
-think (`steerTowardInto`, `cellIndexAt`, `clearShotWith`, `needsPlan`, `aim`,
-`segmentClear`) reads 168 B or more in the scenes that reach it, and the same
-object in each new path of #98 (`waitsFor`, the target's escape test, the Quiet
-Dart condition) reads 168 B in the skerrow wait scene, and in each new path of
-#106 (the dash
-landing search, the near-ally scan) 168 B in the lumeth escape scene on Node 22
-and Node 26. A double argument to
-`waitsFor` read 16 B a think on Node 26, so it takes the distance as a measure.
+A plan check in the same file reads the median `heapUsed` delta around one plan
+step of the path follower, `followPathInto` on a fresh follower (the search, the
+string pull, `splitPath`, the goal copy and, at an end in a blocked cell,
+`nearestFreeCell`), over 600 start and goal pairs spread across arena 1, minus
+the empty pair, on two spreads: clear (both ends in free cells) and fallback
+(both ends at legal points inside blocked cells); all 600 pairs of each plan.
+The lowest of three rounds must be under 2950 B (clear) and 2300 B (fallback).
+Before the scratch the search read 55980 to 56436 B (clear) and 39288 to 39796 B
+(fallback) per plan on Node 22. It now reads, as the rounds read: clear 2784 to
+2800 B on Node 22 and 2784 B on Node 26, fallback 2072 to 2132 B on Node 22 and
+1920 to 2064 B on Node 26. That is the output, about 46 objects of 56 B for a
+path across the arena, in an array made at its final length: while `splitPath`
+grew its array by push and the fallback copied it with a spread, Node 26 (V8
+14.6) read 2904 to 3176 B on the fallback spread against 2280 B on Node 22, and
+no one limit held on both. A fresh six-double object kept in a module variable
+goes over the limit on both Node majors (lowest round, clear and fallback,
+within 100 B between them) per edge test (44260 and 22792 B), per open push
+(25716 and 14224 B), per point of `splitPath` (7320 and 4920 B) and per segment
+of `splitPath` (3200 and 2400 B), and per cell of `nearestFreeCell` (19636 B,
+fallback). Two mutations are at the edge and not guarded: per call of `plan`,
+`findPath` or `pullString` reads 2952 B on clear, 2 B over the limit on both
+majors (clean 2800 B on Node 22, 2784 B on Node 26), and per call of
+`nearestFreeCell` is red on Node 22 (2400 to 2408 B on the fallback spread,
+clean 2072 to 2132 B) but at the limit on Node 26 (2400 B in one run, 2256 B in
+another, against 2300 B; clean 1920 to 2064 B), and invisible on clear. The
+fallback limit stays 2300 B: 2200 B would leave Node 22's clean figure a margin
+of 3 percent. A smaller object per plan or a typed array per search is not
+measured and is the limit of this check, as a two-double point is for the think
+bound. The steady-state scenes cannot see what only Maglev boxes (see
+Allocation, In the browser). A fresh six-double object kept in a module variable
+at each rewritten site of the think (`steerTowardInto`, `cellIndexAt`,
+`clearShotWith`, `needsPlan`, `aim`, `segmentClear`) reads 168 B or more in the
+scenes that reach it, and the same object in each new path of #98 (`waitsFor`,
+the target's escape test, the Quiet Dart condition) reads 168 B in the skerrow
+wait scene, and in each new path of #106 (the dash landing search, the near-ally
+scan) 168 B in the lumeth escape scene on Node 22 and Node 26, and in each new
+path of #112 (the ally scan, the aim at an ally that is pressed, the ally held
+through a windup) 672 B (four slots of 168), 168 B and 168 B in the lumeth
+scenes that run it, on both majors. A double argument to `waitsFor` read 16 B a
+think on Node 26, so it takes the distance as a measure.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the
