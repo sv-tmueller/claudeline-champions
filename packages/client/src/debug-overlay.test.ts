@@ -1,14 +1,14 @@
 import { CHAMPION_RADIUS, parseArenaDef } from '@claudeline/sim';
-import { Group, LineLoop } from 'three';
-import { describe, expect, it } from 'vitest';
+import { LineLoop } from 'three';
+import { describe, expect, it, vi } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import { simToThree } from './camera';
-import { OVERLAY_Y, buildDebugOverlay, updateChampionCircles } from './debug-overlay';
+import { OVERLAY_Y, buildDebugOverlay, updateChampionCircles, type DebugOverlay } from './debug-overlay';
 
 const arena = parseArenaDef(arena01Json);
 
 function loops(): LineLoop[] {
-  const group = buildDebugOverlay(arena, 4);
+  const group = buildDebugOverlay(arena, 4).group;
   return group.children.filter((c): c is LineLoop => c instanceof LineLoop);
 }
 
@@ -21,11 +21,11 @@ function points(loop: LineLoop): [number, number, number][] {
 
 describe('buildDebugOverlay', () => {
   it('names the group so tests and tools can find it', () => {
-    expect(buildDebugOverlay(arena, 4).name).toBe('DebugOverlay');
+    expect(buildDebugOverlay(arena, 4).group.name).toBe('DebugOverlay');
   });
 
   it('starts hidden', () => {
-    expect(buildDebugOverlay(arena, 4).visible).toBe(false);
+    expect(buildDebugOverlay(arena, 4).group.visible).toBe(false);
   });
 
   it('has one loop per obstacle plus the boundary', () => {
@@ -78,8 +78,8 @@ describe('buildDebugOverlay', () => {
 });
 
 describe('champion circles', () => {
-  function circles(overlay: Group): LineLoop[] {
-    const group = overlay.getObjectByName('ChampionCircles');
+  function circles(overlay: DebugOverlay): LineLoop[] {
+    const group = overlay.group.getObjectByName('ChampionCircles');
     if (!group) throw new Error('no ChampionCircles group');
     return group.children.filter((c): c is LineLoop => c instanceof LineLoop);
   }
@@ -87,7 +87,7 @@ describe('champion circles', () => {
   it('adds one named group with one circle per champion, apart from the static loops', () => {
     const overlay = buildDebugOverlay(arena, 4);
     expect(circles(overlay)).toHaveLength(4);
-    expect(overlay.children.filter((c) => c instanceof LineLoop)).toHaveLength(10);
+    expect(overlay.group.children.filter((c) => c instanceof LineLoop)).toHaveLength(10);
   });
 
   it('draws the circles like the other loops, on top of the scene', () => {
@@ -129,5 +129,34 @@ describe('champion circles', () => {
     updateChampionCircles(overlay, [{ x: 2, y: 3, facing: 0 }]);
     const loop = circles(overlay)[0];
     expect([loop?.position.x, loop?.position.z]).toEqual([2, -3]);
+  });
+
+  it('still follows the poses when the circles group is renamed after the build', () => {
+    // The build hands the group back once, so a frame never looks it up by name.
+    const overlay = buildDebugOverlay(arena, 2);
+    const loops = circles(overlay);
+    overlay.circles.name = 'Renamed';
+    updateChampionCircles(overlay, [
+      { x: 5, y: -2, facing: 0 },
+      { x: -6.5, y: 4, facing: 1 },
+    ]);
+    expect(loops.map((loop) => [loop.position.x, loop.position.y, loop.position.z])).toEqual([
+      [5, 0, 2],
+      [-6.5, 0, -4],
+    ]);
+  });
+
+  it('hands back the group that holds the circles', () => {
+    const overlay = buildDebugOverlay(arena, 3);
+    expect(overlay.circles.parent).toBe(overlay.group);
+    expect(overlay.circles.children).toHaveLength(3);
+  });
+
+  it('writes the fields of each circle position and does not call set', () => {
+    const overlay = buildDebugOverlay(arena, 1);
+    const set = vi.spyOn(circles(overlay)[0]!.position, 'set');
+    updateChampionCircles(overlay, [{ x: 1.5, y: 2.5, facing: 0 }]);
+    expect(set).not.toHaveBeenCalled();
+    expect(circles(overlay)[0]!.position.toArray()).toEqual([1.5, 0, -2.5]);
   });
 });

@@ -36,7 +36,7 @@ describe('impact rings', () => {
   it('puts a ring at the contact point on the ground', () => {
     const impact = createImpactRings();
     impact.spawn(3, 4, 100);
-    impact.draw(100, 0);
+    impact.draw(100, { alpha: 0 });
     const [mesh] = shown(impact.group) as [Mesh];
     expect(mesh.position.toArray()).toEqual([3, RING_Y, -4]);
   });
@@ -44,27 +44,27 @@ describe('impact rings', () => {
   it('grows from 0.5 m to 1.2 m and fades out over RING_TICKS', () => {
     const impact = createImpactRings();
     impact.spawn(0, 0, 10);
-    impact.draw(10, 0);
+    impact.draw(10, { alpha: 0 });
     const [mesh] = shown(impact.group) as [Mesh];
     expect(mesh.scale.x).toBeCloseTo(0.5, 12);
     expect(mesh.scale.y).toBeCloseTo(0.5, 12);
     expect(opacity(mesh)).toBeCloseTo(1, 12);
 
-    impact.draw(10 + RING_TICKS / 2, 0);
+    impact.draw(10 + RING_TICKS / 2, { alpha: 0 });
     expect(mesh.scale.x).toBeCloseTo(0.85, 12);
     expect(opacity(mesh)).toBeCloseTo(0.5, 12);
 
     // The sub-tick fraction counts as age.
-    impact.draw(10, 0.5);
+    impact.draw(10, { alpha: 0.5 });
     expect(mesh.scale.x).toBeCloseTo(0.5 + (0.7 * 0.5) / RING_TICKS, 12);
   });
 
   it('hides a finished ring', () => {
     const impact = createImpactRings();
     impact.spawn(0, 0, 10);
-    impact.draw(10 + RING_TICKS - 1, 0.9);
+    impact.draw(10 + RING_TICKS - 1, { alpha: 0.9 });
     expect(shown(impact.group)).toHaveLength(1);
-    impact.draw(10 + RING_TICKS, 0);
+    impact.draw(10 + RING_TICKS, { alpha: 0 });
     expect(shown(impact.group)).toHaveLength(0);
   });
 
@@ -74,7 +74,7 @@ describe('impact rings', () => {
     const first = rings(impact.group)[0] as Mesh;
     expect(first.position.x).toBe(0);
     impact.spawn(100, 0, 2);
-    impact.draw(2, 0);
+    impact.draw(2, { alpha: 0 });
     expect(first.position.x).toBe(100);
     expect(shown(impact.group)).toHaveLength(RING_POOL_SIZE);
     // The second ring is now the oldest.
@@ -88,9 +88,9 @@ describe('impact rings', () => {
     impact.spawn(0, 0, 10);
     impact.spawn(1, 0, 12);
     expect(impact.visibleCount).toBe(2);
-    impact.draw(10 + RING_TICKS, 0);
+    impact.draw(10 + RING_TICKS, { alpha: 0 });
     expect(impact.visibleCount).toBe(1);
-    impact.draw(12 + RING_TICKS, 0);
+    impact.draw(12 + RING_TICKS, { alpha: 0 });
     expect(impact.visibleCount).toBe(0);
   });
 
@@ -99,7 +99,7 @@ describe('impact rings', () => {
     for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn(i, 0, 1);
     impact.spawn(100, 0, 2);
     expect(impact.visibleCount).toBe(RING_POOL_SIZE);
-    impact.draw(2 + RING_TICKS, 0);
+    impact.draw(2 + RING_TICKS, { alpha: 0 });
     expect(impact.visibleCount).toBe(0);
   });
 });

@@ -41,15 +41,15 @@ describe('entity views', () => {
     shot.x = 4;
     shot.y = 8;
     views.sync(list);
-    views.draw(0.5);
+    views.draw({ alpha: 0.5 });
     const mesh = visible(views)[0]!;
     // Sim (x, y) maps to three (x, height, -y).
     expect(mesh.position.x).toBeCloseTo(3, 12);
     expect(mesh.position.z).toBeCloseTo(-6, 12);
     expect(mesh.position.y).toBe(PROJECTILE_Y);
-    views.draw(0);
+    views.draw({ alpha: 0 });
     expect(mesh.position.x).toBeCloseTo(2, 12);
-    views.draw(0.999);
+    views.draw({ alpha: 0.999 });
     expect(mesh.position.x).toBeCloseTo(4, 2);
   });
 
@@ -78,7 +78,7 @@ describe('entity views', () => {
     expect(meshOf.get(6)!.visible).toBe(false);
     expect(meshOf.get(5)!.visible).toBe(true);
     expect(meshOf.get(9)!.visible).toBe(true);
-    views.draw(0);
+    views.draw({ alpha: 0 });
     expect(meshOf.get(5)!.position.x).toBeCloseTo(0.1, 12);
 
     // A new id takes the released slot instead of growing the pool.
@@ -104,7 +104,7 @@ describe('entity views', () => {
     views.capture(list);
     shot.x = 6;
     views.sync(list);
-    views.draw(0.5);
+    views.draw({ alpha: 0.5 });
     expect(views.count).toBe(1);
     expect(visible(views)[0]!.position.x).toBeCloseTo(5.5, 12);
   });
@@ -112,7 +112,7 @@ describe('entity views', () => {
   it('shows a shot that only sync sees at its spawn position', () => {
     const views = createProjectileViews('A');
     views.sync([entity(20, 5, 0)]);
-    views.draw(0.5);
+    views.draw({ alpha: 0.5 });
     expect(visible(views)[0]!.position.x).toBe(5);
   });
 
@@ -162,7 +162,7 @@ describe('entity views', () => {
   it('draws areas flat on the ground as translucent discs', () => {
     const views = createAreaViews('A');
     views.sync([entity(30, 1, 2, 'B', 3)]);
-    views.draw(0);
+    views.draw({ alpha: 0 });
     const mesh = visible(views)[0]!;
     expect(mesh.position.toArray()).toEqual([1, AREA_Y, -2]);
     expect(mesh.rotation.x).toBeCloseTo(-Math.PI / 2, 12);
@@ -185,7 +185,7 @@ describe('entity views', () => {
       flat: false,
     });
     views.sync([entity(1, 0, 0, 'B')]);
-    views.draw(0);
+    views.draw({ alpha: 0 });
     const mesh = visible(views)[0]!;
     expect(mesh.material).toBe(ally);
     expect(mesh.position.y).toBe(2);
@@ -213,7 +213,7 @@ describe('entity views draw without a position.set call', () => {
     expect(shown).toHaveLength(3);
     const sets = shown.map((mesh) => vi.spyOn(mesh.position, 'set'));
     for (const alpha of alphas) {
-      views.draw(alpha);
+      views.draw({ alpha });
       shown.forEach((mesh, i) => {
         const from = shots[i]!;
         const to = moved[i]!;
@@ -230,11 +230,11 @@ describe('entity views draw without a position.set call', () => {
     const list = [entity(1, 1, 1), entity(2, 2, 2)];
     views.capture(list);
     views.sync(list);
-    views.draw(0.5);
+    views.draw({ alpha: 0.5 });
     expect(visible(views)).toHaveLength(2);
     expect(meshes(views).filter((mesh) => !mesh.visible)).toHaveLength(14);
     views.sync([list[0]!]);
-    views.draw(0.5);
+    views.draw({ alpha: 0.5 });
     expect(visible(views)).toHaveLength(1);
     expect(views.count).toBe(1);
   });

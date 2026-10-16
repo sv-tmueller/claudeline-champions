@@ -1,4 +1,5 @@
 import { Group, Mesh, MeshBasicMaterial, RingGeometry } from 'three';
+import type { AlphaClock } from './interpolate';
 
 export const RING_COLOUR = '#ffd23f';
 export const RING_POOL_SIZE = 16;
@@ -57,8 +58,9 @@ export class ImpactRings {
     this.active[index] = true;
   }
 
-  /** `tick` is the sim tick and `alpha` the fraction of the next one already elapsed. */
-  draw(tick: number, alpha: number): void {
+  /** `tick` is the sim tick; the clock record holds the fraction of the next one already elapsed. */
+  draw(tick: number, clock: AlphaClock): void {
+    const alpha = clock.alpha;
     for (let i = 0; i < RING_POOL_SIZE; i++) {
       if (!this.active[i]) continue;
       const mesh = this.meshes[i] as Mesh;
