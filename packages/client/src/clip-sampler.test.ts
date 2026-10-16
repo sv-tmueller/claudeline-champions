@@ -21,6 +21,7 @@ import {
   D_RUN_T,
   createAnim,
   triggerCast,
+  triggerDash,
   triggerDeath,
   triggerHit,
   triggerInterrupt,
@@ -212,7 +213,7 @@ describe('the rig of a view', () => {
 
 /** A world of one champion, to drive the state machine and the sampler together. */
 function crew(root: Object3D, rig: ClipRig, overrides: Partial<AnimChampion> = {}) {
-  const champion: AnimChampion = { alive: true, vx: 0, vy: 0, facing: 0, dash: null, ...overrides };
+  const champion: AnimChampion = { x: 0, y: 0, vx: 0, vy: 0, aimX: 1000, aimY: 0, ...overrides };
   const state = { tick: 100, champions: [champion] };
   const clock = { alpha: 0 };
   const anim: ChampionAnim = createAnim();
@@ -271,7 +272,7 @@ describe('the blend', () => {
 
   it('plays the strike fully over Run, at weight 1: the spine and arms are Attack\'s, the legs and Hips are Run\'s', async () => {
     const { root, rig } = await view('quillon');
-    const c = crew(root, rig, { vx: 5.5, vy: 0, facing: 0 });
+    const c = crew(root, rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
     c.run(20);
     triggerCast(c.anim, CAST_ATTACK);
     c.run(6);
@@ -291,7 +292,7 @@ describe('the blend', () => {
     triggerCast(a.anim, CAST_ATTACK);
     a.run(8);
     const running = await view('quillon');
-    const b = crew(running.root, running.rig, { vx: 5.5, vy: 0, facing: 0 });
+    const b = crew(running.root, running.rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
     b.run(10);
     triggerCast(b.anim, CAST_ATTACK);
     b.run(8);
@@ -304,12 +305,11 @@ describe('the blend', () => {
   it('plays Death over everything: its five channels, and the legs at rest', async () => {
     const { root, rig } = await view('hargrim');
     const rest = readPose(root);
-    const c = crew(root, rig, { vx: 5.5, vy: 0, facing: 0 });
+    const c = crew(root, rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
     c.run(15);
     triggerCast(c.anim, CAST_OTHER);
     c.run(3);
     triggerDeath(c.anim);
-    c.champion.alive = false;
     c.champion.vx = 0;
     c.run(10);
     const pose = readPose(root);
@@ -323,7 +323,6 @@ describe('the blend', () => {
     const { root, rig } = await view('lumeth');
     const c = crew(root, rig);
     triggerDeath(c.anim);
-    c.champion.alive = false;
     c.run(100);
     const later = readPose(root);
     c.run(400);
@@ -333,7 +332,7 @@ describe('the blend', () => {
 
   it('blends a Hit over the legs of Run without touching them', async () => {
     const { root, rig } = await view('skerrow');
-    const c = crew(root, rig, { vx: 5.5, vy: 0, facing: 0 });
+    const c = crew(root, rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
     c.run(20);
     triggerHit(c.anim);
     c.run(3);
@@ -430,6 +429,11 @@ function runLooking(c: Crew, w: Walk, ticks: number, label: string, frames = 1):
   c.run(ticks, frames, () => w.look(`${label}, frame ${n++}`));
 }
 
+/** The aim point 10 m ahead of a champion at the origin that faces `facing`, in centimetres. */
+function aimToward(facing: number): { aimX: number; aimY: number } {
+  return { aimX: Math.round(Math.cos(facing) * 1000), aimY: Math.round(Math.sin(facing) * 1000) };
+}
+
 const WALKS: { speed: number; facing: number; name: string }[] = [
   { speed: 5.5, facing: 0, name: '5.5 m/s forward' },
   { speed: 5.5, facing: Math.PI, name: '5.5 m/s backward' },
@@ -444,7 +448,7 @@ describe('the floor and the top through every transition', () => {
     for (const { speed, facing, name } of WALKS) {
       for (let stopAfter = 0; stopAfter <= 40; stopAfter += 1) {
         for (const [frames, idleAt] of [[1, 8], [2, 7]] as const) {
-          const c = crew(root, rig, { vx: speed, vy: 0, facing });
+          const c = crew(root, rig, { vx: speed, vy: 0, ...aimToward(facing) });
           // The Idle clock is at its rest height (time 0) `idleAt` ticks after the walk stops: the
           // worst case for the fade, since Idle's own Hips rise would lift the feet a little.
           c.anim.d[D_IDLE_T] = (((120 - stopAfter - idleAt) % 120) + 120) % 120 / 60;
@@ -455,7 +459,7 @@ describe('the floor and the top through every transition', () => {
       }
     }
     // A walk that starts and stops over and over, as a pointer at the edge of the dead zone does.
-    const c = crew(root, rig, { vx: 5.5, vy: 0, facing: 0 });
+    const c = crew(root, rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
     for (let round = 0; round < 12; round++) {
       c.champion.vx = 5.5;
       runLooking(c, w, 3 + round, 'on');
@@ -472,7 +476,7 @@ describe('the floor and the top through every transition', () => {
       for (const { speed, facing, name } of WALKS.slice(0, 2)) {
         for (const moving of [false, true]) {
           for (let offset = 0; offset <= 30; offset += 3) {
-            const c = crew(root, rig, moving ? { vx: speed, vy: 0, facing } : { vx: 0, vy: 0, facing });
+            const c = crew(root, rig, moving ? { vx: speed, vy: 0, ...aimToward(facing) } : { vx: 0, vy: 0, ...aimToward(facing) });
             runLooking(c, w, offset, `${kind} over ${moving ? name : 'Idle'}, lead-in`);
             if (kind === 'attack') triggerCast(c.anim, CAST_ATTACK);
             else if (kind === 'cast') triggerCast(c.anim, CAST_OTHER);
@@ -483,7 +487,7 @@ describe('the floor and the top through every transition', () => {
       }
     }
     // An M1 held down: Attack restarts as it ends, and a cast replaces it half way.
-    const c = crew(root, rig, { vx: 5.5, vy: 0, facing: 0 });
+    const c = crew(root, rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
     for (let round = 0; round < 6; round++) {
       triggerCast(c.anim, CAST_ATTACK);
       runLooking(c, w, 24, 'M1 held');
@@ -499,7 +503,7 @@ describe('the floor and the top through every transition', () => {
     const w = walk(id, root);
     for (const kind of [CAST_ATTACK, CAST_OTHER]) {
       for (let at = 0; at <= 30; at += 2) {
-        const c = crew(root, rig, { vx: 5.5, vy: 0, facing: 0 });
+        const c = crew(root, rig, { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 });
         runLooking(c, w, 9, 'before the cast');
         triggerCast(c.anim, kind);
         runLooking(c, w, at, 'cast');
@@ -515,17 +519,15 @@ describe('the floor and the top through every transition', () => {
     for (const moving of [false, true]) {
       for (const overlay of [0, CAST_ATTACK, CAST_OTHER, -1]) {
         for (let at = 0; at <= 40; at += 2) {
-          const c = crew(root, rig, moving ? { vx: 5.5, vy: 0, facing: 0 } : { vx: 0, vy: 0, facing: 0 });
+          const c = crew(root, rig, moving ? { vx: 5.5, vy: 0, aimX: 1000, aimY: 0 } : { vx: 0, vy: 0, aimX: 1000, aimY: 0 });
           runLooking(c, w, at, 'before the death');
           if (overlay > 0) triggerCast(c.anim, overlay);
           if (overlay < 0) triggerHit(c.anim);
           runLooking(c, w, 3, 'overlay');
           triggerDeath(c.anim);
-          c.champion.alive = false;
           c.champion.vx = 0;
           runLooking(c, w, 70, `death after ${at}`);
           // The next round: Idle at time 0.
-          c.champion.alive = true;
           triggerSnap(c.anim);
           runLooking(c, w, 4, 'snap');
         }
@@ -539,9 +541,9 @@ describe('the floor and the top through every transition', () => {
     for (let lead = 0; lead <= 12; lead += 4) {
       const c = crew(root, rig);
       runLooking(c, w, lead, 'lead-in');
-      c.champion.dash = { dirX: 1, dirY: 0 };
+      triggerDash(c.anim, 1);
       runLooking(c, w, 8, 'dashing');
-      c.champion.dash = null;
+      triggerDash(c.anim, 0);
       runLooking(c, w, 60, 'after the dash');
     }
   });

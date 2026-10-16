@@ -3,6 +3,7 @@ import {
   CAST_ATTACK,
   CAST_OTHER,
   triggerCast,
+  triggerDash,
   triggerDeath,
   triggerHit,
   triggerInterrupt,
@@ -33,6 +34,8 @@ export interface FeedbackHandlers {
   cast(tick: number, event: CastStartedEvent): void;
   /** A cast in its windup was cut off. */
   interrupt(tick: number, event: CastInterruptedEvent): void;
+  /** A champion's dash began (`active` 1) or ended (0). */
+  dash(tick: number, championId: number, active: number): void;
   /** A round began: the champions stand at their spawns again. */
   roundStarted(tick: number): void;
   /** A projectile touched a champion. */
@@ -61,6 +64,12 @@ export function routeEvents(state: GameState, handlers: FeedbackHandlers): void 
         break;
       case 'castInterrupted':
         handlers.interrupt(tick, event);
+        break;
+      case 'dashStarted':
+        handlers.dash(tick, event.championId, 1);
+        break;
+      case 'dashEnded':
+        handlers.dash(tick, event.championId, 0);
         break;
       case 'roundStarted':
         handlers.roundStarted(tick);
@@ -146,6 +155,11 @@ export class CombatFeedback implements FeedbackHandlers {
   interrupt(_tick: number, event: CastInterruptedEvent): void {
     const anim = this.anims[event.championId];
     if (anim !== undefined) triggerInterrupt(anim);
+  }
+
+  dash(_tick: number, championId: number, active: number): void {
+    const anim = this.anims[championId];
+    if (anim !== undefined) triggerDash(anim, active);
   }
 
   roundStarted(): void {

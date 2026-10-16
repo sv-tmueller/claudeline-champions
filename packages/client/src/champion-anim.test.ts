@@ -15,6 +15,7 @@ import {
   RUN_MAX_SCALE,
   createAnim,
   triggerCast,
+  triggerDash,
   triggerDeath,
   triggerHit,
   triggerInterrupt,
@@ -46,11 +47,11 @@ interface World {
 }
 
 function walking(speed: number): Partial<AnimChampion> {
-  return { vx: speed, vy: 0, facing: 0 };
+  return { vx: speed, vy: 0, aimX: 1000, aimY: 0 };
 }
 
 function world(overrides: Partial<AnimChampion> = {}): World {
-  const champion: AnimChampion = { alive: true, vx: 0, vy: 0, facing: 0, dash: null, ...overrides };
+  const champion: AnimChampion = { x: 0, y: 0, vx: 0, vy: 0, aimX: 1000, aimY: 0, ...overrides };
   const anim = createAnim();
   const state = { tick: 100, champions: [champion] };
   const clock = { alpha: 0 };
@@ -109,11 +110,39 @@ describe('Idle and Run', () => {
     expect(exact.text()).toBe('Run');
   });
 
-  it('is Run for a dash, whose walk velocity is zero', () => {
-    const w = world({ dash: { dirX: 1, dirY: 0 } });
+  it('is Run for a dash, whose walk velocity is zero, at the cap of the scale', () => {
+    const w = world();
+    triggerDash(w.anim, 1);
     w.run(2);
     expect(w.text()).toBe('Run');
     expect(w.anim.d[D_RUN_SCALE]).toBe(RUN_MAX_SCALE);
+    triggerDash(w.anim, 0);
+    w.run(1);
+    expect(w.anim.want).toBe(0);
+  });
+
+  it('plays a dash backward when it moves against the facing', () => {
+    const w = world({ aimX: 1000, aimY: 0 });
+    triggerDash(w.anim, 1);
+    w.run(1);
+    for (let tick = 0; tick < 3; tick++) {
+      w.champion.x -= 0.5;
+      w.run(1);
+    }
+    expect(w.anim.d[D_RUN_SCALE]).toBe(-RUN_MAX_SCALE);
+    w.champion.x += 0.5;
+    w.run(1);
+    expect(w.anim.d[D_RUN_SCALE]).toBe(RUN_MAX_SCALE);
+  });
+
+  it('forgets a dash at the start of a round', () => {
+    const w = world();
+    triggerDash(w.anim, 1);
+    w.run(2);
+    triggerSnap(w.anim);
+    w.run(1);
+    expect(w.anim.dashing).toBe(0);
+    expect(w.text()).toBe('Idle');
   });
 
   it('enters Run at its passing key, not at frame 0, and with weight 0', () => {
@@ -166,7 +195,7 @@ describe('Idle and Run', () => {
   });
 
   it('plays backward, with a negative scale, when the velocity opposes the facing', () => {
-    const w = world({ vx: -5.5, vy: 0, facing: 0 });
+    const w = world({ vx: -5.5, vy: 0, aimX: 1000, aimY: 0 });
     w.run(1);
     expect(w.anim.d[D_RUN_SCALE]).toBeCloseTo(-2, 9);
     const before = w.anim.d[D_RUN_T] as number;
@@ -181,7 +210,7 @@ describe('Idle and Run', () => {
     w.run(400);
     expect(w.anim.d[D_RUN_T]).toBeGreaterThanOrEqual(0);
     expect(w.anim.d[D_RUN_T]).toBeLessThan(CLIP_SECONDS[1] as number);
-    const back = world({ vx: -5.5, vy: 0, facing: 0 });
+    const back = world({ vx: -5.5, vy: 0, aimX: 1000, aimY: 0 });
     back.run(400);
     expect(back.anim.d[D_RUN_T]).toBeGreaterThanOrEqual(0);
     expect(back.anim.d[D_RUN_T]).toBeLessThan(CLIP_SECONDS[1] as number);
@@ -244,7 +273,7 @@ describe('Idle and Run', () => {
   });
 
   it('plays a backward Run on to the key behind it', () => {
-    const w = world({ vx: -5.5, vy: 0, facing: 0 });
+    const w = world({ vx: -5.5, vy: 0, aimX: 1000, aimY: 0 });
     // Entry 5/30, backward: after 7 ticks 5/30 - 14/60 = -1/15, which is 0.6 s in the loop.
     w.run(7);
     expect(w.anim.d[D_RUN_T]).toBeCloseTo(0.6, 9);
@@ -436,7 +465,6 @@ describe('Death', () => {
     triggerCast(w.anim, CAST_ATTACK);
     w.run(4);
     triggerDeath(w.anim);
-    w.champion.alive = false;
     w.champion.vx = 0;
     w.run(1);
     expect(w.text()).toBe('Death');
@@ -448,7 +476,6 @@ describe('Death', () => {
   it('holds its last frame and never loops', () => {
     const w = world();
     triggerDeath(w.anim);
-    w.champion.alive = false;
     w.run(300);
     expect(w.anim.d[D_DEATH_T]).toBe(CLIP_SECONDS[5]);
     expect(w.anim.d[D_DEATH_W]).toBe(1);
@@ -461,7 +488,6 @@ describe('Death', () => {
   it('plays from time 0, 30 frames in 1 second', () => {
     const w = world();
     triggerDeath(w.anim);
-    w.champion.alive = false;
     w.run(30);
     expect(w.anim.d[D_DEATH_T]).toBeCloseTo(0.5, 9);
   });
@@ -469,7 +495,6 @@ describe('Death', () => {
   it('takes no Hit, no cast and no interrupt once dead', () => {
     const w = world();
     triggerDeath(w.anim);
-    w.champion.alive = false;
     w.run(2);
     triggerHit(w.anim);
     triggerCast(w.anim, CAST_ATTACK);
@@ -485,11 +510,9 @@ describe('Death', () => {
     triggerCast(w.anim, CAST_ATTACK);
     w.run(3);
     triggerDeath(w.anim);
-    w.champion.alive = false;
     w.champion.vx = 0;
     w.run(400);
     expect(w.text()).toBe('Death');
-    w.champion.alive = true;
     triggerSnap(w.anim);
     w.again();
     expect(w.text()).toBe('Idle');

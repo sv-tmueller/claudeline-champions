@@ -139,7 +139,7 @@ export function createClipRig(root: Object3D, clips: readonly AnimationClip[]): 
     if ((object as SkinnedMesh).isSkinnedMesh) object.frustumCulled = false;
   });
 
-  return {
+  const rig: ClipRig = {
     bones,
     rest,
     trackOf,
@@ -155,6 +155,7 @@ export function createClipRig(root: Object3D, clips: readonly AnimationClip[]): 
     pair: new Float64Array(8),
     alpha: new Float64Array(1),
   };
+  return rig;
 }
 
 /**

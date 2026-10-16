@@ -58,14 +58,18 @@ export const RUN_FOOT_FACTOR = 2;
 const RUN_SCALE_PER_SPEED = RUN_FOOT_FACTOR / RUN_REFERENCE_SPEED;
 /** The most the clip is scaled: a dash plays at it, and so does a hasted walk (8.25 m/s at the cap). */
 export const RUN_MAX_SCALE = 3;
+const IDLE_SECONDS = 2;
 const RUN_SECONDS = 20 / 30;
 /** The passing keys of Run, frames 5 and 15: planted feet, `Hips` at rest. */
 const RUN_KEY_1 = 5 / 30;
 const RUN_KEY_2 = 15 / 30;
 /** Run is entered at its first passing key, not at frame 0 (a split), see assets.md. */
 const RUN_ENTRY = RUN_KEY_1;
-/** The longest step of the clip clock: a frame that took longer (a hidden tab) is cut to it. */
-const MAX_DT = 0.25;
+/**
+ * The longest step of the clip clock: a frame that took longer (a hidden tab) is cut to it. At the
+ * scale cap it moves Run by 0.6 s, less than the 2/3 s clip, so a wrap is one subtraction.
+ */
+const MAX_DT = 0.2;
 /** Weights and clip times snap to their end values within this, so float noise ends a blend. */
 const EPS = 1e-9;
 
@@ -91,7 +95,10 @@ export const D_OV_RAW = 10;
 export const D_OV_W = 11;
 export const D_DEATH_T = 12;
 export const D_DEATH_W = 13;
-const D_COUNT = 14;
+/** The position of the last frame, for the direction of a dash. */
+export const D_LAST_X = 14;
+export const D_LAST_Y = 15;
+const D_COUNT = 16;
 
 /**
  * What the hook of a champion says, by `code`: the base clip, plus the overlay that plays
@@ -120,6 +127,12 @@ export interface ChampionAnim {
   mode: number;
   /** A settling Run sits on its key. */
   held: number;
+  /** 1 when the Run of the last frame sat on a passing key: a stop then holds at once. */
+  atKey: number;
+  /** 1 between the sim's dashStarted and dashEnded events of this champion. */
+  dashing: number;
+  /** 1 until the first update, which has no frame before it to measure a displacement from. */
+  fresh: number;
   /** 1 when the champion walks or dashes, 0 when it is idle: the base clip it is heading for. */
   want: number;
   /** The overlay that plays, `OV_NONE` if none. */
@@ -145,6 +158,9 @@ export function createAnim(): ChampionAnim {
   return {
     mode: RUN_OFF,
     held: 0,
+    atKey: 0,
+    dashing: 0,
+    fresh: 1,
     want: 0,
     ov: OV_NONE,
     ovFade: 0,
@@ -189,13 +205,24 @@ export function triggerSnap(anim: ChampionAnim): void {
   anim.pendSnap = 1;
 }
 
+/**
+ * The sim's dashStarted (1) and dashEnded (0) of a champion. A dash plays Run at its cap. It is
+ * an event and not a read of `champion.dash`: an object that only shows up in a dash would be a
+ * load V8 has no feedback for in the frame loop, and the first one deoptimizes it.
+ */
+export function triggerDash(anim: ChampionAnim, on: number): void {
+  anim.dashing = on;
+}
+
 /** What `updateAnims` reads of a champion. The sim's `ChampionState` fits. */
 export interface AnimChampion {
-  alive: boolean;
+  x: number;
+  y: number;
   vx: number;
   vy: number;
-  facing: number;
-  dash: { dirX: number; dirY: number } | null;
+  /** The aim point in whole centimetres: the facing is the direction to it. */
+  aimX: number;
+  aimY: number;
 }
 
 /** What it reads of the sim: the tick and the champions. `GameState` fits. */
@@ -224,11 +251,11 @@ function updateAnim(anim: ChampionAnim, champion: AnimChampion): void {
   const d = anim.d;
   const last = d[D_LAST] as number;
   const now = d[D_NOW] as number;
-  let dt = now - last;
-  // The first frame and a clock that went back stand still; a long gap is cut.
-  if (last < 0 || dt < 0) dt = 0;
-  else if (dt > MAX_DT) dt = MAX_DT;
-  d[D_DT] = dt;
+  // The first frame and a clock that went back stand still; a long gap is cut. Written as stores in
+  // branches, see the note on phis above stepRun.
+  d[D_DT] = now - last;
+  if (last < 0 || now < last) d[D_DT] = 0;
+  else if (now - last > MAX_DT) d[D_DT] = MAX_DT;
   d[D_LAST] = now;
   takeTriggers(anim);
   stepIdle(d);
@@ -288,6 +315,8 @@ function snap(anim: ChampionAnim): void {
   const d = anim.d;
   anim.mode = RUN_OFF;
   anim.held = 0;
+  anim.atKey = 0;
+  anim.dashing = 0;
   anim.want = 0;
   anim.ov = OV_NONE;
   anim.ovFade = 0;
@@ -304,19 +333,34 @@ function snap(anim: ChampionAnim): void {
 }
 
 function stepIdle(d: Float64Array): void {
-  const t = (d[D_IDLE_T] as number) + (d[D_DT] as number);
-  const length = CLIP_SECONDS[CLIP_IDLE] as number;
-  d[D_IDLE_T] = t - length * Math.floor(t / length);
+  // A step is at most MAX_DT, shorter than the clip, so one subtraction wraps it.
+  let t = (d[D_IDLE_T] as number) + (d[D_DT] as number);
+  if (t >= IDLE_SECONDS) t -= IDLE_SECONDS;
+  d[D_IDLE_T] = t;
 }
 
+// A note on phis, for stepRun and the other steps. V8's Maglev gives a double that is the result of
+// a branch merge (`x = cond ? 1 : w`, or a `let` assigned in an `if`) a tagged representation when
+// one side is an integer constant, and every merge of a double then allocates a heap number: one
+// per call, 12 to 16 B, 150 KB in the bench of 12 000 calls. So no double in these steps is the
+// merge of a branch with an integer on one side: a branch stores into the Float64Array, or the
+// choice is arithmetic on a 0 or 1.
 function stepRun(anim: ChampionAnim, champion: AnimChampion): void {
   const d = anim.d;
   const dt = d[D_DT] as number;
   const vx = champion.vx;
   const vy = champion.vy;
-  const dash = champion.dash;
+  // The displacement since the last frame gives a dash its direction: its walk velocity is zero.
+  const x = champion.x;
+  const y = champion.y;
+  const moved = 1 - anim.fresh;
+  const dx = (x - (d[D_LAST_X] as number)) * moved;
+  const dy = (y - (d[D_LAST_Y] as number)) * moved;
+  d[D_LAST_X] = x;
+  d[D_LAST_Y] = y;
+  anim.fresh = 0;
   const speedSquared = vx * vx + vy * vy;
-  if (dash !== null || speedSquared >= RUN_MIN_SPEED_SQUARED) {
+  if (anim.dashing !== 0 || speedSquared >= RUN_MIN_SPEED_SQUARED) {
     anim.want = 1;
     if (anim.mode === RUN_OFF) {
       // From Idle, Run starts on a passing key (the pose closest to rest), so the early
@@ -326,45 +370,86 @@ function stepRun(anim: ChampionAnim, champion: AnimChampion): void {
     }
     anim.mode = RUN_ON;
     anim.held = 0;
-    // Forward unless the champion walks or dashes against its facing.
-    const fx = Math.cos(champion.facing);
-    const fy = Math.sin(champion.facing);
-    let scale = RUN_MAX_SCALE;
-    let dot: number;
-    if (dash !== null) {
-      dot = dash.dirX * fx + dash.dirY * fy;
-    } else {
-      scale = Math.sqrt(speedSquared) * RUN_SCALE_PER_SPEED;
-      if (scale > RUN_MAX_SCALE) scale = RUN_MAX_SCALE;
-      dot = vx * fx + vy * fy;
-    }
-    if (dot < 0) scale = -scale;
+    // Forward unless the champion walks or dashes against its facing. The facing is the direction to
+    // the aim point (the sim turns it there every tick), so the dot product needs no trig: only its
+    // sign matters. A dash has no walk velocity, so its motion is the displacement since the last
+    // frame. The choice between the two is arithmetic on 0 or 1, not a branch or a select: a double
+    // that comes out of a branch is a phi, which V8's Maglev may box.
+    const toAimX = champion.aimX / 100 - x;
+    const toAimY = champion.aimY / 100 - y;
+    const dash = anim.dashing;
+    d[D_RUN_SCALE] = Math.sqrt(speedSquared) * RUN_SCALE_PER_SPEED;
+    if ((d[D_RUN_SCALE] as number) > RUN_MAX_SCALE) d[D_RUN_SCALE] = RUN_MAX_SCALE;
+    const walkScale = d[D_RUN_SCALE] as number;
+    let scale = walkScale + (RUN_MAX_SCALE - walkScale) * dash;
+    const dot = (dx * toAimX + dy * toAimY) * dash + (vx * toAimX + vy * toAimY) * (1 - dash);
+    // The sign is an integer, 1 or -1, and the scale is multiplied: a double negated under a branch was boxed.
+    scale *= dot < 0 ? -1 : 1;
     d[D_RUN_SCALE] = scale;
-    const t = (d[D_RUN_T] as number) + dt * scale;
-    d[D_RUN_T] = t - RUN_SECONDS * Math.floor(t / RUN_SECONDS);
+    // A step of the clip clock, at most MAX_DT times the scale cap, is shorter than the clip: one wrap.
+    let t = (d[D_RUN_T] as number) + dt * scale;
+    if (t >= RUN_SECONDS) t -= RUN_SECONDS;
+    else if (t < 0) t += RUN_SECONDS;
+    d[D_RUN_T] = t;
     const w = (d[D_RUN_W] as number) + dt * RUN_BLEND_RATE;
-    d[D_RUN_W] = w >= 1 - EPS ? 1 : w;
+    if (w >= 1 - EPS) d[D_RUN_W] = 1;
+    else d[D_RUN_W] = w;
+    // The key a stop on the next frame would settle onto, and how far it is: the next passing key
+    // (frames 5 and 15, 1/6 s and 1/2 s) in the direction Run plays. Worked out here, in the hot
+    // frame, so the stop itself is a flip of two integers and no cold code boxes a double.
+    let key = RUN_KEY_1;
+    let remain: number;
+    if (scale >= 0) {
+      if (t <= RUN_KEY_1 + EPS) {
+        remain = RUN_KEY_1 - t;
+      } else if (t <= RUN_KEY_2 + EPS) {
+        key = RUN_KEY_2;
+        remain = RUN_KEY_2 - t;
+      } else {
+        remain = RUN_KEY_1 + RUN_SECONDS - t;
+      }
+    } else if (t >= RUN_KEY_2 - EPS) {
+      key = RUN_KEY_2;
+      remain = t - RUN_KEY_2;
+    } else if (t >= RUN_KEY_1 - EPS) {
+      remain = t - RUN_KEY_1;
+    } else {
+      key = RUN_KEY_2;
+      remain = t + RUN_SECONDS - RUN_KEY_2;
+    }
+    d[D_RUN_KEY] = key;
+    d[D_RUN_REMAIN] = remain;
+    anim.atKey = remain <= EPS ? 1 : 0;
     return;
   }
   anim.want = 0;
   if (anim.mode === RUN_OFF) return;
-  if (anim.mode === RUN_ON) settleOnKey(anim);
+  if (anim.mode === RUN_ON) {
+    // The walk stopped: Run plays on to the key worked out on the last frame, or holds at once
+    // when it already sits on one.
+    anim.mode = RUN_SETTLE;
+    anim.held = anim.atKey;
+    if (anim.atKey !== 0) d[D_RUN_T] = d[D_RUN_KEY] as number;
+  }
   if (anim.held === 0) {
     // Plays on, at the scale it had, until the key, and its weight goes on rising if it
     // was still on its way in. No fade yet: a crossfade toward rest from a split pose
     // dips the feet below the floor (see assets.md).
     const rising = (d[D_RUN_W] as number) + dt * RUN_BLEND_RATE;
-    d[D_RUN_W] = rising >= 1 - EPS ? 1 : rising;
+    if (rising >= 1 - EPS) d[D_RUN_W] = 1;
+    else d[D_RUN_W] = rising;
     const scale = d[D_RUN_SCALE] as number;
-    const step = dt * Math.abs(scale);
+    const step = scale >= 0 ? dt * scale : -dt * scale;
     const remain = d[D_RUN_REMAIN] as number;
     if (step >= remain - EPS) {
       d[D_RUN_T] = d[D_RUN_KEY] as number;
       anim.held = 1;
     } else {
       d[D_RUN_REMAIN] = remain - step;
-      const t = (d[D_RUN_T] as number) + dt * scale;
-      d[D_RUN_T] = t - RUN_SECONDS * Math.floor(t / RUN_SECONDS);
+      let advanced = (d[D_RUN_T] as number) + dt * scale;
+      if (advanced >= RUN_SECONDS) advanced -= RUN_SECONDS;
+      else if (advanced < 0) advanced += RUN_SECONDS;
+      d[D_RUN_T] = advanced;
     }
   } else {
     const w = (d[D_RUN_W] as number) - dt * RUN_BLEND_RATE;
@@ -374,43 +459,6 @@ function stepRun(anim: ChampionAnim, champion: AnimChampion): void {
     } else {
       d[D_RUN_W] = w;
     }
-  }
-}
-
-/**
- * The walk stopped: finds the next passing key in the direction Run plays (frames 5 and
- * 15, 1/6 s and 1/2 s) and how far it is. A Run that already sits on one holds at once.
- */
-function settleOnKey(anim: ChampionAnim): void {
-  const d = anim.d;
-  const t = d[D_RUN_T] as number;
-  anim.mode = RUN_SETTLE;
-  anim.held = 0;
-  let remain: number;
-  let key = RUN_KEY_1;
-  if ((d[D_RUN_SCALE] as number) >= 0) {
-    if (t <= RUN_KEY_1 + EPS) {
-      remain = RUN_KEY_1 - t;
-    } else if (t <= RUN_KEY_2 + EPS) {
-      key = RUN_KEY_2;
-      remain = RUN_KEY_2 - t;
-    } else {
-      remain = RUN_KEY_1 + RUN_SECONDS - t;
-    }
-  } else if (t >= RUN_KEY_2 - EPS) {
-    key = RUN_KEY_2;
-    remain = t - RUN_KEY_2;
-  } else if (t >= RUN_KEY_1 - EPS) {
-    remain = t - RUN_KEY_1;
-  } else {
-    key = RUN_KEY_2;
-    remain = t + RUN_SECONDS - RUN_KEY_2;
-  }
-  d[D_RUN_KEY] = key;
-  d[D_RUN_REMAIN] = remain;
-  if (remain <= EPS) {
-    d[D_RUN_T] = key;
-    anim.held = 1;
   }
 }
 
@@ -425,15 +473,16 @@ function stepOverlay(anim: ChampionAnim): void {
   const length = CLIP_SECONDS[OV_CLIP[ov] as number] as number;
   const t = (d[D_OV_T] as number) + dt;
   d[D_OV_T] = t;
-  let raw = d[D_OV_RAW] as number;
   if (anim.ovFade === 0) {
-    raw += dt * (OVERLAY_IN_RATE[ov] as number);
-    if (raw >= 1 - EPS) raw = 1;
+    const rising = (d[D_OV_RAW] as number) + dt * (OVERLAY_IN_RATE[ov] as number);
+    if (rising >= 1 - EPS) d[D_OV_RAW] = 1;
+    else d[D_OV_RAW] = rising;
   } else {
-    raw -= dt * OVERLAY_OUT_RATE;
-    if (raw <= EPS) raw = 0;
+    const falling = (d[D_OV_RAW] as number) - dt * OVERLAY_OUT_RATE;
+    if (falling <= EPS) d[D_OV_RAW] = 0;
+    else d[D_OV_RAW] = falling;
   }
-  d[D_OV_RAW] = raw;
+  const raw = d[D_OV_RAW] as number;
   // The last 6 ticks of the clip fade it out, so it ends at zero weight on its last key.
   let w = raw;
   const tail = (length - t) * OVERLAY_OUT_RATE;
@@ -456,7 +505,9 @@ function stepDeath(anim: ChampionAnim): void {
   const length = CLIP_SECONDS[CLIP_DEATH] as number;
   // Held on the last frame: the time stops at the clip's end and never wraps.
   const t = (d[D_DEATH_T] as number) + dt;
-  d[D_DEATH_T] = t >= length - EPS ? length : t;
+  if (t >= length - EPS) d[D_DEATH_T] = length;
+  else d[D_DEATH_T] = t;
   const w = (d[D_DEATH_W] as number) + dt * DEATH_BLEND_RATE;
-  d[D_DEATH_W] = w >= 1 - EPS ? 1 : w;
+  if (w >= 1 - EPS) d[D_DEATH_W] = 1;
+  else d[D_DEATH_W] = w;
 }

@@ -44,6 +44,7 @@ function recorder(): { handlers: FeedbackHandlers; calls: Call[]; records: SimEv
     damage: (tick, targetId, sourceId) => calls.push({ kind: 'damage', args: [tick, targetId, sourceId] }),
     cast: (tick, event) => calls.push({ kind: 'cast', args: [tick, event.championId, event.slot === 'M1' ? 1 : 2] }),
     interrupt: (tick, event) => calls.push({ kind: 'interrupt', args: [tick, event.championId] }),
+    dash: (tick, championId, active) => calls.push({ kind: 'dash', args: [tick, championId, active] }),
     roundStarted: (tick) => calls.push({ kind: 'roundStarted', args: [tick] }),
     hit: (tick, event) => {
       calls.push({ kind: 'hit', args: [tick, event.x, event.y] });
@@ -101,6 +102,8 @@ describe('routeEvents', () => {
         { type: 'castStarted', championId: 3, castId: 5, slot: 'M1', ex: false, windupTicks: 6, cost: 0 },
         { type: 'castStarted', championId: 1, castId: 6, slot: 'Q', ex: true, windupTicks: 9, cost: 25 },
         { type: 'castInterrupted', championId: 1, castId: 6, slot: 'Q', ex: true, reason: 'stun' },
+        { type: 'dashStarted', championId: 2, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
+        { type: 'dashEnded', championId: 2, x: 4, y: 0, reason: 'complete' },
         { type: 'roundStarted', round: 2 },
       ]),
       handlers,
@@ -109,6 +112,8 @@ describe('routeEvents', () => {
       { kind: 'cast', args: [12, 3, 1] },
       { kind: 'cast', args: [12, 1, 2] },
       { kind: 'interrupt', args: [12, 1] },
+      { kind: 'dash', args: [12, 2, 1] },
+      { kind: 'dash', args: [12, 2, 0] },
       { kind: 'roundStarted', args: [12] },
     ]);
   });
@@ -585,6 +590,17 @@ describe('the animation triggers', () => {
     expect(anims.map((anim) => anim.pendDeath)).toEqual([0, 1, 1, 0]);
   });
 
+  it('flags the champion whose dash starts and clears it when the dash ends', () => {
+    const { anims, feedback } = make();
+    routeEvents(
+      fakeState(5, [{ type: 'dashStarted', championId: 3, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 }]),
+      feedback,
+    );
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 1]);
+    routeEvents(fakeState(13, [{ type: 'dashEnded', championId: 3, x: 4, y: 0, reason: 'complete' }]), feedback);
+    expect(anims.map((anim) => anim.dashing)).toEqual([0, 0, 0, 0]);
+  });
+
   it('snaps every champion when a round starts', () => {
     const { anims, feedback } = make();
     routeEvents(fakeState(5, [{ type: 'roundStarted', round: 3 }]), feedback);
@@ -600,6 +616,7 @@ describe('the animation triggers', () => {
           { type: 'damage', targetId: 3, sourceId: 0, amount: 1, health: 9 },
           { type: 'death', targetId: 3, sourceId: 0 },
           { type: 'castInterrupted', championId: 3, castId: 1, slot: 'M1', ex: false, reason: 'stun' },
+          { type: 'dashStarted', championId: 3, x: 0, y: 0, dirX: 1, dirY: 0, distance: 4, ticks: 8 },
         ]),
         feedback,
       ),
