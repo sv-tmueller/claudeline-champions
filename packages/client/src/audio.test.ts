@@ -9,6 +9,7 @@ interface Counts {
   gains: number;
   starts: number;
   resumes: number;
+  closes: number;
   /** One entry per `cancelScheduledValues` call: the index of the envelope that got it. */
   cancels: number[];
   /** Every call on an envelope parameter, in order, as text. */
@@ -18,11 +19,12 @@ interface Counts {
 interface FakeOptions {
   state?: string;
   resume?: () => Promise<void>;
+  close?: () => Promise<void>;
 }
 
 /** A stand-in for an AudioContext that counts what the sound code asks of it. Its currentTime throws. */
 function fakeContext(options: FakeOptions = {}): { counts: Counts; make: () => AudioContext } {
-  const counts: Counts = { contexts: 0, oscillators: 0, gains: 0, starts: 0, resumes: 0, cancels: [], calls: [] };
+  const counts: Counts = { contexts: 0, oscillators: 0, gains: 0, starts: 0, resumes: 0, closes: 0, cancels: [], calls: [] };
   const make = (): AudioContext => {
     counts.contexts += 1;
     const context = {
@@ -63,6 +65,10 @@ function fakeContext(options: FakeOptions = {}): { counts: Counts; make: () => A
           connect() {},
         };
       },
+      close() {
+        counts.closes += 1;
+        return options.close ? options.close() : Promise.resolve();
+      },
       resume() {
         counts.resumes += 1;
         return options.resume ? options.resume() : Promise.resolve();
@@ -96,7 +102,7 @@ describe('createWebSound', () => {
     const sound = createWebSound(make);
     sound.play(SOUNDS.hit);
     sound.play(SOUNDS.roundEnd);
-    expect(counts).toEqual({ contexts: 0, oscillators: 0, gains: 0, starts: 0, resumes: 0, cancels: [], calls: [] });
+    expect(counts).toEqual({ contexts: 0, oscillators: 0, gains: 0, starts: 0, resumes: 0, closes: 0, cancels: [], calls: [] });
   });
 
   it('unlock builds one context and one started voice per sound, and a second unlock builds no more', () => {
@@ -194,6 +200,67 @@ describe('createWebSound', () => {
     });
     expect(warnings).toHaveLength(1);
     expect(counts.calls).toEqual([]);
+  });
+
+  it('closes the context it made when a node cannot be made, and never closes a working one', () => {
+    const { counts, make } = fakeContext();
+    withWarnings(() => {
+      const sound = createWebSound(() => {
+        const context = make();
+        context.createOscillator = () => {
+          throw new Error('no oscillator');
+        };
+        return context;
+      });
+      sound.unlock();
+    });
+    expect(counts.closes).toBe(1);
+    const working = fakeContext();
+    createWebSound(working.make).unlock();
+    expect(working.counts.closes).toBe(0);
+  });
+
+  it('survives a close that throws or rejects, and a factory that made nothing closes nothing', async () => {
+    const throwing = fakeContext({
+      close: () => {
+        throw new Error('no close');
+      },
+    });
+    let handled = 0;
+    const rejecting = fakeContext({
+      close: () => {
+        const rejection = Promise.reject(new Error('no close'));
+        const original = rejection.catch.bind(rejection);
+        rejection.catch = ((onRejected: (reason: unknown) => unknown) => {
+          handled += 1;
+          return original(onRejected);
+        }) as typeof rejection.catch;
+        return rejection;
+      },
+    });
+    for (const { make } of [throwing, rejecting]) {
+      const { warnings } = withWarnings(() => {
+        const sound = createWebSound(() => {
+          const context = make();
+          context.createOscillator = () => {
+            throw new Error('no oscillator');
+          };
+          return context;
+        });
+        sound.unlock();
+      });
+      expect(warnings).toHaveLength(1);
+    }
+    await Promise.resolve();
+    expect(throwing.counts.closes).toBe(1);
+    expect(rejecting.counts.closes).toBe(1);
+    expect(handled, 'the rejected close is caught').toBe(1);
+    const { warnings } = withWarnings(() => {
+      createWebSound(() => {
+        throw new Error('no context');
+      }).unlock();
+    });
+    expect(warnings).toHaveLength(1);
   });
 
   it('resumes a suspended context on each unlock', () => {

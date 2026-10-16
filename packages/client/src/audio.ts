@@ -64,8 +64,9 @@ export function createWebSound(makeContext: () => AudioContext): SoundOutput {
   let muted = false;
 
   function build(): void {
+    let made: AudioContext | undefined;
     try {
-      const made = makeContext();
+      made = makeContext();
       const master = made.createGain();
       master.gain.value = MASTER_GAIN;
       master.connect(made.destination);
@@ -86,6 +87,13 @@ export function createWebSound(makeContext: () => AudioContext): SoundOutput {
     } catch (error) {
       failed = true;
       console.warn('the sound is off', error);
+      // A node failed after the context was made: close it, so no silent context or started
+      // oscillator stays alive for the life of the page. A close that fails changes nothing.
+      try {
+        made?.close().catch(ignore);
+      } catch {
+        // Nothing left to release.
+      }
     }
   }
 
