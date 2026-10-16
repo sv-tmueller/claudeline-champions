@@ -417,6 +417,27 @@ describe('the aim at an ally', () => {
   });
 });
 
+describe('a bot reused for another champion', () => {
+  it('does not aim at the ally id of the champion it held for before', () => {
+    // A Lumeth bot presses Soothing Surge at the ally (champion 1) and holds it; the same bot then
+    // thinks on a Quillon state with a cast in progress and a live champion 1 at the same spot.
+    const lumeth = scene({ ...M2_ONLY, ally: [3, 0], allyMissing: 60 });
+    const bot = createBot(0, 'hard', 3);
+    let pressed = false;
+    for (let t = 0; t < THINKS && !pressed; t++) pressed = bot.think(lumeth).buttons !== 0;
+    expect(pressed).toBe(true);
+    const quillon = sceneOf('quillon', 8, { kits, enemy: [-6, 8], ally: [3, 0], ready: [] });
+    const me = quillon.champions[0] as ChampionState;
+    me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 18, windupLeft: 10 };
+    let input = bot.think(quillon);
+    for (let t = 0; t < 12; t++) input = bot.think(quillon);
+    const angle = Math.atan2(input.aimY / 100 - me.y, input.aimX / 100 - me.x);
+    // North, at the enemy: not east, at the old ally.
+    expect(angle).toBeGreaterThan(1.4);
+    expect(angle).toBeLessThan(1.75);
+  });
+});
+
 describe('the run of an ally slot', () => {
   const castDelay = TIERS.hard.castDelay;
   const delay = TIERS.hard.delay;

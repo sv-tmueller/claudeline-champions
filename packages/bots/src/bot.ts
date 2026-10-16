@@ -486,7 +486,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       }
 
       const kit = findKit(state, me.championId);
-      refreshKitCache(kitCache, kit, me.championId);
+      // A rebuild means another kit or champion id: the ally held for the windup of the old one is
+      // an id in another match, and must not be aimed at.
+      if (refreshKitCache(kitCache, kit, me.championId)) aimHold.allyAim = -1;
       const profile = kitCache.profile;
       decide(state, me, profile);
 

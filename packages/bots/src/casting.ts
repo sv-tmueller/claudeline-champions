@@ -259,13 +259,16 @@ export function createKitCache(): KitCache {
   };
 }
 
-/** Rebuilds the cache when `kit` or `championId` differs from the one it was built for. */
+/**
+ * Rebuilds the cache when `kit` or `championId` differs from the one it was built for. Returns
+ * whether it rebuilt, so a bot can drop what it holds for the champion it served before.
+ */
 export function refreshKitCache(
   cache: KitCache,
   kit: KitDef | undefined,
   championId: string,
-): void {
-  if (cache.built && cache.kit === kit && cache.championId === championId) return;
+): boolean {
+  if (cache.built && cache.kit === kit && cache.championId === championId) return false;
   cache.built = true;
   cache.kit = kit;
   cache.championId = championId;
@@ -375,6 +378,7 @@ export function refreshKitCache(
       cache.escapeDash[i] = 1;
     }
   }
+  return true;
 }
 
 /**
