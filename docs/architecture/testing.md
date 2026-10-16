@@ -55,10 +55,23 @@ port 5173, which Playwright starts itself.
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.
 - `combat.spec.ts`: the F4 debug shot, flashes, rings and kills (`combat.png`),
-  and the heap probe below, on the sandbox.
+  the clips (`data-anim0` to `data-anim3`, see client.md, Animation) and the
+  heap probe below, on the sandbox. Before the probe hook runs, on the fake
+  clock: M1 once reads `data-anim0` Idle+Attack within 3 ticks of the press and
+  Idle again within 30 (the button goes up after one tick, so the cooldown
+  allows no second cast), the first hit reads `data-anim2` Idle+Hit, the death
+  reads Death, `death.png` is taken once the corpse has lain for its 60 ticks
+  (it shows the corpse drawn, which is the unculled mesh), and the last read,
+  300 ticks on, still reads Death. `data-anim1` reads Idle at every check
+  (champion 3 is a bot and walks).
 - `live-probe.spec.ts`: the heap probe's second scene, the default match at time
   scale 1 with a pointer that moves before every window, no picture (see the
-  heap probe below).
+  heap probe below). It also reads the clips of the match: `data-anim0` starts
+  with Run at every measured read (the human walks, with M1 held), a bot reads
+  Cast and a champion reads Hit in some read, and the victim of round 3's first
+  death reads Death. The reads are the same on every attempt, since the bots are
+  deterministic and the hook paces the windows: a bot reads Cast from the first
+  read (tick 2729), Attack from 2789, and Hit comes at 2879 (Run+Hit).
 - `match.spec.ts`: the first round of the default match against bots, once per
   arena and team size (`match.png`, and `match-arena02.png` for
   `/?arena=arena02`; `match-3v3.png` and `match-3v3-arena02.png` for the same
@@ -281,7 +294,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   (`bot-driver.ts`), the sound (`audio.ts`: `routeSounds` and `play` run on
   every step's events, and both probe specs unlock the audio with a real
   gesture before the first measured window, so the counted calls reach real
-  Web Audio) and everything in `main.ts`, including the hook's `frameMany`.
+  Web Audio), the champions' clips (`champion-anim.ts`, the state machine, and
+  `clip-sampler.ts`, which poses the bones: both run for every champion in every
+  frame) and everything in `main.ts`, including the hook's `frameMany`.
   Three's `onAnimationFrame` is logged and not counted: no frame
   of a measured window runs through it. A new module on the frame path goes
   into the pattern. The bots package is not counted, and its bytes are the
@@ -433,6 +448,39 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   sandbox in 5 of 12 attempts (the first ring it draws), and one-off spikes of
   `interpolate.ts:placeChampion` (4332 B, once, sandbox) and
   `audio.ts:routeSounds` (1944 B, once, live) fell in one window each.
+- The animation modules read 0 B (#111). On f67a490 (the code of the package
+  from then on), `champion-anim.ts` and `clip-sampler.ts` read 0 B in all 60
+  windows of the 12 local attempts of each scene (4 batches of 3 repeats, none
+  blind). The counted medians stayed in the old range: 324 to 456 B on the
+  sandbox (384, 384, 384; 432, 384, 324; 432, 456, 384; 336, 360, 384) and 432
+  to 576 B live (432, 528, 468; 492, 480, 444; 576, 468, 480; 468, 456, 456),
+  against 600 B and 780 B, so no limit moves. The bots' medians were 6876 to
+  7456 B. Logged, not asserted: `impact-rings.ts:draw` read 24 B in window 1 of
+  the sandbox in 6 of 12 attempts, as before, and one-off spikes of
+  `main.ts:writeCombatHooks` (3628 B, sandbox window 0, once, and 96 B live
+  once) fell in one window each. The package found three things on the way, each
+  the kind of bytes that is easy to ship:
+  - A double that comes out of a branch merge with an integer constant on one
+    side (`x = cond ? 1 : w`, a `let` assigned in an `if`, a negation under an
+    `if`) is boxed by V8's Maglev: one heap number, 12 to 16 B, on every call.
+    The first state machine read 24 to 768 B per window in `stepRun`, 150 KB in
+    a bench of 12 000 calls (a scratch spec that imports the module in the page
+    and runs it under the sampling profiler, never committed), and 0 B in all of
+    them once every such merge became a store in a branch or arithmetic on a 0
+    or 1.
+  - A branch V8 has no feedback for deoptimizes the function that holds it, and
+    the function then runs in the interpreter for hundreds of calls, where every
+    double allocates. The first state machine read `champion.dash` and its
+    `dirX` and `dirY`, and the first dash of the live match (a bot's Glide) cost
+    25 to 29 KB per window in `stepRun` for the four windows after it and 7.8 KB
+    in `stepOverlay`, which is inlined into the same caller. The dash is now the
+    sim's `dashStarted` and `dashEnded` events, which the cold handler turns
+    into an integer, and the direction of a dash is the displacement of the
+    frame.
+  - A closure that captures a parameter makes its function allocate a context on
+    every call, not once per closure: the row below with `() => anim.mode` read
+    2.0 to 2.5 KB a window in `stepRun`, where `() => RUN_SETTLE` (nothing
+    captured) is one function object per transition.
 - To read the per-function figures, read the "combat code allocated" line of a
   failure message, or the per-window lines `heap probe <scene> attempt N window
   W: counted ...` that every attempt logs. Excluding `frameMany` from the
@@ -479,6 +527,24 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   | array per `BotDriver.think` | `bot-driver.ts:think`, first line | `(globalThis as unknown as { __b?: unknown }).__b = [state.tick, inputs.length];` | 1320 to 1996 | 1536 to 1568 |
   | template per `ResultScreen.update` | `result-screen.ts:update`, first line | `` (globalThis as unknown as { __r?: unknown }).__r = `r${state.match?.round}`; `` | 892 to 944 | 836 to 860 (sandbox-gated: red here, 56 B over the limit) |
   | rect per frame in `sampleAim` | `main.ts:sampleAim`, the rect argument of `groundAimFromPointer` | `renderer.domElement.getBoundingClientRect()` in place of `canvasRect` | 336 to 504 (passes: no pointer) | 1020 to 1148 (live-gated) |
+  | object per view update | `clip-sampler.ts:poseChampion`, first line | `(globalThis as unknown as { __m?: unknown }).__m = { t: rig.time[0] };` | 3544 to 3732 | 3812 to 3876 |
+  | binding table per frame | `clip-sampler.ts:poseChampion`, first line | `(globalThis as unknown as { __m?: unknown }).__m = rig.bones.map((bone) => bone.quaternion);` | 3624 to 3744 | 3616 to 3740 |
+  | clip time as an argument | `champion-anim.ts:updateAnims` and `updateAnim` | `updateAnim(anim, champion, now)` and the `now` parameter in place of the `D_NOW` write and read | 1548 to 1776 | 1632 to 1728 |
+  | closure per transition | `champion-anim.ts:stepRun`, after `anim.mode = RUN_SETTLE;` | `(globalThis as unknown as { __m?: unknown }).__m = () => RUN_SETTLE;` | 432 to 456 (passes) | 464 to 544 (passes) |
+
+  The four rows of #111, each applied alone on f67a490 with 3 attempts per
+  scene: the first three fail 6 of 6 (the object and the table name
+  `clip-sampler.ts:poseChampion` at 2.9 to 3.5 KB a window, and the argument
+  names `main.ts:draw`, which V8 inlines `updateAnims` into, at 1.0 to 1.2 KB),
+  and the closure passes 6 of 6, which is the expected reading: it is one
+  function object per transition, a few per window, so `stepRun` reads 28 to 140
+  B in the windows of the live scene and nothing in the sandbox, where no walk
+  stops in a window. It is recorded like the `createGain` row of the audio
+  (client.md, Audio). The existing rows rerun on the same head, all red 6 of 6:
+  the array in `frame` (sandbox 1512 to 1664 B, live 1628 to 1804 B), the
+  closure in `routeEvents` (1620 to 1744 B and 1712 to 1768 B) and the object in
+  the entity views' `draw` (3072 to 3120 B and 3000 to 3100 B), against clean
+  medians of 324 to 456 B and 432 to 576 B.
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure

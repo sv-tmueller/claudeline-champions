@@ -31,9 +31,10 @@ copies the canvas's client rect into an object once per resize
 call, and `groundAimFromPointer` casts the pointer's ray through that copy and
 writes the ground point into a scratch record (`aimHit`), returning only
 whether the ray hit the plane. For the aim sampling, the entity drawing, the
-champion placing, the overlay circles and the rings' `spawn` and position the
-rule is that no raw double crosses a call: objects go in and fields are read
-out, since a double passed to a call that V8 does not inline is boxed.
+champion placing, the overlay circles, the rings' `spawn` and position, the
+animation state machine and the clip sampler the rule is that no raw double
+crosses a call: objects go in and fields are read out, since a double passed to
+a call that V8 does not inline is boxed.
 `main.ts:draw` places each champion view through `placeChampion` in
 `interpolate.ts` (the fields of the position, and the facing through
 `rotation.fromArray` over a preallocated tuple of doubles), the overlay hands
@@ -46,9 +47,12 @@ load of a double field allocates: `ImpactRings.spawn` only keeps the record,
 and the rings' `draw` reads its coordinates. It is not a rule of the whole
 frame path: `interpolatePoses` still passes three raw doubles to `lerpAngle`,
 and the rings' `draw` passes two to `scale.set` per live ring, which read 0 B
-in the probe because V8 inlines them when hot, and the probe's mutations catch
-a regression there. The hook's `frameMany` boxes one timestamp per frame (9 to
-18 B, see [testing](testing.md)). The copy assumes the canvas fills `#app`, so
+once hot (the rings' `draw` logs 24 B in sandbox window 1, see
+[testing](testing.md)) because V8 inlines them, and the probe's mutations catch
+a regression there. The two animation modules hold their doubles in
+`Float64Array`s and pass records and indices, see Animation. The hook's
+`frameMany` boxes one timestamp per frame (9 to 18 B, see
+[testing](testing.md)). The copy assumes the canvas fills `#app`, so
 only a resize moves its rect; a layout change without a resize event would
 leave it stale. The mapping itself is unchanged, and `camera.test.ts` keeps
 the two functions it replaced as an oracle, compared to the new path with
@@ -171,7 +175,9 @@ id. The fallback goes by the id list and not by a failed load, since a 404 is a
 console error and the e2e specs treat that as a failure. `loadModels` loads each
 distinct URL once and clones one view per champion in id order, with
 SkeletonUtils' `clone`: a plain `Object3D.clone` of a rigged model shares the
-source skeleton, so every view would draw at the arena origin.
+source skeleton, so every view would draw at the arena origin. It then binds the
+six clips of the model to the view's bones (`createClipRig`, see Animation); a
+model without one of the clips is a page error at load.
 
 ## Camera
 
@@ -182,8 +188,8 @@ fits the viewport with margin. No rotation, no zoom in v1.
 
 Arena model and champion models loaded from glTF under `assets/models/`.
 Projectiles and areas are simple meshes. Effects start as meshes and
-billboards. The champion models are rigged with four clips (Idle, Run, Cast,
-Death) that nothing plays yet; the animation state machine is batch 10. See
+billboards. The champion models are rigged with six clips (Idle, Run, Attack,
+Cast, Hit, Death), which the client plays itself: see Animation and
 [assets](assets.md).
 
 The combat view is made of small modules that `main.ts` wires together. The
@@ -201,6 +207,8 @@ sim steps first and the views read its state afterwards.
   `champion-look` swaps a champion's materials between its own, the white flash
   and the faded dead grey.
 - `debug-shot.ts`: the dev-only F4 shot above.
+- `champion-anim.ts` and `clip-sampler.ts`: which clip of each champion plays,
+  and the sampler that poses its bones; see Animation.
 - `bot-driver.ts`, `match-setup.ts` and `launch.ts`: see Launch and match.
 - `audio.ts`: the first-pass sound, `routeSounds` over the step's events
   after `routeEvents`, and the unlock on the first gesture; see Audio.
@@ -208,17 +216,19 @@ sim steps first and the views read its state afterwards.
   in centimetres), `data-f0` (its facing in radians, three decimals),
   `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
   `data-rings`, `data-bar0` to `data-bar3`, or to `data-bar5` in a 3v3 (a
-  champion's fill percent, "x" for a hidden bar), `data-overlay`,
+  champion's fill percent, "x" for a hidden bar), `data-anim0` to `data-anim3`,
+  or to `data-anim5` in a 3v3 (what a champion's clips play, see Animation),
+  `data-overlay`,
   `data-debugShots`, `data-phase` (the sim's phase string: warmup, round,
   roundEnd or matchEnd), `data-round` and the readiness flags `data-rendered`
   and `data-arena`. The e2e specs read them and pace themselves by `data-tick`.
   A per-tick hook is written only when its value changes, with `setAttribute`
   and text from the tables of `hook-text.ts` (integers, signed centimetres,
-  facing in milliradians, percents) and `flashTexts` in `feedback.ts`, all made
-  once at startup, so a change write builds no string. A table falls back to
-  the formatter past its range. A position is two hooks and a bar is one hook
-  per champion because a combined "x,y" or "a,b,c,d" text cannot come from a
-  table.
+  facing in milliradians, percents), `flashTexts` in `feedback.ts` and
+  `ANIM_TEXTS` in `champion-anim.ts`, all made once at startup, so a change
+  write builds no string. A table falls back to the formatter past its range. A
+  position is two hooks and a bar is one hook per champion because a combined
+  "x,y" or "a,b,c,d" text cannot come from a table.
 
 The frame path allocates nothing in steady state: views are pooled, text comes
 from tables and is written only on a change, and the numbers a frame carries
@@ -233,7 +243,8 @@ that long to reach its optimized tier, and with a pointer that moves before
 every window, so the aim sampling and the entity drawing are counted:
 `sampleAim` used to allocate about 2.5 KB per window whenever a pointer existed
 (issue #87) and `EntityViews.draw` boxed the three doubles of `position.set` on
-the runner (issue #89), and both now read 0 B. The HUD writes its state with
+the runner (issue #89), and both now read 0 B, as do the two animation modules
+in every window of both scenes. The HUD writes its state with
 `setAttribute` and not `dataset`: in the probe a `dataset` write allocated about
 100 B per window whenever a slot changed, and `setAttribute` allocated none.
 
@@ -249,6 +260,129 @@ same commit.
 | `champion-look.ts` | `FLASH_COLOUR`, `DEAD_COLOUR` |
 | `entity-views.ts` | `PROJECTILE_ALLY_COLOUR`, `PROJECTILE_ENEMY_COLOUR` |
 | `debug-overlay.ts` | the magenta overlay `#ff00ff` |
+
+## Animation
+
+The six clips of a champion model (Idle, Run, Attack, Cast, Hit, Death) play
+through the client's own sampler on the clip data, not through three's
+`AnimationMixer`: the mixer allocated 12 to 104 KB per heap-probe window, and it
+averages the clips that play where an upper-body strike must replace the arms
+and leave the legs alone
+([batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811)).
+The mixer is the test oracle: `clip-sampler.test.ts` compares the sampler to it
+with `Object.is` per component, for every clip of all five models at 60 times
+per clip, with `action.time` and `update(0)`. Two counted modules, both on the
+frame path rules above:
+
+- `champion-anim.ts` is pure, with no three. One record per champion holds the
+  state as small integers (the run mode, the overlay that plays, the pending
+  triggers) and every double in one `Float64Array` (clip times, weights, the
+  scale of Run). `updateAnims(anims, state, clock)` takes the triggers and moves
+  the clips on to the drawn time `(state.tick + clock.alpha) / 60`, read from
+  those fields inside the module, so no `dt` or `t` crosses a call and a pause,
+  `?timescale` and the probe hook all follow it. A frame longer than 0.2 s
+  counts as 0.2 s, and a clock that goes back stands still.
+- `clip-sampler.ts` binds the clips of a view at load and poses its bones.
+  `createClipRig` looks the six clips up by name (`AnimationClip.findByName`:
+  the glb exports them alphabetically, and a missing name throws), binds each
+  track to its bone's `quaternion`, or to the `position` of `Hips`, with a key
+  cursor, saves each bone's rest pose before any write and turns
+  `frustumCulled` off on every `SkinnedMesh`. `poseChampion(rig, anim)` samples
+  the clips that play (LINEAR: the slerp is `Quaternion.slerpFlat` ported
+  operation for operation, and the translation a lerp), blends them and writes
+  each bone once with `fromArray(buffer, 0)`. Nothing else poses a bone, and
+  `placeChampion` stays the only writer of a view's root: the sampler never
+  touches it.
+
+The transitions are tuned constants in ticks at 60 Hz:
+
+| Trigger | What plays | Blend |
+|---|---|---|
+| walk speed under 0.5 m/s | Idle, 2 s, loops | 9 to and from Run |
+| 0.5 m/s or more, or a dash | Run, 20 frames, loops, entered at its first passing key (frame 5) at weight 0 | in 9 |
+| the walk stops | Run plays on at its last scale to its next passing key (frame 5 or 15), holds there, then fades | out 9 |
+| castStarted of M1, a champion or a bot | Attack from time 0; the next M1 restarts it | in 3, out over its last 6 of 24 |
+| castStarted of any other slot | Cast, 30 ticks | in 3, out over its last 6 |
+| castInterrupted | the Attack or Cast fades from its weight | 6 |
+| damage with `sourceId >= 0`, when no Attack or Cast plays and no Hit runs | Hit, 18 ticks | in 2, out over its last 6 |
+| death, the ring's included | Death, held on its last frame | in 6, from the pose of the moment |
+| roundStarted | Idle at time 0 | snap |
+
+Run's time scale is `speed * 2 / 5.5`, so it is 2 at 5.5 m/s: a step covers
+1.83 m of ground against 0.92 m of foot travel in the clip, and the feet would
+slide at scale 1. It is at most 3 (a haste at its cap) and a dash plays at that
+cap. It is negative, so Run plays backward, when the velocity opposes the
+facing (for a dash, the displacement of the frame does). The facing is the
+direction to the aim point, which the sim turns it to every tick, so the sign
+needs no trigonometry. There are no strafe clips.
+
+The blend has no additive part anywhere:
+
+- The base layer crossfades Idle and Run with weights that sum to 1. A channel
+  only Run keys (the legs) blends from the rest pose, as three does.
+- The upper overlay (Attack, Cast or Hit) replaces the channels its clip keys,
+  Spine and both arms, with `slerp(base, overlay, w)`. At w = 1 the strike
+  reads fully while the legs and Hips keep Run's. A cast that replaces an
+  Attack that plays goes on from the weight the Attack had, and its first pose
+  is the rest pose, so a cast started halfway through an Attack jumps there.
+- Death goes over everything. Its five channels (Hips rotation and translation,
+  Spine and both arms) blend from the pose of the moment by its weight, and the
+  legs, which it does not key, blend to rest. Its time stops at the clip's end
+  and never wraps, so the corpse lies on its last frame until the round starts.
+
+The passing-key rule is why Run is entered and left where it is. The floor
+holds for one clip alone at weight 1 (assets.md). A crossfade between Run and
+Idle or rest breaks it when Run is blended away from a pose with turned legs:
+a Run at weight 0.07 on its split key puts the feet 0.67 mm under the floor,
+and 0.44 mm on the frame next to a split. So Run is entered at frame 5, whose
+legs and Hips are at rest, and when the walk stops it plays on at its last scale
+to its next passing key, holds there while the weight fades, and the feet stay
+at or above the floor. `clip-sampler.test.ts` samples every transition (every
+stop phase of Run at four speeds and both directions, every overlay at every
+offset over Idle and Run, interrupts, Death from every state, a dash, the snap)
+for all five models, and the lowest skinned vertex stays at or above -1e-4 m
+(the lowest figure is -9e-15 m). The highest stays under 1.91 m: every
+transition reaches 1.735 m on the three plain models and 1.8695 m on Lumeth,
+but an overlay over Run adds the bounce of Run's Hips (up to 35 mm) to
+Quillon's staff at the strike, 1.9051 m in the sweep and 1.9078 m at the worst
+phase, 6 cm under the health bar at 1.97 m. Entering Run at its split, leaving
+it with no hold and an additive Arm_R are the mutation rows of these pins.
+
+`frustumCulled` is false on every skinned mesh because three computes a skinned
+mesh's bounding sphere from the bind pose, once. The Death corpse lies along the
+aim axis, from -1.03 to +0.81 m in x and from -0.78 to +1.31 m in z in model
+space (the +1.31 m is Quillon's staff), outside that sphere, so a culled corpse
+would vanish near the edge of the screen. `death.png` of `combat.spec.ts` shows
+the corpse drawn.
+
+Where it runs. The triggers ride `routeEvents`' existing pass: `CombatFeedback`
+takes the animation records and its handlers write pending integers per
+champion in the step loop (`cast` and `interrupt` take the sim's event record
+and read the champion id and the slot only, `damage` and `death` forward their
+ids, `dash` follows `dashStarted` and `dashEnded`, `roundStarted` snaps), and
+`stepSim` has no line of its own for it. The handlers run cold, a few times a
+window, in V8's interpreter, where every double a function loads or computes
+allocates a heap number, so they store integers. The dash is an event and not a
+read of `champion.dash`: that object is a load V8 has no type feedback for until
+the first dash, and the first dash of a live match deoptimized the frame path
+and cost 25 KB per window for four windows. `draw` runs `updateAnims` and then
+`poseChampion` for each view, and writes the hooks. Run and its hold are decided
+in the frame that is hot, so a stop flips two integers.
+
+One rule came out of the probe for every function of these modules. V8's Maglev
+gives a double that is the result of a branch merge with an integer constant
+on one side (`x = cond ? 1 : w`, or a `let` assigned in an `if`) a tagged
+representation, and boxes it: 12 to 16 B per call, 150 KB in a bench of 12 000
+calls. So no double in the frame path of these modules is a merge of a branch
+with an integer: a branch stores into the `Float64Array`, and a choice between
+two values is arithmetic on a 0 or 1. The probe counts it: a regression reads
+over 1 KB a window.
+
+The hooks `data-anim0` to `data-animN` hold one of nine texts, in this order:
+`Idle`, `Run`, `Idle+Attack`, `Run+Attack`, `Idle+Cast`, `Run+Cast`,
+`Idle+Hit`, `Run+Hit` and `Death`. They say what each champion is heading for
+(Run is shown while the walk or a dash lasts, not while Run is still playing out
+a stop) and are written only on a change.
 
 ## HUD
 
