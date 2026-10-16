@@ -131,11 +131,13 @@ between, by about 0.1 a^2 (a in radians, 0.037 m for a 35 degree turn).
 
 The rig has no knee bone: one would cost about 4 KB per model even keyed
 sparsely. The validator checks the names, the key counts, the length and each
-clip's exact channel set. The contract tests read the shared key times from the
-BIN and compare them with the Keys column, check the posed top and floor at
-every key, check that `Idle` and `Run` end on the pose they start with (within
-1e-6), and sample 20 steps in each key interval (slerp for rotations, lerp for
-translations) against the same floor and top.
+clip's exact channel set, and that each channel's output is a FLOAT accessor
+(VEC4 for a rotation, VEC3 for a translation) with one element per key. The
+contract tests read the shared key times from the BIN and compare them with the
+Keys column, check the posed top and floor at every key, check that `Idle` and
+`Run` end on the pose they start with (within 1e-6), and sample 20 steps in
+each key interval (slerp for rotations, lerp for translations) against the same
+floor and top.
 
 | Clip | Frames | Seconds | Keys | Channels | Plays |
 |------|--------|---------|------|----------|-------|
@@ -146,9 +148,11 @@ translations) against the same floor and top.
 | `Hit` | 9 | 0.300 | 0, 2, 9 | `Spine, Arm_L, Arm_R` | once, from rest back to rest |
 | `Death` | 30 | 1.000 | 0, 10, 20, 30 | `Hips, Hips translation, Spine, Arm_L, Arm_R` | once, holds the last frame |
 
+In the Channels column a bare bone name means that bone's rotation.
+
 - `Run` is the movement clip. Its nine keys alternate the planted passing key
   (legs and arms at 0, `Hips` at rest) with a lift-off key (legs 13 degrees,
-  `Hips` +0.022 m, the foot corner on the floor) and a split (legs 35 degrees,
+  `Hips` +0.022 m, the feet 22 mm up) and a split (legs 35 degrees,
   `Hips` +0.035 m, the flight phase with the feet 0.128 m up), in the order
   split, lift-off, pass, lift-off, split, lift-off, pass, lift-off, split with
   the legs mirrored in the second half. Only the passing keys are planted, so
@@ -158,10 +162,10 @@ translations) against the same floor and top.
   foot travel, so the feet slide unless the client scales the clip.
 - `Attack` is built for the first slot's cast. The strike at 0.133 s falls
   between the 0.1 s and 0.15 s windups of the first slot, and the clip ends
-  inside the shortest cooldown of that slot (0.4 s). The arm swings through 110
-  degrees and the staff lies horizontal at the strike; a larger swing would
-  cross 1.90 m. `Cast` serves the other slots. `Hit` leans the spine back and
-  throws the arms outward.
+  inside the shortest cooldown of that slot (0.4 s). The staff lies horizontal
+  at the strike. `Arm_R` turned past about 105 degrees from hanging lifts
+  Quillon's staff over 1.90 m. `Cast` serves the other slots. `Hit` leans the
+  spine back and throws the arms outward.
 - `Death` jolts `Hips` up 0.035 m at key 10 (R2, 0.100 m per radian), sinks it
   at key 20 and lies on the floor at key 30 (the lowest vertex 0.6 mm up). The
   client holds the last frame.
@@ -173,11 +177,10 @@ translations) against the same floor and top.
 ### Export
 
 The exporter writes the keys as authored, not sampled at every frame, and only
-the channels each clip keys, which keeps each file at most 46 KB (Lumeth, the
-largest, is 45 628 B). Every skin and animation flag of the exporter that bears
-on the output is set by name in `blender_common.export_glb(out, rigged=True)`,
-so a changed default in a later Blender cannot move the bytes unseen. That
-includes
+the channels each clip keys, which keeps each file under 46 KB. Every skin and
+animation flag of the exporter that bears on the output is set by name in
+`blender_common.export_glb(out, rigged=True)`, so a changed default in a later
+Blender cannot move the bytes unseen. That includes
 `export_optimize_animation_size`, which is off so the exporter never drops a
 key it takes for a duplicate, and the other animation flags at their 5.2
 defaults (frame step, the sampling fallback, negative frames, NLA, merge and
@@ -199,8 +202,7 @@ must print it). Regenerate each model into a scratch directory twice and `cmp`
 both runs against the committed file. `test_export_determinism.py` does this
 four times per model. Regenerate the arenas in place: `git status` must stay
 clean for them. Every champion file must stay under 48 KiB, and the budget does
-not move to make a model fit: the clips key only the channels they move, and
-Lumeth, the largest file, keeps 3 524 B of headroom.
+not move to make a model fit.
 
 ## Validator
 

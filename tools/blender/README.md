@@ -166,17 +166,18 @@ reported as that file's FAIL line, and the remaining files still run.
   `Hips` translating and each clip's channels exactly the set of the Clips
   table, once each (a missing, an extra or a duplicate channel fails); and
   LINEAR samplers that share one input with the table's key count, a minimum of
-  0 and a maximum of frames / 30 within 1e-4. A key moved to another frame
-  makes the exporter write a second input, and a dropped key makes it bake the
-  channel, so both fail. `test_champion_models.py` also reads the shared input
-  times from the BIN chunk and compares them with the frames of the Clips
-  table divided by 30, within 1e-4, so moving a key for every channel at once
-  fails too. It checks the top (at most 1.90 m) and the floor (no vertex below
-  0, with a tolerance of 0.1 mm) at every key of every clip, that `Idle` and
-  `Run` end on the pose they start with (within 1e-6), and samples 20 steps in
-  each key interval against the same floor and top. A mutation of Run key 1 that keeps
-  every key above the floor but sinks the foot between two keys is caught by the
-  sampled floor only.
+  0 and a maximum of frames / 30 within 1e-4, each with a FLOAT output of one
+  element per key (VEC4 for a rotation channel, VEC3 for a translation). A key
+  moved to another frame makes the exporter write a second input, and a dropped
+  key makes it bake the channel, so both fail. `test_champion_models.py` also
+  reads the shared input times from the BIN chunk and compares them with the
+  frames of the Clips table divided by 30, within 1e-4, so moving a key for
+  every channel at once fails too. It checks the top (at most 1.90 m) and the
+  floor (no vertex below 0, with a tolerance of 0.1 mm) at every key of every
+  clip, that `Idle` and `Run` end on the pose they start with (within 1e-6),
+  and samples 20 steps in each key interval against the same floor and top. A
+  mutation of Run key 1 that keeps every key above the floor but sinks the foot
+  between two keys is caught by the sampled floor only.
 - The arena JSON must match spec 8.1 key for key, with positive sizes, 2 to 3
   spawns per team, obstacles and spawns (a 0.5 m circle) inside the playable
   rectangle, no spawn touching an obstacle, `startRadius > endRadius > 0`, and
