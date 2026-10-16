@@ -166,6 +166,25 @@ describe('impact rings', () => {
       expect(rings(impact.group).slice(0, 3).map(hex)).toEqual([RING_COLOUR, RING_COLOUR, PROJECTILE_ALLY_COLOUR]);
     });
 
+    it('copies a colour only when the tint of the ring changes', () => {
+      // A yellow spawn on a yellow ring reads no colour: spawn is cold code, where
+      // every double field load allocates (testing.md, the heap probe).
+      const impact = createImpactRings();
+      const copies = rings(impact.group).map((mesh) => vi.spyOn((mesh.material as MeshBasicMaterial).color, 'copy'));
+      const total = (): number => copies.reduce((sum, spy) => sum + spy.mock.calls.length, 0);
+      // One lap of the pool on yellow, which is what every ring starts as.
+      for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 1);
+      expect(total()).toBe(0);
+      // A tinted lap copies once per ring, and the same tint again copies nothing.
+      for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 2, RING_TINT_ALLY);
+      expect(total()).toBe(RING_POOL_SIZE);
+      for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 3, RING_TINT_ALLY);
+      expect(total()).toBe(RING_POOL_SIZE);
+      // Back to yellow: one copy per ring again.
+      for (let i = 0; i < RING_POOL_SIZE; i++) impact.spawn({ x: i, y: 0 }, 4);
+      expect(total()).toBe(2 * RING_POOL_SIZE);
+    });
+
     it('gives each ring its own colour: tinting one leaves the others', () => {
       const impact = createImpactRings();
       impact.spawn({ x: 0, y: 0 }, 1, RING_TINT_ALLY);
