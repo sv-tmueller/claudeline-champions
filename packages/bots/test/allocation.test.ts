@@ -52,7 +52,7 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  *   lumeth heal          (new scene)     (new scene)     0              (not run)
  *   lumeth windup        (new scene)     (new scene)     0              (not run)
  *
- * The last five scenes have no main figure: they test paths main does not have. The unit job of
+ * The last seven scenes have no main figure: they test paths main does not have. The unit job of
  * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
  * skerrow wait scene (#98) reads 0 on macOS on Node 22 and Node 26, and its runner figure is the
  * unit job of that pull request. The lumeth escape scene (#106) reads 0 in every round on macOS on
@@ -91,15 +91,18 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  * every 30th think at most). The plan search allocates only the path it returns, which the plan
  * check below bounds.
  *
- * This check sees only the optimizing tier a long warm-up reaches (Turbofan). A browser match
- * runs the bots in V8's middle tier, Maglev, for thousands of ticks, and in the engines measured
- * (the Chromium of Playwright 1.63, and V8 14.6 on Node 26 with --no-turbofan) a call with a
- * double argument or result, Number.isFinite included, and a number written to a closure
- * variable each box there (16 B): the live scene read 1.2 KB a window in bot.ts:aim from one such
- * call. That was measured with a scratch config that is not part of this suite, and no committed
- * test checks it again: Node 22, the CI's, has no Maglev by default, and its V8 12.4 does not
- * reproduce the figures even with --maglev --no-turbofan (tens of KB a think, before and after
- * alike). Only Node 26 and the Chromium of Playwright do. See bots.md, Allocation.
+ * In the default tiers this check sees only the optimizing tier a long warm-up reaches
+ * (Turbofan). A browser match runs the bots in V8's middle tier, Maglev, for thousands of ticks,
+ * and in the engines measured (the Chromium of Playwright 1.63, and V8 14.6 on Node 26 with
+ * --no-turbofan) a call with a double argument or result, Number.isFinite included, and a number
+ * written to a closure variable each box there (16 B): the live scene read 1.2 KB a window in
+ * bot.ts:aim from one such call. The same scenes therefore run in Maglev alone, in the
+ * `bots-heap-maglev` project of vitest.heap.config.ts on Node 26.7 (V8 14.6), against
+ * THINK_MAGLEV_LIMIT_BYTES; Node 22's V8 12.4 does not reproduce the figures even with
+ * --maglev --no-turbofan (tens of KB a think, before and after alike), so the project needs
+ * Node 26 and says so when it does not have it. The CI runs this file in the unit job on Node 22
+ * and in its own job on Node 26 (both projects) and on Node 24 (the default tier). See bots.md,
+ * Allocation.
  */
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
 
@@ -116,6 +119,32 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * crosses a call it does not inline, and every number written to a closure variable, 16 B each;
  * the scenes read 0 there, so the smallest mutation is one box per think, 16 B. The limit sits
  * between the two.
+ *
+ * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 16 scenes, the plan
+ * step 2784 B clear and 2400 to 2416 B fallback, the draw block 0 B, both -0 pins 0 B.
+ *
+ *   mutation                                       red in, and what it reads
+ *   Number.isFinite for `t - t === 0` in aim       all 16 scenes 16 B; block 240 B; both pins 16 B
+ *   aimU a closure variable of createBot           the draw block, 16 B
+ *   steerTowardInto's distance through hypot2      8 scenes 80 to 160 B; plan 2944 B clear
+ *   Number.isFinite in cellIndexAt                 3 scenes 16, 80 and 96 B; plan 2912 B; the
+ *                                                  landing pin 32 B
+ *   clearShotWith's length through hypot2          6 scenes 16 to 1600 B
+ *   segmentClear through hypot2                    11 scenes 2416 to 5984 B; plan 740 KB
+ *   waitsFor with a double argument (#103)         the opener press scene, 16 B
+ *   bestDistance of the sight scan a local         the kite, no clear shot scene, 16 B
+ *   `+ 0` for `+ 0.5 - 0.5` in aim                 the aim pin, 768 B
+ *   `+ 0` for `+ 0.5 - 0.5` in landingInto         the landing pin, 288 B
+ *   a bare Math.round in landingInto               the landing pin (no aim of +0 is made)
+ *   rng.ts:next for the draw in aim                the draw block, 24 to 32 B
+ *   a six-double object per call of plan,          the plan step, 2952 B clear and 2576 B
+ *     findPath or pullString                       fallback
+ *   the same object per call of nearestFreeCell    the plan step, 2736 to 2752 B fallback
+ *
+ * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
+ * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
+ * figure, in every scene, block and pin in 3 of 3 runs, so nothing in this file sees them.
  */
 const THINK_MAGLEV_LIMIT_BYTES = 8;
 
@@ -166,9 +195,10 @@ const PLAN_FALLBACK_LIMIT_BYTES = 2300;
 // Maglev alone (Node 26.7): the clear plan reads the same 2784 B, the fallback plan 2400 to 2416 B
 // (the default tier 1920 to 2064 B: Maglev allocates a little more for a fallback plan, so the
 // default tier's 2300 B would leave the clean figure no room). A fresh six-double object per call
-// of `plan`, `findPath` or `pullString` reads 2952 clear and 2568 to 2576 fallback, per call of
-// `nearestFreeCell` 2744 to 2752 fallback: all four go red against these limits, which sit 4 and
-// 3.5 percent above the clean figures and 2 and 2.7 percent below the smallest mutant.
+// of `plan`, `findPath` or `pullString` reads 2952 clear and 2576 fallback, per call of
+// `nearestFreeCell` 2736 to 2752 fallback (the table at THINK_MAGLEV_LIMIT_BYTES): all four go red
+// against these limits, which sit 4 and 3.5 percent above the clean figures and 2 and 3 percent
+// below the smallest mutant.
 const PLAN_MAGLEV_LIMIT_BYTES = 2900;
 const PLAN_MAGLEV_FALLBACK_LIMIT_BYTES = 2500;
 
