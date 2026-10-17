@@ -17,7 +17,23 @@ npm run check                    # lint, typecheck, unit tests, asset checks, Pl
 npm run test                     # Vitest unit tests (all projects)
 npm run lint                     # ESLint, includes the package boundary rules
 npm run typecheck                # tsc for sim, bots, client and the tools/tests config
-npm run e2e                      # Playwright e2e; screenshots scene.png, arena.png, arena-overlay.png, walk.png, combat.png, match.png, result.png, ring.png, scene-arena02.png, match-arena02.png, match-3v3.png, match-3v3-arena02.png, menu.png in test-results/*/
+npm run e2e                      # Playwright e2e; screenshots scene.png,
+                                 # arena.png, arena-overlay.png, walk.png,
+                                 # combat.png, death.png, match.png, result.png,
+                                 # ring.png, scene-arena02.png,
+                                 # match-arena02.png, match-3v3.png,
+                                 # match-3v3-arena02.png, menu.png in
+                                 # test-results/*/
+npm run balance                  # bot-versus-bot win-rate report: plays 4800
+                                 # matches and writes the block of
+                                 # docs/design/balance.md, about 5.5 minutes on
+                                 # Apple silicon. Flags after `--`: --check
+                                 # compares a fresh run with the committed
+                                 # block, --out <file> writes there instead,
+                                 # --seeds N plays the seeds 1 to N. Needs Node
+                                 # 22.15. The manual workflow
+                                 # .github/workflows/balance.yml runs --check on
+                                 # a runner, 12 to 16 minutes.
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
 npm run build                    # production client bundle; CI runs it, check does not
