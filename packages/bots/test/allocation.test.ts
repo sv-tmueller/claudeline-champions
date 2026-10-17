@@ -108,9 +108,12 @@ const THINK_ALLOCATION_LIMIT_BYTES = 128;
 
 /**
  * The tier the run is in: vitest.heap.config.ts sets `BOTS_HEAP_TIER=maglev` for its
- * `bots-heap-maglev` project, which runs this file with `--maglev --no-turbofan` (the middle tier
- * alone, as a browser match runs the bots). Every other run, `npm run test` included, is the
- * default tier.
+ * `bots-heap-maglev` project, which runs this file in the middle tier alone, as a browser match runs
+ * the bots, with the four flags of that config (`--maglev --no-turbofan`, and the two that switch off
+ * background compilation and OSR, which the browser keeps on: the check measures what Maglev's code
+ * boxes, not how the browser tiers the bots up). Every other run, `npm run test` included, is the
+ * default tier. The Maglev project needs Node 26: on Node 22 the whole config is red by design (the
+ * guard and the Maglev checks fail on V8 12.4), and the Node 22 command is `--project bots-heap`.
  */
 const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
 
@@ -706,7 +709,7 @@ describe('think allocation', () => {
   // from its first run. Each scene is warmed up where its aim is whole, then moved 1 to 3 m so
   // the aim lands in [-0.5, 0) cm, and the lower of the two windows after the move must read under
   // the limit (the first window alone reads 16 B in a run of this test by itself).
-  // Red under `+ 0` in aim (416 B) and in landingInto (288 B), Node 26.7, Maglev alone.
+  // Red under `+ 0` in aim (768 B) and in landingInto (288 B), Node 26.7, Maglev alone.
   function expectNoDeoptAtMinusZero(s: Scene, move: (state: GameState) => void): void {
     for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
     move(s.state);
