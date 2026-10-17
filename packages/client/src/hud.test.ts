@@ -1,4 +1,12 @@
-import { RING_SOURCE_ID, SLOTS, createMatch, parseArenaDef, type CastState, type GameState } from '@claudeline/sim';
+import {
+  RING_SOURCE_ID,
+  SLOTS,
+  createMatch,
+  parseArenaDef,
+  type CastState,
+  type GameState,
+  type StatusInstance,
+} from '@claudeline/sim';
 import { describe, expect, it, vi } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import { Hud, type HudHandles } from './hud';
@@ -17,6 +25,7 @@ interface Rig {
     energyFill: Fake;
     exMark: Fake;
     ultimateMark: Fake;
+    shield: { root: Fake; fill: Fake };
     slots: { icon: Fake; seconds: Fake }[];
     score: Fake;
     timer: Fake;
@@ -60,6 +69,7 @@ function rig(threeVThree = false): Rig {
     energyFill: fake(),
     exMark: fake(),
     ultimateMark: fake(),
+    shield: { root: fake(), fill: fake() },
     slots: SLOTS.map(() => ({ icon: fake(), seconds: fake() })),
     score: fake(),
     timer: fake(),
@@ -79,6 +89,8 @@ function allElements(elements: Rig['elements']): Fake[] {
     elements.energyFill,
     elements.exMark,
     elements.ultimateMark,
+    elements.shield.root,
+    elements.shield.fill,
     ...elements.slots.flatMap((slot) => [slot.icon, slot.seconds]),
     elements.score,
     elements.timer,
@@ -119,8 +131,12 @@ describe('HUD first update', () => {
         'data-ready=true',
         'data-windup=false',
         `data-blocked=${i === SLOTS.length - 1}`,
+        'data-silenced=false',
       ]);
     }
+    // The shield is built hidden at 0, so the first update writes nothing for it.
+    expect(elements.shield.root.log).toEqual([]);
+    expect(elements.shield.fill.log).toEqual([]);
     expect(elements.score.log).toEqual(['text=0 : 0']);
     expect(elements.timer.log).toEqual(['text=1:30', 'data-sudden=false']);
     for (const { line, killer, victim } of elements.lines) {
@@ -326,6 +342,186 @@ describe('HUD cooldowns and windup', () => {
     source.cast = null;
     hud.update(state);
     for (const slot of elements.slots) expect(slot.icon.log).toEqual(['data-windup=true', 'data-windup=false']);
+  });
+});
+
+function shield(absorb: number): StatusInstance {
+  return { type: 'shield', sourceId: 0, slot: 'R', remainingTicks: 240, absorb };
+}
+
+function lastTransform(element: Fake): string | undefined {
+  return element.log.filter((entry) => entry.startsWith('transform=')).at(-1);
+}
+
+function silence(): StatusInstance {
+  return { type: 'silence', sourceId: 3, slot: 'Q', remainingTicks: 90 };
+}
+
+describe('HUD shield', () => {
+  it('shows 40 absorb on full health as the last quarter of the track', () => {
+    const { hud, state, elements } = rig();
+    hud.update(state);
+    clearLogs(elements);
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual(['data-absorb=40', 'data-visible=true', 'transform=translateX(75%)']);
+    expect(elements.shield.fill.log).toEqual(['transform=scaleX(0.25)']);
+    expect(writeCount(elements)).toBe(5);
+  });
+
+  it('puts the segment just past the health: 100 of 160 with 40 absorb starts at 62.5%', () => {
+    const { hud, state, elements } = rig();
+    local(state).health = 100;
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual(['data-absorb=40', 'data-visible=true', 'transform=translateX(62.5%)']);
+    expect(elements.shield.fill.log).toEqual(['transform=scaleX(0.25)']);
+  });
+
+  it('fills the whole track from its start when the absorb is above the maximum', () => {
+    const { hud, state, elements } = rig();
+    local(state).statuses = [shield(200)];
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual(['data-absorb=200', 'data-visible=true', 'transform=translateX(0%)']);
+    expect(elements.shield.fill.log).toEqual(['transform=scaleX(1)']);
+  });
+
+  it('adds two shields and rounds a fraction up', () => {
+    const { hud, state, elements } = rig();
+    local(state).statuses = [shield(20.5), shield(19)];
+    hud.update(state);
+    expect(elements.shield.root.log[0]).toBe('data-absorb=40');
+  });
+
+  it('slides back over the end of the health when health plus shield passes the maximum', () => {
+    const { hud, state, elements } = rig();
+    local(state).health = 150;
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    expect(elements.shield.root.log.at(-1)).toBe('transform=translateX(75%)');
+    expect(elements.shield.fill.log).toEqual(['transform=scaleX(0.25)']);
+  });
+
+  it('writes the transforms of every whole health and absorb the way the template builds them', () => {
+    const { hud, state, elements } = rig();
+    for (const health of [0, 1, 7, 80, 159, 160]) {
+      for (const absorb of [1, 3, 40, 100, 160, 161]) {
+        local(state).health = health;
+        local(state).statuses = [shield(absorb)];
+        hud.update(state);
+        const width = Math.min(absorb, 160);
+        const offset = Math.max(0, Math.min(health, 160 - width));
+        expect(lastTransform(elements.shield.root), `health ${health} absorb ${absorb}`).toBe(
+          `transform=translateX(${(offset / 160) * 100}%)`,
+        );
+        expect(lastTransform(elements.shield.fill), `health ${health} absorb ${absorb}`).toBe(
+          `transform=scaleX(${width / 160})`,
+        );
+        // Hidden again, so the next pair starts from a clean visibility flip.
+        local(state).statuses = [];
+        hud.update(state);
+      }
+    }
+  });
+
+  it('builds the text for a maximum the tables were not made for', () => {
+    const { hud, state, elements } = rig();
+    local(state).maxHealth = 130;
+    local(state).health = 130;
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    expect(elements.shield.root.log.at(-1)).toBe(`transform=translateX(${(90 / 130) * 100}%)`);
+    expect(elements.shield.fill.log.at(-1)).toBe(`transform=scaleX(${40 / 130})`);
+  });
+
+  it('writes nothing on a second update with the same shield', () => {
+    const { hud, state, elements } = rig();
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    clearLogs(elements);
+    hud.update(state);
+    hud.update(state);
+    expect(writeCount(elements)).toBe(0);
+  });
+
+  it('writes only the width when the absorb falls on a health that has not changed', () => {
+    const { hud, state, elements } = rig();
+    local(state).health = 100;
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    clearLogs(elements);
+    // 8 absorbed: 32 left. The segment still starts at the health.
+    local(state).statuses = [shield(32)];
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual(['data-absorb=32']);
+    expect(elements.shield.fill.log).toEqual([`transform=scaleX(${32 / 160})`]);
+  });
+
+  it('writes only the start when the health falls and the absorb stays', () => {
+    const { hud, state, elements } = rig();
+    local(state).health = 100;
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    clearLogs(elements);
+    local(state).health = 90;
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual([`transform=translateX(${(90 / 160) * 100}%)`]);
+    expect(elements.shield.fill.log).toEqual([]);
+  });
+
+  it('hides at 0 absorb and keeps the transforms, so a shield that comes back writes only what differs', () => {
+    const { hud, state, elements } = rig();
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    clearLogs(elements);
+    local(state).statuses = [];
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual(['data-absorb=0', 'data-visible=false']);
+    expect(elements.shield.fill.log).toEqual([]);
+    hud.update(state);
+    expect(writeCount(elements)).toBe(2);
+    clearLogs(elements);
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    expect(elements.shield.root.log).toEqual(['data-absorb=40', 'data-visible=true']);
+    expect(elements.shield.fill.log).toEqual([]);
+  });
+
+  it('keeps its writes off the health bar elements', () => {
+    const { hud, state, elements } = rig();
+    hud.update(state);
+    clearLogs(elements);
+    local(state).statuses = [shield(40)];
+    hud.update(state);
+    expect(elements.healthFill.log).toEqual([]);
+    expect(elements.healthText.log).toEqual([]);
+  });
+});
+
+describe('HUD silence', () => {
+  it('writes data-silenced true on all seven slots once, and false once when it ends', () => {
+    const { hud, state, elements } = rig();
+    hud.update(state);
+    clearLogs(elements);
+    local(state).statuses = [silence()];
+    hud.update(state);
+    for (const slot of elements.slots) expect(slot.icon.log).toEqual(['data-silenced=true']);
+    expect(writeCount(elements)).toBe(7);
+    hud.update(state);
+    expect(writeCount(elements)).toBe(7);
+    local(state).statuses = [];
+    hud.update(state);
+    for (const slot of elements.slots) expect(slot.icon.log).toEqual(['data-silenced=true', 'data-silenced=false']);
+  });
+
+  it('leaves data-blocked to the energy gate while silenced', () => {
+    const { hud, state, elements } = rig();
+    local(state).energy = 100;
+    hud.update(state);
+    clearLogs(elements);
+    local(state).statuses = [silence()];
+    hud.update(state);
+    for (const slot of elements.slots) expect(slot.icon.log.some((entry) => entry.startsWith('data-blocked'))).toBe(false);
   });
 });
 

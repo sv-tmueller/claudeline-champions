@@ -32,6 +32,7 @@ function rig() {
     energyFill: fake(),
     exMark: fake(),
     ultimateMark: fake(),
+    shield: { root: fake(), fill: fake() },
     slots: SLOTS.map(() => ({ icon: fake(), seconds: fake() })),
     score: fake(),
     timer: fake(),

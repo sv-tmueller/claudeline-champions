@@ -95,6 +95,17 @@ describe('summarise', () => {
     });
   });
 
+  it('counts the scoreboard writer, and not its DOM module or a module that only starts with its name', () => {
+    const root = node('', '(root)', 0, [
+      node(`${CLIENT}scoreboard.ts`, 'update', 48),
+      node(`${CLIENT}scoreboard-dom.ts`, 'bindScoreboard', 700),
+      node(`${CLIENT}scoreboard-extra.ts`, 'other', 500),
+    ]);
+    const result = summarise(root);
+    expect(result.combat).toBe(48);
+    expect(result.combatByFunction).toEqual({ 'scoreboard.ts:update': 48 });
+  });
+
   it('leaves the sweep files of the sim out of the bytes outside them', () => {
     const root = node('', '(root)', 0, [
       node(`${SIM}projectile.ts`, 'sweep', 10_000),
