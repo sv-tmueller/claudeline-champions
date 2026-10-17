@@ -44,7 +44,7 @@ jobs:
   # within 10 percent of the clean figures, so every Node major the engines field allows runs the
   # check). Node 22 runs it in `checks`. Node 26 is pinned to the version the Maglev limits were
   # measured on: a bump means measuring again (docs/architecture/bots.md, Allocation).
-  bots-heap-node26:
+  bots-heap:
     name: Bots heap check, Node ${{ matrix.node }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
