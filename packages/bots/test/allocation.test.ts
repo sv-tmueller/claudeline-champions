@@ -194,6 +194,7 @@ const ROUNDS = 3;
 
 const deltas = new Float64Array(WINDOW);
 const sorted = new Float64Array(WINDOW);
+const bases = new Float64Array(WINDOW);
 
 function heap(): number {
   return process.memoryUsage().heapUsed;
@@ -512,6 +513,12 @@ describe('think allocation', () => {
       const figures: number[] = [];
       for (let round = 0; round < ROUNDS; round++) {
         for (let i = 0; i < WINDOW; i++) {
+          // The empty pair is read in this loop, just before the think's: a call of
+          // `process.memoryUsage()` allocates its result object, 144 B in a tier that does not
+          // optimise it away, and `emptyPairMedian` read at another time or in another function can
+          // sit in another tier than this loop (on Node 24 one scene read +144 B in every round).
+          const emptyBefore = heap();
+          bases[i] = heap() - emptyBefore;
           const before = heap();
           const input = s.bot.think(s.state);
           const after = heap();
@@ -519,7 +526,7 @@ describe('think allocation', () => {
           if (input.buttons !== 0) presses++;
           if (input.moveX !== 0 || input.moveY !== 0) moves++;
         }
-        const figure = median(deltas, WINDOW) - emptyPairMedian();
+        const figure = median(deltas, WINDOW) - median(bases, WINDOW);
         figures.push(figure);
         best = Math.min(best, figure);
         lines.push(`${s.name} round ${round + 1}: ${Math.round(figure)} B per think`);
@@ -598,6 +605,8 @@ describe('think allocation', () => {
         for (let i = 0; i < WINDOW; i++) followers[i] = createFollower();
         let planned = 0;
         for (let i = 0; i < WINDOW; i++) {
+          const emptyBefore = heap();
+          bases[i] = heap() - emptyBefore;
           const before = heap();
           plan(i);
           deltas[i] = heap() - before;
@@ -607,7 +616,7 @@ describe('think allocation', () => {
         // plans (the fallback ones through a free cell at each end), as 600 of 600 do.
         if (set === clear) expect(planned, 'clear pairs with no points').toBe(WINDOW);
         else expect(planned, 'fallback pairs with points').toBe(WINDOW);
-        rounds.push(median(deltas, WINDOW) - emptyPairMedian());
+        rounds.push(median(deltas, WINDOW) - median(bases, WINDOW));
       }
       figures[set.name] = rounds;
     }

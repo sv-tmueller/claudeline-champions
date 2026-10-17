@@ -12,9 +12,8 @@ import { defineConfig } from 'vitest/config';
 // The Maglev project runs with `--no-concurrent-recompilation`. V8 optimises a hot function on a
 // background thread and installs the code when the job is done, so which code a window of the test
 // measures depends on how long the job took. On a busy machine that read 480 B in a block of 15
-// thinks and 32 B a think after the move to -0 (a boxed pair of doubles a think, in the aim's two
-// stores) in some runs of a clean tree and not in others; compiled on the calling thread, the same
-// tree reads the same figures in every run.
+// thinks (32 B a think) and 32 B a think after the move to -0 in some runs of a clean tree and not
+// in others; compiled on the calling thread, the same tree reads the same figures in every run.
 //
 // `npm run test` runs the default tier in the `bots` project of vitest.config.ts as well.
 export default defineConfig({
