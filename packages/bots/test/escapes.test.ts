@@ -18,7 +18,7 @@ import { createMeasure } from '../src/hypot';
 import { createKiteScratch } from '../src/kite';
 import { createSightScratch } from '../src/sight';
 import { TIERS } from '../src/difficulty';
-import { createLanding, teleportEndInto } from '../src/escape';
+import { createLanding, landingInto, teleportEndInto } from '../src/escape';
 import { createRng } from '../src/rng';
 import { arena01, copyInput, jsonKits, rosterKits } from './helpers';
 import { quietKit } from './kits';
@@ -503,6 +503,75 @@ describe('the landing differential', () => {
     expect(shortAims.below).toBeGreaterThan(300);
     expect(shortAims.above).toBeGreaterThan(300);
     expect(shortAims.onCaster).toBe(40);
+  });
+});
+
+describe('the rounding of the landing aim', () => {
+  /** Champion 0 of a mirror match, moved to (x, y); `landingInto` reads only its position and team. */
+  function meAt(x: number, y: number): ChampionState {
+    const state = createMatch(
+      {
+        teamSize: 2,
+        players: [
+          { championId: 'quillon', team: 'A' },
+          { championId: 'hargrim', team: 'A' },
+          { championId: 'quillon', team: 'B' },
+          { championId: 'hargrim', team: 'B' },
+        ],
+      },
+      arena01,
+      1,
+      jsonKits(),
+    );
+    const me = state.champions[0] as ChampionState;
+    me.x = x;
+    me.y = y;
+    return me;
+  }
+
+  it('turns a landing point in [-0.5, 0) cm into +0 on x and on y, as roundAim does', () => {
+    // A bare Math.round gives -0 here, which `Object.is` tells from 0: the aim is the same input
+    // to the sim, but `+ 0` after Math.round deoptimised the function in Maglev (see
+    // allocation.test.ts, the move to -0).
+    for (const offset of [-0.0001, -0.003, -0.00499, -0.005]) {
+      const land = createLanding();
+      land.range = 4;
+      land.dirX = 1;
+      land.dirY = 0;
+      landingInto(land, meAt(-4 + offset, 1.5));
+      expect(land.aimX, `x landing ${offset} m`).toSatisfy((v: number) => Object.is(v, 0));
+      expect(land.aimY, `y of the landing at 1.5 m`).toBe(150);
+      expect(land.aimX).toBe(roundAim(-4 + offset + 4));
+      const mirrored = createLanding();
+      mirrored.range = 4;
+      mirrored.dirX = 0;
+      mirrored.dirY = 1;
+      landingInto(mirrored, meAt(1.5, -4 + offset));
+      expect(mirrored.aimY, `y landing ${offset} m`).toSatisfy((v: number) => Object.is(v, 0));
+      expect(mirrored.aimX, `x of the landing at 1.5 m`).toBe(150);
+    }
+  });
+
+  it('is roundAim of the landing point, bit for bit, over 4000 seeded landings', () => {
+    const rng = createRng(4047);
+    for (let i = 0; i < 4000; i++) {
+      const range = [4, 5, 8][i % 3] as number;
+      const heading = rng.next() * 2 * Math.PI;
+      const land = createLanding();
+      land.range = range;
+      // Some headings are the axes, where one coordinate of the landing is the position itself.
+      land.dirX = i % 7 === 0 ? 0 : i % 11 === 0 ? 1 : Math.cos(heading);
+      land.dirY = i % 7 === 0 ? 1 : i % 11 === 0 ? 0 : Math.sin(heading);
+      // Every third landing is within a centimetre of the origin on x, the others anywhere.
+      const x = i % 3 === 0 ? -land.dirX * range + (rng.next() - 0.5) * 0.02 : (rng.next() - 0.5) * 20;
+      const y = i % 5 === 0 ? -land.dirY * range + (rng.next() - 0.5) * 0.02 : (rng.next() - 0.5) * 12;
+      const me = meAt(x, y);
+      landingInto(land, me);
+      const wantX = roundAim(me.x + land.dirX * range);
+      const wantY = roundAim(me.y + land.dirY * range);
+      expect(Object.is(land.aimX, wantX), `x ${x} dir ${land.dirX} range ${range}`).toBe(true);
+      expect(Object.is(land.aimY, wantY), `y ${y} dir ${land.dirY} range ${range}`).toBe(true);
+    }
   });
 });
 

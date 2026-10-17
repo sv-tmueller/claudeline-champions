@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
-import { createBot } from '../src/bot';
+import { AIM_ERROR_HOLD, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { createFollower, followPathInto } from '../src/follow';
 import type { PathFollower } from '../src/follow';
 import { pointBlocked } from '../src/geometry';
 import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
 import type { NavGrid, Vec2 } from '../src/grid';
+import { hypot2 } from '../src/hypot';
 import type { Intent } from '../src/intent';
 import type { MoveCommand } from '../src/steer';
 import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKits } from './helpers';
@@ -51,7 +52,7 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  *   lumeth heal          (new scene)     (new scene)     0              (not run)
  *   lumeth windup        (new scene)     (new scene)     0              (not run)
  *
- * The last five scenes have no main figure: they test paths main does not have. The unit job of
+ * The last seven scenes have no main figure: they test paths main does not have. The unit job of
  * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
  * skerrow wait scene (#98) reads 0 on macOS on Node 22 and Node 26, and its runner figure is the
  * unit job of that pull request. The lumeth escape scene (#106) reads 0 in every round on macOS on
@@ -90,17 +91,65 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  * every 30th think at most). The plan search allocates only the path it returns, which the plan
  * check below bounds.
  *
- * This check sees only the optimizing tier a long warm-up reaches (Turbofan). A browser match
- * runs the bots in V8's middle tier, Maglev, for thousands of ticks, and in the engines measured
- * (the Chromium of Playwright 1.63, and V8 14.6 on Node 26 with --no-turbofan) a call with a
- * double argument or result, Number.isFinite included, and a number written to a closure
- * variable each box there (16 B): the live scene read 1.2 KB a window in bot.ts:aim from one such
- * call. That was measured with a scratch config that is not part of this suite, and no committed
- * test checks it again: Node 22, the CI's, has no Maglev by default, and its V8 12.4 does not
- * reproduce the figures even with --maglev --no-turbofan (tens of KB a think, before and after
- * alike). Only Node 26 and the Chromium of Playwright do. See bots.md, Allocation.
+ * In the default tiers this check sees only the optimizing tier a long warm-up reaches
+ * (Turbofan). A browser match runs the bots in V8's middle tier, Maglev, for thousands of ticks,
+ * and in the engines measured (the Chromium of Playwright 1.63, and V8 14.6 on Node 26 with
+ * --no-turbofan) a call with a double argument or result, Number.isFinite included, and a number
+ * written to a closure variable each box there (16 B): the live scene read 1.2 KB a window in
+ * bot.ts:aim from one such call. The same scenes therefore run in Maglev alone, in the
+ * `bots-heap-maglev` project of vitest.heap.config.ts on Node 26.7 (V8 14.6), against
+ * THINK_MAGLEV_LIMIT_BYTES; Node 22's V8 12.4 does not reproduce the figures even with
+ * --maglev --no-turbofan (tens of KB a think, before and after alike), so the project needs
+ * Node 26 and says so when it does not have it. The CI runs this file in the unit job on Node 22
+ * and in its own job on Node 26 (both projects) and on Node 24 (the default tier). See bots.md,
+ * Allocation.
  */
 const THINK_ALLOCATION_LIMIT_BYTES = 128;
+
+/**
+ * The tier the run is in: vitest.heap.config.ts sets `BOTS_HEAP_TIER=maglev` for its
+ * `bots-heap-maglev` project, which runs this file in the middle tier alone, as a browser match runs
+ * the bots, with the four flags of that config (`--maglev --no-turbofan`, and the two that switch off
+ * background compilation and OSR, which the browser keeps on: the check measures what Maglev's code
+ * boxes, not how the browser tiers the bots up). Every other run, `npm run test` included, is the
+ * default tier. The Maglev project needs Node 26: on Node 22 the whole config is red by design (the
+ * guard and the Maglev checks fail on V8 12.4), and the Node 22 command is `--project bots-heap`.
+ */
+const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
+
+/**
+ * The most heap one think may allocate in Maglev alone, in bytes. Maglev boxes every double that
+ * crosses a call it does not inline, and every number written to a closure variable, 16 B each;
+ * the scenes read 0 there, so the smallest mutation is one box per think, 16 B. The limit sits
+ * between the two.
+ *
+ * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 16 scenes, the plan
+ * step 2784 B clear and 2400 to 2416 B fallback, the draw block 0 B, both -0 pins 0 B.
+ *
+ *   mutation                                       red in, and what it reads
+ *   Number.isFinite for `t - t === 0` in aim       all 16 scenes 16 B; block 240 B; both pins 16 B
+ *   aimU a closure variable of createBot           the draw block, 16 B
+ *   steerTowardInto's distance through hypot2      8 scenes 80 to 160 B; plan 2944 B clear
+ *   Number.isFinite in cellIndexAt                 3 scenes 16, 80 and 96 B; plan 2912 B; the
+ *                                                  landing pin 32 B
+ *   clearShotWith's length through hypot2          6 scenes 16 to 1600 B
+ *   segmentClear through hypot2                    11 scenes 2416 to 5984 B; plan 740 KB
+ *   waitsFor with a double argument (#103)         the opener press scene, 16 B
+ *   bestDistance of the sight scan a local         the kite, no clear shot scene, 16 B
+ *   `+ 0` for `+ 0.5 - 0.5` in aim                 the aim pin, 768 B
+ *   `+ 0` for `+ 0.5 - 0.5` in landingInto         the landing pin, 288 B
+ *   a bare Math.round in landingInto               the landing pin (no aim of +0 is made)
+ *   rng.ts:next for the draw in aim                the draw block, 24 to 32 B
+ *   a six-double object per call of plan,          the plan step, 2952 B clear and 2576 B
+ *     findPath or pullString                       fallback
+ *   the same object per call of nearestFreeCell    the plan step, 2736 to 2752 B fallback
+ *
+ * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
+ * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
+ * figure, in every scene, block and pin in 3 of 3 runs, so nothing in this file sees them.
+ */
+const THINK_MAGLEV_LIMIT_BYTES = 8;
 
 /**
  * The least the baseline sim step must read, as in the sim's own allocation test: it proves the
@@ -146,6 +195,31 @@ const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
  */
 const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
 const PLAN_FALLBACK_LIMIT_BYTES = 2300;
+// Maglev alone (Node 26.7): the clear plan reads the same 2784 B, the fallback plan 2400 to 2416 B
+// (the default tier 1920 to 2064 B: Maglev allocates a little more for a fallback plan, so the
+// default tier's 2300 B would leave the clean figure no room). A fresh six-double object per call
+// of `plan`, `findPath` or `pullString` reads 2952 clear and 2576 fallback, per call of
+// `nearestFreeCell` 2736 to 2752 fallback (the table at THINK_MAGLEV_LIMIT_BYTES): all four go red
+// against these limits, which sit 4 and 3.5 percent above the clean figures and 2 and 3 percent
+// below the smallest mutant.
+const PLAN_MAGLEV_LIMIT_BYTES = 2900;
+const PLAN_MAGLEV_FALLBACK_LIMIT_BYTES = 2500;
+
+/** Calls of `hypot2` in one control window, and the least per call the control must read. */
+const CONTROL_CALLS = 20;
+const CONTROL_FLOOR_BYTES_PER_CALL = 16;
+
+/** The control loop: the result of every call is stored, so it must be a number. */
+function hypotLoop(out: Float64Array, seed: number): void {
+  for (let i = 0; i < CONTROL_CALLS; i++) out[i] = hypot2(seed + i * 0.25, 3 + i);
+}
+
+/**
+ * The most heap a block of 15 thinks with one aim draw may allocate in Maglev alone, in bytes
+ * (median over the blocks of a round, the lowest round, the empty pair taken off). Main's draw
+ * (`rng.ts:next`) read 16 to 32 B there, the draw written out in `aim` reads 0.
+ */
+const DRAW_BLOCK_MAGLEV_LIMIT_BYTES = 8;
 
 const WARM_UP = 20000;
 const WINDOW = 600;
@@ -153,6 +227,7 @@ const ROUNDS = 3;
 
 const deltas = new Float64Array(WINDOW);
 const sorted = new Float64Array(WINDOW);
+const bases = new Float64Array(WINDOW);
 
 function heap(): number {
   return process.memoryUsage().heapUsed;
@@ -421,11 +496,44 @@ function arrangeHeal(state: GameState): void {
 }
 
 describe('think allocation', () => {
+  // The Maglev project is only worth its figures on the engine they were measured on and with the
+  // flags applied: V8 12.4 (Node 22) does not reproduce them, a worker that lost its execArgv
+  // runs the default tiers and reads 0 B everywhere, and one that compiles on a background thread
+  // or replaces its loops on the stack (`--no-concurrent-recompilation` or `--no-use-osr` lost)
+  // reads 480 B in a block or 32 B a think after the move to -0 in some runs (see
+  // vitest.heap.config.ts). The control below proves the tier itself.
+  it.runIf(MAGLEV)('runs on Node 26 (V8 14) with the Maglev-only flags of the config', () => {
+    const v8Major = Number.parseInt(process.versions.v8.split('.')[0] ?? '0', 10);
+    const wanted = ['--maglev', '--no-turbofan', '--no-concurrent-recompilation', '--no-use-osr'];
+    const flags = wanted.filter((flag) => process.execArgv.includes(flag));
+    const missing = wanted.filter((flag) => !flags.includes(flag));
+    const problem = `the Maglev heap check needs Node 26 (V8 14.6) and ${wanted.join(' ')}: found V8 ${process.versions.v8}, missing ${missing.join(' ') || 'nothing'}`;
+    expect(v8Major >= 14 && missing.length === 0, problem).toBe(true);
+  });
+
+  // The control: a call V8 does not inline boxes the double it returns, and Maglev does not inline
+  // `hypot2` into this loop (Turbofan does, and reads about 0). So a Maglev run that reads 0 B in
+  // the scenes below has not gone vacuous: it reads at least 16 B per call here.
+  it.runIf(MAGLEV)('measures a Maglev that boxes: a loop of hypot2 calls reads at least 16 B a call', () => {
+    const out = new Float64Array(CONTROL_CALLS);
+    for (let i = 0; i < 2000; i++) hypotLoop(out, i);
+    for (let i = 0; i < WINDOW; i++) {
+      const before = heap();
+      hypotLoop(out, i);
+      deltas[i] = heap() - before;
+    }
+    const perCall = (median(deltas, WINDOW) - emptyPairMedian()) / CONTROL_CALLS;
+    console.log(`maglev control, hypot2 into a Float64Array: ${perCall} B per call`);
+    expect(perCall, 'median bytes per hypot2 call in the control loop, floor 16').toBeGreaterThanOrEqual(CONTROL_FLOOR_BYTES_PER_CALL);
+  });
+
   // Runner (ubuntu-latest, Node 22): 2.9 and 3.9 s green, 5.9, 5.9 and 5.7 s red on 5820f16
   // (runs 39001711657, 39008413462, 39009180211 x3); 1.6 s locally (Apple M5 Pro, Node 22.23.2,
   // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
-  // runner time (testing.md, Check suite).
+  // runner time (testing.md, Check suite). The heap jobs of #108 (Node 24 and 26, both tiers) read
+  // 3.3 to 5.2 s.
   it('allocates under the limit per think in every scene', { timeout: 15_000 }, () => {
+    const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
     const scenes = buildScenes();
     const lines: string[] = [];
     const checksums = scenes.map((s) => checksum(s.state));
@@ -440,6 +548,12 @@ describe('think allocation', () => {
       const figures: number[] = [];
       for (let round = 0; round < ROUNDS; round++) {
         for (let i = 0; i < WINDOW; i++) {
+          // The empty pair is read in this loop, just before the think's: a call of
+          // `process.memoryUsage()` allocates its result object, 144 B in a tier that does not
+          // optimise it away, and `emptyPairMedian` read at another time or in another function can
+          // sit in another tier than this loop (on Node 24 one scene read +144 B in every round).
+          const emptyBefore = heap();
+          bases[i] = heap() - emptyBefore;
           const before = heap();
           const input = s.bot.think(s.state);
           const after = heap();
@@ -447,13 +561,13 @@ describe('think allocation', () => {
           if (input.buttons !== 0) presses++;
           if (input.moveX !== 0 || input.moveY !== 0) moves++;
         }
-        const figure = median(deltas, WINDOW) - emptyPairMedian();
+        const figure = median(deltas, WINDOW) - median(bases, WINDOW);
         figures.push(figure);
         best = Math.min(best, figure);
         lines.push(`${s.name} round ${round + 1}: ${Math.round(figure)} B per think`);
       }
       console.log(`think allocation, ${s.name}: ${figures.map((f) => Math.round(f)).join(', ')} B per think`);
-      if (!(best < THINK_ALLOCATION_LIMIT_BYTES)) {
+      if (!(best < thinkLimit)) {
         failures.push(`${s.name}: lowest round ${Math.round(best)} B, ${figures.map(Math.round).join(', ')}`);
       }
       // The scene is live: the bot acts on the intent the scene is built for, and presses (or not).
@@ -466,7 +580,7 @@ describe('think allocation', () => {
 
     expect(
       failures,
-      `scenes whose lowest round is at or over ${THINK_ALLOCATION_LIMIT_BYTES} B per think; ${lines.join('; ')}`,
+      `scenes whose lowest round is at or over ${thinkLimit} B per think; ${lines.join('; ')}`,
     ).toEqual([]);
     // think never mutates the state.
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
@@ -475,7 +589,7 @@ describe('think allocation', () => {
   // Runner (ubuntu-latest, Node 22): 1.6 and 1.7 s green, 2.7, 2.6 and 2.3 s red on 5820f16
   // (runs 39001711657, 39008413462, 39009180211 x3); 0.75 s locally (Apple M5 Pro, Node 22.23.2,
   // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
-  // runner time (testing.md, Check suite).
+  // runner time (testing.md, Check suite). The heap jobs of #108 read 1.7 to 3.2 s.
   it("allocates only the path it plans, across arena01: the follower's whole plan step", { timeout: 10_000 }, () => {
     const grid: NavGrid = buildNavGrid(arena01);
     const free: number[] = [];
@@ -526,6 +640,8 @@ describe('think allocation', () => {
         for (let i = 0; i < WINDOW; i++) followers[i] = createFollower();
         let planned = 0;
         for (let i = 0; i < WINDOW; i++) {
+          const emptyBefore = heap();
+          bases[i] = heap() - emptyBefore;
           const before = heap();
           plan(i);
           deltas[i] = heap() - before;
@@ -535,19 +651,115 @@ describe('think allocation', () => {
         // plans (the fallback ones through a free cell at each end), as 600 of 600 do.
         if (set === clear) expect(planned, 'clear pairs with no points').toBe(WINDOW);
         else expect(planned, 'fallback pairs with points').toBe(WINDOW);
-        rounds.push(median(deltas, WINDOW) - emptyPairMedian());
+        rounds.push(median(deltas, WINDOW) - median(bases, WINDOW));
       }
       figures[set.name] = rounds;
     }
     const lines = Object.entries(figures).map(([name, rounds]) => `${name} ${rounds.map((f) => Math.round(f)).join(', ')}`);
     console.log(`plan allocation, the follower's plan step over ${WINDOW} pairs: ${lines.join('; ')} B per plan`);
     for (const [name, rounds] of Object.entries(figures)) {
-      const limit = name === 'clear' ? PLAN_ALLOCATION_LIMIT_BYTES : PLAN_FALLBACK_LIMIT_BYTES;
+      const limit =
+        name === 'clear'
+          ? MAGLEV
+            ? PLAN_MAGLEV_LIMIT_BYTES
+            : PLAN_ALLOCATION_LIMIT_BYTES
+          : MAGLEV
+            ? PLAN_MAGLEV_FALLBACK_LIMIT_BYTES
+            : PLAN_FALLBACK_LIMIT_BYTES;
       expect(
         Math.min(...rounds),
         `lowest round of the median bytes per ${name} plan: ${rounds.map(Math.round).join(', ')}`,
       ).toBeLessThan(limit);
     }
+  });
+
+  // The draw block: the per-think median hides the aim error draw, which runs once in 15 thinks
+  // (AIM_ERROR_HOLD). A block of 15 thinks holds exactly one draw, wherever it starts, so the
+  // median over blocks reads the draw in its first think. On main the draw was `rng.ts:next`, run
+  // too rarely to be optimised before a long run: it read about 30 B a draw in the browser.
+  // Run in Maglev alone: in the default tiers a block reads about -140 B whatever the draw (a
+  // block of thinks reads less than the empty pair there, so the check has no power), and `next`
+  // is optimised there.
+  it.runIf(MAGLEV)('allocates nothing in a block of 15 thinks with one aim draw', () => {
+    const s = scene('press', 1, 'engage', true, false, (state) => {
+      put(state, 1, -4, -3);
+      put(state, 2, 4, -3);
+      ch(state, 1).energy = 60;
+    });
+    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
+    const figures: number[] = [];
+    for (let round = 0; round < ROUNDS; round++) {
+      for (let i = 0; i < WINDOW; i++) {
+        const before = heap();
+        for (let k = 0; k < AIM_ERROR_HOLD; k++) s.bot.think(s.state);
+        deltas[i] = heap() - before;
+      }
+      figures.push(median(deltas, WINDOW) - emptyPairMedian());
+    }
+    console.log(`think allocation, a block of ${AIM_ERROR_HOLD} thinks with one draw: ${figures.map((f) => Math.round(f)).join(', ')} B per block`);
+    expect(
+      Math.min(...figures),
+      `lowest round of the median bytes per block of ${AIM_ERROR_HOLD} thinks: ${figures.map(Math.round).join(', ')}`,
+    ).toBeLessThan(DRAW_BLOCK_MAGLEV_LIMIT_BYTES);
+  });
+
+  // The first aim of -0: after a warm-up on whole-centimetre aims, a point in [-0.5, 0) cm rounds
+  // to -0, and `Math.round(..) + 0` then saw its first value that is not an int32: V8 deoptimised
+  // the function, and in Maglev alone the bot ran about 1200 thinks in a lower tier at 290 to
+  // 420 B a think (the browser read 65 KB a window in `aim`). `+ 0.5 - 0.5` has number feedback
+  // from its first run. Each scene is warmed up where its aim is whole, then moved 1 to 3 m so
+  // the aim lands in [-0.5, 0) cm, and the lower of the two windows after the move must read under
+  // the limit (the first window alone reads 16 B in a run of this test by itself).
+  // Red under `+ 0` in aim (768 B) and in landingInto (288 B), Node 26.7, Maglev alone.
+  function expectNoDeoptAtMinusZero(s: Scene, move: (state: GameState) => void): void {
+    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
+    move(s.state);
+    const figures: number[] = [];
+    let zeros = 0;
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < WINDOW; i++) {
+        const before = heap();
+        const input = s.bot.think(s.state);
+        deltas[i] = heap() - before;
+        if (Object.is(input.aimX, 0) || Object.is(input.aimY, 0)) zeros++;
+      }
+      figures.push(median(deltas, WINDOW) - emptyPairMedian());
+    }
+    console.log(
+      `think allocation after the move to -0, ${s.name}: ${figures.map((f) => Math.round(f)).join(', ')} B per think, ${zeros} aims of +0`,
+    );
+    // The scene reaches the case it is for: the aim is +0, a -0 turned, on some thinks.
+    expect(zeros, `${s.name}: thinks with an aim of 0`).toBeGreaterThan(0);
+    expect(
+      Math.min(...figures),
+      `${s.name}: lowest of the two windows after the move, median bytes per think: ${figures.map(Math.round).join(', ')}`,
+    ).toBeLessThan(THINK_MAGLEV_LIMIT_BYTES);
+  }
+
+  // 8 m from the target, along x, with the error of a normal bot: aimX is
+  // 100 * (x + 8 cos(2 atan u)) cm, between -4 and 0 for x = -8, and a part of the draws are -0.
+  it.runIf(MAGLEV)('keeps the aim of a press optimised when it first rounds to -0', () => {
+    const s = scene('press, aim at -0.3 cm', 1, 'engage', true, false, (state) => {
+      put(state, 1, -5, -3);
+      put(state, 2, 3, -3);
+      ch(state, 1).energy = 60;
+    });
+    expectNoDeoptAtMinusZero(s, (state) => {
+      put(state, 1, -8, -3);
+      put(state, 2, 0, -3);
+    });
+  });
+
+  // Skip lands 4 m away, straight from the target: from x = 3.997 the landing is at x = -0.003.
+  it.runIf(MAGLEV)("keeps an escape press's landing optimised when it first rounds to -0", () => {
+    const s = scene('escape press, landing at -0.3 cm', 1, 'kite', true, true, (state) => {
+      put(state, 1, 2.997, -3);
+      put(state, 2, 5.997, -3);
+    });
+    expectNoDeoptAtMinusZero(s, (state) => {
+      put(state, 1, 3.997, -3);
+      put(state, 2, 6.997, -3);
+    });
   });
 
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {

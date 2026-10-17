@@ -12,6 +12,16 @@ CI is split by cost:
 
 - Typecheck, lint, unit tests and the asset checks run on pull requests that
   touch code, drafts included, and on pushes to main.
+- The bots' heap check (`packages/bots/test/allocation.test.ts`) runs in its
+  own job on the Node majors the unit job does not run, through
+  `vitest.heap.config.ts`: Node 26.7.0 (pinned; V8 14.6) in the default tiers
+  and in Maglev alone, the tier a browser match runs the bots in (`--maglev
+  --no-turbofan --no-concurrent-recompilation --no-use-osr`; the last two
+  switch off background compilation and OSR, which the browser keeps on, so
+  that the figures do not depend on compile timing), and Node 24 in the
+  default tiers. The unit job runs it on Node 22. The job has no `needs:`,
+  runs on drafts in parallel with the unit job and takes about half a minute.
+  See [bots](bots.md), Testing.
 - Build and the Playwright e2e specs (`e2e/*.spec.ts`) run on pull requests
   that are ready for review and on pushes to main. They skip draft pull
   requests. They start only after the typecheck, lint, unit test and asset
@@ -391,31 +401,32 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   window that is the median by counted bytes) must be at most
   `LIVE_BOTS_LIMIT_BYTES`, 12 000 B (`heap-probe.ts` has the figures, and
   bots.md, Allocation, In the browser, the causes). The bytes in a browser
-  window were: 0.7 to 1.2 KB per window in the sandbox (`bot.ts:move` and
-  `rng.ts:next` of its one bot, not asserted), and in the live scene's
-  measured windows on bc1d6f1 25 to 131 KB per window on the runner, a median
-  window of 52 and 40 KB in two jobs (39 to 44 KB over 15 local attempts): the
-  garbage of the plan search, about 53 KB a plan, and the calls V8's Maglev
-  tier boxes, `Number.isFinite` and `hypot2` among them (bots.md). After the
-  fixes of #93 the median window read 3.2 to 4.0 KB locally (windows of about
-  6.1, 10.8, 2.6, 3.7 and 1.6 KB) and 3588, 3912 and 3756 B in the three
-  runner jobs on 04be0f9, on windows 5 to 9 of round 3. The dash hold of #98
-  moved the measured windows to windows 4 to 8 of a round 3 that begins at tick
-  2609, and there the median window reads 6404 to 7996 B over 15 local attempts,
-  6952, 7348 and 7200 B in three runner jobs on 4ea802d and up to 7568 B in the
-  tester's twelve attempts (main's bots read 5744 to 6416 B there). The limit
-  is 50 percent above the largest clean median of the three, 7996 B, a local
-  one (11 994, rounded up to 100), and it is also under a quarter of the
-  smallest median with the fixes reverted (61.9 KB on these windows, 38.9 KB on
-  the old ones), which fails the bound in every attempt (3 of 3 local, 9 of 9
-  before). It does not catch one reverted fix alone (`aim`'s 1.2 KB leaves the
-  median under 12 KB). The windows after a round starts are not asserted:
-  megabytes before the fixes, 0.04 to 0.72 MB in the first window of a round
-  after them, locally (bots.md). `summarise` gives the bots' files the prefix
-  `bots/`, as it gives the sim's `sim/`, so a bots file such as `bot.ts` never
-  matches a client entry. Bytes of an inlined callee land on its caller: V8
-  inlines `frame` and its callees into `frameMany`, so their bytes show on it,
-  and bots bytes inlined into the glue show in `bot-driver.ts` or `stepSim`.
+  window were: 0.6 to 0.9 KB per window in the sandbox (`bot.ts:move` of its
+  one bot, not asserted; `rng.ts:next` is gone since #108), and in the live
+  scene's measured windows on bc1d6f1 25 to 131 KB per window on the runner, a
+  median window of 52 and 40 KB in two jobs (39 to 44 KB over 15 local
+  attempts): the garbage of the plan search, about 53 KB a plan, and the calls
+  V8's Maglev tier boxes, `Number.isFinite` and `hypot2` among them (bots.md).
+  After the fixes of #93 the median window read 3.2 to 4.0 KB locally (windows
+  of about 6.1, 10.8, 2.6, 3.7 and 1.6 KB) and 3588, 3912 and 3756 B in the
+  three runner jobs on 04be0f9, on windows 5 to 9 of round 3. The dash hold of
+  #98 moved the measured windows to windows 4 to 8 of a round 3 that begins at
+  tick 2609, and there the median window reads 6404 to 7996 B over 15 local
+  attempts, 6952, 7348 and 7200 B in three runner jobs on 4ea802d and up to
+  7568 B in the tester's twelve attempts (main's bots read 5744 to 6416 B
+  there). The limit is 50 percent above the largest clean median of the three,
+  7996 B, a local one (11 994, rounded up to 100), and it is also under a
+  quarter of the smallest median with the fixes reverted (61.9 KB on these
+  windows, 38.9 KB on the old ones), which fails the bound in every attempt (3
+  of 3 local, 9 of 9 before). It does not catch one reverted fix alone (`aim`'s
+  1.2 KB leaves the median under 12 KB). The windows after a round starts are
+  not asserted: megabytes before the fixes, 0.04 to 0.72 MB in the first window
+  of a round after them, locally (bots.md). `summarise` gives the bots' files
+  the prefix `bots/`, as it gives the sim's `sim/`, so a bots file such as
+  `bot.ts` never matches a client entry. Bytes of an inlined callee land on its
+  caller: V8 inlines `frame` and its callees into `frameMany`, so their bytes
+  show on it, and bots bytes inlined into the glue show in `bot-driver.ts` or
+  `stepSim`.
 - A blind mode, seen locally only. In some local attempts every counted function
   read 0 B, `frameMany` included (which otherwise reads 252 to 588 B per window,
   one boxed number per frame), and a mutation read no mutation-sized figure: 13
