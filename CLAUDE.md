@@ -5,7 +5,7 @@ A top-down arena fighter. The approved design is in
 architecture reference is in `docs/architecture/`.
 
 The repo is an npm workspaces monorepo: `packages/sim`, `packages/bots` and
-`packages/client`. TypeScript is `~6.0` only. Node `^22.13` or `>=24`.
+`packages/client`. TypeScript is `~6.0` only. Node `^22.15` or `>=24`.
 
 ## Useful commands
 

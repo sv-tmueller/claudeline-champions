@@ -106,7 +106,8 @@ raising it is a one-line change.
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
 file and `-- --seeds N` plays the seeds 1 to N. It needs Node 22.15 or later,
-for `module.registerHooks` (see `tools/balance/register.ts`). It is not in
+for `module.registerHooks` (see `tools/balance/register.ts`), which is why the
+`engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
 `npm run check`: a full run took about 5.5 minutes on Apple silicon.
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check` on a runner
