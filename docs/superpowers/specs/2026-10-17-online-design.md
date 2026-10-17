@@ -27,7 +27,7 @@ Non-goals of this cut:
 - Docker and deployment. They are parked, because they are outward-facing and
   need the owner's decision on a host and its cost (package P9).
 - Client-side prediction, delta snapshots, binary snapshots (milestone 6
-  later packages, P6 and P7, behind the protocol version).
+  later packages, P6a, P6b and P7, behind the protocol version).
 - Spectating (milestone 9) and pausing online (decided in section 2).
 - Rate limits and abuse handling beyond the baseline in section 11.
 
@@ -89,9 +89,11 @@ fixed here.
   encode and decode with validation. No I/O, no transport, no game logic.
 - Imports relative paths and `@claudeline/sim` only (types, and `Button` if it
   needs the bit values). It cannot import `bots`, so it declares its own
-  `'easy' | 'normal' | 'hard'` union for the difficulty. The server assigns it
-  to the `Difficulty` type of `@claudeline/bots`, so a divergence is a type
-  error there.
+  `'easy' | 'normal' | 'hard'` union for the difficulty. One-way assignment
+  to the `Difficulty` type of `@claudeline/bots` would miss a new bots tier, so
+  package P2 adds a two-way check in the server: a type that is `true` only
+  when each union is assignable to the other, used in a declaration that fails
+  to compile otherwise.
 - Lint (a `packages/protocol/src/**` block in `eslint.config.js`): the import
   patterns of the bots block with `@claudeline/sim` as the one allowed package,
   the relative-path bans of the sim and bots blocks, no dynamic `import()` and
@@ -102,9 +104,12 @@ fixed here.
   because the codec is not part of the determinism contract.
 - Tests (`packages/protocol/test/**`): relative paths, `@claudeline/sim` and
   `vitest` only.
-- tsconfig: extends `tsconfig.base.json` with `lib: ["ES2023"]` and
-  `types: []`, like sim and bots, so any other browser or Node global is a
-  type error.
+- tsconfig: extends `tsconfig.base.json` with `lib: ["ES2023"]`,
+  `types: []` and `erasableSyntaxOnly`. The first two are sim's and bots',
+  so any other browser or Node global is a type error. The server loads
+  `protocol` from source through Node's type stripping (see server below), so
+  syntax that needs a transform, an `enum` or a `namespace`, would fail at
+  runtime: `ErrorCode` is a union of string literals.
 
 ### server
 
@@ -131,10 +136,19 @@ fixed here.
   never imports `server`.
 - `eslint.config.js` has no import rule for the client today, although
   packages.md says lint enforces the boundaries. Package P1 adds a
-  `packages/client/**` block that denies `@claudeline/server` and any relative
-  path into `server`. It cannot ban `import()` there, because `main.ts` has one
-  dynamic import (the dev-only debug shot), so a dynamic import of `server`
-  stays a review matter.
+  `packages/client/**` block with two rules. A `no-restricted-imports` pattern
+  denies `@claudeline/server` and any relative path with a `server` segment
+  (the form of bots' `relativeIntoSim`, `^\.{1,2}/(.*/)?server(/|$)`). A
+  `no-restricted-syntax` selector denies a dynamic import of the same
+  sources: `ImportExpression[source.value=/<the same alternatives>/]`, and a
+  `TSImportType` selector on `argument.literal.value` for `import()` types.
+  The client keeps its one dynamic import, `main.ts`'s dev-only debug shot,
+  because the selector anchors on the `server` segment: a trial of the two
+  selectors on `import('./debug-shot')` and `import('./observer')` passes, and
+  `import('@claudeline/server')`, `import('../../server/src/room')` and an
+  `import()` type of `@claudeline/server` fail. The cost, as for bots and
+  `sim`: a client file cannot be named `server`, so package P4a names its
+  socket file otherwise.
 
 ### bots and sim
 
@@ -148,9 +162,11 @@ Unchanged. Nothing in this design weakens a `sim` or `bots` rule.
   `tsc -p packages/server`.
 - `tests/lint-boundaries.test.ts` gains rows for each new block. Each rule has
   a firing row and an allowed row, as the existing ones do.
-- `npm run server` starts the router from source. The default port is 8787
-  (not 5174, which is Vite's fallback port) and the default host is
-  `127.0.0.1`; `PORT` and `HOST` override them.
+- `npm run server` starts the router from source. The default port is 8787 and
+  the default host is `127.0.0.1`; `PORT` and `HOST` override them (defaults,
+  see the table in section 4). 8787 is a port no other command of this repo
+  uses: Vite holds 5173 with `strictPort` in `packages/client/vite.config.ts`,
+  and the e2e server must run beside it.
 
 ## 4. The process model
 
@@ -161,11 +177,11 @@ browser --ws--> router (one port, the room-code table)
                   +--> room child B
 ```
 
-**Router.** It accepts a WebSocket and waits for the first message (at most
-5 s). It decodes that message with the `protocol` codec and routes it:
+**Router.** It accepts a WebSocket and waits for the first message (at most 5 s,
+a default). It decodes that message with the `protocol` codec and routes it:
 
 - `createRoom`: draws an unused room code, forks a child for it, and hands the
-  connection to the child. The server has a cap on rooms (default 16); beyond
+  connection to the child. The server has a cap on rooms (a default, 16); beyond
   it the answer is `roomFull`.
 - `joinRoom`: looks the code up in the table, `roomNotFound` if absent.
 - `reconnect`: takes the room code from the front of the token and routes the
@@ -210,6 +226,33 @@ match runs. In the lobby the child only reacts to messages.
 The match ends when the step emits `matchEnded`. The room then sends
 `matchEnd` after that final snapshot and returns to the lobby (section 5).
 
+### Defaults a package may tune
+
+The numbers marked "a default" in this design are starting values, not
+decisions. The architecture does not depend on any of them. The package that
+owns one may change it, with the new value and its reason written into this
+table in the same pull request, and no amendment line is needed. Fixed by the
+decision and not defaults: the 60 Hz tick, a snapshot every third tick
+(20 Hz), the render delay of 6 ticks, and the address parameters of
+section 9.
+
+| Default | Value | Reason | Owner |
+|---------|-------|--------|-------|
+| Rooms per server | 16 | each room is one Node process, so the cap bounds processes and memory until a deployment measures them | P3 |
+| First message | within 5 s | a socket that never speaks would hold a slot | P3 |
+| Idle close | 30 s without a message | frees a dead socket; the 5 s ping keeps a lobby socket alive with margin | P3 |
+| Client ping | every 5 s | keepalive and the round trip for the HUD | P4a |
+| Bad messages | the 20th in a row closes | a buggy or hostile client stops costing parse time | P2 |
+| Client message size | 1024 bytes | about ten times the largest `input` (104 characters), set as `ws` `maxPayload` | P1, P3 |
+| Aim range | integers within 100 000 cm | far outside any arena (tens of meters) and the sim does not clamp aim, so the decoder bounds it | P1 |
+| Input queue | 6, oldest dropped | 6 ticks is 100 ms of input: more adds latency, fewer drops inputs on jitter | P2 |
+| Congestion | 64 KB `bufferedAmount` (about 20 snapshots at the mean of 3222 B, about 8 at the largest of 8065 B), polled every 100 ms, closed after 120 ticks (2 s) of pending batches | skipping snapshots keeps the stream current; a longer backlog means the client cannot keep up | P3 (router), P2 (pending list) |
+| Grace | 600 ticks (10 s) | long enough for a network blip, short enough that allies do not wait on a frozen champion | P5 |
+| Empty room | closed after 3600 ticks (60 s) with no connected human | a match nobody watches should not run on | P5 |
+| Reconnect backoff | 0.5 s doubling to 4 s, given up after 60 s | the same 60 s as the empty-room close, so retrying past it is pointless | P5 |
+| Compression | `permessage-deflate` off | costs CPU on the 60 Hz loop; the mean stream is about 64 KB/s. Revisit when P2 has measured server CPU | P3 |
+| Port and host | 8787, `127.0.0.1` | section 3 | P3 |
+
 ## 5. The lobby and the ready flow
 
 - **Room code.** Five characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`: the
@@ -228,13 +271,25 @@ The match ends when the step emits `matchEnded`. The room then sends
   `easy`, `normal` or `hard`. `roundsToWin` is 3 (the sim's
   `DEFAULT_ROUNDS_TO_WIN`) and has no field in the message: a `Room` option
   overrides it in tests only. A new setting resets every ready flag. A
-  `teamSize` that would leave more humans on a team than it has places is
-  refused with `teamFull`.
+  `teamSize` change is refused with `teamFull` unless the humans still fit:
+  each team has at most the new `teamSize` humans and no human sits in a seat
+  numbered twice the new `teamSize` or higher (lowering 3 to 2 with a human in
+  seat 4 or 5 is refused). Seats are never renumbered, so the `seat` in
+  `welcome` stays the client's seat.
+- **Lists.** The lobby needs the roster and the arenas before any match, and
+  `matchStart` comes too late. `welcome` carries them: `roster` is the champion
+  ids in roster order, and `arenas` lists each arena with its name and the
+  largest team size it has spawns for. The server is the authority on data, as
+  with `matchStart`: a client built from older data cannot offer a choice the
+  server would refuse, and one list has one source. A `championId` or
+  `arenaId` outside the lists is `badMessage`; no further error code is
+  needed. The client keeps its bundled models and look data for drawing, and an
+  id it cannot draw is a client defect for P4c, not a protocol case.
 - **Choices.** A human picks a team (A or B, at most `teamSize` humans a team)
-  and a champion from the server's kits. Duplicates are allowed, as in local
+  and a champion from `roster`. Duplicates are allowed, as in local
   play. A new joiner starts on the team with fewer humans (A on a tie) with
-  the first champion in roster order, which is the kit ids sorted, as
-  `main.ts` sorts them. A change of team or champion resets that human's ready
+  the first champion in `roster`, which is the kit ids sorted, as `main.ts`
+  sorts them. A change of team or champion resets that human's ready
   flag.
 - **Ready.** The match starts as soon as every human in the room is ready and
   there is at least one.
@@ -258,7 +313,7 @@ The flow, message by message. Lobby (every row is one message from section 6):
 | Step | From | Message |
 |------|------|---------|
 | Create | client | `createRoom` |
-| | server | `welcome`, then `room` |
+| | server | `welcome` (with `roster` and `arenas`), then `room` |
 | Join | client | `joinRoom` |
 | | server | `welcome` to the joiner, `room` to everyone |
 | Failed first message | server | `error` (fatal), then the socket closes |
@@ -299,6 +354,11 @@ interface RoomSettings {
   arenaId: string;
   difficulty: Difficulty;
 }
+interface ArenaListing {
+  id: string;
+  name: string;
+  maxTeamSize: 2 | 3;                // 3 only with three spawns a team
+}
 interface SeatInfo {
   seat: number;                      // 0 to 2 * teamSize - 1
   team: TeamId | null;               // null while the seat is open
@@ -336,7 +396,7 @@ Server to client:
 
 | `t` | Fields | When |
 |-----|--------|------|
-| `welcome` | `v: number`, `roomCode: string`, `seat: number`, `token: string` | answers `createRoom`, `joinRoom` and `reconnect` |
+| `welcome` | `v: number`, `roomCode: string`, `seat: number`, `token: string`, `roster: string[]`, `arenas: ArenaListing[]` | answers `createRoom`, `joinRoom` and `reconnect` |
 | `room` | `roomCode: string`, `phase: 'lobby' \| 'match'`, `hostSeat: number`, `settings: RoomSettings`, `seats: SeatInfo[]` | after `welcome`, then on every change |
 | `matchStart` | `you: number`, `config: MatchConfig`, `arena: ArenaDef`, `kits: KitDef[]`, `snapshotEvery: 3`, `renderDelay: 6` | match start, and on a reconnect during a match |
 | `snapshot` | `tick: number`, `ack: number`, `state: SnapshotState`, `events: EventBatch[]` | every third tick |
@@ -344,10 +404,15 @@ Server to client:
 | `error` | `code: ErrorCode`, `fatal: boolean` | on a refused message |
 | `pong` | `id: number`, `tick: number` | answers `ping` |
 
-`you` is the receiving human's champion id. `MatchConfig`
+`you` is the receiving human's champion id. `arena` is the match's
+`state.arena` and `kits` its `state.kits`, exactly (see "Data once" below).
+`roster` is the champion ids in roster order and `arenas` the arenas the server
+will accept, so the lobby choices come from the server (section 5, Lists).
+`MatchConfig`
 (`packages/sim/src/state.ts`) is `{ teamSize: 2 | 3, players: PlayerConfig[],
 roundsToWin?: number }`, and the server sends `roundsToWin: 3`. `ack` is the
-last input `tick` the server applied for that client (section 7). `pong.tick`
+last input `tick` the server applied for that client, -1 before the first
+(section 7). `pong.tick`
 is the server's `state.tick`, 0 in the lobby.
 
 Error codes (`ErrorCode`):
@@ -355,14 +420,14 @@ Error codes (`ErrorCode`):
 | Code | Meaning | Fatal |
 |------|---------|-------|
 | `version` | the first message's `v` is not the server's | yes |
-| `badMessage` | not JSON, an unknown `t`, a wrong field type or value, over the size limit in the codec, a non-text frame, or a message sent before `welcome` that is not a first message | before `welcome`; after it only on the twentieth in a row |
+| `badMessage` | not JSON, an unknown `t`, a wrong field type or value (a `championId` or `arenaId` outside the server's lists included), over the size limit in the codec, a non-text frame, or a message sent before `welcome` that is not a first message | before `welcome`; after it only on the twentieth in a row |
 | `roomNotFound` | no room has that code | yes |
 | `roomFull` | the room has no open seat, or the server is at its room cap | yes |
 | `matchRunning` | `joinRoom` for a room that is playing | yes |
 | `badToken` | `reconnect` with a token no seat holds | yes |
 | `notHost` | `settings` from a non-host | no |
 | `notInLobby` | `select`, `settings` or `ready` during a match | no |
-| `teamFull` | `select` or `settings` that would put more humans on a team than it has places | no |
+| `teamFull` | `select` or `settings` that would put more humans on a team than it has places, or a lower `teamSize` with a human in a seat that would no longer exist (section 5) | no |
 
 "Fatal" means the server sends the `error` and closes the socket. `teamFull`
 is a team with no place left, which is not a full room, so it has its own
@@ -376,23 +441,29 @@ Further rules:
   [simulation.md](../../architecture/simulation.md#state-and-api-surface); this
   design does not copy it, so it cannot go stale. `matchEnd` repeats the result
   of `matchEnded` for the client that has not read the batches.
-- **Keepalive.** A client pings every 5 s, so the idle rule of section 11
-  does not close a lobby connection. During a match the inputs keep it busy.
+- **Keepalive.** A client pings every 5 s (a default), so the idle rule of
+  section 11 does not close a lobby connection. During a match the inputs keep
+  it busy.
 - **Data once.** `matchStart` carries the arena and the kits once, so the
   server is the authority on data and client and server cannot hold different
-  kit versions.
-- **Limits.** A client message is at most 1024 bytes. An `input` is at most
-  about 105 bytes (104 characters for a seven-digit `tick` and six-digit aim
-  values), so the limit leaves room for a name and a token. `ws` closes an
+  kit versions. What it carries is exactly `state.arena` and `state.kits` of
+  the match: `createMatch` keeps a copy of the arena and only the kits the
+  players use, in the order they were given (`packages/sim/src/match.ts`), and
+  the server gives it all its kits sorted by id. `checksum` covers both, so
+  a client given the raw files, every kit, or another order could not
+  rebuild the server's checksum. The measured 8303 B is for these.
+- **Limits.** A client message is at most 1024 bytes (a default). An `input` is
+  at most about 105 bytes (104 characters for a seven-digit `tick` and six-digit
+  aim values), so the limit leaves room for a name and a token. `ws` closes an
   oversize frame itself with code 1009. `name` is 1 to 16 characters after
   trimming, without control characters. `roomCode` is five characters of the
   alphabet in section 5. `token` is a room code, a dot and 22 base64url
   characters.
 - **Validation.** The server's decoder checks every field of every client
   message against its type and range (`aimX` and `aimY` are integers within
-  100 000 cm, `buttons` an integer from 0 to 255), keeps only the known
-  fields, and builds a fresh object, so an extra field or a `__proto__` key
-  reaches nothing. An invalid message is answered with `error` and ignored,
+  100 000 cm, a default, and `buttons` an integer from 0 to 255), keeps only the
+  known fields, and builds a fresh object, so an extra field or a `__proto__`
+  key reaches nothing. An invalid message is answered with `error` and ignored,
   never thrown on. The client's decoder checks the envelope and the scalar
   fields of each server message, and not the inside of `state`, `arena` and
   `kits`: the server is the authority on them.
@@ -405,9 +476,13 @@ Further rules:
 - `input.tick` is the client's input counter: 0 at `matchStart`, then one more
   for each sampled tick, and one message per sampled tick. It is not the
   server's tick. The client samples at 60 Hz, the rate of its fixed-step loop.
-- The server keeps a FIFO per human seat, capped at 6, the oldest dropped. It
-  drops any message with a `tick` at or below the last one received for that
-  seat, so a duplicate or a reordered message does nothing.
+- The server keeps a FIFO per human seat, capped at 6 (a default), the oldest
+  dropped. It drops any message with a `tick` at or below the last one received
+  for that seat, so a duplicate or a reordered message does nothing. The mark
+  starts at -1 at `matchStart`, and a `reconnect` resets it to -1, empties the
+  queue and resets `ack` to -1, because the returning client counts from 0
+  again (section 10); without the reset every input below the old mark would
+  be dropped as stale.
 - Each server tick takes one input from the queue. When the queue is empty, the
   server repeats the last move and aim with the buttons cleared, so a late
   packet does not stop a running champion and does not fire again.
@@ -416,9 +491,9 @@ Further rules:
 - The seat comes from the connection. No message names a seat, so a client
   cannot send input for another champion. The sim's `resolveInput` sanitizes
   each input again.
-- `ack` is the last input `tick` applied for that client. Nothing reads it in
-  this cut. It costs a few bytes and prediction (P6) needs it to know which
-  inputs the snapshot already contains.
+- `ack` is the last input `tick` applied for that client, -1 before the first.
+  Nothing reads it in this cut. It costs a few bytes and prediction (P6a and
+  P6b) needs it to know which inputs the snapshot already contains.
 
 ## 8. Snapshots
 
@@ -427,10 +502,16 @@ Further rules:
   goes out at once.
 - **Content.** `state` is `GameState` without `arena`, `kits` and `events`
   (`SnapshotState`). `GameState` is plain JSON, and the whole of it survives a
-  JSON round trip: a snapshot rebuilt with the arena and kits has the server's
-  `checksum`. The rebuilt state also needs the events of that tick, because
-  `checksum` covers `state.events`: they are the last batch when its `tick`
-  is the snapshot's, else an empty list.
+  JSON round trip. The client rebuilds the server's `GameState` from exactly
+  three parts: the snapshot's `state`, the match's `state.arena` and
+  `state.kits` as `matchStart` sent them (section 6, Data once), and the
+  events of that tick, because `checksum` covers `state.events`: they are the
+  last batch when its `tick` is the snapshot's, else an empty list. With those
+  three the rebuilt state has the server's `checksum`; with the tick's events
+  left out, 516 of 2448 snapshots of the arena02 run below did not match.
+- **Off cadence.** The snapshot a returning client gets at once (section 10) is
+  not on a third tick. Its pending list starts with the batch of the tick just
+  stepped, when that tick had events, so the rule above holds for it too.
 - **Events.** `events` holds the batches since the client's last snapshot, each
   tick exactly once and in tick order: up to three batches, one for each tick
   since the last snapshot that had events, and more after a skipped snapshot.
@@ -438,10 +519,12 @@ Further rules:
   string into each client's envelope, which differs by `ack` and `events`.
 - **Backpressure.** The router measures each socket's `bufferedAmount` as it
   relays and every 100 ms, and tells the child (`congested`) when it crosses
-  64 KB, about ten snapshots. While a client is congested
-  the child skips that client's snapshots and keeps its batches for the next
-  snapshot it gets. A client congested for more than 120 ticks (2 s) of pending
-  batches is closed and treated as a disconnect (section 10).
+  64 KB (65 536 B), which is about twenty snapshots at the mean message of
+  3222 B and about eight at the largest measured, 8065 B. While a client is
+  congested the child skips that client's snapshots and keeps its batches for
+  the next snapshot it gets. A client with more than 120 ticks (2 s) of pending
+  batches is closed and treated as a disconnect (section 10). The threshold,
+  the poll and the 120 ticks are defaults (section 4).
 
 Measured sizes. Method: a scratch script, run on the shipped sim, bots and
 data with `node --experimental-strip-types --import
@@ -452,27 +535,33 @@ data with `node --experimental-strip-types --import
 and `events`, and only the ticks that had events in `events`) and plays until
 `matchEnd`. Run 1: arena01, Hargrim, Quillon and Lumeth each side, normal
 bots, seed 1: 19 530 ticks, 6510 snapshots. Run 2: arena02, the same
-roster, hard bots, seed 7: 4215 ticks, 1405 snapshots.
+roster, hard bots, seed 7: 4215 ticks, 1405 snapshots. Run 3: arena02,
+Skerrow, Quillon and Lumeth each side, hard bots, seed 7: 7346 ticks, 2448
+snapshots (the match of the round trip below).
 
-| What | Run 1 mean | Run 1 max | Run 2 mean | Run 2 max |
-|------|-----------|-----------|-----------|-----------|
-| `state` | 2829 B | 5042 B | 2731 B | 4675 B |
-| Event batches | 334 B | 2341 B | 240 B | 2260 B |
-| Whole `snapshot` message | 3222 B | 6366 B | 3029 B | 6168 B |
-| `arena` and `kits`, sent once | 8303 B | | 8537 B | |
+| What | Run 1 mean / max | Run 2 mean / max | Run 3 mean / max |
+|------|------------------|------------------|------------------|
+| `state` | 2829 / 5042 B | 2731 / 4675 B | 2797 / 5225 B |
+| Event batches | 334 / 2341 B | 240 / 2260 B | 268 / 3458 B |
+| Whole `snapshot` message | 3222 / 6366 B | 3029 / 6168 B | 3123 / 8065 B |
+| `arena` and `kits`, sent once | 8303 B | 8537 B | 8126 B |
 
-At 20 Hz the mean is about 64 KB/s per client in run 1 and 61 KB/s in run 2.
-The largest single message is 6366 B, so if every snapshot were that large it
-would be 127 KB/s: an upper bound, not a measurement. A client sends at most
-60 `input` messages a second at about 105 B, 6.3 KB/s. `permessage-deflate`
-is off in this cut, since it costs CPU on a 60 Hz loop. Server CPU is not
-measured here: package P2 measures a tick with six seats.
+At 20 Hz the mean is about 64 KB/s per client in run 1, 61 KB/s in run 2 and
+62 KB/s in run 3. The largest single message in the three runs is 8065 B
+(run 3), which at 20 Hz would be 161 KB/s if every snapshot were that large.
+Three
+runs of one roster of four are a sample, not a bound: a snapshot grows with the
+entities in play, so package P2 measures again with the roster to six champions
+and the later kits. A client sends at most 60 `input` messages a second at about
+105 B, 6.3 KB/s. `permessage-deflate` is off in this cut (a default, section 4),
+since it costs CPU on a 60 Hz loop. Server CPU is not measured here: package P2
+measures a tick with six seats.
 
 Round trip. A second script plays a 3v3 with a different roster (Skerrow,
-Quillon and Lumeth each side), builds the snapshot message at every third
-tick, parses it, rebuilds the state as above (the arena and kits copied once
-at the start, the events of the tick from the batches) and compares its
-`checksum` with the server's. Arena02, hard bots, seed 7: 2448 snapshots up to
+Quillon and Lumeth each side), builds the snapshot message at every third tick,
+parses it, rebuilds the state as above (the arena and kits copied once at the
+start, the events of the tick from the batches) and compares its `checksum` with
+the server's. Arena02, hard bots, seed 7 (run 3): 2448 snapshots up to
 `matchEnd` at tick 7346, 0 mismatches. Arena01, normal bots, seed 1: 3674
 snapshots, 0 mismatches. The scripts are scratch files and are not committed;
 the headless test of section 12 holds the same check.
@@ -503,31 +592,41 @@ the headless test of section 12 holds the same check.
   joins that room instead of creating one, and `&name=<name>`. The look of the
   lobby screen follows the pre-match screen the local client gets; this design
   fixes the flow and the parameters only. Names are written with `textContent`.
-- **Assumptions package P4 must remove.** The client has them today, from the
-  local match:
+  The lobby screen and the address are package P4c.
+- **Assumptions packages P4a to P4b must remove.** The client has them today,
+  from the local match. Each is assigned to the package that does the work
+  (the sizes are in section 13):
   - `HUMAN_ID = 0` in `main.ts`: the human is champion 0, on team A. Online
     the local player can be any champion id on either team (`matchStart.you`).
     The projectile and area colours, the health bars, the HUD and the sound
     routing already take the local team or id as a parameter, but `main.ts`
-    fills each from `HUMAN_ID` or `human.team`.
+    fills each from `HUMAN_ID` or `human.team`. P4b.
   - The `data-p0x`, `data-p0y` and `data-f0` hooks read champion 0. The e2e
-    online row needs them for the local champion.
+    online row needs them for the local champion. P4b writes them for the
+    local id, and P4c's e2e reads them.
   - The HUD score reads A : B (`scoreIndex(roundsToWin, scoreA, scoreB)`)
     whichever team the local player is on. Online it must read the local team
-    first, or label the sides.
+    first, or label the sides. P4b.
   - `updateAnims` reads the drawn time as `(state.tick + clock.alpha) / 60`
     from one state, and the poses come from the previous and the current
     state, one tick apart. Online the two states are a snapshot gap (three
-    ticks) apart and the clock's alpha means that gap.
+    ticks) apart, so the drawn time must come from the render tick, not from
+    `state.tick` and an alpha. `champion-anim.ts` has no DOM and is counted by
+    the heap probe, so P4a changes it to take a drawn-time record and tests
+    it with the render clock.
   - The entity views take previous positions from `capture`, called before a
     step, and current ones from `sync`, called after it, by entity id. Online
     the two calls get snapshot A and snapshot B, three ticks apart. An entity
     only in B gets a slot where B has it and does not move in between, and a
     projectile that lived and expired between two snapshots is never drawn,
-    though its events still release.
-  - `main.ts` owns the fixed-step loop, the bots and the sim. Online there is
-    no sim in the client: the loop only samples input and draws.
-  - The menu's Restart and its pause.
+    though its events still release. P4b feeds the views from the buffer P4a
+    builds.
+  - `main.ts` owns the fixed-step loop, the bots and the sim, in about 450
+    lines. Online there is no sim in the client: the loop only samples input,
+    sends it and draws. P4b splits the start-up into a local path and an
+    online path that share the scene, HUD and draw code.
+  - The menu's Restart and its pause. P4b: online, Escape opens the menu
+    over the running match and Leave replaces Restart.
 - **Heap probe.** The online receive path (`JSON.parse` per message) is outside
   the heap probe in this cut. The draw path that online shares with the local
   scenes stays counted there.
@@ -541,9 +640,11 @@ the headless test of section 12 holds the same check.
 - **Held seat.** When a human's socket closes during a match, the seat stays.
   For a grace period of 600 ticks (10 s) the champion gets the sim's missing
   input and stands still. After that a bot drives the seat until the player
-  returns. A room with no connected human for 3600 ticks (60 s) closes.
-- **Client.** It retries with backoff, 0.5 s doubling to 4 s, for 60 s, and
-  gives up on `badToken`. The retry sends `reconnect` with the token.
+  returns. A room with no connected human for 3600 ticks (60 s) closes. The
+  600 and 3600 ticks are defaults (section 4), owned by package P5.
+- **Client.** It retries with backoff, 0.5 s doubling to 4 s, for 60 s (the
+  same defaults table), and gives up on `badToken`. The retry sends
+  `reconnect` with the token.
 - **Lobby.** A disconnect in the lobby frees the seat at once, and the token
   dies with it, so a reconnect there is answered `badToken` and the client
   returns to the join screen.
@@ -554,15 +655,19 @@ the headless test of section 12 holds the same check.
 | Step | From | Message |
 |------|------|---------|
 | Return | client | `reconnect` |
-| | server | `welcome` with the same token and seat |
+| | server | `welcome` with the same token and seat, and `roster` and `arenas` |
 | | server | `room` |
 | In a match | server | `matchStart`, then at once one `snapshot` |
 | Bad token | server | `error` (`badToken`, fatal) |
 | Room gone | server | `error` (`roomNotFound`, fatal) |
 
-The returning client's input counter starts at 0 again and its queue is empty.
-The `matchStart` it gets is the same data as the first time, with the current
-state arriving in the snapshot that follows.
+The returning client's input counter starts at 0 again. On `reconnect` the
+server resets the seat's last-received input tick and its `ack` to -1 and
+empties its queue (section 7), so the new counter is not dropped as stale. The
+`matchStart` it gets is the same data as the first time (the match's
+`state.arena` and `state.kits`), with the current state arriving in the
+snapshot that follows, whose `events` start with the batch of the tick just
+stepped (section 8).
 
 ## 11. Security baseline
 
@@ -570,13 +675,13 @@ state arriving in the snapshot that follows.
   No client-trusted state, and no hidden information to leak, because the game
   has none and the bots read the full state too.
 - Every message is validated and size-capped (section 6). Twenty invalid
-  messages in a row close the connection. The sim's `resolveInput` sanitizes
-  every input once more, so a bad value cannot reach `step` even if the
-  codec has a bug.
+  messages in a row (a default) close the connection. The sim's `resolveInput`
+  sanitizes every input once more, so a bad value cannot reach `step` even if
+  the codec has a bug.
 - The server derives seat and team from the connection and checks `championId`
   and `arenaId` against its own data.
 - The first message must arrive within 5 s, and a connection silent for 30 s
-  is closed.
+  is closed (both defaults, section 4).
 - The server binds 127.0.0.1 by default. A deployment sets its own host and
   checks the `Origin` header against an allowlist.
 - The client treats the server as untrusted for rendering: an undecodable
@@ -584,8 +689,9 @@ state arriving in the snapshot that follows.
   address can point the client at any server through `?server=`; the client
   accepts only `ws:` and `wss:` addresses.
 - Rate limits, connection caps per address and TLS are parked with deployment
-  (P9). The input queue cap already bounds what a flood of `input` messages
-  can do: one input is used per tick, however many arrive.
+  (P9). The cap of 16 rooms and the message limits (section 4) are the only
+  limits in this cut. The input queue cap already bounds what a flood of `input`
+  messages can do: one input is used per tick, however many arrive.
 
 ## 12. Test strategy
 
@@ -606,13 +712,14 @@ Each layer, and what it asserts:
   - The event batches are complete: every tick's events appear once.
   - The server's recorded input stream replays through the sim to the same
     final `checksum`.
-  - Reconnect: the grace period, the bot takeover, the return.
+  - Reconnect: the grace period, the bot takeover, the return, and that the
+    returning client's inputs from tick 0 apply (the counter reset).
 - **Socket test** (`packages/server/test`): a real `ws` server on a free port
   and Node's built-in `WebSocket` client (typed by `@types/node`): a client
   creates a room, a second joins by its code, they ready up and the first
   snapshot arrives. A second process, a forked room, is covered here once.
 - **Client units** (`packages/client/src/*.test.ts`): the snapshot buffer, the
-  render clock, the event release, the input tick counter.
+  render clock, the event release, the input tick counter, the anims time base.
 - **Lint rows** (`tests/lint-boundaries.test.ts`): a firing row and an allowed
   row per new rule (section 3).
 - **One Playwright e2e** (`e2e/online.spec.ts`, screenshot `online.png`): a
@@ -623,18 +730,21 @@ Each layer, and what it asserts:
 
 ## 13. The package map
 
-Sizes follow the planning scale (S, M, L). Each package is one pull request.
+Sizes follow the planning scale (S, M, L). Each package is one pull request,
+and every row is S or M, or parked.
 
 | # | Package | Size | Blocked by |
 |---|---------|------|------------|
 | P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project | M | this spec |
 | P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test | M | P1 |
 | P3 | Server transport and processes: the `ws` dependency, the router and a fork per room, room codes and tokens, `npm run server`, the socket test | M | P2 |
-| P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, unit tests | M | P1 |
-| P4b | Client online mode: the address and lobby screen, `main.ts` for any local id and team, the menu's Leave, the Playwright e2e and the CI server start | M | P3, P4a |
-| P5 | Reconnect: the grace period, the bot takeover, client backoff, loopback and e2e rows | M | P3, P4b |
-| P6 | Prediction and reconciliation of the local champion | L, split: movement first (M), casts after (M) | P5 |
-| P7 | Delta snapshots, with a protocol version bump | M | P4b |
+| P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests | M | P1 |
+| P4b | Client online match path: `main.ts` split into a local and an online start (no sim in the online loop), any local id and team, the `data-p0*` hooks and the HUD score for the local team, the views fed from the buffer, the menu without pause and its Leave | M | P4a |
+| P4c | Client lobby: the address parameters and the lobby screen, the Playwright e2e and the CI server start | M | P3, P4b |
+| P5 | Reconnect: the grace period, the bot takeover, the seat's input-counter reset, client backoff, loopback and e2e rows | M | P3, P4c |
+| P6a | Prediction and reconciliation of the local champion, movement | M | P5 |
+| P6b | Prediction of the local champion's casts | M | P6a |
+| P7 | Delta snapshots, with a protocol version bump | M | P4c |
 | P8 | Docker image | S | P3 |
 | P9 | First deployment | parked: outward-facing, needs the owner's host and cost decision | P8 |
 
@@ -644,14 +754,14 @@ each lands:
 - The `protocol` package: P1.
 - Match server: P2 and P3.
 - WebSocket transport: P3 and P4a.
-- Lobby and ready flow: P2 and P4b.
-- Snapshot interpolation: P4a.
-- Prediction and reconciliation: P6.
+- Lobby and ready flow: P2 and P4c.
+- Snapshot interpolation: P4a and P4b.
+- Prediction and reconciliation: P6a and P6b.
 - Reconnect: P5.
 - Server-side bots filling empty slots: P2.
 - Docker image: P8.
 - A first deployment: P9.
 
-P6 can only be checked once the authoritative path and the interpolation work,
+P6a can only be checked once the authoritative path and the interpolation work,
 which is the order section 7 of the design spec already gives. P1 can start as
 soon as this design is approved.
