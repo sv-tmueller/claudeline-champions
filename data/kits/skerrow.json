@@ -93,7 +93,7 @@
           "radius": 2.5,
           "cosHalfAngle": 0.7071067812,
           "effects": [
-            { "type": "damage", "amount": 20 },
+            { "type": "damage", "amount": 14 },
             { "type": "applyStatus", "status": { "type": "dot", "perPulse": 4, "ticks": 120 } }
           ]
         }

@@ -193,9 +193,9 @@ describe('playMatch', () => {
 
   // The runs of packages/bots/test/lumeth.test.ts, with its configs, bot seeds 101 and up by champion
   // id and match seed 7: the harness plays the same match as the bots' own tests, so the end ticks
-  // they pin (6409, 4860, 11167 and 7373) come out of it too.
+  // they pin (7860, 4860, 11167 and 7373) come out of it too.
   it.each([
-    { name: 'a 2v2 on arena01', arena: 'arena01', size: 2, endTick: 6409 },
+    { name: 'a 2v2 on arena01', arena: 'arena01', size: 2, endTick: 7860 },
     { name: 'a 2v2 on arena02', arena: 'arena02', size: 2, endTick: 4860 },
     { name: 'a 3v3 on arena01', arena: 'arena01', size: 3, endTick: 11167 },
     { name: 'a 3v3 on arena02', arena: 'arena02', size: 3, endTick: 7373 },
@@ -379,12 +379,26 @@ describe('a run', () => {
       '2v2 arena01 quillon v skerrow',
       '2v2 arena02 hargrim v lumeth',
     ]);
-    // Two seeds on each of the two fills of a 2v2, and and on the two orders of the fill of a 3v3.
+    // Two seeds on each of the two fills of a 2v2, and on the two orders of the fill of a 3v3.
     expect(first.cells.map((c) => c.played.length)).toEqual([
       ...Array<number>(12).fill(4),
       ...Array<number>(12).fill(4),
     ]);
     expect(first.cells.flatMap((c) => c.played).every((p) => !p.record.budgetHit)).toBe(true);
+  });
+});
+
+describe('a run over too few kits', () => {
+  it('throws before the first match when a pairing has no fill in a mode', () => {
+    // Three kits give every pairing one fill in 2v2 and none in 3v3, which needs two champions outside the pair.
+    const three = { kits: DATA.kits.slice(0, 3), arenas: DATA.arenas };
+    let played = 0;
+    expect(() =>
+      playCells(three, 1, () => {
+        played++;
+      }),
+    ).toThrow(/no fill/);
+    expect(played).toBe(0);
   });
 });
 
@@ -413,7 +427,7 @@ describe('the committed block and --check', () => {
     // A block that continues the other one is not the same.
     expect(sameReport(report, `${report}\nmore`)).toBe(false);
     expect(sameReport(`${report}\nmore`, report)).toBe(false);
-    const moreSeeds =renderReport({ head: 'abc1234', seeds: 3, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    const moreSeeds = renderReport({ head: 'abc1234', seeds: 3, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
     expect(sameReport(moreSeeds, report)).toBe(false);
     expect(sameReport(report.replace('| outside |', '| in band |'), report)).toBe(false);
   });

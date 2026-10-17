@@ -169,7 +169,7 @@ export default defineConfig(
     rules: {
       'no-restricted-imports': boundaryRule([
         {
-          regex: '^(?!\\.{1,2}(/|$)|node:|(@claudeline/sim|@claudeline/bots|vitest)(/|$))',
+          regex: '^(?!\\.{1,2}(/|$)|node:|(@claudeline/sim|@claudeline/bots)$|vitest(/|$))',
           message: 'The balance tool imports relative paths, node: builtins, vitest and the entry points of @claudeline/sim and @claudeline/bots only.',
         },
         outOfPackage,

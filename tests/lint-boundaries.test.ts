@@ -281,6 +281,19 @@ const cases: Case[] = [
     rule: IMPORTS,
   },
   {
+    // Pins the allow-list and the `$` anchor: a deep path into a package is not its entry point.
+    name: 'balance tool imports a file inside @claudeline/sim',
+    file: balanceFile,
+    code: "import '@claudeline/sim/src/kit';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'balance tool uses a dynamic import',
+    file: balanceFile,
+    code: "export const p = import('node:fs');",
+    rule: SYNTAX,
+  },
+  {
     name: 'client uses Math.sin and Math.cos',
     file: clientFile,
     code: 'export const v = Math.sin(1) + Math.cos(1);',

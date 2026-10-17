@@ -160,7 +160,7 @@ describe('Quiet Dart, the opener of Skerrow on a target with an escape ready', (
 
 describe('Binding Sigil, the opener of Lumeth beside an ally', () => {
   // Lumeth stands at (-6, 0) with the enemy 8 m east of her, at (2, 0): inside Q's band less the
-  // margin (10 m). Only Q is ready. Champion 1 is her ally, `gap` metres behind the enemy.
+  // margin (10.5 m). Only Q is ready. Champion 1 is her ally, `gap` metres behind the enemy.
   const kits = rosterKits();
   const sigil = (options: Parameters<typeof sceneOf>[2] = {}) =>
     sceneOf('lumeth', 8, { kits, ready: ['Q'], ...options });
@@ -201,8 +201,8 @@ describe('Binding Sigil, the opener of Lumeth beside an ally', () => {
   });
 
   it('presses Q beside an ally at the top of its band less the margin, and not past it', () => {
-    expect(pressOf(sceneOf('lumeth', 10, { kits, ready: ['Q'], ally: [6, 0] }))).toBe('Q');
-    expect(pressOf(sceneOf('lumeth', 10.05, { kits, ready: ['Q'], ally: [6, 0] }))).toBeNull();
+    expect(pressOf(sceneOf('lumeth', 10.5, { kits, ready: ['Q'], ally: [6, 0] }))).toBe('Q');
+    expect(pressOf(sceneOf('lumeth', 10.55, { kits, ready: ['Q'], ally: [6, 0] }))).toBeNull();
   });
 });
 

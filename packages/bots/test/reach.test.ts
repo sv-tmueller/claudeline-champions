@@ -126,7 +126,7 @@ describe('abilityReach', () => {
     expect(abilityReach(slots.M2)).toBeNull();
     expect(slots.M2.ex && abilityReach(slots.M2.ex)).toBeNull();
     expect(abilityReach(slots.M1)).toEqual({ min: 0, max: 12 });
-    expect(abilityReach(slots.Q)).toEqual({ min: 0, max: 11 });
+    expect(abilityReach(slots.Q)).toEqual({ min: 0, max: 11.5 });
     expect(abilityReach(slots.E)).toEqual({ min: 0, max: 3.5 });
     expect(abilityReach(slots.R)).toBeNull();
     expect(abilityReach(slots.F)).toEqual({ min: 0, max: 5.5 });

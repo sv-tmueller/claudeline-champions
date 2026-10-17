@@ -75,7 +75,7 @@
         {
           "type": "area",
           "placement": { "type": "aim", "range": 9 },
-          "radius": 1.5,
+          "radius": 2,
           "durationTicks": 1,
           "intervalTicks": 1,
           "targets": "enemies",

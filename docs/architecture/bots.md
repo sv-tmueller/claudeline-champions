@@ -1015,11 +1015,11 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (6409, 4860, 11167 and 7373), plus two rounds of
+tick when the budget was set (7860, 4860, 11167 and 7373), plus two rounds of
 the longest round that did not go to sudden death, rounded up to 100 (1700 in
-the 2v2 runs, whose longest is 1626, and 3400 in the 3v3 runs, the client's
-longest for the same roster), and one of 7000, rounded up to 1000 (17000, 16000,
-25000 and 22000); a run whose longest round passes its term fails. Every run has
+the 2v2 runs, whose longest is 1653, and 2000 in the 3v3 runs, the client's
+longest for the same roster), and one of 7000, rounded up to 1000 (19000, 16000,
+23000 and 19000); a run whose longest round passes its term fails. Every run has
 a Lumeth heal an ally; across the four, Soothing Surge heals an ally, Aegis Veil
 is cast, Mend Bolt hits an enemy, and Lantern Burst and Glide are pressed (both
 in the 3v3 on arena02). The two start-edit runs of headless-kits.test.ts stay as

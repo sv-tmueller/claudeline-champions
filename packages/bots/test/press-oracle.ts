@@ -176,7 +176,7 @@ const SKERROW_CLEARANCES: Record<string, number> = {
 
 // data/kits/lumeth.json, in the shipped set only. The enemy bands: Mend Bolt is a bolt of 20 m/s for
 // 36 ticks (12 m), which she also presses at an enemy when no ally needs it; Binding Sigil is an area
-// at the aim, range 9 plus radius 1.5 plus 0.5, an opener at a target beside an ally; Lantern Burst
+// at the aim, range 9 plus radius 2 plus 0.5, an opener at a target beside an ally; Lantern Burst
 // is an area around her, radius 3 plus 0.5, which she presses as an escape (the row in `ESCAPES`;
 // the band is the kit's and is never what presses it, because her trigger reaches farther than its
 // top). Soothing Surge, Aegis Veil and Dawnbloom reach allies only (Dawnbloom's slow on enemies is
@@ -184,7 +184,7 @@ const SKERROW_CLEARANCES: Record<string, number> = {
 // without an ally that qualifies a press of them fails the run.
 const LUMETH_BANDS: Record<string, Band> = {
   'lumeth:M1': { min: 0, max: (20 * 36) / 60 },
-  'lumeth:Q': { min: 0, max: 11, needs: 'nearAlly' },
+  'lumeth:Q': { min: 0, max: 11.5, needs: 'nearAlly' },
   'lumeth:E': { min: 0, max: 3.5 },
 };
 const LUMETH_CLEARANCES: Record<string, number> = {

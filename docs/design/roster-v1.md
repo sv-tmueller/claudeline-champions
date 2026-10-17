@@ -143,7 +143,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 | M1 | Mend Bolt: `projectile`, `heal` on an ally hit, damage on an enemy hit | 10 heal or 10 damage | 12 m | 20 m/s / 0.35 m | 0.6 s | 0.1 s, free | none |
 | M2 | Soothing Surge: `projectile` (hits allies only, passes through enemies), `heal`, `applyStatus` | 14 heal, plus 12 heal over time in total | 10.13 m | 16 m/s / 0.5 m | 5 s | 0.3 s, slowed | heal over time for 3.0 s (2 per tick) |
 | SPACE | Glide: `dash` (4 m in 0.2 s), `applyStatus` | none | 4 m | n/a | 8 s | 0, free | haste 30 percent for 1.0 s on self |
-| Q | Binding Sigil: `area` (circle, radius 1.5 m, placed up to 9 m away, one hit), `applyStatus` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
+| Q | Binding Sigil: `area` (circle, radius 2.0 m, placed up to 9 m away, one hit), `applyStatus` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
 | E | Lantern Burst: `area` (circle, radius 3 m around caster, one hit), `knockback` (2 m outward in 8 ticks) | 12 damage | 3 m radius | n/a | 9 s | 0.2 s, slowed | none |
 | R | Aegis Veil: `area` (circle, radius 5 m around caster, one hit), `shield` on allies in the area, including self | 30 absorb for 4 s | 5 m radius | n/a | 12 s | 0, free | none |
 | F | Dawnbloom (ultimate): `area` (circle, radius 5 m around caster, one hit), `heal` on allies, `applyStatus` | 30 heal, plus 30 heal over time in total | 5 m radius | n/a | 10 s | 0.6 s, slowed | heal over time for 3.0 s (5 per tick) on allies, slow 30 percent for 2.0 s on enemies |
@@ -194,7 +194,7 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 | M2 | Throwing Knife: `projectile`, `applyStatus` | 12 damage | 10 m | 24 m/s / 0.2 m | 3 s | 0.1 s, free | slow 20 percent for 1.0 s |
 | SPACE | Lunge: `dash` (6 m in 0.2 s), `applyStatus` | none | 6 m | n/a | 6 s | 0, free | haste 20 percent for 1.5 s on self |
 | Q | Quiet Dart: `projectile`, `applyStatus` | 8 damage | 11 m | 20 m/s / 0.3 m | 12 s | 0.2 s, free | silence 1.5 s |
-| E | Rend: `meleeArc` (90 degree arc, `cosHalfAngle` 0.7071067812), `applyStatus` | 20 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
+| E | Rend: `meleeArc` (90 degree arc, `cosHalfAngle` 0.7071067812), `applyStatus` | 14 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
 | R | Vanish Step: `teleport` (up to 5 m toward the aim point), `applyStatus` | none | 5 m | n/a | 16 s | 0, free | invulnerable 0.5 s on self |
 | F | Reaper's Dance (ultimate): `teleport` (up to 8 m toward the aim point), `meleeArc` (360 degrees, `cosHalfAngle` -1, swung where the teleport lands), `applyStatus` | 40 damage | 8 m teleport, 2.5 m arc | n/a | 10 s | 0.3 s, locked | stun 0.5 s and silence 2.0 s, both applied on hit, so the silence outlasts the stun |
 
@@ -203,12 +203,12 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
 | SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, `cosHalfAngle` 0.7071067812, 2.0 m) deals 14 damage. Haste on self becomes 30 percent for 2.0 s. |
-| E | Rend EX: direct damage 20 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
+| E | Rend EX: direct damage 14 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
 
 **Intended counters.**
 
 - Beats Quillon. Lunge closes 6 m, Quiet Dart silences Skip so she cannot blink away, and Quillon's heavy hits all have a locked windup.
-- Beats Lumeth. Quiet Dart silences her whole kit, and she has 120 health against a 20 damage Rend with a damage over time on top.
+- Beats Lumeth. Quiet Dart silences her whole kit, and she has 120 health against a 14 damage Rend with a damage over time on top.
 - Loses to Hargrim. Iron Hide soaks the first burst, Ground Slam slows the retreat, and 160 health outlasts her. Vanish Step gives only 0.5 s every 16 s.
 
 **Bot profile sketch.**
@@ -235,32 +235,40 @@ Each pairing has a plan and a weakness. No pairing is a flat loss against anothe
 
 ## 6. Balance notes
 
-Status: the baseline of batch #105 (issue #109). No row of this document has
-changed. The method, the band (40 to 60 percent per cell) and the full report
-are in [balance](balance.md); the tuning pass is issue #121.
+Status: the baseline of batch #105 (issue #109) and its first tuning pass
+(issue #121). Two rows of this document changed in the pass: Skerrow's Rend
+(14 damage instead of 20, with the matching Rend EX text and the counter line
+that names it) and Lumeth's Binding Sigil (radius 2.0 m instead of 1.5 m). The
+method, the band (40 to 60 percent per cell) and the full report are in
+[balance](balance.md).
 
 The six intended counters above, measured as bot against bot at the normal tier
 over 100 seeds on both arenas, with the same fill on both teams (2v2: each
 other champion in turn; 3v3: the other two, in both orders). The rates are
 the favoured champion's win rate in percent, 2v2 on arena01 and arena02, then
-3v3 on arena01 and arena02, from the report in balance.md.
+3v3 on arena01 and arena02, from the report in balance.md after the pass.
 
 | Counter | Favoured | 2v2 arena01 | 2v2 arena02 | 3v3 arena01 | 3v3 arena02 | Reading |
 |---------|----------|-------------|-------------|-------------|-------------|---------|
-| Hargrim beats Skerrow | Hargrim | 31.0 | 35.5 | 62.5 | 28.5 | Inverted in three cells, 2.5 over in one. |
-| Hargrim beats Lumeth | Hargrim | 0.5 | 3.0 | 0.0 | 0.0 | Inverted: Lumeth wins. |
-| Quillon beats Hargrim | Quillon | 100.0 | 99.0 | 99.0 | 92.5 | Right way, too strong. |
-| Skerrow beats Quillon | Skerrow | 0.0 | 0.0 | 3.5 | 5.5 | Inverted: Quillon wins. |
-| Lumeth beats Quillon | Lumeth | 62.5 | 6.0 | 56.5 | 20.0 | Right way in one cell, 2.5 over; in band in one; inverted in two. |
-| Skerrow beats Lumeth | Skerrow | 0.0 | 4.5 | 0.0 | 2.0 | Inverted: Lumeth wins. |
+| Hargrim beats Skerrow | Hargrim | 41.0 | 34.0 | 63.5 | 44.5 | In band in two cells and 6.0 under in one, so Skerrow is still ahead in all three; the right way only in 3v3 arena01, 3.5 over. Both outer cells are inside the noise. |
+| Hargrim beats Lumeth | Hargrim | 0.5 | 2.0 | 0.0 | 1.0 | Inverted: Lumeth wins. Left to #124. |
+| Quillon beats Hargrim | Quillon | 100.0 | 100.0 | 96.5 | 93.5 | Right way, too strong. Left to #124. |
+| Skerrow beats Quillon | Skerrow | 0.0 | 0.5 | 4.0 | 5.0 | Inverted: Quillon wins. Left to #124. |
+| Lumeth beats Quillon | Lumeth | 65.5 | 15.0 | 58.5 | 17.5 | Right way in two cells, one in band and one 5.5 over; inverted in two, left to #124. |
+| Skerrow beats Lumeth | Skerrow | 1.0 | 1.0 | 0.0 | 2.0 | Inverted: Lumeth wins. Accepted: no Skerrow or Lumeth number moved it within the rule; bots limits may account. |
 
-- One cell of 24 is in the band. Three counters are inverted outright
-  (Hargrim over Lumeth, Skerrow over Quillon, Skerrow over Lumeth), one is too
-  strong (Quillon over Hargrim), and two are mixed.
-- By champion, over all the cells it is in: Hargrim 14.2 percent, Skerrow
-  21.5, Lumeth 77.9 and Quillon 86.4.
+- Three cells of 24 are in the band (the baseline had one): Hargrim v Skerrow
+  in 2v2 on arena01 and in 3v3 on arena02, and Lumeth v Quillon in 3v3 on
+  arena01. Three counters are inverted in every cell (Hargrim over Lumeth,
+  Skerrow over Quillon, Skerrow over Lumeth), one is too strong (Quillon over
+  Hargrim), and two are mixed.
+- By champion, over all the cells it is in: Hargrim 16.4 percent, Skerrow
+  19.2, Lumeth 79.1 and Quillon 85.3 (14.2, 21.5, 77.9 and 86.4 before the
+  pass).
 - The 3v3 rates pool both orders of the fill, because the order sets the spawn
   slots and moves a cell by tens of points (balance.md, section 3).
-- Every number above is for these bots, which do not dodge, always target the
-  nearest enemy and never press some abilities (bots.md). A kit change in #121
-  is checked against this table before this document's rows change.
+- Every number above is for these bots, which do not dodge, target the nearest
+  enemy and never press some abilities (bots.md). Each cell's disposition, in
+  band, accepted with its reason or left to #124 (the Hargrim and Quillon
+  tuning pass), is in balance.md, section 5, and the changes and the dropped
+  candidates are in section 6.
