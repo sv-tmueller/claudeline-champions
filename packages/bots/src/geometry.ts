@@ -7,6 +7,15 @@ import { hypot2 } from './hypot';
 // radius and the boundary shrunk by it, the same rules as the sim's collision pass. The
 // checks are strict, so touching counts as free.
 
+/**
+ * The tolerance of every strict test below, in metres. The sim's collision push leaves a champion at
+ * the edge of an inflated obstacle with rounding noise (one ulp inside, distance 1.4999999999999998
+ * against 1.5, was seen), and a champion that reads as inside has no plan: its cell and point are
+ * blocked and no segment from it is clear. A position closer than this to the edge counts as
+ * touching, which is free.
+ */
+const TOUCH = 1e-9;
+
 function assertNever(value: never): never {
   throw new Error(`unexpected obstacle ${JSON.stringify(value)}`);
 }
@@ -20,11 +29,11 @@ function insideShrunkBoundary(grid: NavGrid, p: Vec2): boolean {
 function overlapsObstacle(o: Obstacle, p: Vec2): boolean {
   switch (o.type) {
     case 'circle':
-      return hypot2(p.x - o.x, p.y - o.y) < o.r + CHAMPION_RADIUS;
+      return hypot2(p.x - o.x, p.y - o.y) < o.r + CHAMPION_RADIUS - TOUCH;
     case 'rect': {
       const gapX = Math.max(Math.abs(p.x - o.x) - o.w / 2, 0);
       const gapY = Math.max(Math.abs(p.y - o.y) - o.h / 2, 0);
-      return hypot2(gapX, gapY) < CHAMPION_RADIUS;
+      return hypot2(gapX, gapY) < CHAMPION_RADIUS - TOUCH;
     }
     default:
       return assertNever(o);
@@ -58,9 +67,9 @@ export function obstacleShapes(obstacles: readonly Obstacle[]): number[] {
   const shapes: number[] = [];
   for (const o of obstacles) {
     if (o.type === 'circle') {
-      shapes.push(SHAPE_CIRCLE, o.x, o.y, o.r, 0.5, o.r + CHAMPION_RADIUS);
+      shapes.push(SHAPE_CIRCLE, o.x, o.y, o.r, 0.5, o.r + CHAMPION_RADIUS - TOUCH);
     } else {
-      shapes.push(SHAPE_RECT, o.x, o.y, o.w, o.h, CHAMPION_RADIUS);
+      shapes.push(SHAPE_RECT, o.x, o.y, o.w, o.h, CHAMPION_RADIUS - TOUCH);
     }
   }
   return shapes;
