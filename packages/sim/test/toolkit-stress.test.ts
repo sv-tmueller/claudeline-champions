@@ -211,7 +211,11 @@ describe('toolkit stress run', () => {
     }
   });
 
-  it('gives the same checksum when run twice', () => {
+  // Runner (ubuntu-latest, Node 22): 2.0 and 2.5 s green, 3.8, 3.6 and 3.7 s red on 5820f16
+  // (runs 39001711657, 39008413462, 39009180211 x3); 1.05 s locally (Apple M5 Pro, Node 22.23.2,
+  // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it('gives the same checksum when run twice', { timeout: 10_000 }, () => {
     expect(checksum(play(20251002).state)).toBe(checksum(run.state));
   });
 

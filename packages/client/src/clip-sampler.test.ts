@@ -497,7 +497,12 @@ const WALKS: { speed: number; facing: number; name: string }[] = [
 ];
 
 describe('the floor and the top through every transition', () => {
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m, entering and leaving Run at every phase', async (id) => {
+  // Five cases, one per model; the lumeth case is the slowest. Runner (ubuntu-latest, Node 22):
+  // 2.3 to 3.2 and 3.1 to 4.1 s green, 3.3 to 7.9, 4.2 to 8.0 and 3.7 to 7.6 s red on 5820f16
+  // (runs 39001711657, 39008413462, 39009180211 x3); 1.1 to 1.8 s locally (Apple M5 Pro,
+  // Node 22.23.2, full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice
+  // the slowest runner time (testing.md, Check suite).
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m, entering and leaving Run at every phase', { timeout: 20_000 }, async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const { speed, facing, name } of WALKS) {
@@ -524,7 +529,12 @@ describe('the floor and the top through every transition', () => {
     expect(w.figures().low).toBeGreaterThanOrEqual(FLOOR);
   });
 
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m with Attack, Cast and Hit over Idle and over Run', async (id) => {
+  // Five cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.0 and up to 1.3 s
+  // green, 1.9 to 2.6,1.1 to 2.2 and 1.9 to 2.6 s red on 5820f16 (runs 39001711657,
+  // 39008413462, 39009180211 x3); 0.34 to 0.47 s locally (Apple M5 Pro, Node 22.23.2, full
+  // npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest runner
+  // time (testing.md, Check suite).
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m with Attack, Cast and Hit over Idle and over Run', { timeout: 10_000 }, async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const kind of ['attack', 'cast', 'hit'] as const) {
@@ -581,7 +591,12 @@ describe('the floor and the top through every transition', () => {
     }
   });
 
-  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m through Death from every state, and the snap back', async (id) => {
+  // Five cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.2 and 1.1 to 1.5 s
+  // green, 1.2 to 2.9, 1.1 to 1.5 and 1.1 to 3.0 s red on 5820f16 (runs 39001711657, 39008413462,
+  // 39009180211 x3); 0.41 to 0.54 s locally (Apple M5 Pro, Node 22.23.2, full npm run test).
+  // Timeout: the smallest of 10, 15 and 20 s at least twice the slowest runner time (testing.md,
+  // Check suite).
+  it.each(MODEL_IDS)('keeps %s above the floor and under 1.91 m through Death from every state, and the snap back', { timeout: 10_000 }, async (id) => {
     const { root, rig } = await view(id);
     const w = walk(id, root);
     for (const moving of [false, true]) {

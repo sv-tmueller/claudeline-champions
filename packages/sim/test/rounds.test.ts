@@ -207,7 +207,11 @@ describe('the rounds fixture', () => {
     ]);
   });
 
-  it('passes the match, collision, status, ability, -0, JSON and checksum oracles at every step', () => {
+  // Runner (ubuntu-latest, Node 22): 2.0 and 2.4 s green, 3.5, 3.6 and 2.5 s red on 5820f16
+  // (runs 39001711657, 39008413462, 39009180211 x3); 1.1 s locally (Apple M5 Pro, Node 22.23.2,
+  // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it('passes the match, collision, status, ability, -0, JSON and checksum oracles at every step', { timeout: 10_000 }, () => {
     const state = start();
     expect(checkEveryStep(state)).toEqual([]);
     const watcher = new RoundWatcher();
