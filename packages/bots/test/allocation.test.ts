@@ -421,7 +421,11 @@ function arrangeHeal(state: GameState): void {
 }
 
 describe('think allocation', () => {
-  it('allocates under the limit per think in every scene', () => {
+  // Runner (ubuntu-latest, Node 22): 2.9 and 3.9 s green, 5.9, 5.9 and 5.7 s red on 5820f16
+  // (runs 39001711657, 39008413462, 39009180211 x3); 1.6 s locally (Apple M5 Pro, Node 22.23.2,
+  // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it('allocates under the limit per think in every scene', { timeout: 15_000 }, () => {
     const scenes = buildScenes();
     const lines: string[] = [];
     const checksums = scenes.map((s) => checksum(s.state));
@@ -468,7 +472,11 @@ describe('think allocation', () => {
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
   });
 
-  it("allocates only the path it plans, across arena01: the follower's whole plan step", () => {
+  // Runner (ubuntu-latest, Node 22): 1.6 and 1.7 s green, 2.7, 2.6 and 2.3 s red on 5820f16
+  // (runs 39001711657, 39008413462, 39009180211 x3); 0.75 s locally (Apple M5 Pro, Node 22.23.2,
+  // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it("allocates only the path it plans, across arena01: the follower's whole plan step", { timeout: 10_000 }, () => {
     const grid: NavGrid = buildNavGrid(arena01);
     const free: number[] = [];
     // Legal points inside blocked cells (the cell centre is blocked, the point is not): a bot can

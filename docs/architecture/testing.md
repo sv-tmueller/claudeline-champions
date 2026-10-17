@@ -18,6 +18,67 @@ CI is split by cost:
   check job passes.
 - Changes that touch only `docs/` or Markdown files do not trigger CI.
 
+Vitest's default test timeout is 5 s, and the GitHub runner is slower and less
+steady than a development machine: the same code read 2.9, 3.9 and 5.9 s for
+one test on three runs in a day. A unit test whose runner time passes 2.5 s
+therefore gets its own timeout, as an options object
+(`it(name, { timeout: N }, fn)`, and the same position for `it.each`), and a
+comment above it with its runner times, its local time and the rule. There is
+no project-level `testTimeout`, which would hide the next slow test. The rule:
+the timeout is the smallest of 10, 15 or 20 s that is at least twice the
+slowest runner time seen in the logs. When a test passes half of its timeout,
+apply the rule again.
+
+A synchronous test's timeout is checked when its body returns, so no value
+stops a hang. The unit job's `timeout-minutes: 10` does that. What the value
+bounds is a slowdown.
+
+To rescan, read the unit job's times from a CI run. Vitest prints a time
+from 300 ms (its default `slowTestThreshold`), in colour, and the
+`[0-9]{4}ms` filter keeps the times of 1 s and up:
+
+```bash
+gh api --allow-escape-sequences repos/OWNER/REPO/actions/jobs/JOB_ID/logs \
+  | perl -pe 's/\e\[[0-9;]*m//g' | grep -aE '[0-9]{4}ms$'
+```
+
+The tests with their own timeout for this reason. Local times are from one
+full `npm run test` on an Apple M5 Pro with Node 22.23.2; runner times are
+ubuntu-latest, Node 22, over the five logs of 5e0bf3d, #127 and 5820f16 (two
+green, three red attempts of identical code); green is the first range, red
+the second.
+
+- `packages/bots/test/allocation.test.ts`, "allocates under the limit per
+  think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
+  timeout 15 s.
+- `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
+  every phase" (five models, lumeth slowest): 1.1 to 1.8 s locally, 2.3 to
+  4.1 s green, 3.3 to 8.0 s red, timeout 20 s.
+- `packages/sim/test/toolkit-stress.test.ts`, "gives the same checksum when
+  run twice": 1.05 s locally, 2.0 to 2.5 s green, 3.6 to 3.8 s red, timeout
+  10 s.
+- `packages/sim/test/rounds.test.ts`, "passes the match, collision, status,
+  ability, -0, JSON and checksum oracles at every step": 1.1 s locally, 2.0
+  to 2.4 s green, 2.5 to 3.6 s red, timeout 10 s.
+- `packages/bots/test/bot.test.ts`, "matches the reference chain on random
+  frozen states, to the centimetre": 1.0 s locally, 1.4 to 1.7 s green, 2.6
+  to 3.0 s red, timeout 10 s.
+- `packages/bots/test/allocation.test.ts`, "allocates only the path it plans,
+  across arena01: the follower's whole plan step": 0.75 s locally, 1.6 to
+  1.7 s green, 2.3 to 2.7 s red, timeout 10 s.
+- `packages/client/src/clip-sampler.test.ts`, "with Attack, Cast and Hit over
+  Idle and over Run" (five models): 0.34 to 0.47 s locally, up to 1.3 s
+  green, 1.1 to 2.6 s red, timeout 10 s.
+- `packages/client/src/clip-sampler.test.ts`, "through Death from every
+  state, and the snap back" (five models): 0.41 to 0.54 s locally, up to 1.5
+  s green, 1.1 to 3.0 s red, timeout 10 s.
+
+`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" keeps
+its 120 s timeout, and it is the thinnest margin in the suite: 18.6 s locally,
+47.3 to 59.6 s on the runner. By the rule, twice the slowest runner time is
+119.2 s, which is 0.8 s under the timeout. It sits at half its timeout, and
+raising it is a one-line change.
+
 ## Test types
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,

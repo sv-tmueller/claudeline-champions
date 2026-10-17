@@ -703,7 +703,11 @@ describe('aim lead', () => {
   // away from it, one at least as fast as the projectile, a zero offset, and the projectile
   // speeds of the shipped kits through a cast in its windup (the speed of the winding-up ability
   // is the one the aim leads with), and no cast (the nominal speed).
-  it('matches the reference chain on random frozen states, to the centimetre', () => {
+  // Runner (ubuntu-latest, Node 22): 1.4 and 1.7 s green, 2.7, 2.6 and 3.0 s red on 5820f16
+  // (runs 39001711657, 39008413462, 39009180211 x3); 1.0 s locally (Apple M5 Pro, Node 22.23.2,
+  // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it('matches the reference chain on random frozen states, to the centimetre', { timeout: 10_000 }, () => {
     const rng = createRng(20241005);
     // Half the states use the shipped kits, half a fixture whose M2 EX bolt (18 m/s) is faster than
     // its base bolt (15 m/s): the shipped kits give both the same speed on every slot.
