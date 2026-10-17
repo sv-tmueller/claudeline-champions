@@ -18,13 +18,24 @@ from test_validate_glb import table_rows
 
 REPO = Path(__file__).resolve().parents[2]
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
-ARENA_GLB = REPO / "assets" / "models" / "arenas" / "arena01.glb"
+ARENA_GLBS = {
+    "arena01": REPO / "assets" / "models" / "arenas" / "arena01.glb",
+    "arena02": REPO / "assets" / "models" / "arenas" / "arena02.glb",
+}
 
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
 IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow"}
 ROSTER = ("hargrim", "quillon", "lumeth", "skerrow")
+# The body colours reserved for champions five and six (decision 2 of batch
+# #134), as linear triples like a glb's baseColorFactor. They are held to the
+# same colour rules as the roster before their models exist. Move each into
+# ROSTER, and out of here, when its model lands (batch 12).
+RESERVED_BODIES = {
+    "ondrel": (0.03, 0.30, 0.03),
+    "brimwick": (0.72, 0.19, 0.00),
+}
 
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
@@ -520,12 +531,22 @@ def contract_problems(doc, bin_chunk):
     return problems
 
 
+def overlay_colour_problem(rgb):
+    """Rule a for one 8-bit colour: it cannot read as the magenta debug overlay."""
+    r, g, b = rgb
+    if b - g > OVERLAY_B_MINUS_G:
+        return "colour %s has b - g = %d, the limit is %d" % (hex_of((r, g, b)), b - g, OVERLAY_B_MINUS_G)
+    return None
+
+
 def overlay_problem(doc):
     """Rule a: no body colour can read as the magenta debug overlay."""
-    r, g, b = material_rgb8(doc, "body")
-    if b - g > OVERLAY_B_MINUS_G:
-        return "body %s has b - g = %d, the limit is %d" % (hex_of((r, g, b)), b - g, OVERLAY_B_MINUS_G)
-    return None
+    return overlay_colour_problem(material_rgb8(doc, "body"))
+
+
+def reserved_rgb8(linear):
+    """The 8-bit sRGB colour of a linear triple, as `material_rgb8` reads a glb."""
+    return tuple(srgb8(c) for c in linear)
 
 
 # test helpers
@@ -593,17 +614,25 @@ class CommittedChampionTests(unittest.TestCase):
             with self.subTest(file=path.name):
                 self.assertIsNone(overlay_problem(load(path)[0]))
 
+    def test_no_reserved_body_colour_can_read_as_the_debug_overlay(self):
+        for champion, linear in RESERVED_BODIES.items():
+            with self.subTest(champion=champion):
+                self.assertIsNone(overlay_colour_problem(reserved_rgb8(linear)))
+
     def test_roster_colours_stay_distinct_from_the_scene_and_each_other(self):
         placeholder_doc = load(CHAMPIONS_DIR / "placeholder.glb")[0]
-        arena_doc = load(ARENA_GLB)[0]
         others = dict(CLIENT_COLOURS)
-        others["arena floor"] = material_rgb8(arena_doc, "floor")
+        for arena_id, path in ARENA_GLBS.items():
+            arena_doc = load(path)[0]
+            others["%s floor" % arena_id] = material_rgb8(arena_doc, "floor")
+            others["%s trim" % arena_id] = material_rgb8(arena_doc, "trim")
         others["accent"] = material_rgb8(placeholder_doc, "accent")
         others["placeholder body"] = material_rgb8(placeholder_doc, "body")
-        roster = {i: material_rgb8(load(CHAMPIONS_DIR / ("%s.glb" % i))[0], "body") for i in ROSTER}
-        for champion, colour in roster.items():
+        bodies = {i: material_rgb8(load(CHAMPIONS_DIR / ("%s.glb" % i))[0], "body") for i in ROSTER}
+        bodies.update({i: reserved_rgb8(linear) for i, linear in RESERVED_BODIES.items()})
+        for champion, colour in bodies.items():
             candidates = dict(others)
-            candidates.update({"%s body" % o: c for o, c in roster.items() if o != champion})
+            candidates.update({"%s body" % o: c for o, c in bodies.items() if o != champion})
             for label, other in candidates.items():
                 with self.subTest(champion=champion, against=label):
                     self.assertGreaterEqual(
@@ -612,6 +641,33 @@ class CommittedChampionTests(unittest.TestCase):
                         "%s %s is too close to %s %s"
                         % (champion, hex_of(colour), label, hex_of(other)),
                     )
+
+    def test_the_arena_floor_and_trim_stay_distinct_from_what_the_client_draws(self):
+        # The placeholder body is left out: the floor was never held to it (it
+        # is 48.5 away), and the placeholder is not a roster champion.
+        accent = material_rgb8(load(CHAMPIONS_DIR / "placeholder.glb")[0], "accent")
+        others = dict(CLIENT_COLOURS)
+        others["accent"] = accent
+        for arena_id, path in ARENA_GLBS.items():
+            arena_doc = load(path)[0]
+            for surface in ("floor", "trim"):
+                colour = material_rgb8(arena_doc, surface)
+                for label, other in others.items():
+                    with self.subTest(arena=arena_id, surface=surface, against=label):
+                        self.assertGreaterEqual(
+                            distance(colour, other),
+                            MIN_DISTANCE,
+                            "%s %s %s is too close to %s %s"
+                            % (arena_id, surface, hex_of(colour), label, hex_of(other)),
+                        )
+
+    def test_no_arena_material_can_read_as_the_debug_overlay(self):
+        for arena_id, path in ARENA_GLBS.items():
+            doc = load(path)[0]
+            for material in doc["materials"]:
+                with self.subTest(arena=arena_id, material=material["name"]):
+                    rgb = material_rgb8(doc, material["name"])
+                    self.assertIsNone(overlay_colour_problem(rgb))
 
 
 class KeyFrameTableTests(unittest.TestCase):
