@@ -586,7 +586,11 @@ the key of a capture) and a plain DOM click on each button.
   samples it exactly as it does for any mouse, and allocates nothing (issue
   #87).
 
-The menu pauses in local matches only. Pausing online is milestone 6.
+The menu pauses in local matches only. Online play never pauses: Escape opens
+the menu over the running match, and the menu offers Leave in place of Restart
+([batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441), designed in the
+[online design](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering);
+not built yet).
 
 ## Platform interface
 
