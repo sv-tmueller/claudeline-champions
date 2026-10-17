@@ -466,11 +466,12 @@ describe('think allocation', () => {
   // The Maglev project is only worth its figures on the engine they were measured on and with the
   // flags applied: V8 12.4 (Node 22) does not reproduce them, a worker that lost its execArgv
   // runs the default tiers and reads 0 B everywhere, and one that compiles on a background thread
-  // (`--no-concurrent-recompilation` lost) reads 480 B in a block or 32 B a think after the move to
-  // -0 in some runs (see vitest.heap.config.ts). The control below proves the tier itself.
-  it.runIf(MAGLEV)('runs on Node 26 (V8 14) with --maglev --no-turbofan --no-concurrent-recompilation', () => {
+  // or replaces its loops on the stack (`--no-concurrent-recompilation` or `--no-use-osr` lost)
+  // reads 480 B in a block or 32 B a think after the move to -0 in some runs (see
+  // vitest.heap.config.ts). The control below proves the tier itself.
+  it.runIf(MAGLEV)('runs on Node 26 (V8 14) with the Maglev-only flags of the config', () => {
     const v8Major = Number.parseInt(process.versions.v8.split('.')[0] ?? '0', 10);
-    const wanted = ['--maglev', '--no-turbofan', '--no-concurrent-recompilation'];
+    const wanted = ['--maglev', '--no-turbofan', '--no-concurrent-recompilation', '--no-use-osr'];
     const flags = wanted.filter((flag) => process.execArgv.includes(flag));
     const missing = wanted.filter((flag) => !flags.includes(flag));
     const problem = `the Maglev heap check needs Node 26 (V8 14.6) and ${wanted.join(' ')}: found V8 ${process.versions.v8}, missing ${missing.join(' ') || 'nothing'}`;
