@@ -45,6 +45,8 @@ import { arenaModelUrl, championModelUrl } from './models';
 import { createBrowserPlatform, type SettingsStorage } from './platform';
 import { buildResult } from './result-dom';
 import { ResultScreen } from './result-screen';
+import { Scoreboard } from './scoreboard';
+import { bindScoreboard, buildScoreboard } from './scoreboard-dom';
 import './style.css';
 import './hud.css';
 import './result.css';
@@ -118,6 +120,8 @@ scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.
 
 // Built before the models load, so the HUD shows while they do.
 const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
+// The scoreboard shows while Tab is held (bindScoreboard, below). It reads the tallies of the feedback.
+const scoreboard = new Scoreboard(buildScoreboard(hudRoot, state.champions, human.team), feedback);
 const result = new ResultScreen(buildResult(resultRoot, kitIds, arenas, launch), human.team, roundsToWin);
 
 // Built hidden, like the result panel. The Menu itself is made at the end, once the loop exists.
@@ -301,6 +305,7 @@ function stepSim(steps: number): void {
   writeHooks();
   writeCombatHooks();
   hud.update(state);
+  scoreboard.update(state);
   result.update(state);
 }
 
@@ -410,6 +415,7 @@ capturePoses(state.champions, previousPoses);
 writeHooks();
 writeCombatHooks();
 hud.update(state);
+scoreboard.update(state);
 result.update(state);
 if (import.meta.env.DEV) {
   // Dev builds only: Vite replaces the flag with false in a build and drops the
@@ -440,7 +446,13 @@ const menu = new Menu(menuDom.handles, input, platform, {
     }
   },
   restart: () => location.reload(),
-  releaseInput: () => input.releaseAll(),
+  // Opening the menu hides the scoreboard along with the held keys.
+  releaseInput() {
+    input.releaseAll();
+    scoreboard.hide();
+  },
 }, settings.muted);
 bindMenu(window, menu, menuDom.buttons);
+// Tab, while the menu is closed.
+bindScoreboard(window, scoreboard, () => menu.isOpen);
 renderer.setAnimationLoop(frame);
