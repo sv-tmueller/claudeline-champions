@@ -127,7 +127,9 @@ closed, and the six counters of roster v1 stand unchanged.
 | Brimwick | loses | beats | beats | loses | loses to Ondrel |
 
 Over six champions the records are Hargrim 3 wins and 2 losses, Quillon 2 and
-3, Lumeth 2 and 3, Skerrow 3 and 2, Ondrel 3 and 2, Brimwick 2 and 3.
+3, Lumeth 2 and 3, Skerrow 3 and 2, Ondrel 3 and 2, Brimwick 2 and 3. The
+line "Ondrel beats Skerrow" is conditional on ground being down before Quiet
+Dart lands (section 2).
 
 The measured state of roster v1 is the reason to read the web with care. In
 the report of [balance](balance.md) (sections 4 and 5), over the cells each
@@ -195,22 +197,24 @@ carries stun, root or silence. Each lingering duration (3.0, 2.0, 2.0, 3.0 and
 
 - Beats Hargrim. He must cross 5 to 9 m of her ground. Mire (30 percent) and
   Reed Screen's field (30 percent) add to 60 percent, which cuts his 5.5 m/s
-  to 2.2 m/s without his hastes and 3.3 m/s under Rush's 20 percent. Reed
-  Fence pushes him 1 m every 0.33 s, which is 3 m/s, so inside it he closes on
-  Maul Swing's 3.0 m at 0.3 m/s at best and not at all at 2.2 m/s. Only all
-  his hastes at the 50 percent cap (Rush, Rally Cry and Iron Hide) give 4.95
-  m/s and beat it. Rush is one 5 m hop every 7 s, and Chain Hook is one 14
-  damage pull every 9 s.
-- Beats Skerrow. Quiet Dart (silence 1.5 s) stops every cast, Reed Step, Reed
+  to 2.2 m/s. Reed Fence pushes him 1 m every 0.33 s, which is 3 m/s, so with
+  no haste up he cannot close on Maul Swing's 3.0 m inside it. Any one haste
+  beats the push (Rush 3.3 m/s, Rally Cry 3.85, Rush with Iron Hide 4.4), so
+  the Fence holds Hargrim only while no haste is up. Rush is one 5 m hop
+  every 7 s, and Chain Hook is one 14 damage pull every 9 s.
+- Beats Skerrow, if a Mire, a Reed Fence or a Reed Screen is down before Quiet
+  Dart lands. The dart (silence 1.5 s) stops every cast, Reed Step, Reed
   Screen and Reed Fence included, but not a windup already running (rules
-  2.4), not the ground already down, and not her 130 health. From 9 m the dart
-  lands 0.61 s after she presses it (a 0.2 s windup, then 8.2 m at 20 m/s),
-  and in the 1.5 s of silence she deals at most 70: Rend 14 plus 12 of its
-  damage over time, four Twin Cuts (36) and the dart's 8. That leaves Ondrel
-  60 when Reed Screen (40 absorb, no windup) comes back. Its 3.0 m field then
-  slows Skerrow 30 percent and Reed Fence shoves her out of the 2.5 m of Twin
-  Cut every 0.33 s. A Mire or a Fence placed before the dart lands keeps
-  running through the whole silence.
+  2.4) and not ground already down. From 9 m it lands 0.61 s after she
+  presses it (a 0.2 s windup, then 8.2 m at 20 m/s). In the 1.5 s of silence
+  she deals Rend 14, two pulses of its damage over time 8, Throwing Knife 12,
+  three Twin Cuts 27 and the dart's 8: 69, or 83 with Lunge EX and about 100
+  with Lunge EX and Rend EX (50 energy). With ground down first, the Mire and
+  Reed Screen's field slow her 60 percent, she walks 2.2 m/s against Reed
+  Fence's 3 m/s push, and Ondrel stays above 90. Under the Screen's 30 percent
+  alone she walks 3.85 m/s, faster than the push, so the Fence holds her only
+  with the Mire's slow on top. An open race from the dart is roughly even,
+  and Skerrow's with EX.
 - Beats Brimwick. A caster in a locked windup stands in the mire: Starshell
   (0.7 s) and Grand Finale (1.0 s) cannot walk, so two of the Mire's three
   pulses land, 16 in all, the second while she is still inside its 2.5 m
