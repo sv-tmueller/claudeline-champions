@@ -5,6 +5,7 @@ import {
   ULTIMATE_ENERGY_COST,
   type ChampionState,
   type MatchState,
+  type StatusInstance,
 } from '@claudeline/sim';
 
 /** The slot that is the ultimate, F. */
@@ -13,9 +14,10 @@ const ULTIMATE_INDEX = SLOTS.length - 1;
 /**
  * What the HUD reads from a champion: the sim's own fields, so a rename there
  * breaks the build. `cooldowns` holds one remaining-tick entry per slot in
- * `SLOTS` order and `cast` is non-null during a windup.
+ * `SLOTS` order, `cast` is non-null during a windup and `statuses` holds the
+ * silence and the shields.
  */
-export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast'>;
+export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast' | 'statuses'>;
 
 export interface SlotView {
   /** Whole seconds of cooldown left, 0 when the slot is ready. */
@@ -24,25 +26,67 @@ export interface SlotView {
   windup: boolean;
   /** The slot cannot be used for lack of energy. */
   blocked: boolean;
+  /** The champion is silenced: the same for all seven slots (rules.md section 2). */
+  silenced: boolean;
 }
 
 /** Seven views in `SLOTS` order, made once and filled in place by `readSlotViews`. */
 export function createSlotViews(): SlotView[] {
-  return SLOTS.map(() => ({ seconds: 0, windup: false, blocked: false }));
+  return SLOTS.map(() => ({ seconds: 0, windup: false, blocked: false, silenced: false }));
 }
 
 /** Fills `out` from the champion. Allocates nothing. */
 export function readSlotViews(source: SlotSource, out: readonly SlotView[]): void {
   const cooldowns = source.cooldowns;
   const windup = source.cast !== null;
+  // An indexed scan that keeps a boolean: no number is merged, so nothing is boxed.
+  const statuses = source.statuses;
+  let silenced = false;
+  for (let i = 0; i < statuses.length; i++) {
+    if ((statuses[i] as StatusInstance).type === 'silence') {
+      silenced = true;
+      break;
+    }
+  }
   for (let i = 0; i < out.length; i++) {
     const view = out[i] as SlotView;
     const ticks = cooldowns[i] ?? 0;
     view.seconds = ticks > 0 ? Math.ceil(ticks / TICK_RATE) : 0;
     view.windup = windup;
-    // Only the ultimate has an energy gate to show; silence is not built yet.
+    // Only the ultimate has an energy gate to show; the silence has its own flag.
     view.blocked = i === ULTIMATE_INDEX && source.energy < ULTIMATE_ENERGY_COST;
+    view.silenced = silenced;
   }
+}
+
+/** What the HUD shows of the local champion's shield. */
+export interface ShieldView {
+  /** The absorb left over all shield statuses, rounded up to a whole number; 0 without a shield. */
+  absorb: number;
+}
+
+export function createShieldView(): ShieldView {
+  return { absorb: 0 };
+}
+
+// The running sum of `readShieldView`. A `let total = 0` loop would merge the integer constant
+// with a double at the loop's phi and box the number in the tiers that inline it; a typed array
+// slot is a plain double store (see client.md, the probe).
+const ABSORB_SUM = new Float64Array(1);
+
+/**
+ * Fills `out` from the champion's shield statuses, which the sim stacks: the absorb is their sum,
+ * rounded up like the health. The number is stored into the view record and never returned, so no
+ * double crosses a call. Allocates nothing.
+ */
+export function readShieldView(source: Pick<SlotSource, 'statuses'>, out: ShieldView): void {
+  const statuses = source.statuses;
+  ABSORB_SUM[0] = 0;
+  for (let i = 0; i < statuses.length; i++) {
+    const status = statuses[i] as StatusInstance;
+    if (status.type === 'shield') ABSORB_SUM[0] = (ABSORB_SUM[0] as number) + status.absorb;
+  }
+  out.absorb = Math.ceil(ABSORB_SUM[0] as number);
 }
 
 /** What the HUD shows of the round, read from `state.match`. */
