@@ -1,6 +1,7 @@
 name: Balance reproduction
 
-# A manual run only: it plays 4800 bot matches (about five minutes on a runner) and checks
+# A manual run only: it plays 4800 bot matches (about 16 minutes on a runner, measured on the
+# first run on main, against about five and a half on Apple silicon) and checks
 # that docs/design/balance.md reproduces on linux/amd64. Trigger it on a branch with
 #   gh workflow run balance.yml --ref <branch>
 # It never runs on pull requests or pushes.
