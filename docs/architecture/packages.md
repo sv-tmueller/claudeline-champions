@@ -6,7 +6,7 @@ Repository layout, dependency rules and data flow. Source: spec sections 3.1,
 ## Repository layout
 
 ```
-package.json                npm workspaces root, scripts: dev, check, test, lint, typecheck, e2e
+package.json                npm workspaces root and the npm scripts
 packages/sim/               pure TypeScript, zero runtime deps, no DOM types
 packages/bots/              depends on sim only
 packages/client/            Vite + Three.js, depends on sim and bots
@@ -14,6 +14,7 @@ packages/server/            Node authoritative match server (milestone 6)
 packages/protocol/          shared network message types (milestone 6)
 packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
+tools/balance/              bot-versus-bot win-rate harness, `npm run balance`
 data/arenas/                arena definitions (JSON), read by sim and by Blender scripts
 data/kits/                  roster kit definitions (JSON, one `KitDef` per champion), read like arenas
 assets/models/              generated .glb files, committed
@@ -22,6 +23,7 @@ docs/design/                game design documents (rules, roster, arenas)
 docs/roadmap.md             living roadmap
 docs/superpowers/specs/     approved designs (the design spec)
 .github/workflows/ci.yml    typecheck, lint, unit tests and asset checks on code pull requests; build and e2e on ready pull requests and main
+.github/workflows/balance.yml  manual run that reproduces the balance report
 ```
 
 ## Dependency rules
@@ -32,6 +34,9 @@ docs/superpowers/specs/     approved designs (the design spec)
 - `bots` imports `sim` only.
 - `client` imports `sim` and `bots`. It owns all rendering, input, audio and UI.
 - `server` imports `sim`, `bots` and `protocol`. It never imports `client`.
+- `tools/balance` imports relative paths, `node:` builtins, `vitest` and the
+  entry points of `@claudeline/sim` and `@claudeline/bots`. It reads `data/`
+  and never a package's own files.
 - Lint enforces these boundaries. A violation fails `npm run check`.
 
 ## Data flow

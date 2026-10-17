@@ -17,6 +17,8 @@ CI is split by cost:
   requests. They start only after the typecheck, lint, unit test and asset
   check job passes.
 - Changes that touch only `docs/` or Markdown files do not trigger CI.
+- The balance workflow (`.github/workflows/balance.yml`) is not part of CI.
+  It runs only by hand (see [Balance reproduction](#balance-reproduction)).
 
 Vitest's default test timeout is 5 s, and the GitHub runner is slower and less
 steady than a development machine: the same code read 2.9, 3.9 and 5.9 s for
@@ -84,6 +86,11 @@ raising it is a one-line change.
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
   replay fixtures with checksums. See [simulation](simulation.md).
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
+- Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`):
+  the pairings, fills and seeds, `playMatch` against a reference loop, the
+  aggregation and the report text, and the CLI's flags. They run in
+  `npm run test` with the other projects and play 1 or 2 seeds, not the full
+  report.
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
@@ -91,6 +98,23 @@ raising it is a one-line change.
   [assets](assets.md).
 - Strict TypeScript, ESLint with the dependency-boundary rule. See
   [packages](packages.md).
+
+## Balance reproduction
+
+`npm run balance` plays all 4800 matches of the report in
+[balance.md](../design/balance.md) and writes its block; `-- --check`
+regenerates the block in memory and exits 1 when it differs from the committed
+one (the head line is not compared), `-- --out <file>` writes the block to a
+file and `-- --seeds N` plays the seeds 1 to N. It needs Node 22.15 or later,
+for `module.registerHooks` (see `tools/balance/register.ts`), which is why the
+`engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
+`npm run check`: a full run took about 5.5 minutes on Apple silicon.
+
+`.github/workflows/balance.yml` runs `npm run balance -- --check` on a runner
+(`workflow_dispatch` only, so it never runs on a pull request or a push). It
+can be dispatched with `gh workflow run balance.yml --ref <branch>` once the
+file is on the default branch. Budget 12 to 16 minutes; the runs on record
+are in [balance.md](../design/balance.md#7-how-to-regenerate).
 
 ## Playwright e2e
 
