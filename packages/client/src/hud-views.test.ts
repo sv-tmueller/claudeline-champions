@@ -194,6 +194,12 @@ describe('shield view', () => {
     expect(view.absorb).toBe(1);
   });
 
+  it('rounds each shield up before it adds them', () => {
+    const view = createShieldView();
+    readShieldView(source({ statuses: [status('shield', { absorb: 0.5 }), status('shield', { absorb: 0.5 })] }), view);
+    expect(view.absorb).toBe(2);
+  });
+
   it('forgets the last read: a fresh read starts from nothing', () => {
     const view = createShieldView();
     readShieldView(source({ statuses: [status('shield', { absorb: 40 })] }), view);

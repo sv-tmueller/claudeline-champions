@@ -69,36 +69,28 @@ export function createShieldView(): ShieldView {
   return { absorb: 0 };
 }
 
-// The running sum of `readShieldView`, which only runs in a frame with a shield. A `let total = 0`
-// loop would merge the integer constant with a double at the loop's phi and box the number in the
-// tiers that inline it; a typed array slot is a plain double store (see client.md, the probe).
-const ABSORB_SUM = new Float64Array(1);
+// The running sum of `readShieldView`, whole numbers in an Int32Array slot. The function is called
+// once per frame, so it stays in the lower tiers for its first thousand frames, where every double
+// that is loaded, added or read from a Float64Array is a new heap number: the scratch run of
+// combat.spec with R held read 660 to 936 B a window in `readShieldView` with a Float64Array sum,
+// and 0 B with this. A `let total = 0` loop would also merge the integer constant with a double
+// at the loop's phi in the tiers above (see client.md, the probe).
+const ABSORB_SUM = new Int32Array(1);
 
 /**
  * Fills `out` from the champion's shield statuses, which the sim stacks: the absorb is their sum,
- * rounded up like the health. The number is stored into the view record and never returned, so no
- * double crosses a call. Allocates nothing.
+ * each shield rounded up like the health, so a fraction left by the ring's damage shows as the
+ * next whole point. The number is stored into the view record and never returned, so no double
+ * crosses a call. Allocates nothing.
  */
 export function readShieldView(source: Pick<SlotSource, 'statuses'>, out: ShieldView): void {
   const statuses = source.statuses;
-  // Most frames have no shield: they find none with an integer scan and touch no double.
-  let shielded = false;
-  for (let i = 0; i < statuses.length; i++) {
-    if ((statuses[i] as StatusInstance).type === 'shield') {
-      shielded = true;
-      break;
-    }
-  }
-  if (!shielded) {
-    out.absorb = 0;
-    return;
-  }
   ABSORB_SUM[0] = 0;
   for (let i = 0; i < statuses.length; i++) {
     const status = statuses[i] as StatusInstance;
-    if (status.type === 'shield') ABSORB_SUM[0] = (ABSORB_SUM[0] as number) + status.absorb;
+    if (status.type === 'shield') ABSORB_SUM[0] = (ABSORB_SUM[0] as number) + Math.ceil(status.absorb);
   }
-  out.absorb = Math.ceil(ABSORB_SUM[0] as number) | 0;
+  out.absorb = ABSORB_SUM[0] as number;
 }
 
 // Rounds of the priming below: enough for V8 to allocate the feedback vector of both readers.
