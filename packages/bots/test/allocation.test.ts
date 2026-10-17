@@ -163,10 +163,14 @@ const BASELINE_FLOOR_BYTES_PER_STEP = 1000;
  */
 const PLAN_ALLOCATION_LIMIT_BYTES = 2950;
 const PLAN_FALLBACK_LIMIT_BYTES = 2300;
-// Maglev alone: the clear plan reads the same 2784 B, the fallback plan 2400 to 2416 B (the default
-// tier 1920 to 2064 B): Maglev allocates a little more for a fallback plan.
-const PLAN_MAGLEV_LIMIT_BYTES = 2950;
-const PLAN_MAGLEV_FALLBACK_LIMIT_BYTES = 2600;
+// Maglev alone (Node 26.7): the clear plan reads the same 2784 B, the fallback plan 2400 to 2416 B
+// (the default tier 1920 to 2064 B: Maglev allocates a little more for a fallback plan, so the
+// default tier's 2300 B would leave the clean figure no room). A fresh six-double object per call
+// of `plan`, `findPath` or `pullString` reads 2952 clear and 2568 to 2576 fallback, per call of
+// `nearestFreeCell` 2744 to 2752 fallback: all four go red against these limits, which sit 4 and
+// 3.5 percent above the clean figures and 2 and 2.7 percent below the smallest mutant.
+const PLAN_MAGLEV_LIMIT_BYTES = 2900;
+const PLAN_MAGLEV_FALLBACK_LIMIT_BYTES = 2500;
 
 /** Calls of `hypot2` in one control window, and the least per call the control must read. */
 const CONTROL_CALLS = 20;
