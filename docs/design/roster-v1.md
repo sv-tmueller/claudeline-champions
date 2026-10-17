@@ -235,32 +235,40 @@ Each pairing has a plan and a weakness. No pairing is a flat loss against anothe
 
 ## 6. Balance notes
 
-Status: the baseline of batch #105 (issue #109). No row of this document has
-changed. The method, the band (40 to 60 percent per cell) and the full report
-are in [balance](balance.md); the tuning pass is issue #121.
+Status: the baseline of batch #105 (issue #109) and its first tuning pass
+(issue #121). Two rows of this document changed in the pass: Skerrow's Rend
+(14 damage instead of 20, with the matching Rend EX text and the counter line
+that names it) and Lumeth's Binding Sigil (radius 2.0 m instead of 1.5 m). The
+method, the band (40 to 60 percent per cell) and the full report are in
+[balance](balance.md).
 
 The six intended counters above, measured as bot against bot at the normal tier
 over 100 seeds on both arenas, with the same fill on both teams (2v2: each
 other champion in turn; 3v3: the other two, in both orders). The rates are
 the favoured champion's win rate in percent, 2v2 on arena01 and arena02, then
-3v3 on arena01 and arena02, from the report in balance.md.
+3v3 on arena01 and arena02, from the report in balance.md after the pass.
 
 | Counter | Favoured | 2v2 arena01 | 2v2 arena02 | 3v3 arena01 | 3v3 arena02 | Reading |
 |---------|----------|-------------|-------------|-------------|-------------|---------|
-| Hargrim beats Skerrow | Hargrim | 31.0 | 35.5 | 62.5 | 28.5 | Inverted in three cells, 2.5 over in one. |
-| Hargrim beats Lumeth | Hargrim | 0.5 | 3.0 | 0.0 | 0.0 | Inverted: Lumeth wins. |
-| Quillon beats Hargrim | Quillon | 100.0 | 99.0 | 99.0 | 92.5 | Right way, too strong. |
-| Skerrow beats Quillon | Skerrow | 0.0 | 0.0 | 3.5 | 5.5 | Inverted: Quillon wins. |
-| Lumeth beats Quillon | Lumeth | 62.5 | 6.0 | 56.5 | 20.0 | Right way in one cell, 2.5 over; in band in one; inverted in two. |
-| Skerrow beats Lumeth | Skerrow | 0.0 | 4.5 | 0.0 | 2.0 | Inverted: Lumeth wins. |
+| Hargrim beats Skerrow | Hargrim | 41.0 | 34.0 | 63.5 | 44.5 | In band in two cells; 6.0 under in one and 3.5 over in one, both inside the noise. |
+| Hargrim beats Lumeth | Hargrim | 0.5 | 2.0 | 0.0 | 1.0 | Inverted: Lumeth wins. Left to #124. |
+| Quillon beats Hargrim | Quillon | 100.0 | 100.0 | 96.5 | 93.5 | Right way, too strong. Left to #124. |
+| Skerrow beats Quillon | Skerrow | 0.0 | 0.5 | 4.0 | 5.0 | Inverted: Quillon wins. Accepted, a bots limit. |
+| Lumeth beats Quillon | Lumeth | 65.5 | 15.0 | 58.5 | 17.5 | Right way in two cells, one in band and one 5.5 over; inverted in two, left to #124. |
+| Skerrow beats Lumeth | Skerrow | 1.0 | 1.0 | 0.0 | 2.0 | Inverted: Lumeth wins. Accepted, a bots limit. |
 
-- One cell of 24 is in the band. Three counters are inverted outright
-  (Hargrim over Lumeth, Skerrow over Quillon, Skerrow over Lumeth), one is too
-  strong (Quillon over Hargrim), and two are mixed.
-- By champion, over all the cells it is in: Hargrim 14.2 percent, Skerrow
-  21.5, Lumeth 77.9 and Quillon 86.4.
+- Three cells of 24 are in the band (the baseline had one): Hargrim v Skerrow
+  in 2v2 on arena01 and in 3v3 on arena02, and Lumeth v Quillon in 3v3 on
+  arena01. Three counters are inverted in every cell (Hargrim over Lumeth,
+  Skerrow over Quillon, Skerrow over Lumeth), one is too strong (Quillon over
+  Hargrim), and two are mixed.
+- By champion, over all the cells it is in: Hargrim 16.4 percent, Skerrow
+  19.2, Lumeth 79.1 and Quillon 85.3 (14.2, 21.5, 77.9 and 86.4 before the
+  pass).
 - The 3v3 rates pool both orders of the fill, because the order sets the spawn
   slots and moves a cell by tens of points (balance.md, section 3).
-- Every number above is for these bots, which do not dodge, always target the
-  nearest enemy and never press some abilities (bots.md). A kit change in #121
-  is checked against this table before this document's rows change.
+- Every number above is for these bots, which do not dodge, target the nearest
+  enemy and never press some abilities (bots.md). Each cell's disposition, in
+  band, accepted with its reason or left to #124 (the Hargrim and Quillon
+  tuning pass), is in balance.md, section 5, and the changes and the dropped
+  candidates are in section 6.
