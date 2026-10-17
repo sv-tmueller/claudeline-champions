@@ -72,7 +72,7 @@ export function createShieldView(): ShieldView {
 // The running sum of `readShieldView`, whole numbers in an Int32Array slot. The function is called
 // once per frame, so it stays in the lower tiers for its first thousand frames, where every double
 // that is loaded, added or read from a Float64Array is a new heap number: the scratch run of
-// combat.spec with R held read 660 to 936 B a window in `readShieldView` with a Float64Array sum,
+// combat.spec with R held read 636 to 936 B a window in `readShieldView` with a Float64Array sum,
 // and 0 B with this. A `let total = 0` loop would also merge the integer constant with a double
 // at the loop's phi in the tiers above (see client.md, the probe).
 const ABSORB_SUM = new Int32Array(1);

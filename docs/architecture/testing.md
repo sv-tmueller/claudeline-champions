@@ -146,7 +146,33 @@ port 5173, which Playwright starts itself.
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
   and every link of the other three rows carrying `difficulty=hard`, and
-  `/?difficulty=brutal` reads normal as current.
+  `/?difficulty=brutal` reads normal as current. The default test lists eight
+  `data-hud` elements (the eighth is `scoreboard`, hidden and not displayed) and
+  reads `data-silenced="false"` on all seven slots, while only F reads
+  `data-blocked="true"`: the silence flag is not the energy gate.
+- `hud.spec.ts`: the shield, the scoreboard and the silence flag, on the
+  sandbox (`/?scene=sandbox`) with a paused clock and tick budgets, like
+  `combat.spec.ts` (`scoreboard.png`, at 1280x720). At the start the
+  scoreboard is hidden and not displayed, with the header (Champion, K, D) and
+  four rows in id order (Hargrim, Quillon ally; Lumeth, Skerrow enemy), all
+  alive at 0 and 0; the shield is hidden at 0 absorb and every slot reads
+  `data-silenced="false"`. F4 shots kill Lumeth; KeyR shows the shield with
+  `data-absorb="40"`, and the bounding boxes read its fill at 0.25 of the
+  health track's width and its left edge at 0.75 of it. Holding Tab shows the
+  scoreboard with Hargrim at 1 and 0, Lumeth dead at 0 and 1 and the others
+  alive at 0 and 0, and takes the picture; releasing it hides it. After the
+  shield's 240 ticks it is hidden at 0 again. There are no pixel counts, so a
+  change of the arena or the palette cannot move it. The silence is read false
+  only: no champion of the sandbox silences the human (Skerrow, the only
+  silencer, has no kit there), and the flag is shown in the headless scripted
+  scene of `hud-scene.test.ts` on the real sim (a client unit test: R shows 40
+  absorb, Skerrow's Quiet Dart takes 8 of it and silences all seven slots for
+  its 90 ticks, a scripted kill counts on the scoreboard), decision 6 of batch
+  #134. The test sets a 60 s timeout. It takes 3.9 to 4.5 s locally. On the
+  runner a frame is 17 to 24 ms at the probe viewport (about 450 of them, in
+  batches of one `runFor`) and 105 to 210 ms at 1280x720, and about 20
+  tick-exact frames also pay a hook read of 32 to 75 ms, so about 20 s, which
+  is the margin of 3x of the rule.
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.
@@ -198,7 +224,11 @@ port 5173, which Playwright starts itself.
   2801, with a Lumeth on each team and the dodge; it was 1954 before the dodge
   and 1557 with two Quillons a side). Each row logs its wall time, and a row
   over 40 s gets its own timeout. The test follows the Quillon link of the
-  result panel, which keeps the arena and the team size. The other plays the
+  result panel, which keeps the arena and the team size. The arena01 2v2 row
+  also holds Tab at the match end: the scoreboard shows over the result panel,
+  its deaths column sums to `data-deaths` (every death counts for its victim),
+  its kills column is at most that (a ring death credits no kill), and
+  releasing Tab hides it. The other plays the
   sandbox to the red edge: the ring warning hidden until 600 ticks before the
   ring, the countdown, the radius text equal to the sim's within 0.1 m and
   falling, and the red edge (`ring.png`, counted as red pixels against a picture
@@ -390,9 +420,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   in [client](client.md).
 - The counted code is the `COMBAT_CODE` pattern: the combat render modules,
   the pose and overlay helpers, the loop clock, the input sampler, the pointer
-  aim (`camera.ts`), the HUD writer and its views, the kill feed, the champion
-  names, the result screen's writer (`result-screen.ts`), the text tables of
-  the hooks and the HUD (`hook-text.ts`), the client's bot-driving glue
+  aim (`camera.ts`), the HUD writer and its views, the scoreboard writer
+  (`scoreboard.ts`; its DOM module `scoreboard-dom.ts`, with the Tab listener,
+  is event code and is not counted), the kill feed, the champion names, the
+  result screen's writer (`result-screen.ts`), the text tables of the hooks and
+  the HUD (`hook-text.ts`), the client's bot-driving glue
   (`bot-driver.ts`), the sound (`audio.ts`: `routeSounds` and `play` run on
   every step's events, and both probe specs unlock the audio with a real
   gesture before the first measured window, so the counted calls reach real
@@ -659,6 +691,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   | binding table per frame | `clip-sampler.ts:poseChampion`, first line | `(globalThis as unknown as { __m?: unknown }).__m = rig.bones.map((bone) => bone.quaternion);` | 3604 to 3740 | 3588 to 3848 |
   | clip time as an argument | `champion-anim.ts:updateAnims` and `updateAnim` | `updateAnim(anim, champion, now)` and the `now` parameter in place of the `D_NOW` write and read | 1548 to 1692 | 1596 to 1764 |
   | closure per transition | `champion-anim.ts:stepRun`, after `anim.mode = RUN_SETTLE;` | `(globalThis as unknown as { __m?: unknown }).__m = () => RUN_SETTLE;` | 384 to 408 (passes) | 460 to 544 (passes) |
+  | template per `Scoreboard.update` | `scoreboard.ts:update`, first line | `` (globalThis as unknown as { __s?: unknown }).__s = `s${(state as unknown as { tick: number }).tick}`; `` | 1176 to 1392 | 1212 to 1436 |
 
   The four rows of #111, each applied alone on 415ba94 with 3 attempts per
   scene: the first three fail 6 of 6 (the object and the table name
@@ -673,6 +706,15 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   live 1628 to 1804 B), the closure in `routeEvents` (1620 to 1744 B and 1712 to
   1768 B) and the object in the entity views' `draw` (3072 to 3120 B and 3000 to
   3100 B), against clean medians of 324 to 456 B and 432 to 576 B.
+
+  The row of #138 and two reruns, each applied alone on the final head of the
+  PR (01414c7) with 3 attempts per scene: the template per `Scoreboard.update`
+  fails 6 of 6 (`scoreboard.ts:update` at 756 to 1032 B a window), the template
+  per `Hud.update` reruns red 6 of 6 (sandbox 1188 to 1344 B, live 1328 to 1468
+  B; `hud.ts:update` at 756 to 952 B) and so does the closure in `routeEvents`
+  (1612 to 1748 B and 1672 to 1772 B; `feedback.ts:routeEvents` at 1156 to
+  1268 B). The clean medians of the same head are 408 to 456 B on the sandbox
+  and 456 to 480 B on the live scene (bots 5856 to 6376 B).
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure
@@ -705,6 +747,25 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   limit 1 when it was first measured, and 3 of 10 attempts on a rerun (128, 80
   and 32 B in the worst window, 0 B in the other 7). `setAttribute` read 0 B in
   every attempt of every clean run.
+- The shield branch and the silence branch run in neither scene (the human of
+  both casts no R, and no champion there silences it), and neither is added to
+  `combat.spec` or `live-probe.spec`, which would move the documented scenes.
+  The scan of the statuses runs in every frame of both. The shield is checked
+  once by hand, with a copy of `combat.spec.ts` that holds KeyR in the first
+  warm-up volley and again before the measured volley, so the shield
+  (`data-absorb="40"`) shows at the start and at the end of the five windows.
+  The copy is never committed. In 3 attempts a `Float64Array` sum in
+  `readShieldView` read 636 to 936 B a window in `hud-views.ts:readShieldView`:
+  the function is called once per frame, so it is still in the lower tiers,
+  where a loaded or added double boxes. With an `Int32Array` sum of per-shield
+  ceilings `hud.ts` and `hud-views.ts` read 0 B in all 15 windows (counted
+  medians 408 to 504 B). The live scene showed `readSlotViews` and
+  `readShieldView` at 48 to 480 B a window before `primeStatusReads` (client.md,
+  the frame path); with it they read 0 B in 3 attempts. The change writes (the
+  shield's start and width, the silenced flag) are on review, like the other
+  per-change writes. The medians of the local `--repeat-each=3` runs on the
+  final head are 408 to 456 B on the sandbox (limit 600) and 456 to 480 B on
+  the live scene (limit 780), the live bots 5856 to 6376 B (limit 12 000).
 - The history, which is why the windows use a hook: with the windows on the fake
   clock, `onAnimationFrame` had two modes. Playwright's fake clock hands out ids
   of 1e12 and up, so each `requestAnimationFrame` call boxes about three heap

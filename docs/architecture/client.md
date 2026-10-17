@@ -71,6 +71,15 @@ before it joins `held`, so `toPlayerInput` and its tables are the same whatever
 the bindings. A key held across a rebinding is cleared by the `releaseAll` the
 menu runs on close. Escape opens the menu (see Menu and keybinding).
 
+Tab is reserved and fixed (rules.md section 6) and is no `Action`: the input
+core ignores it, since it is not in the translation. While it is held,
+`bindScoreboard` (`scoreboard-dom.ts`) shows the scoreboard (see HUD,
+Scoreboard). A keydown of Tab, repeats included and not with Ctrl, Alt or Meta
+held, calls `preventDefault` and `show`; a keyup hides it, and so do a blur and
+a visibility change, which can swallow the keyup. While the menu is open the
+listener does nothing and leaves the default alone, so Tab keeps moving focus
+in the menu. The listener is event code, not frame path.
+
 Two keys are not game input. F3 toggles the debug overlay. F4 fires a debug
 shot from the local champion towards the aim point; it is a dev-only key.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
@@ -252,7 +261,17 @@ but for one-off windows (1 of 135 sandbox and 2 of 135 live windows, 144 to 468
 B, in `blendChannel` or `slerpFlat`; no median moved). The HUD writes its state
 with `setAttribute` and not `dataset`: in the probe a `dataset` write allocated
 about 100 B per window whenever a slot changed, and `setAttribute` allocated
-none.
+none. The two status reads of the HUD, the silence scan in `readSlotViews` and
+`readShieldView`, read the human's `statuses`, an array of objects of five
+shapes that is empty at first. In the live probe they first deopted on a shape
+or an array map their loads had not seen (`--trace-deopt`: "wrong map" at
+`statuses.length` and `.type`) and boxed numbers in the lower tier until the
+next compile, 48 to 480 B a window, so `main.ts` runs both once at startup
+(`primeStatusReads`) over empty and filled lists of six shapes. The shield sum
+is an `Int32Array` slot of per-shield ceilings: the function is called once per
+frame, so it stays in the lower tiers for its first thousand frames, where every
+double boxes, and a `Float64Array` sum read 636 to 936 B a window in a scratch
+run with the shield showing (testing.md).
 
 The colours that the world view draws are constants in these files. Champion
 model colours must stay clear of them, and `tools/blender/test_champion_models.py`
@@ -407,22 +426,36 @@ a stop) and are written only on a change.
 ## HUD
 
 An HTML and CSS overlay under `#hud`, built once at startup by `hud-dom.ts`.
-It has seven elements, named by `data-hud` after
-[rules.md](../design/rules.md) section 8: `health-bar`, `energy-bar`,
-`cooldown-icons`, `round-score`, `round-timer`, `ring-warning` and `kill-feed`.
+It has eight elements, named by `data-hud` after
+[rules.md](../design/rules.md) sections 6 and 8: `health-bar`, `energy-bar`,
+`cooldown-icons`, `round-score`, `round-timer`, `ring-warning`, `kill-feed` and
+`scoreboard`. `hud-dom.ts` builds the first seven and `scoreboard-dom.ts` the
+eighth, under the same root.
 
 - Health bar: the local champion's health as `ceil(health) / maxHealth` and a
-  fill.
+  fill. The shield segment sits in the same track (`data-part="shield"`, with a
+  `shield-fill` child). The sim has no total absorb: shields are `statuses`
+  entries `{ type: 'shield', absorb }` that add, so `readShieldView` sums the
+  rounded-up absorb of each into a `ShieldView`. The segment is `min(absorb,
+  max)` wide and starts at `max(0, min(health, max - width))`: just past the
+  health, sliding back over its end when health plus shield pass the maximum.
+  At full health 40 absorb on 160 covers the last quarter. Its colour is
+  `var(--hud-text)`, so no colour is new. It is hidden at 0 absorb and keeps
+  its last transforms; `data-visible` and `data-absorb` say what it shows.
 - Energy bar: a fill with marks at 25 (EX ready) and 100 (ultimate ready).
 - Cooldown icons: seven, in `SLOTS` order and labelled M1, M2, SPACE, Q, E, R
   and F. `hud-views.ts` turns a champion into seven `SlotView`s: whole seconds
-  of cooldown left, a windup flag and a blocked flag. Its source is the sim's
-  own fields, `Pick<ChampionState, 'energy' | 'cooldowns' | 'cast'>`, so a rename
-  in the sim breaks the build. A slot shows its seconds from the cooldown (up to
-  99, then the number itself), the ultimate shows as blocked while energy is
-  below 100, and every slot dims during a windup. The energy marks and the
-  ultimate cost are the sim's `EX_ENERGY_COST`, `ULTIMATE_ENERGY_COST` and
-  `MAX_ENERGY`.
+  of cooldown left, a windup flag, a blocked flag and a silenced flag. Its
+  source is the sim's own fields, `Pick<ChampionState, 'energy' | 'cooldowns' |
+  'cast' | 'statuses'>`, so a rename in the sim breaks the build. A slot shows
+  its seconds from the cooldown (up to 99, then the number itself), the
+  ultimate shows as blocked while energy is below 100, and every slot dims
+  during a windup. While the champion has a
+  `silence` status (an indexed scan of `statuses`) all seven slots read
+  silenced and carry `data-silenced="true"`, drawn dim with an enemy-colour
+  border by the last of the slot rules in `hud.css`; `data-blocked` stays the
+  energy gate alone. The energy marks and the ultimate cost are the sim's
+  `EX_ENERGY_COST`, `ULTIMATE_ENERGY_COST` and `MAX_ENERGY`.
 - Round score and timer: a `RoundView` read from `state.match`. The score is
   `score.A : score.B` with "first to N" from `match.roundsToWin` at startup. In
   the warmup the timer shows 1:30, since the round clock has not started. In a
@@ -448,8 +481,42 @@ It has seven elements, named by `data-hud` after
   the round, and nothing was hit. The deciding death still reaches the feed,
   since the sim emits the deaths before `roundEnded`.
 
-Not built yet: the shield segment on the health bar, the silence state of a
-slot and the scoreboard.
+### Scoreboard
+
+The eighth element, `data-hud="scoreboard"` (rules.md section 6, Tab), shows
+every champion with its state, kills and deaths while Tab is held.
+`buildScoreboard` (`scoreboard-dom.ts`) builds it hidden (`data-visible`): a
+header row (`data-row="header"`, Champion, K, D) and one row per champion, the
+local team first and each team in id order. A row is `data-row=<id>` with
+`data-team` (`ally` or `enemy`, coloured by the HUD's team rules) and
+`data-alive`, and its cells are `data-part` `team` (Ally or Enemy), `name`,
+`state` (Alive or Dead), `kills` and `deaths`. The local team is a parameter
+of `buildScoreboard`, not the human's id.
+
+The counts come from the sim's events. `CombatFeedback` keeps `killCounts`
+and `deathCounts`, an `Int32Array` per champion, and `tallyChanges`, which
+its `death` handler writes: a death counts for its victim, and a kill for the
+source only when that is another champion of the match, so a death by the
+ring (`RING_SOURCE_ID`) counts a death and no kill. They are match totals and
+never reset: a page is one match, and Restart reloads it. The constructor of
+`CombatFeedback` is unchanged.
+
+`Scoreboard.update` (`scoreboard.ts`, in the heap probe's counted code) runs
+once per stepping frame after `Hud.update`, and once at startup. It writes
+only on a change: `data-alive` and the state text when a champion's `alive`
+flipped, and the kills and deaths cells that changed while `tallyChanges`
+moved (the count loop is skipped otherwise). It writes while hidden too, so
+showing the board needs no catch-up, and the DOM is built with the start
+values, so the first update writes nothing. `show` and `hide` write
+`data-visible` once per change.
+
+The scoreboard works in every phase, `matchEnd` included, because the final
+tally is the useful one there. It draws above the result panel: its rule has
+`z-index: 1`, since `#hud` has no stacking context and `#result` comes later
+in the page. It takes no pointer events, so the result links under it still
+click; Tab's focus movement over those links is given up while it is held.
+Opening the menu hides it: the menu's `releaseInput` action also calls
+`scoreboard.hide()`.
 
 ### Result screen and champion select
 
@@ -505,19 +572,24 @@ round to win and three on arena01, three on arena02, and a 3v3 on each) give the
 tick budget of each row, and the result screen's unit tests the Victory and
 Defeat cases that the idle human cannot reach.
 
-`Hud.update` runs once per stepping frame, after all of that frame's sim steps.
+`Hud.update` runs once per stepping frame, after all of that frame's sim steps,
+and `Scoreboard.update` right after it.
 It compares integers and booleans held in cache fields with the new values and
 writes the DOM only when one changed, so a steady frame writes and allocates
 nothing. The texts come from tables made in the constructor: the health text and
 fill per whole health up to the local champion's maximum, the energy fill per
-whole energy, and the score per pair up to the rounds to win (`scoreTexts` in
-`hud-views.ts`, shared with the result screen). A value past a table builds its
-text, so nothing is wrong outside the range, only slower. The kill feed counts
+whole energy, the shield's start (`translateX`) per whole health, and the score
+per pair up to the rounds to win (`scoreTexts` in `hud-views.ts`, shared with
+the result screen). The shield's width is the health fill's text for that
+width. A value past a table builds its text, so nothing is wrong outside the
+range, only slower. The kill feed counts
 its pushes and expiries, and the HUD skips its line loop while that count has
 not moved. The e2e specs read the states from data attributes: `data-ready`,
-`data-windup` and `data-blocked` on a slot, `data-ready` on an energy mark,
-`data-visible` on a kill-feed line, `data-team` on its names and `data-sudden`
-on the timer.
+`data-windup`, `data-blocked` and `data-silenced` on a slot, `data-ready` on an
+energy mark, `data-visible` and `data-absorb` on the shield segment,
+`data-visible` on a kill-feed line, `data-team` on its names, `data-sudden` on
+the timer, and on the scoreboard `data-visible`, and `data-alive` and
+`data-team` on a row.
 
 `hud.css` sizes everything from one viewport unit, `--hud-u` (`min(1vw,
 1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
@@ -553,8 +625,9 @@ the key of a capture) and a plain DOM click on each button.
   picture. `setPaused(false)` calls `clock.reset()` (`loop.ts`) and starts the loop
   again. After a reset the next `advance` returns 0, so the paused time is never
   caught up (without it the first frame would run the full 5 steps of a stall). The
-  input is released on open and on close. Pausing this way keeps `frame`, `stepSim`,
-  `draw` and the hook writers as they are: nothing in the menu runs per frame, and
+  input is released on open and on close, and the scoreboard is hidden on
+  open. Pausing this way keeps `frame`, `stepSim`, `draw` and the hook writers
+  as they are: nothing in the menu runs per frame, and
   its DOM is written only on events. The heap probes never open it.
 - **Resume** is Escape again or the button. **Restart** is `location.reload()`: the
   address is the setup (champion, difficulty, arena, team size and the dev time
