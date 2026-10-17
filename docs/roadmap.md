@@ -87,17 +87,19 @@ The candidate packages are P1 to P9 in
 | P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks, typecheck and Vitest project | M | the design |
 | P2 | Server skeleton: `Room`, lobby and ready flow, bot fill, 60 Hz loop, input queue, snapshot cadence, headless loopback test | M | P1 |
 | P3 | Server transport and processes: `ws`, the router and a fork per room, room codes and tokens, `npm run server`, socket test | M | P2 |
-| P4a | Client net core, no DOM: socket, snapshot buffer, render clock, event release, input sender | M | P1 |
-| P4b | Client online mode: address and lobby screen, any local id and team, menu Leave, the e2e | M | P3, P4a |
-| P5 | Reconnect: grace period, bot takeover, client backoff | M | P3, P4b |
-| P6 | Prediction and reconciliation of the local champion | L, split: movement (M), then casts (M) | P5 |
-| P7 | Delta snapshots, behind a protocol version bump | M | P4b |
+| P4a | Client net core, no DOM: socket, snapshot buffer, render clock, event release, input sender, the anims time base | M | P1 |
+| P4b | Client online match path: `main.ts` split into a local and an online start, any local id and team, the views fed from the buffer, menu without pause and Leave | M | P4a |
+| P4c | Client lobby: address parameters and lobby screen, the e2e and the CI server start | M | P3, P4b |
+| P5 | Reconnect: grace period, bot takeover, input-counter reset, client backoff | M | P3, P4c |
+| P6a | Prediction and reconciliation of the local champion, movement | M | P5 |
+| P6b | Prediction of the local champion's casts | M | P6a |
+| P7 | Delta snapshots, behind a protocol version bump | M | P4c |
 | P8 | Docker image | S | P3 |
 | P9 | First deployment | parked: outward-facing, needs the owner's host and cost decision | P8 |
 
 Item by package: `protocol` package P1; match server P2 and P3; WebSocket
-transport P3 and P4a; lobby and ready flow P2 and P4b; snapshot interpolation
-P4a; prediction and reconciliation P6; reconnect P5; server-side bots P2;
+transport P3 and P4a; lobby and ready flow P2 and P4c; snapshot interpolation
+P4a and P4b; prediction and reconciliation P6a and P6b; reconnect P5; server-side bots P2;
 Docker image P8; first deployment P9 (parked).
 
 ### 7. Ladder
