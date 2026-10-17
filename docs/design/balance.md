@@ -84,7 +84,9 @@ Sources:
   count). A drawn round is one nobody won.
 - **The bots.** The cells measure the kits as the bots play them, and the
   bots have limits (bots.md, "Not built yet" and "Never pressed"): no dodging;
-  the nearest enemy is always the target; no Rally Cry; no EX variant of
+  the target is the nearest enemy, except that a bot keeps its current target
+  unless another enemy is more than 1 m nearer (`TARGET_SWITCH_MARGIN` in
+  `packages/bots/src/bot.ts`); no Rally Cry; no EX variant of
   Lumeth's M2 and R; no 8 m leash and no M1 finisher for Lumeth; her heals
   count the instant part only; no Lunge away for Skerrow. A kit that is
   balanced for players may not be for these bots, and the reverse.
@@ -228,8 +230,9 @@ which pulls Lumeth 4 m closer and slows her. In a replayed 2v2 match on
 arena01 (Hargrim and Quillon against Lumeth and Quillon, seed 1, round 1)
 Lumeth did 138 of the 160 damage Hargrim took, mostly with Mend Bolt from
 range, and Hargrim cast the hook once. Limits that may account: the target is
-the nearest enemy, so the hook may go at another champion than Lumeth; nobody
-dodges, so her bolts may land; Rally Cry is never pressed.
+the nearest enemy (or the current one within 1 m of it), so the hook may go at
+another champion than Lumeth; nobody dodges, so her bolts may land; Rally Cry
+is never pressed.
 
 In 40-seed screens only Mend Bolt's cooldown (36 to 50 and to 70 ticks) and
 its damage on an enemy (10 to 8) moved the cell by more than a few points
@@ -292,20 +295,20 @@ escape ready; nobody dodges.
 Quillon wins 95 to 100 percent against Skerrow, where the roster has Skerrow
 ahead. #121 moved Skerrow's numbers only and none moved the cells within the
 rule. #124 tried Quillon's (section 6.2) and none did either. Two got a full
-run: Hush Ward's absorb, 30 to 20 (Q1), and Lance's damage, 28 to 22 (Q2,
-aimed at 3v3 arena02, 95.0 to 95.5); neither moved a Quillon v Skerrow cell by
-5 points. Eight failed before a full run: six on the fixture coverage (Skip's
+run: Hush Ward's absorb, 30 to 20 (Q1), and Lance's damage, 28 to 22 (Q2, aimed
+at 3v3 arena02, 95.0 to 95.5); neither moved a Quillon v Skerrow cell by 5
+points. Eight failed before a full run: six on the fixture coverage (Skip's
 cooldown, Bind Shot's slow and its duration, Snare Orb's cooldown, Rod Bolt's
 cooldown and Lance's windup; the committed Quillon fixture is attempt 23 of its
 search, and the search is not in the repository) and two on the no-stall clause
 of lumeth.test.ts (Rod Bolt's reach and its damage). Limits that may account:
-the target is the nearest enemy, so in a replayed Quillon and Hargrim against
-Skerrow and Hargrim match (2v2, arena01, seed 1, round 1) Skerrow hit the other
-Hargrim while Quillon's bolts hit her Hargrim nine times (eight Rod Bolts, six
-of them for the full 11 damage and two absorbed by Iron Hide, and one Snare
-Orb) and Skerrow three times; Skerrow's Lunge opener waits at 6 to 8 m and she
-has no Lunge away; the bot presses Quiet Dart only at a target with an escape
-ready; nobody dodges.
+the target is the nearest enemy (or the current one within 1 m of it), so in a
+replayed Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01,
+seed 1, round 1) Skerrow hit the other Hargrim while Quillon's bolts hit her
+Hargrim nine times (eight Rod Bolts, six of them for the full 11 damage and two
+absorbed by Iron Hide, and one Snare Orb) and Skerrow three times; Skerrow's
+Lunge opener waits at 6 to 8 m and she has no Lunge away; the bot presses Quiet
+Dart only at a target with an escape ready; nobody dodges.
 
 ### 5.6 Hargrim v Skerrow (two in band, two accepted within the noise)
 
@@ -503,9 +506,10 @@ the repository, so a miss ends a candidate):
 
 - `npm run balance` plays all 4800 matches and writes the block of section 4.
   It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
-  stops with a message below that. A full run takes about 5 minutes on one core
-  of an Apple silicon laptop; the wall time goes to stdout and never into the
-  file.
+  stops with a message below that. A full run takes about 5.5 minutes on one
+  core of an Apple silicon laptop and 12 to 16 minutes on the runner of the
+  manual workflow (runs 38990892639 at 933 s, 38997052269 at 953 s and
+  39005677735 at 737 s); the wall time goes to stdout and never into the file.
 - It refuses to write when `data/`, `packages/sim/src`, `packages/bots/src` or
   `tools/balance` differ from HEAD, because the head line would then name a
   commit that does not hold the sources. Commit the change first.
