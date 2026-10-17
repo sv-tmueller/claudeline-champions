@@ -530,7 +530,7 @@ describe('the floor and the top through every transition', () => {
   });
 
   // Five cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.0 and up to 1.3 s
-  // green, 1.9 to 2.6,1.1 to 2.2 and 1.9 to 2.6 s red on 5820f16 (runs 39001711657,
+  // green, 1.9 to 2.6, 1.1 to 2.2 and 1.9 to 2.6 s red on 5820f16 (runs 39001711657,
   // 39008413462, 39009180211 x3); 0.34 to 0.47 s locally (Apple M5 Pro, Node 22.23.2, full
   // npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest runner
   // time (testing.md, Check suite).
