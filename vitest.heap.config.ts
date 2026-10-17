@@ -34,7 +34,6 @@ export default defineConfig({
           name: 'bots-heap',
           environment: 'node',
           include: ['packages/bots/test/allocation.test.ts'],
-          testTimeout: 30000,
         },
       },
       {
@@ -45,7 +44,6 @@ export default defineConfig({
           pool: 'forks',
           execArgv: ['--maglev', '--no-turbofan', '--no-concurrent-recompilation', '--no-use-osr'],
           env: { BOTS_HEAP_TIER: 'maglev' },
-          testTimeout: 60000,
         },
       },
     ],
