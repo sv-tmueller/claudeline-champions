@@ -268,7 +268,11 @@ the favoured champion's win rate in percent, 2v2 on arena01 and arena02, then
   first pass; the second kept no change).
 - The 3v3 rates pool both orders of the fill, because the order sets the spawn
   slots and moves a cell by tens of points (balance.md, section 3).
-- Every number above is for these bots, which do not dodge, target the nearest
+- 2026-10-17: the bots dodge a predicted projectile (#137, bots.md, Dodge), at
+  0.25, 0.5 and 0.75 on the three tiers. The rates above were measured with
+  bots that did not; the report regenerated with the dodge is in balance.md,
+  section 4.
+- Every number above is for these bots, which did not dodge, target the nearest
   enemy and never press some abilities (bots.md). Each cell's disposition, in
   band or accepted with its reason, is in balance.md, section 5, and the
   changes and the dropped candidates of both passes are in section 6.

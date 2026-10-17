@@ -83,9 +83,11 @@ Sources:
   `damage` of a champion to a champion of the other team (the ring does not
   count). A drawn round is one nobody won.
 - **The bots.** The cells measure the kits as the bots play them, and the
-  bots have limits (bots.md, "Not built yet" and "Never pressed"): no dodging;
-  the target is the nearest enemy, except that a bot keeps its current target
-  unless another enemy is more than 1 m nearer (`TARGET_SWITCH_MARGIN` in
+  bots have limits (bots.md, "Not built yet" and "Never pressed"): the dodge
+  is one coin a projectile (0.5 at the normal tier, no dodging at all until
+  #137) and there is no local avoidance of champions; the target is the
+  nearest enemy, except that a bot keeps its current target unless another
+  enemy is more than 1 m nearer (`TARGET_SWITCH_MARGIN` in
   `packages/bots/src/bot.ts`), and that a bot that would retreat targets a
   finisher instead, the nearest enemy in reach with a clear shot whose health
   fraction is at or below its own (bots.md, "Finisher"); no Rally Cry; no EX

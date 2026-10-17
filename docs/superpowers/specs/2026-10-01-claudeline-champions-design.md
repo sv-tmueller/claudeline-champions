@@ -267,6 +267,12 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
   openers, escapes and finishers are not built.
   Amended 2026-10-06 by [#81](https://github.com/sv-tmueller/claudeline-champions/issues/81) (batch #80): openers and escapes are built as stateless slot conditions in the bots' profiles
   (bots.md, Openers and escapes); the one finisher is bots.md's Finisher rule; per-slot finishers are not built.
+  Amended 2026-10-17 by [batch #134 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232087847):
+  dodging a predicted projectile is a movement override of the acted intent,
+  decided on the current state after the aim, and not a scored intent through
+  the reaction delay (bots.md, Dodge). The reaction is the tier's cast delay,
+  one coin is drawn per projectile, and the dodge probabilities are 0.25, 0.5
+  and 0.75.
 - Aim: lead moving targets using their current velocity; add a tier-dependent
   angular error.
 - Difficulty tiers: easy, normal, hard. They differ in reaction delay (ticks
