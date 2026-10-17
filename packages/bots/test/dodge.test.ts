@@ -345,6 +345,17 @@ describe('the dodge, direction', () => {
     expect(segmentClear(grid, { x: -6, y: 0.3 }, { x: -6, y: 1.3 })).toBe(false);
     expect(hardMove(lane(undefined, { me: [-6, 0.3], enemy: [0, 0.3], arena }))).toEqual([0, -1]);
   });
+
+  it('takes the other side when the cell the step ends in is blocked but the point is a legal one', () => {
+    // A legal position can lie in a blocked cell (the cell's centre is inside the inflated post,
+    // the point is not), and the path follower would not plan to it.
+    const post: Obstacle = { type: 'circle', x: -5.2, y: 1.35, r: 0.1, height: 1.5, blocksProjectiles: false };
+    const arena = arenaWith(post);
+    const grid = buildNavGrid(arena);
+    expect(cellFree(grid, { x: -6, y: 1.3 })).toBe(false);
+    expect(segmentClear(grid, { x: -6, y: 0.3 }, { x: -6, y: 1.3 })).toBe(true);
+    expect(hardMove(lane(undefined, { me: [-6, 0.3], enemy: [0, 0.3], arena }))).toEqual([0, -1]);
+  });
 });
 
 describe('the dodge, two threats', () => {
