@@ -180,7 +180,7 @@ Quillon cells have neither champion in the pairing, and the eight Hargrim v
 Lumeth and Lumeth v Quillon cells have only Lumeth in them to move. The
 searches behind the readings are in section 6.
 
-### 5.1 Every cell
+### 5.1 Each cell
 
 | Mode | Arena | X v Y | X rate | Disposition | Reading |
 |------|-------|-------|--------|-------------|---------|
@@ -217,11 +217,11 @@ set did in section 3.
 
 Hargrim wins 0 to 2 percent in all four cells. The counter is Chain Hook,
 which pulls Lumeth 4 m closer and slows her. In a replayed 2v2 match on
-arena01 (Hargrim and Quillon against Lumeth and Quillon, seed 2) Lumeth did 138
-of the 160 damage Hargrim took, mostly with Mend Bolt from range, and Hargrim
-cast the hook once. Limits that may account: the target is the nearest enemy,
-so the hook may go at another champion than Lumeth; nobody dodges, so her bolts
-may land; Rally Cry is never pressed.
+arena01 (Hargrim and Quillon against Lumeth and Quillon, seed 1, round 1)
+Lumeth did 138 of the 160 damage Hargrim took, mostly with Mend Bolt from
+range, and Hargrim cast the hook once. Limits that may account: the target is
+the nearest enemy, so the hook may go at another champion than Lumeth; nobody
+dodges, so her bolts may land; Rally Cry is never pressed.
 
 In 40-seed screens only Mend Bolt's cooldown (36 to 50 and to 70 ticks) and
 its damage on an enemy (10 to 8) moved the cell by more than a few points
@@ -232,11 +232,11 @@ close the gap are Hargrim's (the hook, M1 and Rush), which are #124's.
 
 ### 5.3 Hargrim v Quillon (four cells, left to #124)
 
-Quillon wins 92.5 to 100 percent: the favourite is far above 60, and the
+Quillon wins 93.5 to 100 percent: the favourite is far above 60, and the
 right way round. Neither champion of the pairing is Skerrow or Lumeth, so the
 pass could not touch the cell; a Skerrow or Lumeth in the fill only moves it a
-few points (the cell sat between 0 and 7.5 percent in every run of section 6).
-Limits that may account: nobody dodges, so Hargrim may walk into bolts, and
+few points (the cell sat between 0 and 9.5 percent in the full runs of section
+6). Limits that may account: nobody dodges, so Hargrim may walk into bolts, and
 Rally Cry, his haste, is never pressed.
 
 ### 5.4 Lumeth v Skerrow and Quillon v Skerrow (eight cells, accepted)
@@ -251,9 +251,9 @@ Skerrow runs and nine Lumeth runs gave no other move of more than 10 points in
 these eight cells (section 6).
 
 Limits that may account: the target is the nearest enemy, so in a replayed
-Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01, seed 2)
-Skerrow and her Hargrim fought the other Hargrim while Quillon's bolts landed
-on her Hargrim; Skerrow's Lunge opener waits
+Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01, seed 1,
+round 1) Skerrow hit the other Hargrim while Quillon's bolts hit her Hargrim
+six times and Skerrow twice; Skerrow's Lunge opener waits
 at 6 to 8 m for its opening and she has no Lunge away; Lumeth's Lantern Burst
 is pressed as an escape when an acted enemy is within 3 m, which may push a
 diving Skerrow 2 m back each time it is ready; the bot presses Quiet Dart only
