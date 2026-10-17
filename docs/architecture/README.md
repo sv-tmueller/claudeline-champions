@@ -18,9 +18,10 @@ first.
   a human produces.
 - `client` maps keyboard and mouse to `PlayerInput`, steps the sim, and renders
   the result with Three.js and an HTML HUD.
-- Online (milestone 6, not built yet), the same sim runs on the server
-  (`server`, `protocol`): clients send their input stream and the server stays
-  authoritative.
+- Online (milestone 6, designed in the
+  [online design](../superpowers/specs/2026-10-17-online-design.md) and not
+  built yet), the same sim runs on the server (`server`, `protocol`): clients
+  send their input stream and the server stays authoritative.
 - Arenas are JSON. The sim reads them for collision and Blender scripts read
   them to generate the committed `.glb` models.
 - Roster kits are JSON too, under `data/kits/<id>.json`: plain data that the
@@ -94,7 +95,9 @@ Topics:
   statuses, abilities, match flow, determinism rules.
 - [Client](client.md): loop, input, camera, scene, HUD, platform interface.
 - [Bots](bots.md): navigation, decisions, aim, difficulty tiers.
-- [Online](online.md): netcode and ladder principles.
+- [Online](online.md): the milestone 6 netcode design, its packages and tests,
+  and the ladder principles. The approved source is the
+  [online design](../superpowers/specs/2026-10-17-online-design.md).
 - [Assets](assets.md): Blender pipeline, node naming, arena definition, the
   champion rig and clips.
 - [Testing](testing.md): check suite, test types, the heap probe and the
@@ -109,6 +112,7 @@ Decisions:
 - [ADR-003: typed ability modules](decisions/ADR-003-typed-ability-modules.md)
 - [ADR-004: script-driven Blender assets](decisions/ADR-004-script-driven-blender-assets.md)
 - [ADR-005: original content](decisions/ADR-005-original-content.md)
+- [ADR-006: the first online cut](decisions/ADR-006-online-first-cut.md)
 
 Batch decisions that shaped the structure (none of them is a new ADR):
 
@@ -176,6 +180,14 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   its triggers ride `routeEvents`' pass and its doubles live in typed arrays:
   [batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811).
   Recorded in [Client](client.md#animation) and [Assets](assets.md#clips).
+
+- The online process model and package rules: a router forks one process per
+  room, `protocol` holds a pure codec, the client imports `protocol`, and
+  online play never pauses:
+  [batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441).
+  Recorded in [ADR-006](decisions/ADR-006-online-first-cut.md), with dated
+  amendment lines under the design spec's sections 2, 3.2 and 7, in
+  [Online](online.md) and in [Packages](packages.md#dependency-rules).
 
 Planning:
 
