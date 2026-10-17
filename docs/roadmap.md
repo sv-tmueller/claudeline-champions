@@ -16,7 +16,7 @@ lists are candidates, sliced batch by batch at dispatch time.
 | 3. First blood | Effects toolkit, combat, match flow with sudden death, HUD, two champions | done ([batch #23](https://github.com/sv-tmueller/claudeline-champions/issues/23), [batch #32](https://github.com/sv-tmueller/claudeline-champions/issues/32), [batch #47](https://github.com/sv-tmueller/claudeline-champions/issues/47) and [batch #53](https://github.com/sv-tmueller/claudeline-champions/issues/53) merged): the effects toolkit, statuses and line of sight, the kit framework with cooldowns, windups and energy, combat rendering and the HUD, match flow with sudden death, the Hargrim and Quillon kits |
 | 4. Bots 2v2, the first playable | Bot AI, champions three and four, champion select, match setup, result screen | done as the first playable ([batch #23](https://github.com/sv-tmueller/claudeline-champions/issues/23), [batch #32](https://github.com/sv-tmueller/claudeline-champions/issues/32), [batch #47](https://github.com/sv-tmueller/claudeline-champions/issues/47), [batch #53](https://github.com/sv-tmueller/claudeline-champions/issues/53) and [batch #63](https://github.com/sv-tmueller/claudeline-champions/issues/63) merged): bot navigation, utility intents, aim leading and three tiers, bots that cast from kit data with per-champion range profiles, the energy reserve and allocation-free thinks, the Skerrow kit, a 2v2 versus bots from the browser to the result screen and its champion select; carried to milestone 5: the Lumeth kit ([#70](https://github.com/sv-tmueller/claudeline-champions/issues/70)) and the Lumeth bot profile, a team-size and difficulty choice in the client (the team size in the select since [batch #91](https://github.com/sv-tmueller/claudeline-champions/issues/91), the difficulty since [batch #105](https://github.com/sv-tmueller/claudeline-champions/issues/105)), first-pass sound (in since batch #105) |
 | 5. Feel and breadth | Rigs and animation, menus and keybinding, second arena, 3v3, roster to six, balance pass | in progress: arena02 as data and a committed model ([batch #63](https://github.com/sv-tmueller/claudeline-champions/issues/63)); [batch #80](https://github.com/sv-tmueller/claudeline-champions/issues/80): projectiles with ally effects, bot openers and escapes with the Skerrow rules, the live-match heap probe ([#77](https://github.com/sv-tmueller/claudeline-champions/issues/77)) and the arena select with the Escape menu and keybinding ([#82](https://github.com/sv-tmueller/claudeline-champions/issues/82)); [batch #91](https://github.com/sv-tmueller/claudeline-champions/issues/91): the Lumeth kit, which completes the v1 roster as data, 3v3 in match setup and the select on both arenas, the four roster models and the placeholder rigged with the Idle, Run, Cast and Death clips, the pointer aim and the entity drawing allocation-free with the heap probe counting both, the bots' allocation-free plan search with the live probe's bots bound, Skerrow's wait in the 6 to 8 m band and the Quiet Dart opener, with no dash pressed on an escape think for any kit, and the Reaper's Dance pin ([#98](https://github.com/sv-tmueller/claudeline-champions/issues/98)); [batch #105](https://github.com/sv-tmueller/claudeline-champions/issues/105): the Lumeth bot rules, her ally slots, the seeded runs and the 3v3 roster ([#106](https://github.com/sv-tmueller/claudeline-champions/issues/106), [#112](https://github.com/sv-tmueller/claudeline-champions/issues/112)), the Attack and Hit clips, which make six clips (Idle, Run, Cast, Death, Attack, Hit) on the four roster models and the placeholder, with the Run rework and the clip budget ([#107](https://github.com/sv-tmueller/claudeline-champions/issues/107)), the frame-path carries and the animation state machine with its own clip sampler ([#117](https://github.com/sv-tmueller/claudeline-champions/issues/117), [#111](https://github.com/sv-tmueller/claudeline-champions/issues/111)), the difficulty choice and first-pass sound ([#110](https://github.com/sv-tmueller/claudeline-champions/issues/110)), the bots' heap check in CI on Node 26 in Maglev alone and on Node 24, with the aim draw over a typed state ([#108](https://github.com/sv-tmueller/claudeline-champions/issues/108)), and the balance harness with its baseline report and the first tuning pass, in two halves: Skerrow's Rend damage 20 to 14 and Lumeth's Binding Sigil radius 2.0 m, the Hargrim and Quillon half keeping no number ([#109](https://github.com/sv-tmueller/claudeline-champions/issues/109), [#121](https://github.com/sv-tmueller/claudeline-champions/issues/121), [#124](https://github.com/sv-tmueller/claudeline-champions/issues/124)); next: the milestone 6 design (batch 11), alongside what remains of milestone 5: the roster to six and a second balance pass once the fixture search tool ([#128](https://github.com/sv-tmueller/claudeline-champions/issues/128)) and the bot stalls ([#129](https://github.com/sv-tmueller/claudeline-champions/issues/129), [#123](https://github.com/sv-tmueller/claudeline-champions/issues/123)) are done |
-| 6. Online | Protocol, match server, WebSocket transport, prediction, reconnect, deployment | planned |
+| 6. Online | Protocol, match server, WebSocket transport, prediction, reconnect, deployment | designed ([spec](superpowers/specs/2026-10-17-online-design.md), [batch #134](https://github.com/sv-tmueller/claudeline-champions/issues/134)); nothing built yet |
 | 7. Ladder | Accounts, matchmaking, casual and ranked queues, Glicko-2, seasons, leaderboard | planned |
 | 8. Steam | Electron desktop package, Steamworks, three desktop platforms, gamepad support | planned |
 | 9. Live | Replays, spectating, telemetry, balance tooling, more content and modes | planned |
@@ -70,11 +70,37 @@ lists are candidates, sliced batch by batch at dispatch time.
 
 ### 6. Online
 
+Designed in the [online design](superpowers/specs/2026-10-17-online-design.md)
+and [ADR-006](architecture/decisions/ADR-006-online-first-cut.md)
+([batch #134](https://github.com/sv-tmueller/claudeline-champions/issues/134)).
+The candidate packages are P1 to P9 in
+[its package map](superpowers/specs/2026-10-17-online-design.md#13-the-package-map):
+
 - `protocol` package, match server, WebSocket transport.
 - Lobby and ready flow.
 - Snapshot interpolation, client prediction and reconciliation, reconnect.
 - Server-side bots filling empty slots.
 - Docker image and a first deployment.
+
+| # | Package | Size | Blocked by |
+|---|---------|------|------------|
+| P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks, typecheck and Vitest project | M | the design |
+| P2 | Server skeleton: `Room`, lobby and ready flow, bot fill, 60 Hz loop, input queue, snapshot cadence, headless loopback test | M | P1 |
+| P3 | Server transport and processes: `ws`, the router and a fork per room, room codes and tokens, `npm run server`, socket test | M | P2 |
+| P4a | Client net core, no DOM: socket, snapshot buffer, render clock, event release, input sender, the anims time base | M | P1 |
+| P4b | Client online match path: `main.ts` split into a local and an online start, any local id and team, the views fed from the buffer, menu without pause and Leave, checked by a client unit through a fake transport | M | P4a |
+| P4c | Client lobby: address parameters and lobby screen, the e2e and the CI server start | M | P3, P4b |
+| P5 | Reconnect: grace period, bot takeover, input-counter reset, client backoff | M | P3, P4c |
+| P6a | Prediction and reconciliation of the local champion, movement | M | P5 |
+| P6b | Prediction of the local champion's casts | M | P6a |
+| P7 | Delta snapshots, behind a protocol version bump | M | P4c |
+| P8 | Docker image | S | P3 |
+| P9 | First deployment | parked: outward-facing, needs the owner's host and cost decision | P8 |
+
+Item by package: `protocol` package P1; match server P2 and P3; WebSocket
+transport P3 and P4a; lobby and ready flow P2 and P4c; snapshot interpolation
+P4a and P4b; prediction and reconciliation P6a and P6b; reconnect P5;
+server-side bots P2; Docker image P8; first deployment P9 (parked).
 
 ### 7. Ladder
 

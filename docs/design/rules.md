@@ -268,7 +268,10 @@ Default controls `[spec]`:
   and has these actions: Resume (Escape again does the same), Restart the
   match with the same champion, difficulty, arena and team size, back to the
   champion, arena, team size and difficulty select, the keys view and the
-  sound toggle `[tuned]`. Pausing online is decided in milestone 6.
+  sound toggle `[tuned]`. Online play never pauses: Escape opens the menu over
+  the running match, and the menu offers Leave in place of Restart
+  ([batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441), designed in the
+  [online design](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering)).
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
 - The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.
