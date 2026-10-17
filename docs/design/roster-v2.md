@@ -136,3 +136,110 @@ Skerrow 19.2, and three of the six v1 counters measure inverted in every
 cell. The bots, which do not dodge and never press some abilities, decide
 much of that, so this document states the web as intent and adds no measured
 number.
+
+## 2. Ondrel, the zone controller
+
+**Fantasy.** Ondrel is a fen-reeve who keeps the dykes of a sinking marsh. She
+cannot hold ground by force, so she turns dry ground into mire, fences it with
+reeds and drags people into it. A fight against her is a fight over where
+everybody is standing.
+
+**Role and range.** Zone controller. Intended range is 5 to 9 m, with the
+Mire and the Drowned Ground placed up to 8 m from her. Her ground stays down
+for 2 to 5 s, so she plays the space between the fighters more than the
+fighters.
+
+**Stats.**
+
+| Stat | Value |
+|------|-------|
+| Max health | 130 |
+| Move speed | 5.5 m/s, no kit modifier |
+| Collision radius | 0.5 m |
+
+Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role
+value, in steps of 10 (rules 5), like Skerrow's.
+
+**Abilities.**
+
+| Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
+|------|---------------------|--------|-------|----------------|----------|--------|------------------|
+| M1 | Clod Toss: `projectile` | 9 damage | 10 m | 20 m/s / 0.3 m | 0.6 s | 0.15 s, free | none |
+| M2 | Mire: `area` (circle, radius 2.0 m, placed at the aim up to 8 m, 3 pulses of 1.0 s over 3.0 s), `applyStatus` | 8 damage per pulse, 24 in total | 8 m to centre | n/a | 6 s | 0.4 s, slowed | slow 30 percent for 1.5 s on each pulse |
+| SPACE | Reed Step: `dash` (4.5 m in 0.25 s), `area` (circle, radius 1.5 m around caster, at the start point, 2 pulses of 1.0 s over 2.0 s), `applyStatus` | none | 4.5 m | n/a | 8 s | 0, free | slow 40 percent for 1.0 s on each pulse |
+| Q | Reed Fence: `area` (circle, radius 2.5 m around caster, one hit), then `area` (the same circle, 4 pulses of 0.5 s over 2.0 s), `knockback` (1 m outward in 6 ticks on each pulse) | 10 damage, once | 2.5 m radius | n/a | 12 s | 0.3 s, slowed | none |
+| E | Undertow: `projectile`, `knockback` (pull toward caster, up to 3 m in 15 ticks, stops at contact), `applyStatus` | 10 damage | 8 m | 16 m/s / 0.5 m | 8 s | 0.4 s, slowed | slow 40 percent for 1.5 s |
+| R | Reed Screen: `shield` on self, `area` (circle, radius 3.0 m around caster, 3 pulses of 1.0 s over 3.0 s), `applyStatus` | 30 absorb for 4 s | 3 m radius | n/a | 14 s | 0, free | slow 30 percent for 1.0 s on enemies in the area, on each pulse |
+| F | Drowned Ground (ultimate): `area` (circle, radius 4.0 m, placed at the aim up to 8 m, 5 pulses of 1.0 s over 5.0 s), `applyStatus` | 10 damage per pulse, 50 in total | 8 m to centre | n/a | 10 s | 0.7 s, locked | slow 40 percent for 1.5 s on each pulse |
+
+Reading the rows. Every lingering area targets enemies. The pulses of an area
+are on its ticks 0, 1.0 s, 2.0 s and so on, so the first pulse lands when the
+area is placed. The slow of a pulse is refreshed by the next one, so a target
+that stays in the Mire stays slowed, and one that leaves it is still slowed for
+1.5 s. Reed Step's patch is where she starts the dash, not where she ends.
+Reed Fence is a one-hit area for the damage, which gives the energy, and a
+lingering area for the push, which gives none. Slows from different slots add
+and stop at 70 percent in total (rules 4.1). No pulse carries stun, root or
+silence. Each lingering duration (3.0, 2.0, 2.0, 3.0 and 5.0 s) is shorter
+than the cooldown of its slot.
+
+**EX variants** (Shift plus slot, 25 energy).
+
+| Slot | What changes against the base ability |
+|------|----------------------------------------|
+| M2 | Mire EX: radius 2.0 m becomes 2.5 m, damage per pulse 8 becomes 10 (30 in total), slow becomes 40 percent for 2.0 s. |
+| E | Undertow EX: damage 10 becomes 14, pull 3 m becomes 4 m, slow becomes 60 percent for 2.0 s. |
+
+**Intended counters.**
+
+- Beats Hargrim. He must cross 5 to 9 m of her ground. Mire (30 percent) and
+  Reed Screen's field (30 percent) add to 60 percent, which cuts his 5.5 m/s
+  to 2.2 m/s, and Reed Fence pushes him back 1 m a pulse inside 3.0 m. Rush is
+  one 5 m hop every 7 s, and Chain Hook is one 14 damage pull every 9 s.
+- Beats Skerrow. Reed Screen has no windup, so its 30 absorb is up before
+  Lunge lands. Its 3.0 m field slows her 30 percent, and Reed Fence pushes her
+  1 m out of the 2.0 m of Twin Cut and the 2.5 m of Rend.
+- Beats Brimwick. A caster in a locked windup stands in the mire: Starshell
+  (0.7 s) and Grand Finale (1.0 s) cannot walk, so Mire lands its 24 in total
+  and Undertow drags her 3 m closer, and Ondrel has 130 health to her 120.
+- Loses to Quillon. Rod Bolt reaches 13.93 m and Lance 17.92 m, and the
+  longest of Ondrel's ordinary tools reach 10 m (Clod Toss) and 10.5 m (the
+  Mire). Skip, a 4 m teleport, and Hush Ward's 30 percent haste take Quillon
+  out of every zone.
+- Loses to Lumeth. Aegis Veil absorbs 30, which is more than all of the 24 of
+  a Mire, and Soothing Surge heals 14 plus 12 over time, so the zone chip is
+  outhealed. Binding Sigil roots Ondrel for 1.5 s, and a rooted champion
+  cannot start Reed Step (rules 2.3).
+
+**Bot profile sketch.**
+
+| Field | Value | From the roster |
+|-------|-------|-----------------|
+| `rangeMin` | 5 | The roster's 5 m. A `KIT_RULES` row for `ondrel` with 5, so she kites a target closer than 5 m (batch 13). |
+| `rangeMax` | 9 | Comes from the M1 band: Clod Toss reaches 10 m, minus `RANGE_MARGIN` 1 m, through the `KIT_RULES` row. It equals the roster's 9 m. |
+| `openers` | E (Undertow), `band` null (the kit band less the margin, 7 m), `motion` `'away'`, `when` null | A target that walks away is dragged back into her ground. M2 has no rule and is pressed on its band. |
+| `escapes` | SPACE (Reed Step), then R (Reed Screen) | Dash away from the target and leave the patch, then shield. |
+| `holdF` | false | Drowned Ground is pressed on its band with 100 energy. |
+| `wait` | null | She has no opener to wait for. |
+| `escapeWithin` | null | The common trigger: a retreat with the target inside 6 m, or a kite inside `rangeMin`. |
+| `allies` | empty | No slot of hers acts on an ally. |
+| Finisher (intent, not a profile field) | M2 (EX Mire with 25 energy, 30 in total) on a target at 30 health or less, or E on a fleeing one | The pattern of roster v1. The bots build no per-slot finisher. |
+
+The bands (kit band less the margin) are M1 9 m, M2 9.5 m, E 7 m, R 2.5 m,
+Q 2.0 m and F 11.5 m. An area press needs a clear shot of 0.5 m, so bots will
+not use "behind cover". Reed Step has a band of 1.0 m from its own area, so the
+usual walk presses it only at a target that touches her, and the escape rule
+presses it otherwise. Every slot is pressed, so no slot is never pressed.
+
+**Model.** Cue: a reed bundle strapped to her back, one thin box of about
+0.10 m by 0.16 m by 0.80 m, built in the body material and carried by the
+`Spine` bone like Hargrim's shoulder blocks. It sits against the back of the
+torso (x from -0.25 m to -0.15 m, 1.00 m to 1.80 m high), so the estimated top
+is 1.80 m, at most 1.90 m, and the footprint stays inside 0.5 m. It is behind
+the torso and clear of the visor (x from 0.11 m) and the chest plate (x from
+0.14 m), so neither is hidden from the 55 degree camera. Body colour: moss
+green, linear (0.03, 0.30, 0.03), about `#309530`. In 8-bit sRGB b minus g is
+-101, so the overlay rule holds (`overlay None`). The nearest colours from
+the scratch run at `ae41fed` are the dead grey `#5a6070` at 93.1, Skerrow at
+101.0 and Quillon at 101.1, so the minimum distance is 93.1, above the 80 the
+test asks for.
