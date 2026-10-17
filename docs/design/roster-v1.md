@@ -143,7 +143,7 @@ This document defines the four champions of roster v1, one per archetype: melee 
 | M1 | Mend Bolt: `projectile`, `heal` on an ally hit, damage on an enemy hit | 10 heal or 10 damage | 12 m | 20 m/s / 0.35 m | 0.6 s | 0.1 s, free | none |
 | M2 | Soothing Surge: `projectile` (hits allies only, passes through enemies), `heal`, `applyStatus` | 14 heal, plus 12 heal over time in total | 10.13 m | 16 m/s / 0.5 m | 5 s | 0.3 s, slowed | heal over time for 3.0 s (2 per tick) |
 | SPACE | Glide: `dash` (4 m in 0.2 s), `applyStatus` | none | 4 m | n/a | 8 s | 0, free | haste 30 percent for 1.0 s on self |
-| Q | Binding Sigil: `area` (circle, radius 1.5 m, placed up to 9 m away, one hit), `applyStatus` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
+| Q | Binding Sigil: `area` (circle, radius 2.0 m, placed up to 9 m away, one hit), `applyStatus` | 8 damage | 9 m | n/a | 13 s | 0.5 s, slowed | root 1.5 s |
 | E | Lantern Burst: `area` (circle, radius 3 m around caster, one hit), `knockback` (2 m outward in 8 ticks) | 12 damage | 3 m radius | n/a | 9 s | 0.2 s, slowed | none |
 | R | Aegis Veil: `area` (circle, radius 5 m around caster, one hit), `shield` on allies in the area, including self | 30 absorb for 4 s | 5 m radius | n/a | 12 s | 0, free | none |
 | F | Dawnbloom (ultimate): `area` (circle, radius 5 m around caster, one hit), `heal` on allies, `applyStatus` | 30 heal, plus 30 heal over time in total | 5 m radius | n/a | 10 s | 0.6 s, slowed | heal over time for 3.0 s (5 per tick) on allies, slow 30 percent for 2.0 s on enemies |

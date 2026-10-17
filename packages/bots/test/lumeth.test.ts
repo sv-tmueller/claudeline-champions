@@ -21,7 +21,7 @@ const SEEDS_3V3 = [101, 102, 103, 104, 105, 106];
  * The tick budget of a match, by the formula of the client's match-setup.test.ts and the e2e rows:
  * the end tick when the budget was set, plus two rounds of `round` ticks and one sudden-death
  * round of 7000, rounded up to 1000. The round term is the longest round that did not go to sudden
- * death, rounded up to 100: 1626 ticks in the 2v2 runs here (1700), and 3331 in the client's 3v3 of
+ * death, rounded up to 100: 1653 ticks in the 2v2 runs here (1700), and 3331 in the client's 3v3 of
  * the same roster (3400; the 3v3 runs here have 1969 at most, with other seeds). A run whose longest
  * round passes its term fails, so the term follows the rounds and not the old figures.
  */
@@ -48,9 +48,9 @@ const ROWS: Row[] = [
     arena: arena01,
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
-    endTick: 6409,
+    endTick: 7860,
     round: 1700,
-    budget: 17_000,
+    budget: 19_000,
   },
   {
     name: 'a 2v2 on arena02',

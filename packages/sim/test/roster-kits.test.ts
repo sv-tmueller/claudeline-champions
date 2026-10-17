@@ -1129,13 +1129,13 @@ describe('Lumeth', () => {
     rig.clean();
   });
 
-  it('Q Binding Sigil lands where it is aimed, 8 damage and a 90 tick root, and misses what is 2.1 m off', () => {
-    const rig = new Rig(lumeth, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.1] });
+  it('Q Binding Sigil lands where it is aimed, 8 damage and a 90 tick root, and misses what is 2.6 m off', () => {
+    const rig = new Rig(lumeth, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.6] });
     rig.run(30 + 1, press('Q', { aim: [X0 + 6, 0] }));
     const [spawned] = rig.events('areaSpawned');
     expect(spawned?.step).toBe(30);
     expect(spawned?.e.x).toBeCloseTo(X0 + 6, 9);
-    expect(spawned?.e.radius).toBe(1.5);
+    expect(spawned?.e.radius).toBe(2);
     expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([[2, 8, 112]]);
     expect(rig.applied()).toEqual([[2, 'root', 90]]);

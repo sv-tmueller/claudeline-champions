@@ -193,9 +193,9 @@ describe('playMatch', () => {
 
   // The runs of packages/bots/test/lumeth.test.ts, with its configs, bot seeds 101 and up by champion
   // id and match seed 7: the harness plays the same match as the bots' own tests, so the end ticks
-  // they pin (6409, 4860, 11167 and 7373) come out of it too.
+  // they pin (7860, 4860, 11167 and 7373) come out of it too.
   it.each([
-    { name: 'a 2v2 on arena01', arena: 'arena01', size: 2, endTick: 6409 },
+    { name: 'a 2v2 on arena01', arena: 'arena01', size: 2, endTick: 7860 },
     { name: 'a 2v2 on arena02', arena: 'arena02', size: 2, endTick: 4860 },
     { name: 'a 3v3 on arena01', arena: 'arena01', size: 3, endTick: 11167 },
     { name: 'a 3v3 on arena02', arena: 'arena02', size: 3, endTick: 7373 },
