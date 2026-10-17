@@ -400,6 +400,18 @@ describe('a run over too few kits', () => {
     ).toThrow(/no fill/);
     expect(played).toBe(0);
   });
+
+  it('throws before the first match when there is no pairing at all', () => {
+    // One kit has no pairing, so the check above never runs and the run would play 0 matches and return [].
+    const one = { kits: DATA.kits.slice(0, 1), arenas: DATA.arenas };
+    let played = 0;
+    expect(() =>
+      playCells(one, 1, () => {
+        played++;
+      }),
+    ).toThrow(/no pairing/);
+    expect(played).toBe(0);
+  });
 });
 
 describe('the committed block and --check', () => {

@@ -332,9 +332,9 @@ describe('playableTeamSize', () => {
 // budget was set (measured through this setup and the client's bot driver on the bots of #112, with
 // Lumeth on both teams; 12431 and 7125 with two Quillons a side on 57dd52f, the bots of #98), plus
 // two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is 2000,
-// the longest non-sudden 3v3 round measured (1954 ticks, arena01, round 2; 1770 and 1334 are the
-// next), rounded up to 100: a healer keeps a round going, where the longest was 1557 with two
-// Quillons and the 2v2 rows assume 1000 (3331 before Binding Sigil's radius went from 1.5 to 2 m).
+// the longest non-sudden 3v3 round measured (1954 ticks, arena01, round 2, 3331 before Binding
+// Sigil's radius went from 1.5 to 2 m; 1770 and 1334 are the next), rounded up to 100: a healer
+// keeps a round going, where the longest was 1557 with two Quillons and the 2v2 rows assume 1000.
 // arena01: ceil((5349 + 2 * 2000 + 7000) / 1000) * 1000 = 17000. arena02:
 // ceil((11095 + 2 * 2000 + 7000) / 1000) * 1000 = 23000. Every kit or bots change moves the
 // end tick, the console line reports the current one, and a match that ends past the budget fails

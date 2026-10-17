@@ -212,10 +212,13 @@ export function playCells(
 ): Cell[] {
   const kitIds = inputs.kits.map((kit) => kit.id);
   const all = configs(kitIds);
+  const allPairings = pairings(kitIds);
+  // One kit (or none) has no pairing, so the loop below never runs and the run would play 0 matches.
+  if (allPairings.length === 0) throw new Error('There is no pairing: a run needs at least two kits.');
   // A pairing with no fill in a mode (fewer than three kits in 2v2, four in 3v3) would read as a cell
   // of 0 matches, so refuse before the first match.
   for (const mode of ['2v2', '3v3'] as const) {
-    for (const pairing of pairings(kitIds)) {
+    for (const pairing of allPairings) {
       if (!all.some((c) => c.mode === mode && c.x === pairing.x && c.y === pairing.y)) {
         throw new Error(`${pairing.x} v ${pairing.y} has no fill in ${mode}: it needs more kits.`);
       }
@@ -225,7 +228,7 @@ export function playCells(
   let done = 0;
   for (const mode of ['2v2', '3v3'] as const) {
     for (const arena of inputs.arenas) {
-      for (const pairing of pairings(kitIds)) {
+      for (const pairing of allPairings) {
         const cell: Cell = { mode, arena: arena.id, x: pairing.x, y: pairing.y, played: [] };
         const mine = all.filter((c) => c.mode === mode && c.x === pairing.x && c.y === pairing.y);
         for (const config of mine) {
