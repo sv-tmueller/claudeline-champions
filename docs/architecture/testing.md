@@ -33,12 +33,13 @@ A synchronous test's timeout is checked when its body returns, so no value
 stops a hang. The unit job's `timeout-minutes: 10` does that. What the value
 bounds is a slowdown.
 
-To rescan, read the unit job's times from a CI run. Vitest prints only the
-times of a second or more:
+To rescan, read the unit job's times from a CI run. Vitest prints a time
+from 300 ms (its default `slowTestThreshold`), in colour, and the
+`[0-9]{4}ms` filter keeps the times of 1 s and up:
 
 ```bash
-gh api repos/OWNER/REPO/actions/jobs/JOB_ID/logs | cut -f3- \
-  | grep -aE 'ms$' | grep -aE '[0-9]{4}ms'
+gh api --allow-escape-sequences repos/OWNER/REPO/actions/jobs/JOB_ID/logs \
+  | perl -pe 's/\e\[[0-9;]*m//g' | grep -aE '[0-9]{4}ms$'
 ```
 
 The tests with their own timeout for this reason. Local times are from one
@@ -72,10 +73,11 @@ the second.
   state, and the snap back" (five models): 0.41 to 0.54 s locally, up to 1.5
   s green, 1.1 to 3.0 s red, timeout 10 s.
 
-`harness.test.ts` "plays 24 cells over the shipped data" keeps its 120 s
-timeout, and it is the thinnest margin in the suite: 18.6 s locally, 47.3 to
-59.6 s on the runner, so twice the slowest green run (114 s) still fits. It
-sits at half its timeout, and raising it is a one-line change.
+`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" keeps
+its 120 s timeout, and it is the thinnest margin in the suite: 18.6 s locally,
+47.3 to 59.6 s on the runner. By the rule, twice the slowest runner time is
+119.2 s, which is 0.8 s under the timeout. It sits at half its timeout, and
+raising it is a one-line change.
 
 ## Test types
 
