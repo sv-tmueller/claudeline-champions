@@ -113,9 +113,8 @@ for `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `.github/workflows/balance.yml` runs `npm run balance -- --check` on a runner
 (`workflow_dispatch` only, so it never runs on a pull request or a push). It
 can be dispatched with `gh workflow run balance.yml --ref <branch>` once the
-file is on the default branch. Three runs on record took 933 s (run
-38990892639 on main), 953 s (38997052269) and 737 s (39005677735), so budget
-12 to 16 minutes. All three reproduced the committed report.
+file is on the default branch. Budget 12 to 16 minutes; the runs on record
+are in [balance.md](../design/balance.md#7-how-to-regenerate).
 
 ## Playwright e2e
 

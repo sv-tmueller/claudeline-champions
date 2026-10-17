@@ -86,9 +86,11 @@ Sources:
   bots have limits (bots.md, "Not built yet" and "Never pressed"): no dodging;
   the target is the nearest enemy, except that a bot keeps its current target
   unless another enemy is more than 1 m nearer (`TARGET_SWITCH_MARGIN` in
-  `packages/bots/src/bot.ts`); no Rally Cry; no EX variant of
-  Lumeth's M2 and R; no 8 m leash and no M1 finisher for Lumeth; her heals
-  count the instant part only; no Lunge away for Skerrow. A kit that is
+  `packages/bots/src/bot.ts`), and that a bot that would retreat targets a
+  finisher instead, the nearest enemy in reach with a clear shot whose health
+  fraction is at or below its own (bots.md, "Finisher"); no Rally Cry; no EX
+  variant of Lumeth's M2 and R; no 8 m leash and no M1 finisher for Lumeth; her
+  heals count the instant part only; no Lunge away for Skerrow. A kit that is
   balanced for players may not be for these bots, and the reverse.
 - **Noise.** A rate over `n` decided matches has a 95 percent interval of
   about 7 points at n = 200 (every cell) around 50 percent, and about 10 at
