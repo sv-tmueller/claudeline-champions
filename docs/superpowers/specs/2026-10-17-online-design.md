@@ -252,6 +252,8 @@ section 9.
 | Reconnect backoff | 0.5 s doubling to 4 s, given up after 60 s | the same 60 s as the empty-room close, so retrying past it is pointless | P5 |
 | Compression | `permessage-deflate` off | costs CPU on the 60 Hz loop; the mean stream is about 64 KB/s. Revisit when P2 has measured server CPU | P3 |
 | Port and host | 8787, `127.0.0.1` | section 3 | P3 |
+| Name length | 1 to 16 characters after trimming | fits a lobby row, and a message well under the size limit | P1 |
+| New room | team size 2, the first arena by id with two spawns a team, difficulty `normal` | the smallest match; the host changes it with `settings` | P2 |
 
 ## 5. The lobby and the ready flow
 
@@ -261,7 +263,8 @@ section 9.
   character is likelier than another. A collision with a live room draws
   again.
 - **Seats.** A room has twice the team size in seats, numbered from 0. A seat
-  is open, a human or a bot. A seat has a team once someone sits in it.
+  is open, a human or a bot. A seat has a team once someone sits in it. A
+  joiner takes the lowest open seat.
 - **Host.** The creator is the host. If the host leaves, the human in the
   lowest seat becomes host. A lobby with no human closes and its child exits
   (a running match follows section 10).
@@ -275,7 +278,14 @@ section 9.
   each team has at most the new `teamSize` humans and no human sits in a seat
   numbered twice the new `teamSize` or higher (lowering 3 to 2 with a human in
   seat 4 or 5 is refused). Seats are never renumbered, so the `seat` in
-  `welcome` stays the client's seat.
+  `welcome` stays the client's seat. The way out for a human in seat 4 or 5 is
+  to `leave` and `joinRoom` again, which takes the lowest open seat; a lone
+  human there closes the lobby by leaving and creates a new room.
+  A new room opens on defaults, team size 2, the first arena by id that has
+  two spawns a team and difficulty `normal` (section 4), and the host changes
+  them with `settings` after `welcome`. `createRoom` carries no settings,
+  because it is sent before `welcome` brings the server's `arenas`, and an id
+  outside them is a fatal `badMessage` there.
 - **Lists.** The lobby needs the roster and the arenas before any match, and
   `matchStart` comes too late. `welcome` carries them: `roster` is the champion
   ids in roster order, and `arenas` lists each arena with its name and the
@@ -312,7 +322,7 @@ The flow, message by message. Lobby (every row is one message from section 6):
 
 | Step | From | Message |
 |------|------|---------|
-| Create | client | `createRoom` |
+| Create | client | `createRoom` (no settings; the host sends `settings` after `welcome`) |
 | | server | `welcome` (with `roster` and `arenas`), then `room` |
 | Join | client | `joinRoom` |
 | | server | `welcome` to the joiner, `room` to everyone |
@@ -376,7 +386,7 @@ Client to server:
 
 | `t` | Fields | When |
 |-----|--------|------|
-| `createRoom` | `v: number`, `name: string`, `settings: RoomSettings` | first message |
+| `createRoom` | `v: number`, `name: string` | first message |
 | `joinRoom` | `v: number`, `roomCode: string`, `name: string` | first message |
 | `reconnect` | `v: number`, `token: string` | first message |
 | `select` | `team: TeamId`, `championId: string` | lobby |
@@ -456,9 +466,9 @@ Further rules:
   at most about 105 bytes (104 characters for a seven-digit `tick` and six-digit
   aim values), so the limit leaves room for a name and a token. `ws` closes an
   oversize frame itself with code 1009. `name` is 1 to 16 characters after
-  trimming, without control characters. `roomCode` is five characters of the
-  alphabet in section 5. `token` is a room code, a dot and 22 base64url
-  characters.
+  trimming (a default), without control characters. `roomCode` is five
+  characters of the alphabet in section 5. `token` is a room code, a dot and 22
+  base64url characters.
 - **Validation.** The server's decoder checks every field of every client
   message against its type and range (`aimX` and `aimY` are integers within
   100 000 cm, a default, and `buttons` an integer from 0 to 255), keeps only the
@@ -546,16 +556,15 @@ snapshots (the match of the round trip below).
 | Whole `snapshot` message | 3222 / 6366 B | 3029 / 6168 B | 3123 / 8065 B |
 | `arena` and `kits`, sent once | 8303 B | 8537 B | 8126 B |
 
-At 20 Hz the mean is about 64 KB/s per client in run 1, 61 KB/s in run 2 and
-62 KB/s in run 3. The largest single message in the three runs is 8065 B
-(run 3), which at 20 Hz would be 161 KB/s if every snapshot were that large.
-Three
-runs of one roster of four are a sample, not a bound: a snapshot grows with the
-entities in play, so package P2 measures again with the roster to six champions
-and the later kits. A client sends at most 60 `input` messages a second at about
-105 B, 6.3 KB/s. `permessage-deflate` is off in this cut (a default, section 4),
-since it costs CPU on a 60 Hz loop. Server CPU is not measured here: package P2
-measures a tick with six seats.
+At 20 Hz the mean per client is about 64 KB/s in run 1, 61 KB/s in run 2 and
+62 KB/s in run 3. The largest single message in the three runs is 8065 B (run
+3), which at 20 Hz would be 161 KB/s if every snapshot were that large. Three
+runs of one roster of four are a sample, not a bound: a snapshot grows with
+the entities in play, so package P2 measures again with the roster to six
+champions and the later kits. A client sends at most 60 `input` messages a
+second at about 105 B, 6.3 KB/s. `permessage-deflate` is off in this cut (a
+default, section 4), since it costs CPU on a 60 Hz loop. Server CPU is not
+measured here: package P2 measures a tick with six seats.
 
 Round trip. A second script plays a 3v3 with a different roster (Skerrow,
 Quillon and Lumeth each side), builds the snapshot message at every third tick,
@@ -592,8 +601,11 @@ the headless test of section 12 holds the same check.
   joins that room instead of creating one, and `&name=<name>`. The look of the
   lobby screen follows the pre-match screen the local client gets; this design
   fixes the flow and the parameters only. Names are written with `textContent`.
-  The lobby screen and the address are package P4c.
-- **Assumptions packages P4a to P4b must remove.** The client has them today,
+  The lobby screen and the address are package P4c. Until then the online
+  match path of P4b is reached only by its check: a client unit that drives
+  the online start through a fake transport with a scripted snapshot
+  sequence, and asserts the local id, the hooks and what the draw gets.
+- **Assumptions packages P4a and P4b must remove.** The client has them today,
   from the local match. Each is assigned to the package that does the work
   (the sizes are in section 13):
   - `HUMAN_ID = 0` in `main.ts`: the human is champion 0, on team A. Online
@@ -689,8 +701,8 @@ stepped (section 8).
   address can point the client at any server through `?server=`; the client
   accepts only `ws:` and `wss:` addresses.
 - Rate limits, connection caps per address and TLS are parked with deployment
-  (P9). The cap of 16 rooms and the message limits (section 4) are the only
-  limits in this cut. The input queue cap already bounds what a flood of `input`
+  (P9). The cap of 16 rooms and the message limits (section 4) are the limits
+  in this cut. The input queue cap already bounds what a flood of `input`
   messages can do: one input is used per tick, however many arrive.
 
 ## 12. Test strategy
@@ -739,7 +751,7 @@ and every row is S or M, or parked.
 | P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test | M | P1 |
 | P3 | Server transport and processes: the `ws` dependency, the router and a fork per room, room codes and tokens, `npm run server`, the socket test | M | P2 |
 | P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests | M | P1 |
-| P4b | Client online match path: `main.ts` split into a local and an online start (no sim in the online loop), any local id and team, the `data-p0*` hooks and the HUD score for the local team, the views fed from the buffer, the menu without pause and its Leave | M | P4a |
+| P4b | Client online match path: `main.ts` split into a local and an online start (no sim in the online loop), any local id and team, the `data-p0*` hooks and the HUD score for the local team, the views fed from the buffer, the menu without pause and its Leave; its check is a client unit driving the online start through a fake transport | M | P4a |
 | P4c | Client lobby: the address parameters and the lobby screen, the Playwright e2e and the CI server start | M | P3, P4b |
 | P5 | Reconnect: the grace period, the bot takeover, the seat's input-counter reset, client backoff, loopback and e2e rows | M | P3, P4c |
 | P6a | Prediction and reconciliation of the local champion, movement | M | P5 |

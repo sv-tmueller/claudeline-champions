@@ -88,7 +88,7 @@ The candidate packages are P1 to P9 in
 | P2 | Server skeleton: `Room`, lobby and ready flow, bot fill, 60 Hz loop, input queue, snapshot cadence, headless loopback test | M | P1 |
 | P3 | Server transport and processes: `ws`, the router and a fork per room, room codes and tokens, `npm run server`, socket test | M | P2 |
 | P4a | Client net core, no DOM: socket, snapshot buffer, render clock, event release, input sender, the anims time base | M | P1 |
-| P4b | Client online match path: `main.ts` split into a local and an online start, any local id and team, the views fed from the buffer, menu without pause and Leave | M | P4a |
+| P4b | Client online match path: `main.ts` split into a local and an online start, any local id and team, the views fed from the buffer, menu without pause and Leave, checked by a client unit through a fake transport | M | P4a |
 | P4c | Client lobby: address parameters and lobby screen, the e2e and the CI server start | M | P3, P4b |
 | P5 | Reconnect: grace period, bot takeover, input-counter reset, client backoff | M | P3, P4c |
 | P6a | Prediction and reconciliation of the local champion, movement | M | P5 |
@@ -99,8 +99,8 @@ The candidate packages are P1 to P9 in
 
 Item by package: `protocol` package P1; match server P2 and P3; WebSocket
 transport P3 and P4a; lobby and ready flow P2 and P4c; snapshot interpolation
-P4a and P4b; prediction and reconciliation P6a and P6b; reconnect P5; server-side bots P2;
-Docker image P8; first deployment P9 (parked).
+P4a and P4b; prediction and reconciliation P6a and P6b; reconnect P5;
+server-side bots P2; Docker image P8; first deployment P9 (parked).
 
 ### 7. Ladder
 
