@@ -71,6 +71,28 @@
   background: var(--hud-ally);
 }
 
+/*
+ * Shield segment: a layer over the track. Its root takes the start as a translate and is
+ * hidden at 0 absorb; the fill takes the width as a scale. The HUD text colour, so it adds none.
+ */
+#hud [data-part='shield-fill'] {
+  width: 100%;
+  height: 100%;
+  background: var(--hud-text);
+  border-radius: calc(var(--hud-u) * 0.3);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+#hud [data-part='shield'] {
+  position: absolute;
+  inset: 0;
+}
+
+#hud [data-part='shield'][data-visible='false'] {
+  display: none;
+}
+
 #hud [data-part='health-text'] {
   min-width: calc(var(--hud-u) * 8);
   text-align: right;
@@ -152,6 +174,12 @@
 
 #hud [data-slot][data-blocked='true'] {
   opacity: 0.35;
+}
+
+/* Silenced: all seven slots, in the enemy colour. Last of the slot rules, so it wins by order. */
+#hud [data-slot][data-silenced='true'] {
+  opacity: 0.35;
+  border-color: var(--hud-enemy);
 }
 
 #hud [data-part='key'] {
@@ -298,4 +326,46 @@
 
 #hud [data-part='arrow'] {
   margin: 0 calc(var(--hud-u) * 0.4);
+}
+
+/*
+ * Scoreboard (rules.md section 6, Tab): the champions with state, kills and deaths, in the middle
+ * of the screen while Tab is held. The rows take the ally and enemy colours of [data-team]. It
+ * draws above the result panel, which comes later in the page: #hud has no stacking context.
+ */
+#hud [data-hud='scoreboard'] {
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: calc(var(--hud-u) * 36);
+  padding: calc(var(--hud-u) * 1);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--hud-u) * 0.4);
+}
+
+#hud [data-hud='scoreboard'][data-visible='false'] {
+  display: none;
+}
+
+#hud [data-hud='scoreboard'] [data-row] {
+  display: grid;
+  grid-template-columns: calc(var(--hud-u) * 5) 1fr calc(var(--hud-u) * 5) calc(var(--hud-u) * 3) calc(var(--hud-u) * 3);
+  column-gap: calc(var(--hud-u) * 1);
+  font-size: calc(var(--hud-u) * 1.8);
+}
+
+#hud [data-hud='scoreboard'] [data-row='header'] {
+  font-size: calc(var(--hud-u) * 1.2);
+  opacity: 0.7;
+}
+
+#hud [data-hud='scoreboard'] [data-row][data-alive='false'] {
+  opacity: 0.55;
+}
+
+#hud [data-hud='scoreboard'] [data-part='kills'],
+#hud [data-hud='scoreboard'] [data-part='deaths'] {
+  text-align: right;
 }
