@@ -90,14 +90,14 @@ port 5173, which Playwright starts itself.
   the 3v3 rows), within a budget of ticks and frames per row: 15 000 and 182 on
   arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5184 in the e2e and 5053 in
   a headless run, on 57dd52f), 14 000 and 171 on arena02 (tick 4198 headless and
-  4224 in the e2e, a Defeat 0 : 3), and 25 000 and 286 on the 3v3 of arena01 (it
-  ends at tick 10 378 headless and 10 464 in the e2e, a Defeat 1 : 3) and 26 000
-  and 296 on the 3v3 of arena02 (tick 11 683 headless and 11 904 in the e2e, a
+  4224 in the e2e, a Defeat 0 : 3), and 17 000 and 203 on the 3v3 of arena01 (it
+  ends at tick 5349 headless and 5664 in the e2e, a Defeat 0 : 3) and 23 000
+  and 265 on the 3v3 of arena02 (tick 11 095 headless and 11 424 in the e2e, a
   Defeat 0 : 3). A headless run through the client's setup and driver gives each
   row's tick, in `match-setup.test.ts`. The budget is that tick plus two rounds
   of about 1000 and one round to sudden death of about 7000, rounded up to 1000,
   and the frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their
-  rows use 3400 for a round (the longest measured is 3331, with a Lumeth on each
+  rows use 2000 for a round (the longest measured is 1954, with a Lumeth on each
   team; it was 1557 with two Quillons a side). Each row logs its wall time, and
   a row over 40 s gets its own timeout. The test follows the Quillon link of the
   result panel, which keeps the arena and the team size. The other plays the

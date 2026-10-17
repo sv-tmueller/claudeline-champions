@@ -331,18 +331,19 @@ describe('playableTeamSize', () => {
 // The tick budgets of the 3v3 rows of e2e/match-end.spec.ts: the end tick of the match when the
 // budget was set (measured through this setup and the client's bot driver on the bots of #112, with
 // Lumeth on both teams; 12431 and 7125 with two Quillons a side on 57dd52f, the bots of #98), plus
-// two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is 3400,
-// the longest non-sudden 3v3 round measured (3331 ticks, arena01, round 3; 3227 and 2045 are the
+// two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is 2000,
+// the longest non-sudden 3v3 round measured (1954 ticks, arena01, round 2; 1770 and 1334 are the
 // next), rounded up to 100: a healer keeps a round going, where the longest was 1557 with two
-// Quillons and the 2v2 rows assume 1000. arena01: ceil((10378 + 2 * 3400 + 7000) / 1000) * 1000 =
-// 25000. arena02: ceil((11683 + 2 * 3400 + 7000) / 1000) * 1000 = 26000. Every bots change moves the
+// Quillons and the 2v2 rows assume 1000 (3331 before Binding Sigil's radius went from 1.5 to 2 m).
+// arena01: ceil((5349 + 2 * 2000 + 7000) / 1000) * 1000 = 17000. arena02:
+// ceil((11095 + 2 * 2000 + 7000) / 1000) * 1000 = 23000. Every kit or bots change moves the
 // end tick, the console line reports the current one, and a match that ends past the budget fails
 // here before the e2e does.
-const THREE_V_THREE_ROUND_TICKS = 3400;
-const ARENA01_3V3_END_TICK = 10_378;
-const ARENA01_3V3_BUDGET_TICKS = 25_000;
-const ARENA02_3V3_END_TICK = 11_683;
-const ARENA02_3V3_BUDGET_TICKS = 26_000;
+const THREE_V_THREE_ROUND_TICKS = 2000;
+const ARENA01_3V3_END_TICK = 5_349;
+const ARENA01_3V3_BUDGET_TICKS = 17_000;
+const ARENA02_3V3_END_TICK = 11_095;
+const ARENA02_3V3_BUDGET_TICKS = 23_000;
 
 describe('a 3v3 match of bots from setup to the result', () => {
   it('ends on arena01 with a winner on 3 within the budget of the e2e', { timeout: 120_000 }, () => {
