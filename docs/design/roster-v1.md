@@ -250,12 +250,12 @@ the favoured champion's win rate in percent, 2v2 on arena01 and arena02, then
 
 | Counter | Favoured | 2v2 arena01 | 2v2 arena02 | 3v3 arena01 | 3v3 arena02 | Reading |
 |---------|----------|-------------|-------------|-------------|-------------|---------|
-| Hargrim beats Skerrow | Hargrim | 41.0 | 34.0 | 63.5 | 44.5 | In band in two cells; 6.0 under in one and 3.5 over in one, both inside the noise. |
+| Hargrim beats Skerrow | Hargrim | 41.0 | 34.0 | 63.5 | 44.5 | In band in two cells and 6.0 under in one, so Skerrow is still ahead in all three; the right way only in 3v3 arena01, 3.5 over. Both outer cells are inside the noise. |
 | Hargrim beats Lumeth | Hargrim | 0.5 | 2.0 | 0.0 | 1.0 | Inverted: Lumeth wins. Left to #124. |
 | Quillon beats Hargrim | Quillon | 100.0 | 100.0 | 96.5 | 93.5 | Right way, too strong. Left to #124. |
-| Skerrow beats Quillon | Skerrow | 0.0 | 0.5 | 4.0 | 5.0 | Inverted: Quillon wins. Accepted, a bots limit. |
+| Skerrow beats Quillon | Skerrow | 0.0 | 0.5 | 4.0 | 5.0 | Inverted: Quillon wins. Left to #124. |
 | Lumeth beats Quillon | Lumeth | 65.5 | 15.0 | 58.5 | 17.5 | Right way in two cells, one in band and one 5.5 over; inverted in two, left to #124. |
-| Skerrow beats Lumeth | Skerrow | 1.0 | 1.0 | 0.0 | 2.0 | Inverted: Lumeth wins. Accepted, a bots limit. |
+| Skerrow beats Lumeth | Skerrow | 1.0 | 1.0 | 0.0 | 2.0 | Inverted: Lumeth wins. Accepted: no Skerrow or Lumeth number moved it within the rule; bots limits may account. |
 
 - Three cells of 24 are in the band (the baseline had one): Hargrim v Skerrow
   in 2v2 on arena01 and in 3v3 on arena02, and Lumeth v Quillon in 3v3 on

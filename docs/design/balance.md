@@ -69,8 +69,9 @@ Sources:
   (Quillon v Skerrow, 3v3 on arena01, with the fill [lumeth, hargrim], seed 6);
   every other match ended before tick 26 000 (the longest took 25 954). That
   one is a bot stall, not a kit effect: from tick 7521 the two surviving
-  Hargrims stand still 2.13 m apart inside the end ring with no button
-  pressed, and round 1 never ends. It is issue #123, a bots fix; the tuning
+  Hargrims stand still about 2.14 m apart (on the final kits; 2.13 m on the
+  baseline's) inside the end ring with no button pressed, and round 1 never
+  ends. It is issue #123, a bots fix; the tuning
   pass never chases it with kit numbers.
 - **Metrics.** Ticks count from the start of the round. Round mean and round
   longest are over the rounds that did not go to sudden death. Sudden-death
@@ -176,9 +177,10 @@ measured, so none is stated as the cause. "Within the noise" means within the
 from the band.
 
 The pass could move only Skerrow and Lumeth numbers. The four Hargrim v
-Quillon cells have neither champion in the pairing, and the eight Hargrim v
-Lumeth and Lumeth v Quillon cells have only Lumeth in them to move. The
-searches behind the readings are in section 6.
+Quillon cells have neither champion in the pairing, the eight Hargrim v Lumeth
+and Lumeth v Quillon cells have only Lumeth in them to move, and the four
+Quillon v Skerrow cells hold a Quillon whose numbers are #124's. The searches
+behind the readings are in section 6.
 
 ### 5.1 Each cell
 
@@ -186,28 +188,28 @@ searches behind the readings are in section 6.
 |------|-------|-------|--------|-------------|---------|
 | 2v2 | arena01 | hargrim v lumeth | 0.5 | left to #124 | Inverted: Lumeth wins. 5.2. |
 | 2v2 | arena01 | hargrim v quillon | 0.0 | left to #124 | Too strong a counter. 5.3. |
-| 2v2 | arena01 | hargrim v skerrow | 41.0 | in band | Moved in by Rend's damage. |
-| 2v2 | arena01 | lumeth v quillon | 65.5 | accepted, within the noise | The right way, 5.5 over. 5.6. |
-| 2v2 | arena01 | lumeth v skerrow | 99.0 | accepted, bots limit | Inverted. 5.4. |
-| 2v2 | arena01 | quillon v skerrow | 100.0 | accepted, bots limit | Inverted. 5.4. |
+| 2v2 | arena01 | hargrim v skerrow | 41.0 | in band | Moved in by Rend's damage; Skerrow is still ahead (the counter is inverted inside the band). 5.6. |
+| 2v2 | arena01 | lumeth v quillon | 65.5 | accepted, within the noise | The right way, 5.5 over. 5.7. |
+| 2v2 | arena01 | lumeth v skerrow | 99.0 | accepted, no number moved it | Inverted. 5.4. |
+| 2v2 | arena01 | quillon v skerrow | 100.0 | left to #124 | Inverted: Quillon wins. 5.5. |
 | 2v2 | arena02 | hargrim v lumeth | 2.0 | left to #124 | Inverted: Lumeth wins. 5.2. |
 | 2v2 | arena02 | hargrim v quillon | 0.0 | left to #124 | Too strong a counter. 5.3. |
-| 2v2 | arena02 | hargrim v skerrow | 34.0 | accepted, within the noise | Inverted, 6.0 under the band. 5.5. |
-| 2v2 | arena02 | lumeth v quillon | 15.0 | left to #124 | Inverted: Quillon wins. 5.6. |
-| 2v2 | arena02 | lumeth v skerrow | 99.0 | accepted, bots limit | Inverted. 5.4. |
-| 2v2 | arena02 | quillon v skerrow | 99.5 | accepted, bots limit | Inverted. 5.4. |
+| 2v2 | arena02 | hargrim v skerrow | 34.0 | accepted, within the noise | Skerrow is still ahead, 6.0 under the band. 5.6. |
+| 2v2 | arena02 | lumeth v quillon | 15.0 | left to #124 | Inverted: Quillon wins. 5.7. |
+| 2v2 | arena02 | lumeth v skerrow | 99.0 | accepted, no number moved it | Inverted. 5.4. |
+| 2v2 | arena02 | quillon v skerrow | 99.5 | left to #124 | Inverted: Quillon wins. 5.5. |
 | 3v3 | arena01 | hargrim v lumeth | 0.0 | left to #124 | Inverted: Lumeth wins. 5.2. |
 | 3v3 | arena01 | hargrim v quillon | 3.5 | left to #124 | Too strong a counter. 5.3. |
-| 3v3 | arena01 | hargrim v skerrow | 63.5 | accepted, within the noise | The right way, 3.5 over. 5.5. |
-| 3v3 | arena01 | lumeth v quillon | 58.5 | in band | Lumeth ahead as intended (50.0 and 67.0 by fill order). |
-| 3v3 | arena01 | lumeth v skerrow | 100.0 | accepted, bots limit | Inverted. 5.4. |
-| 3v3 | arena01 | quillon v skerrow | 96.0 | accepted, bots limit | Inverted. 5.4. One match hit the budget (5.7). |
+| 3v3 | arena01 | hargrim v skerrow | 63.5 | accepted, within the noise | The right way, 3.5 over: the one cell where Hargrim is ahead. 5.6. |
+| 3v3 | arena01 | lumeth v quillon | 58.5 | in band | Lumeth ahead as intended (50.0 and 67.0 by fill order). 5.7. |
+| 3v3 | arena01 | lumeth v skerrow | 100.0 | accepted, no number moved it | Inverted. 5.4. |
+| 3v3 | arena01 | quillon v skerrow | 96.0 | left to #124 | Inverted: Quillon wins. 5.5. One match hit the budget (5.8). |
 | 3v3 | arena02 | hargrim v lumeth | 1.0 | left to #124 | Inverted: Lumeth wins. 5.2. |
 | 3v3 | arena02 | hargrim v quillon | 6.5 | left to #124 | Too strong a counter. 5.3. |
-| 3v3 | arena02 | hargrim v skerrow | 44.5 | in band | Moved in by Rend's damage (26.0 and 63.0 by fill order). |
-| 3v3 | arena02 | lumeth v quillon | 17.5 | left to #124 | Inverted: Quillon wins. 5.6. |
-| 3v3 | arena02 | lumeth v skerrow | 98.0 | accepted, bots limit | Inverted. 5.4. |
-| 3v3 | arena02 | quillon v skerrow | 95.0 | accepted, bots limit | Inverted. 5.4. |
+| 3v3 | arena02 | hargrim v skerrow | 44.5 | in band | Moved in by Rend's damage; Skerrow is still ahead (26.0 and 63.0 by fill order). 5.6. |
+| 3v3 | arena02 | lumeth v quillon | 17.5 | left to #124 | Inverted: Quillon wins. 5.7. |
+| 3v3 | arena02 | lumeth v skerrow | 98.0 | accepted, no number moved it | Inverted. 5.4. |
+| 3v3 | arena02 | quillon v skerrow | 95.0 | left to #124 | Inverted: Quillon wins. 5.5. |
 
 The three cells in band sit 1.0, 1.5 and 4.5 points from an edge, so a rerun
 on other seeds may move any of them out, as the 3v3 fill order and the seed
@@ -239,38 +241,54 @@ few points (the cell sat between 0 and 9.5 percent in the full runs of section
 6). Limits that may account: nobody dodges, so Hargrim may walk into bolts, and
 Rally Cry, his haste, is never pressed.
 
-### 5.4 Lumeth v Skerrow and Quillon v Skerrow (eight cells, accepted)
+### 5.4 Lumeth v Skerrow (four cells, accepted)
 
-Lumeth wins 98 to 100 percent and Quillon 95 to 100 against Skerrow, where the
-roster has Skerrow ahead. The cells are accepted as a bots limit: no Skerrow
-number the pass tried moved them toward the band without taking a cell out of
-it. The nearest by far was Rend's cooldown, 420 to 240 ticks: Lumeth v
-Skerrow on arena02 in 2v2 fell from 98.5 to 75.5, but three cells left the
-band, among them two of the Hargrim v Skerrow cells it had just entered. Eight
-Skerrow runs and nine Lumeth runs gave no other move of more than 10 points in
-these eight cells (section 6).
+Lumeth wins 98 to 100 percent against Skerrow, where the roster has Skerrow
+ahead. No Skerrow or Lumeth number moved the cells within the rule, and the
+limits of the bots may account for them. The nearest any number came was
+Rend's cooldown, 420 to 240 ticks: Lumeth v Skerrow on arena02 in 2v2 fell from
+98.5 to 75.5, but three cells left the band, among them two of the Hargrim v
+Skerrow cells it had just entered (and the Skerrow fixture lost its coverage).
+That is a trade-off between kit numbers, so a bots limit is not the whole
+reading. Eight Skerrow runs and nine Lumeth runs gave no other move of more
+than 10 points in the eight Lumeth v Skerrow and Quillon v Skerrow cells
+(section 6).
 
-Limits that may account: the target is the nearest enemy, so in a replayed
-Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01, seed 1,
-round 1) Skerrow hit the other Hargrim while Quillon's bolts hit her Hargrim
-six times and Skerrow twice; Skerrow's Lunge opener waits
-at 6 to 8 m for its opening and she has no Lunge away; Lumeth's Lantern Burst
-is pressed as an escape when an acted enemy is within 3 m, which may push a
-diving Skerrow 2 m back each time it is ready; the bot presses Quiet Dart only
-at a target with an escape ready; nobody dodges.
+Limits that may account: Skerrow's Lunge opener waits at 6 to 8 m for its
+opening and she has no Lunge away; Lumeth's Lantern Burst is pressed as an
+escape when an acted enemy is within 3 m, which may push a diving Skerrow 2 m
+back each time it is ready; the bot presses Quiet Dart only at a target with an
+escape ready; nobody dodges.
 
-### 5.5 Hargrim v Skerrow (accepted within the noise, two in band)
+### 5.5 Quillon v Skerrow (four cells, left to #124)
 
-The two cells in band came from Rend's damage, 20 to 14. 2v2 on arena02 sits 6
-points under the band and 3v3 on arena01 3.5 over: both inside the noise, on
-opposite sides of the band (Throwing Knife's cooldown, 180 to 300 ticks, took
-2v2 on arena02 into the band and raised the summed distance). Limits that may
-account: Iron Hide is an escape slot for the bot, so it is not pressed against
-an opener as the roster has it; Skerrow waits at 6 to 8 m and has no Lunge
-away; nobody dodges. The 3v3 cells pool two fill orders that differ widely
-(26.0 and 63.0 on arena02).
+Quillon wins 95 to 100 percent against Skerrow, where the roster has Skerrow
+ahead. The pass moved Skerrow's numbers only (section 6) and none moved the
+cells within the rule; no Quillon number was tried, and those are #124's, as
+the Hargrim v Lumeth numbers are in 5.2. Limits that may account: the target is
+the nearest enemy, so in a replayed Quillon and Hargrim against Skerrow and
+Hargrim match (2v2, arena01, seed 1, round 1) Skerrow hit the other Hargrim
+while Quillon's bolts hit her Hargrim nine times (eight Rod Bolts, six of them
+for the full 11 damage and two absorbed by Iron Hide, and one Snare Orb) and
+Skerrow three times; Skerrow's Lunge opener waits at 6 to 8 m and she has no
+Lunge away; the bot presses Quiet Dart only at a target with an escape ready;
+nobody dodges.
 
-### 5.6 Lumeth v Quillon (one in band, one accepted, two left to #124)
+### 5.6 Hargrim v Skerrow (two in band, two accepted within the noise)
+
+The roster has Hargrim ahead. By the reading of section 2 he is ahead only in
+3v3 on arena01 (63.5, 3.5 over); in the other three cells (41.0, 34.0 and 44.5)
+he is under 50 percent, so Skerrow is still ahead, in two of them inside the
+band. The two cells in band came from Rend's damage, 20 to 14. 2v2 on arena02
+sits 6 points under the band and 3v3 on arena01 3.5 over: both inside the
+noise, on opposite sides of the band (Throwing Knife's cooldown, 180 to 300
+ticks, took 2v2 on arena02 into the band and raised the summed distance, and it
+fails the Skerrow fixture coverage). Limits that may account: Iron Hide is an
+escape slot for the bot, so it is not pressed against an opener as the roster
+has it; Skerrow waits at 6 to 8 m and has no Lunge away; nobody dodges. The 3v3
+cells pool two fill orders that differ widely (26.0 and 63.0 on arena02).
+
+### 5.7 Lumeth v Quillon (one in band, one accepted, two left to #124)
 
 Arena01 is the right way round (65.5 in 2v2, 5.5 over and inside the noise; 58.5
 in 3v3, in band) and arena02 inverted (15.0 and 17.5), so the two arenas differ
@@ -284,12 +302,12 @@ are pressed only at an ally that needs them and count the instant heal only,
 the EX variants of Soothing Surge and Aegis Veil are never pressed, and she has
 no 8 m leash.
 
-### 5.7 The budget hit
+### 5.8 The budget hit
 
 One match of the 4800 did not end: quillon v skerrow, 3v3, arena01, with
 [lumeth, hargrim], seed 6. Replayed through `playMatch` on the final kits it
 is the stall of issue #123: from tick 7521 the two surviving Hargrims stand
-about 2.1 m apart with no button pressed since tick 7465 and no cast, so round
+2.14 m apart with no button pressed since tick 7465 and no cast, so round
 1 never ends. It is a bot stall and not a kit effect, and no kit number was
 chased for it. The longest match that did end took 25 954 ticks.
 
@@ -310,7 +328,13 @@ cells of the distance to the 40 to 60 band.
   695.5 to 679.0, and no cell left the band. Rend EX keeps its 28.
 - Change 2 kept 3 cells in band and took the summed distance from 679.0 to
   675.5, and no cell left the band. It moves Binding Sigil's band from 11 m to
-  11.5 m (the range 9 plus the radius plus 0.5).
+  11.5 m (the range 9 plus the radius plus 0.5). Its measured effect is inside
+  the noise of one run (section 3): the targets moved by 1.5 and 2.0 points (3
+  and 4 more wins out of 200), and the fall of 3.5 in the sum is the net of 14
+  moves of 0.5 to 4 points. The keep rests on the rule of decision 28 and not on
+  a measured gain. Two side effects went the wrong way: Hargrim v Skerrow 2v2
+  arena01, in band, fell from 45.0 to 41.0, and Lumeth v Quillon 2v2 arena01
+  rose from 63.5 to 65.5, further out of the band.
 - The report above is the result: 3 cells in band of 24, and the summed
   distance 675.5. By champion over its cells: Hargrim 16.4 (14.2 before),
   Lumeth 79.1 (77.9), Quillon 85.3 (86.4) and Skerrow 19.2 (21.5).
@@ -322,16 +346,19 @@ the band, no cell in band leaves it and the summed distance falls; one that
 turns a pinned run, the fixture coverage or allocation.test.ts red is dropped.
 Skerrow had 8 full runs and 1 kept change, Lumeth 9 and 1; neither champion
 reached its cap of 4 kept changes or 10 runs, since every candidate screened on
-the way (at 40 seeds, with the fixture coverage and allocation.test.ts checked
-first) either failed a check or moved nothing the rule could use.
+the way (at 40 seeds) either failed a check or moved nothing the rule could
+use. The fixture coverage and allocation.test.ts were run on a candidate before
+its full run only from some point on: Skerrow runs 3 and 6 and Lumeth run 2 were
+checked after theirs, and each of the three fails the coverage. Every other
+candidate with a full run passes both, and run 7 was checked first and fails.
 
 | Champion | Number | Old to new | Run | Why dropped |
 |----------|--------|------------|-----|-------------|
 | Skerrow | M1 damage | 9 to 8 | 1 | Lumeth v Quillon 3v3 arena01 left the band (56.5 to 62.0). |
-| Skerrow | E cooldown | 420 to 240 | 3 | Three cells left the band. |
+| Skerrow | E cooldown | 420 to 240 | 3 | Three cells left the band; the fixture coverage is red too. |
 | Skerrow | M1 damage | 9 to 8 | 4 | Target cell moved away (34.5 to 33.0); the sum fell by 1. |
 | Skerrow | Q silence | 90 to 120 ticks | 5 | The sum rose to 703.0; two cells left the band. |
-| Skerrow | M2 cooldown | 180 to 300 | 6 | The sum rose from 679.0 to 687.5. |
+| Skerrow | M2 cooldown | 180 to 300 | 6 | The sum rose from 679.0 to 687.5; the fixture coverage is red too (the fixture is a Skerrow mirror, so on any base). |
 | Skerrow | M2 cooldown | 180 to 300 | 7 | The fixture coverage turned red, and the sum rose to 692.0. |
 | Skerrow | max health | 130 to 120 | 8 | The sum rose from 675.5 to 686.0. |
 | Lumeth | M1 damage on enemies | 10 to 8 | 1 | The sum did not fall (679.0 to 679.0). |
