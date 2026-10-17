@@ -40,22 +40,22 @@ describe('the pairings, the fills and the configs', () => {
     expect(all).toEqual(['a v b', 'a v c', 'a v d', 'b v c', 'b v d', 'c v d']);
   });
 
-  it('has 18 configs: 2 fills for each pairing in 2v2 and 1 in 3v3', () => {
+  it('has 24 configs: 2 fills for each pairing in 2v2 and 2 in 3v3', () => {
     const all = configs(KITS);
-    expect(all).toHaveLength(18);
+    expect(all).toHaveLength(24);
     expect(all.filter((c) => c.mode === '2v2')).toHaveLength(12);
-    expect(all.filter((c) => c.mode === '3v3')).toHaveLength(6);
+    expect(all.filter((c) => c.mode === '3v3')).toHaveLength(12);
   });
 
-  it('fills 2v2 with each champion outside the pair, and 3v3 with the other two', () => {
+  it('fills 2v2 with each champion outside the pair, and 3v3 with the other two in both orders', () => {
     const fills = (mode: string, x: string, y: string) =>
       configs(KITS)
         .filter((c) => c.mode === mode && c.x === x && c.y === y)
         .map((c) => c.fill.join('+'));
     expect(fills('2v2', 'a', 'b')).toEqual(['c', 'd']);
     expect(fills('2v2', 'b', 'd')).toEqual(['a', 'c']);
-    expect(fills('3v3', 'a', 'b')).toEqual(['c+d']);
-    expect(fills('3v3', 'c', 'd')).toEqual(['a+b']);
+    expect(fills('3v3', 'a', 'b')).toEqual(['c+d', 'd+c']);
+    expect(fills('3v3', 'c', 'd')).toEqual(['a+b', 'b+a']);
   });
 
   it('puts X first on team A for odd seeds and on team B for even seeds, the same fill on both', () => {
@@ -99,7 +99,7 @@ describe('the shipped data', () => {
     expect(KIT_IDS).toEqual(['hargrim', 'lumeth', 'quillon', 'skerrow']);
     expect(DATA.arenas.map((a) => a.id)).toEqual(['arena01', 'arena02']);
     expect(pairings(KIT_IDS)).toHaveLength(6);
-    expect(configs(KIT_IDS)).toHaveLength(18);
+    expect(configs(KIT_IDS)).toHaveLength(24);
   });
 });
 
@@ -379,10 +379,10 @@ describe('a run', () => {
       '2v2 arena01 quillon v skerrow',
       '2v2 arena02 hargrim v lumeth',
     ]);
-    // Two seeds on each of the two fills of a 2v2, and on the one fill of a 3v3.
+    // Two seeds on each of the two fills of a 2v2, and and on the two orders of the fill of a 3v3.
     expect(first.cells.map((c) => c.played.length)).toEqual([
       ...Array<number>(12).fill(4),
-      ...Array<number>(12).fill(2),
+      ...Array<number>(12).fill(4),
     ]);
     expect(first.cells.flatMap((c) => c.played).every((p) => !p.record.budgetHit)).toBe(true);
   });

@@ -16,7 +16,7 @@ export interface Pairing {
 
 /**
  * One match-up: X and the fill against Y and the same fill. X is the first champion of its team,
- * the fill follows in kit order. The mode fixes the fill's size, 1 in 2v2 and 2 in 3v3.
+ * the fill follows. The mode fixes the fill's size, 1 in 2v2 and 2 in 3v3.
  */
 export interface Config extends Pairing {
   mode: Mode;
@@ -37,11 +37,15 @@ function outside(pairing: Pairing, kitIds: readonly string[]): string[] {
   return kitIds.filter((id) => id !== pairing.x && id !== pairing.y);
 }
 
-/** The fills of a pairing: each champion outside it in 2v2, and the champions outside it together in 3v3. */
+/**
+ * The fills of a pairing: each champion outside it in 2v2, and in 3v3 each ordered pair of
+ * champions outside it, so both orders of the two (the order sets the spawn slots, which swing a
+ * cell by tens of points).
+ */
 function fillsOf(mode: Mode, pairing: Pairing, kitIds: readonly string[]): string[][] {
   const others = outside(pairing, kitIds);
   if (mode === '2v2') return others.map((id) => [id]);
-  return [others];
+  return others.flatMap((z) => others.filter((w) => w !== z).map((w) => [z, w]));
 }
 
 /** Every config over the kits: the 2v2 ones, then the 3v3 ones, each by pairing and then by fill. */

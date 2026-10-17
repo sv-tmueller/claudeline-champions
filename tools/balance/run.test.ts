@@ -27,7 +27,7 @@ describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
       const file = join(dir, 'report.md');
       const run = balance('--seeds', '1', '--out', file);
       expect(run.status, run.stderr).toBe(0);
-      expect(run.stdout).toMatch(/played 36 matches in \d+\.\d s/);
+      expect(run.stdout).toMatch(/played 48 matches in \d+\.\d s/);
       const text = readFileSync(file, 'utf8');
       expect(text.startsWith(`${REPORT_START}\n`)).toBe(true);
       expect(text.endsWith(`${REPORT_END}\n`)).toBe(true);
