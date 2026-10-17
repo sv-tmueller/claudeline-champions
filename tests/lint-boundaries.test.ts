@@ -25,6 +25,7 @@ const botsFile = 'packages/bots/src/virtual.ts';
 const botsCtsFile = 'packages/bots/src/virtual.cts';
 const botsTestFile = 'packages/bots/test/virtual.test.ts';
 const clientFile = 'packages/client/src/virtual.ts';
+const balanceFile = 'tools/balance/virtual.ts';
 
 type Case = { name: string; file: string; code: string; rule: string | null };
 
@@ -271,6 +272,13 @@ const cases: Case[] = [
     file: simTestFile,
     code: 'export const v = Math.atan2(1, 2) + Math.hypot(3, 4) + Math.sin(1) + 2 ** 3;',
     rule: null,
+  },
+  {
+    // The balance tool reads the packages through their entry points only.
+    name: 'balance tool imports a bots test by relative path',
+    file: balanceFile,
+    code: "import '../../packages/bots/test/helpers';",
+    rule: IMPORTS,
   },
   {
     name: 'client uses Math.sin and Math.cos',
