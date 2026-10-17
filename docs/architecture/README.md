@@ -73,7 +73,16 @@ first.
   (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
-  placeholder, each rigged, with six clips the client plays.
+  placeholder, each rigged, with six clips the client plays. The kits carry
+  the first tuning pass's two numbers, Skerrow's Rend and Lumeth's Binding
+  Sigil radius (see [balance.md](../design/balance.md)).
+- `tools/balance`: the balance harness. `npm run balance` plays every
+  champion pairing bot against bot, in 2v2 and 3v3 on both arenas, over a seed
+  set and writes the win-rate report into
+  [balance.md](../design/balance.md); `--check` compares a fresh run with the
+  committed block. Its unit tests are the `tools` Vitest project, and a manual
+  workflow reproduces the report on a runner (see [Testing](testing.md)). It
+  needs Node 22.15 or later.
 - `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
 
 ## Index
@@ -88,7 +97,10 @@ Topics:
 - [Online](online.md): netcode and ladder principles.
 - [Assets](assets.md): Blender pipeline, node naming, arena definition, the
   champion rig and clips.
-- [Testing](testing.md): check suite and test types.
+- [Testing](testing.md): check suite, test types, the heap probe and the
+  manual balance workflow.
+- [Balance](../design/balance.md) (a design doc): the bands, the report that
+  `npm run balance` writes and the tuning passes.
 
 Decisions:
 
