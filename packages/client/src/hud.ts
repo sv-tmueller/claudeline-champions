@@ -4,15 +4,18 @@ import {
   TIMER_TEXT,
   createRingView,
   createRoundView,
+  createShieldView,
   createSlotViews,
   readRingView,
   readRoundView,
+  readShieldView,
   readSlotViews,
   scoreIndex,
   scoreTexts,
   type RingSource,
   type RingView,
   type RoundView,
+  type ShieldView,
   type SlotSource,
   type SlotView,
 } from './hud-views';
@@ -39,6 +42,11 @@ export interface HudHandles {
   energyFill: HudElement;
   exMark: HudElement;
   ultimateMark: HudElement;
+  /**
+   * The shield segment inside the health track: the root carries the start (a translate), the
+   * visibility and the absorb, the fill carries the width (a scale).
+   */
+  shield: { root: HudElement; fill: HudElement };
   /** One per slot in `SLOTS` order. */
   slots: readonly { icon: HudElement; seconds: HudElement }[];
   score: HudElement;
@@ -75,6 +83,11 @@ function healthFill(key: number, max: number): string {
   return `scaleX(${max > 0 ? Math.min(Math.max(key / max, 0), 1) : 0})`;
 }
 
+/** The start of the shield segment: `offset` of `max` health, as a share of the track. */
+function shieldStartText(offset: number, max: number): string {
+  return `translateX(${max > 0 ? (offset / max) * 100 : 0}%)`;
+}
+
 function flag(value: boolean): string {
   return value ? TRUE : FALSE;
 }
@@ -93,6 +106,8 @@ export class Hud {
   private readonly tableMaxHealth: number;
   private readonly healthTexts: string[] = [];
   private readonly healthFills: string[] = [];
+  // The shield's start, `translateX(k/max*100%)` for a whole k from 0 to the same maximum.
+  private readonly shieldStarts: string[] = [];
   private readonly energyFills: string[] = [];
   private readonly scoreTable: string[];
   private readonly roundsToWin: number;
@@ -100,9 +115,17 @@ export class Hud {
   private readonly slotViews: SlotView[] = createSlotViews();
   private readonly round: RoundView = createRoundView();
   private readonly ringView: RingView = createRingView();
+  private readonly shieldView: ShieldView = createShieldView();
 
   private healthKey = -1;
   private maxHealth = -1;
+  // The shield is built hidden at 0 absorb, so the first update writes nothing for it. The start
+  // and the width stay at what they last were while it is hidden, and -1 means never written.
+  private shieldAbsorb = 0;
+  private shieldVisible = 0;
+  private shieldStart = -1;
+  private shieldWidth = -1;
+  private shieldMax = -1;
   private energyKey = -1;
   private exReady = -1;
   private ultimateReady = -1;
@@ -123,6 +146,7 @@ export class Hud {
   private readonly slotReady: number[] = [];
   private readonly slotWindup: number[] = [];
   private readonly slotBlocked: number[] = [];
+  private readonly slotSilenced: number[] = [];
   private readonly lineShown: number[] = [];
   private readonly lineKiller: number[] = [];
   private readonly lineVictim: number[] = [];
@@ -140,6 +164,7 @@ export class Hud {
     for (let key = 0; key <= this.tableMaxHealth; key++) {
       this.healthTexts.push(`${key} / ${this.tableMaxHealth}`);
       this.healthFills.push(healthFill(key, this.tableMaxHealth));
+      this.shieldStarts.push(shieldStartText(key, this.tableMaxHealth));
     }
     for (let key = 0; key <= MAX_ENERGY; key++) this.energyFills.push(`scaleX(${key / MAX_ENERGY})`);
     this.roundsToWin = roundsToWin;
@@ -151,6 +176,7 @@ export class Hud {
       this.slotReady.push(-1);
       this.slotWindup.push(-1);
       this.slotBlocked.push(-1);
+      this.slotSilenced.push(-1);
     }
     for (let i = 0; i < KILL_FEED_LINES; i++) {
       this.lineShown.push(-1);
@@ -163,6 +189,7 @@ export class Hud {
     const champion = state.champions[this.localId];
     if (champion) {
       this.updateHealth(champion);
+      this.updateShield(champion);
       this.updateEnergy(champion.energy);
       this.updateSlots(champion);
     }
@@ -183,6 +210,42 @@ export class Hud {
     this.handles.healthText.textContent = tabled ?? `${key} / ${max}`;
     this.handles.healthFill.style.transform =
       tabled !== undefined ? (this.healthFills[key] as string) : healthFill(key, max);
+  }
+
+  /**
+   * The segment starts where the health ends and slides back over its end when health plus shield
+   * pass the maximum. Hidden at 0 absorb, it keeps its last transforms.
+   */
+  private updateShield(source: SlotSource): void {
+    const view = this.shieldView;
+    const shield = this.handles.shield;
+    readShieldView(source, view);
+    const absorb = view.absorb | 0;
+    if (absorb !== this.shieldAbsorb) {
+      this.shieldAbsorb = absorb;
+      shield.root.setAttribute('data-absorb', intText(absorb));
+    }
+    const visible = absorb > 0 ? 1 : 0;
+    if (visible !== this.shieldVisible) {
+      this.shieldVisible = visible;
+      shield.root.setAttribute('data-visible', flag(visible === 1));
+    }
+    if (visible === 0) return;
+    const max = this.maxHealth;
+    const width = Math.min(absorb, max);
+    const start = Math.max(0, Math.min(this.healthKey, max - width));
+    // A new maximum rewrites both, since the texts are shares of it.
+    const rewrite = max !== this.shieldMax;
+    this.shieldMax = max;
+    const tabled = max === this.tableMaxHealth;
+    if (rewrite || start !== this.shieldStart) {
+      this.shieldStart = start;
+      shield.root.style.transform = (tabled ? this.shieldStarts[start] : undefined) ?? shieldStartText(start, max);
+    }
+    if (rewrite || width !== this.shieldWidth) {
+      this.shieldWidth = width;
+      shield.fill.style.transform = (tabled ? this.healthFills[width] : undefined) ?? healthFill(width, max);
+    }
   }
 
   private updateEnergy(energy: number): void {
@@ -227,6 +290,11 @@ export class Hud {
       if (blocked !== this.slotBlocked[i]) {
         this.slotBlocked[i] = blocked;
         handle.icon.setAttribute('data-blocked', flag(blocked === 1));
+      }
+      const silenced = view.silenced ? 1 : 0;
+      if (silenced !== this.slotSilenced[i]) {
+        this.slotSilenced[i] = silenced;
+        handle.icon.setAttribute('data-silenced', flag(silenced === 1));
       }
     }
   }

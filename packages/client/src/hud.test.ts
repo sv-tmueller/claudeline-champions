@@ -366,7 +366,7 @@ describe('HUD shield', () => {
     hud.update(state);
     expect(elements.shield.root.log).toEqual(['data-absorb=40', 'data-visible=true', 'transform=translateX(75%)']);
     expect(elements.shield.fill.log).toEqual(['transform=scaleX(0.25)']);
-    expect(writeCount(elements)).toBe(5);
+    expect(writeCount(elements)).toBe(4);
   });
 
   it('puts the segment just past the health: 100 of 160 with 40 absorb starts at 62.5%', () => {
