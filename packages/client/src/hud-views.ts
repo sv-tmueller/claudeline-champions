@@ -69,9 +69,9 @@ export function createShieldView(): ShieldView {
   return { absorb: 0 };
 }
 
-// The running sum of `readShieldView`. A `let total = 0` loop would merge the integer constant
-// with a double at the loop's phi and box the number in the tiers that inline it; a typed array
-// slot is a plain double store (see client.md, the probe).
+// The running sum of `readShieldView`, which only runs in a frame with a shield. A `let total = 0`
+// loop would merge the integer constant with a double at the loop's phi and box the number in the
+// tiers that inline it; a typed array slot is a plain double store (see client.md, the probe).
 const ABSORB_SUM = new Float64Array(1);
 
 /**
@@ -81,12 +81,64 @@ const ABSORB_SUM = new Float64Array(1);
  */
 export function readShieldView(source: Pick<SlotSource, 'statuses'>, out: ShieldView): void {
   const statuses = source.statuses;
+  // Most frames have no shield: they find none with an integer scan and touch no double.
+  let shielded = false;
+  for (let i = 0; i < statuses.length; i++) {
+    if ((statuses[i] as StatusInstance).type === 'shield') {
+      shielded = true;
+      break;
+    }
+  }
+  if (!shielded) {
+    out.absorb = 0;
+    return;
+  }
   ABSORB_SUM[0] = 0;
   for (let i = 0; i < statuses.length; i++) {
     const status = statuses[i] as StatusInstance;
     if (status.type === 'shield') ABSORB_SUM[0] = (ABSORB_SUM[0] as number) + status.absorb;
   }
-  out.absorb = Math.ceil(ABSORB_SUM[0] as number);
+  out.absorb = Math.ceil(ABSORB_SUM[0] as number) | 0;
+}
+
+// Rounds of the priming below: enough for V8 to allocate the feedback vector of both readers.
+const PRIME_ROUNDS = 100;
+
+/**
+ * Runs both status readers at startup over empty and filled lists of statuses of six shapes. The
+ * sim builds a status with the fields of its type, so a champion's `statuses` holds objects of
+ * five shapes (stun, root, silence and invulnerable share one), in an array that is empty at first
+ * and holds objects after the first push. In the live heap probe (testing.md) the readers deopted
+ * on a map their loads had not seen ("wrong map" at `statuses.length` and at `.type`, found with
+ * --trace-deopt), and the frames in the lower tier until the next compile boxed numbers: 48 to
+ * 480 B in a window. With the loads fed six shapes and both array maps before the first frame they
+ * see no map that is new to them. The shapes are the client's own and need not be the sim's maps.
+ */
+export function primeStatusReads(): void {
+  const base = { sourceId: 0, slot: null, remainingTicks: 1 };
+  const statuses = [
+    { ...base, type: 'stun' },
+    { ...base, type: 'slow', percent: 1 },
+    { ...base, type: 'shield', absorb: 1 },
+    { ...base, type: 'dot', perPulse: 1, ticksToNextPulse: 1 },
+    { ...base, type: 'knockback', dirX: 1, dirY: 0, distance: 1, totalTicks: 1 },
+    { type: 'haste', percent: 1, sourceId: 0, slot: null, remainingTicks: 1 },
+  ] as StatusInstance[];
+  const slots = createSlotViews();
+  const shield = createShieldView();
+  // The arrays too: the sim's `statuses` is an empty literal (small integers kind) that becomes
+  // an array of objects at the first push, and the load of `.length` deoptimizes on the map it has
+  // not seen. An empty array, then arrays of objects, so both maps are in the feedback.
+  const lists: StatusInstance[][] = [[], statuses, [], statuses.slice(0, 1), [], statuses.slice(2)];
+  // V8 allocates the feedback vector of a function only after it has run for a while, and a load
+  // records its maps only from then on, so the reads repeat until the vectors exist.
+  for (let round = 0; round < PRIME_ROUNDS; round++) {
+    for (const list of lists) {
+      const source: SlotSource = { energy: 0, cooldowns: [], cast: null, statuses: list };
+      readSlotViews(source, slots);
+      readShieldView(source, shield);
+    }
+  }
 }
 
 /** What the HUD shows of the round, read from `state.match`. */

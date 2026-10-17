@@ -32,6 +32,7 @@ import { createHealthBars } from './health-bars';
 import { cmText, facingKey, facingText, intText, percentText } from './hook-text';
 import { Hud } from './hud';
 import { buildHud } from './hud-dom';
+import { primeStatusReads } from './hud-views';
 import { createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
 import { parseLaunch } from './launch';
@@ -121,6 +122,8 @@ scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.
 // Built before the models load, so the HUD shows while they do.
 const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
 // The scoreboard shows while Tab is held (bindScoreboard, below). It reads the tallies of the feedback.
+// The status readers see every shape of a status before the first frame (hud-views.ts).
+primeStatusReads();
 const scoreboard = new Scoreboard(buildScoreboard(hudRoot, state.champions, human.team), feedback);
 const result = new ResultScreen(buildResult(resultRoot, kitIds, arenas, launch), human.team, roundsToWin);
 

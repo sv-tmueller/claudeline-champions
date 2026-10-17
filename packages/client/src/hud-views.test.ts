@@ -20,6 +20,7 @@ import {
   createShieldView,
   createRoundView,
   createSlotViews,
+  primeStatusReads,
   readRingView,
   readRoundView,
   readShieldView,
@@ -206,6 +207,22 @@ describe('shield view', () => {
     const view = createShieldView();
     readShieldView(champion, view);
     expect(view.absorb).toBe(40);
+  });
+});
+
+describe('priming the status readers', () => {
+  it('runs at startup and leaves the readers with nothing of its own', () => {
+    primeStatusReads();
+    const views = createSlotViews();
+    const shield = createShieldView();
+    readSlotViews(source(), views);
+    readShieldView(source(), shield);
+    expect(views.some((v) => v.silenced)).toBe(false);
+    expect(shield.absorb).toBe(0);
+    readSlotViews(source({ statuses: [status('silence')] }), views);
+    readShieldView(source({ statuses: [status('shield', { absorb: 7 })] }), shield);
+    expect(views.every((v) => v.silenced)).toBe(true);
+    expect(shield.absorb).toBe(7);
   });
 });
 
