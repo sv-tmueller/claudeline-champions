@@ -11,6 +11,7 @@ const HUD_ELEMENTS = [
   'round-timer',
   'ring-warning',
   'kill-feed',
+  'scoreboard',
 ];
 // A round is 5400 ticks (90 s at 60 Hz) and the warmup before round 1 is 180 ticks.
 const ROUND_TICKS = 5400;
@@ -18,7 +19,14 @@ const TICK_RATE = 60;
 const WARMUP_TICKS = 180;
 
 interface HudRead {
-  slots: { name: string | null; ready: string | null; windup: string | null; blocked: string | null; seconds: string }[];
+  slots: {
+    name: string | null;
+    ready: string | null;
+    windup: string | null;
+    blocked: string | null;
+    silenced: string | null;
+    seconds: string;
+  }[];
   healthText: string;
   marks: { name: string | null; ready: string | null }[];
   score: string;
@@ -49,6 +57,7 @@ async function readHud(page: Page): Promise<HudRead> {
         ready: icon.getAttribute('data-ready'),
         windup: icon.getAttribute('data-windup'),
         blocked: icon.getAttribute('data-blocked'),
+        silenced: icon.getAttribute('data-silenced'),
         seconds: icon.querySelector('[data-part="seconds"]')?.textContent ?? '?',
       })),
       healthText: text('[data-hud="health-bar"] [data-part="health-text"]'),
@@ -126,6 +135,8 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
       expect(slot.seconds, `${slot.name} shows no cooldown`).toBe('');
       // Only the ultimate is blocked: the energy starts at 0.
       expect(slot.blocked, `${slot.name} blocked`).toBe(slot.name === 'F' ? 'true' : 'false');
+      // Nobody silences the human at the start, and the silence flag is its own: F is not silenced.
+      expect(slot.silenced, `${slot.name} silenced`).toBe('false');
     }
     // The pick is Hargrim, with 160 health.
     expect(hud.healthText).toBe('160 / 160');
@@ -140,6 +151,9 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     // The ring warning exists and stays hidden until the countdown before sudden death.
     expect(await page.locator('[data-hud="ring-warning"]').getAttribute('data-visible')).toBe('false');
     expect(await page.locator('[data-hud="ring-warning"]').isVisible()).toBe(false);
+    // The scoreboard exists and stays hidden until Tab is held (hud.spec.ts).
+    expect(await page.locator('[data-hud="scoreboard"]').getAttribute('data-visible')).toBe('false');
+    expect(await page.locator('[data-hud="scoreboard"]').isVisible()).toBe(false);
     // The result panel exists and stays hidden until the match ends. Its select
     // lists the roster in order: the champions with a kit link to a relaunch on the
     // arena being played, the others are greyed and have no link. The arena row
