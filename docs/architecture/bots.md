@@ -731,6 +731,17 @@ B (3 attempts), and the tester's twelve attempts up to 7568 B. What is in them
 is the plans (`splitPath`, `plan`), the cold kite step and the escape landing
 code, no hot path: `aim`, `updateRuns` and `computeCues` read 0 B.
 
+The dodge of #137 lengthens the rounds before round 3, which now begins by tick
+4289, with the first projectile in window 2 and the first hits in window 4 of
+it (three 17-window runs, identical). The lead stays 4 windows, the window of
+the first hits, so the measured windows are windows 4 to 8, ticks 4409 to 4559:
+15 local attempts read a median window of 3428 to 4068 B (the windows 0.9 to
+1.3 KB, 12.3 to 13.1 KB, 3.3 to 4.0 KB, 5.5 to 8.8 KB and 3.4 to 4.0 KB; the
+second is the cold kite and escape code, as before). With a lead of 2, the
+first projectile, the measured windows hold that cold window and the median
+read about 9 KB. `dodge.ts` is in no window's list of functions (3 attempts
+read by function).
+
 The live scene bounds the bots: the median of its five windows' own bots figures
 must be at most 12 000 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
 is 50 percent above the largest median of any clean attempt of the three
@@ -1189,11 +1200,12 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (7860, 4860, 11167 and 7373), plus two rounds of
-the longest round that did not go to sudden death, rounded up to 100 (1700 in
-the 2v2 runs, whose longest is 1653, and 2000 in the 3v3 runs, the client's
-longest for the same roster), and one of 7000, rounded up to 1000 (19000, 16000,
-23000 and 19000); a run whose longest round passes its term fails. Every run has
+tick when the budget was set (6623, 7521, 6773 and 10934 on the bots of #137),
+plus two rounds of the longest round that did not go to sudden death, rounded up
+to 100 (1700 in the 2v2 runs, whose longest is 1619, and 2900 in the 3v3 runs,
+the client's longest for the same roster, 2801), and one of 7000, rounded up to
+1000 (18000, 18000, 20000 and 24000); a run whose longest round passes its term
+fails. Every run has
 a Lumeth heal an ally; across the four, Soothing Surge heals an ally, Aegis Veil
 is cast, Mend Bolt hits an enemy, and Lantern Burst and Glide are pressed (both
 in the 3v3 on arena02). The two start-edit runs of headless-kits.test.ts stay as

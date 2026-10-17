@@ -166,7 +166,7 @@ port 5173, which Playwright starts itself.
   Cast and a champion reads Hit in some read, and the victim of round 3's first
   death reads Death. The reads are the same on every attempt, since the bots are
   deterministic and the hook paces the windows: a bot reads Cast from the first
-  read (tick 2729), Attack from 2789, and Hit comes at 2879 (Run+Hit).
+  read (tick 4409), Attack from 4439, and Hit comes at 4469 (Idle+Hit).
 - `match.spec.ts`: the first round of the default match against bots, once per
   arena and team size (`match.png`, and `match-arena02.png` for
   `/?arena=arena02`; `match-3v3.png` and `match-3v3-arena02.png` for the same
@@ -175,26 +175,28 @@ port 5173, which Playwright starts itself.
   hidden result panel. It asserts budgets only, never an exact tick, because
   any bots change can move the ticks: the 3v3 rows log the headless ticks next
   to the ones they read (projectile 267 and 271, hit 290 and 319, with a Lumeth
-  on each team; 267 and 275, 301 and 307 with two Quillons a side) and assert
+  on each team, as before the dodge; 267 and 275, 301 and 307 with two
+  Quillons a side) and assert
   the budgets of the 2v2 rows.
 - `match-end.spec.ts`: tests on the dev-only time scale `?timescale=100`
   (client.md, Launch and match), on a paused clock in frames of 16 ms that run
   96 ticks each, read every 5 frames at 320x180. One plays the default match
   with an idle human to its result screen (`result.png`), once per arena
   (`/?arena=arena02&timescale=100` for arena02) and team size (`teamsize=3` for
-  the 3v3 rows), within a budget of ticks and frames per row: 15 000 and 182 on
-  arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5184 in the e2e and 5053 in
-  a headless run, on 57dd52f), 14 000 and 171 on arena02 (tick 4198 headless and
-  4224 in the e2e, a Defeat 0 : 3), and 17 000 and 203 on the 3v3 of arena01 (it
-  ends at tick 5349 headless and 5664 in the e2e, a Defeat 0 : 3) and 23 000
-  and 265 on the 3v3 of arena02 (tick 11 095 headless and 11 424 in the e2e, a
-  Defeat 0 : 3). A headless run through the client's setup and driver gives each
-  row's tick, in `match-setup.test.ts`. The budget is that tick plus two rounds
-  of about 1000 and one round to sudden death of about 7000, rounded up to 1000,
-  and the frames are ceil(ticks / 96) + 25. The 3v3 rounds run longer, so their
-  rows use 2000 for a round (the longest measured is 1954, with a Lumeth on each
-  team; it was 1557 with two Quillons a side). Each row logs its wall time, and
-  a row over 40 s gets its own timeout. The test follows the Quillon link of the
+  the 3v3 rows), within a budget of ticks and frames per row: 14 000 and 171 on
+  arena01 (`ceil(14000 / 96) + 25`; it ends at tick 5184 in the e2e and 4936 in
+  a headless run, on the bots of #137), 22 000 and 255 on arena02 (tick 12 191
+  headless and 12 384 in the e2e, a Defeat 2 : 3), and 19 000 and 223 on the
+  3v3 of arena01 (it ends at tick 5774 headless and 6144 in the e2e, a Defeat
+  0 : 3) and 29 000 and 328 on the 3v3 of arena02 (tick 15 773 headless and
+  16 224 in the e2e, a Defeat 2 : 3). A headless run through the client's setup
+  and driver gives each row's tick, in `match-setup.test.ts`. The budget is
+  that tick plus two rounds of about 1000 and one round to sudden death of about
+  7000, rounded up to 1000, and the frames are ceil(ticks / 96) + 25. The 3v3
+  rounds run longer, so their rows use 2900 for a round (the longest measured is
+  2801, with a Lumeth on each team and the dodge; it was 1954 before the dodge
+  and 1557 with two Quillons a side). Each row logs its wall time, and a row
+  over 40 s gets its own timeout. The test follows the Quillon link of the
   result panel, which keeps the arena and the team size. The other plays the
   sandbox to the red edge: the ring warning hidden until 600 ticks before the
   ring, the countdown, the radius text equal to the sim's within 0.1 m and
@@ -298,17 +300,21 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   the pointer aim with real changes. The clock is paused before the page loads
   and never runs a frame, so the first read is tick 0 and every tick is the
   hook's. The warm-up is plain windows with no profiler from tick 0 to the first
-  round that begins after tick 2100 (round 3, begun by tick 2609 on 57dd52f on
-  every run so far: the bots are deterministic), then 4 plain windows of the
-  round (the lead, 120 ticks), then the next 5 windows are measured, ticks 2729
-  to 2879. The lead is derived from three 17-window runs of round 3 with the
-  pointer on 57dd52f, all three identical: the first projectile spawns in window
-  4 (ticks 2729 to 2759), the first hits land in window 6 (five at once), and
-  then 1 to 2 hits land per window and 0 to 3 projectiles are live at the reads
-  to the end of the run (tick 3119), with the first death of the round read at
-  tick 3419. Before the dash hold of #98 the round began by tick 2879, the first
-  projectile spawned in window 5 (lead 5, windows 3029 to 3179) and the first
-  death was read at 3539. The margin after the last measured window is 540 ticks
+  round that begins after tick 2100 (round 3, begun by tick 4289 on the bots of
+  #137 on every run so far: the bots are deterministic), then 4 plain windows of
+  the round (the lead, 120 ticks), then the next 5 windows are measured, ticks
+  4409 to 4559. The lead is derived from three 17-window runs of round 3 with
+  the pointer on the bots of #137, all three identical: the first projectile
+  spawns in window 2 (ticks 4349 to 4379), the first hits land in window 4
+  (three at once), and then 1 to 3 hits land per window and 0 to 2 projectiles
+  are live at the reads to the end of the run (tick 4799), with the first death
+  of the round read at tick 4859. The lead is 4, the window of the first hits:
+  a lead of 2 (the first projectile) reads a bots median of about 9 KB in the
+  cold first windows, a lead of 4 reads 3.4 to 4.1 KB. Before the dodge the
+  round began by tick 2609 and the first projectile spawned in window 4 (windows
+  2729 to 2879, first death at 3419), and before the dash hold of #98 by tick
+  2879 (first projectile in window 5, first death at 3539). The margin after
+  the last measured window is 300 ticks
   (the floor is 60). The human walks W and D in the first window, then A and D
   in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
   Hargrim's M1 windup is `slowed`, so the walk goes on under the cast.
@@ -414,7 +420,12 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   tick 2609, and there the median window reads 6404 to 7996 B over 15 local
   attempts, 6952, 7348 and 7200 B in three runner jobs on 4ea802d and up to
   7568 B in the tester's twelve attempts (main's bots read 5744 to 6416 B
-  there). The limit is 50 percent above the largest clean median of the three,
+  there). The dodge of #137 moved them again, to windows 4 to 8 of a round 3
+  that begins at tick 4289 (ticks 4409 to 4559): the median window reads 3428 to
+  4068 B over 15 local attempts (the windows 0.9 to 1.3 KB, 12.3 to 13.1 KB,
+  3.3 to 4.0 KB, 5.5 to 8.8 KB and 3.4 to 4.0 KB; the second is the cold kite
+  and escape code), under the 7996 B of #98. The limit is 50 percent above the
+  largest clean median of the three (#98's),
   7996 B, a local one (11 994, rounded up to 100), and it is also under a
   quarter of the smallest median with the fixes reverted (61.9 KB on these
   windows, 38.9 KB on the old ones), which fails the bound in every attempt (3

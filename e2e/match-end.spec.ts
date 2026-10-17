@@ -21,15 +21,15 @@ const COUNTDOWN_TICKS = 600;
 const SUDDEN_DEATH_TICKS = 1800;
 const RING_START_M = 18;
 const RING_END_M = 3;
-// The match: this test's own run ended at tick 5184 on 57dd52f (read in frames of 96
-// ticks, with an idle human; 5053 in the headless run of match-setup.test.ts, 5117 on
-// 8d80073 and 5184 read then too). Bot output moves with the bots package, so re-measure
-// it when the bots change. The budget is 15 000 ticks: the measured 5184 plus two more
-// rounds of about 1000 each and one round to sudden death of about 7000 is about 14 000.
+// The match: this test's own run ended at tick 5184 on the bots of #137 (read in frames of
+// 96 ticks, with an idle human; 4936 in the headless run of match-setup.test.ts; on 57dd52f
+// it read 5184 too, with 5053 headless). Bot output moves with the bots package, so
+// re-measure it when the bots change. The budget is 14 000 ticks: the headless 4936 plus two
+// more rounds of about 1000 each and one round to sudden death of about 7000 is 13 936.
 // Passing it fails the test.
-const MATCH_BUDGET_TICKS = 15_000;
+const MATCH_BUDGET_TICKS = 14_000;
 // The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 15 000 ticks
-// are at most 157 frames, and the budget is that plus 25. Without the scale the match
+// are at most 146 frames, and the budget is that plus 25. Without the scale the match
 // takes thousands of frames, and this fails the test at once, where the 60 s timeout
 // alone would only fail it on a slow machine (a frame costs 2 ms here and 17 to 24 ms
 // at this viewport on the CI runner).
@@ -50,17 +50,19 @@ const TEST_TIMEOUT_MS = 60_000;
 // is not empty. The budgets of arena01 are the two constants above. arena02 has its own headless run
 // (match-setup.test.ts, ARENA02_END_TICK) and its budget is built the same way: that tick plus
 // two more rounds of about 1000 each and one round to sudden death of about 7000, rounded up to
-// 1000: 4198 + 2000 + 7000 = 13 198, so 14 000 ticks, and frames = ceil(14 000 / 96) + 25 = 171
-// (13 000 and 161 with the 3474 of #86).
+// 1000: 12 191 + 2000 + 7000 = 21 191, so 22 000 ticks, and frames = ceil(22 000 / 96) + 25 = 255
+// (14 000 and 171 with the 4198 of #98, 13 000 and 161 with the 3474 of #86; a first round of
+// 6453 ticks goes to sudden death since the dodge).
 // The 3v3 rows have their own headless runs (match-setup.test.ts, ARENA01_3V3_END_TICK and
 // ARENA02_3V3_END_TICK) and the same formula with a longer round, since the longest non-sudden 3v3
-// round measured is 1954 ticks (a healer on each team keeps a round going), rounded up to 2000: end
-// tick + 2 * 2000 + 7000, rounded up to 1000.
-//   arena01: 5 349 + 4000 + 7000 = 16 349, so 17 000 ticks; frames = ceil(17 000 / 96) + 25 = 203.
-//   arena02: 11 095 + 4000 + 7000 = 22 095, so 23 000 ticks; frames = ceil(23 000 / 96) + 25 = 265.
-// (With two Quillons a side the figures were 12 431 with 23 000 and 265 on arena01, and 7 125 with
+// round measured is 2801 ticks (a healer on each team keeps a round going, and the dodge lengthens
+// it), rounded up to 2900: end tick + 2 * 2900 + 7000, rounded up to 1000.
+//   arena01: 5 774 + 5800 + 7000 = 18 574, so 19 000 ticks; frames = ceil(19 000 / 96) + 25 = 223.
+//   arena02: 15 773 + 5800 + 7000 = 28 573, so 29 000 ticks; frames = ceil(29 000 / 96) + 25 = 328.
+// (On the bots of #112 the figures were 5 349 with 17 000 and 203 on arena01, and 11 095 with 23 000
+// and 265 on arena02; with two Quillons a side 12 431 with 23 000 and 265 on arena01, and 7 125 with
 // 18 000 and 213 on arena02, and 10 631 with 21 000 and 244 and 7 119 in #86 and #96.)
-// The headless runs end in a Defeat 0 : 3 on arena01 (round 3) and a Defeat 0 : 3 on arena02 (round 3,
+// The headless runs end in a Defeat 0 : 3 on arena01 (round 3) and a Defeat 2 : 3 on arena02 (round 5,
 // the first one a sudden-death round). The rows read the result off the page and log it next to those
 // figures. The exact outcome is not pinned: the 2v2 rows derive it from the score the same way, and
 // every bots change moves it. The headless match-setup tests log the end tick and fail once a match
@@ -69,9 +71,9 @@ const TEST_TIMEOUT_MS = 60_000;
 // about ten times more, so about 7 s), under the 60 s default.
 const ROWS = [
   { id: 'arena01', size: 2, query: '', budgetTicks: MATCH_BUDGET_TICKS, budgetFrames: MATCH_BUDGET_FRAMES },
-  { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 14_000, budgetFrames: 171 },
-  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 17_000, budgetFrames: 203, expected: 'Defeat 0 : 3 at about tick 5 349' },
-  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 23_000, budgetFrames: 265, expected: 'Defeat 0 : 3 at about tick 11 095' },
+  { id: 'arena02', size: 2, query: 'arena=arena02&', budgetTicks: 22_000, budgetFrames: 255 },
+  { id: 'arena01', size: 3, query: 'teamsize=3&', budgetTicks: 19_000, budgetFrames: 223, expected: 'Defeat 0 : 3 at about tick 5 774' },
+  { id: 'arena02', size: 3, query: 'arena=arena02&teamsize=3&', budgetTicks: 29_000, budgetFrames: 328, expected: 'Defeat 2 : 3 at about tick 15 773' },
 ] as const;
 
 interface Hooks {
