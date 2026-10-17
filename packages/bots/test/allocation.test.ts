@@ -463,13 +463,17 @@ function arrangeHeal(state: GameState): void {
 
 describe('think allocation', () => {
   // The Maglev project is only worth its figures on the engine they were measured on and with the
-  // flags applied: V8 12.4 (Node 22) does not reproduce them, and a worker that lost its execArgv
-  // runs the default tiers and reads 0 B everywhere. The control below proves the tier itself.
-  it.runIf(MAGLEV)('runs on Node 26 (V8 14) with --maglev --no-turbofan', () => {
+  // flags applied: V8 12.4 (Node 22) does not reproduce them, a worker that lost its execArgv
+  // runs the default tiers and reads 0 B everywhere, and one that compiles on a background thread
+  // (`--no-concurrent-recompilation` lost) reads 480 B in a block or 32 B a think after the move to
+  // -0 in some runs (see vitest.heap.config.ts). The control below proves the tier itself.
+  it.runIf(MAGLEV)('runs on Node 26 (V8 14) with --maglev --no-turbofan --no-concurrent-recompilation', () => {
     const v8Major = Number.parseInt(process.versions.v8.split('.')[0] ?? '0', 10);
-    const flags = ['--maglev', '--no-turbofan'].filter((flag) => process.execArgv.includes(flag));
-    const problem = `the Maglev heap check needs Node 26 (V8 14.6) and --no-turbofan: found V8 ${process.versions.v8} with ${flags.join(' ') || 'neither flag'}`;
-    expect(v8Major >= 14 && flags.length === 2, problem).toBe(true);
+    const wanted = ['--maglev', '--no-turbofan', '--no-concurrent-recompilation'];
+    const flags = wanted.filter((flag) => process.execArgv.includes(flag));
+    const missing = wanted.filter((flag) => !flags.includes(flag));
+    const problem = `the Maglev heap check needs Node 26 (V8 14.6) and ${wanted.join(' ')}: found V8 ${process.versions.v8}, missing ${missing.join(' ') || 'nothing'}`;
+    expect(v8Major >= 14 && missing.length === 0, problem).toBe(true);
   });
 
   // The control: a call V8 does not inline boxes the double it returns, and Maglev does not inline
