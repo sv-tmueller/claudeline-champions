@@ -77,9 +77,17 @@ holds the roster kits as plain data (`KitDef`), checked by `validateKit` and rea
 
 Amended 2026-10-17 by [batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441), for milestone 6 (the full text is [section 3 of the online design](2026-10-17-online-design.md#3-package-layout-and-rules)):
 
-- `protocol` holds the message types, `PROTOCOL_VERSION` and pure JSON encode and decode with validation. It has no I/O, no transport and no game logic. It imports relative paths and `@claudeline/sim` only. It has the host bans of `sim` (no `window`, `document`, `fetch`, `Date`, `performance`, `Math.random`, no Node built-ins and no dynamic `import()`) but not its math ban. Its tsconfig has `lib: ["ES2023"]` and `types: []`.
-- `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with Node globals. It never imports `client`, and it may read the wall clock.
-- `client` imports `sim`, `bots` and `protocol`, replacing "`client` imports `sim` and `bots`" above. It never imports `server`, and a lint deny rule names that: the client has no import rule today.
+- `protocol` holds the message types, `PROTOCOL_VERSION` and pure JSON encode
+  and decode with validation. It has no I/O, no transport and no game logic.
+  It imports relative paths and `@claudeline/sim` only. It has the host bans
+  of `sim` (no `window`, `document`, `fetch`, `Date`, `performance`,
+  `Math.random`, no Node built-ins and no dynamic `import()`) but not its math
+  ban. Its tsconfig has `lib: ["ES2023"]` and `types: []`.
+- `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with
+  Node globals. It never imports `client`, and it may read the wall clock.
+- `client` imports `sim`, `bots` and `protocol`, replacing "`client` imports
+  `sim` and `bots`" above. It never imports `server`, and a lint deny rule
+  names that: the client has no import rule today.
 - `sim` and `bots` are unchanged.
 
 ### 3.3 Data flow

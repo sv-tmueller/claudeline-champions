@@ -16,7 +16,7 @@ the code or amend this file with a dated line.
 
 ## 1. Intent and non-goals
 
-Intent: two to six people play the existing 2v2 or 3v3 together through a
+Intent: one to six people play the existing 2v2 or 3v3 together through a
 browser, on a server that stays authoritative, with bots filling the empty
 seats. One server process serves many rooms. A room is found by a short code.
 There is no matchmaking: someone creates a room and tells the others the code.
@@ -40,8 +40,8 @@ Non-goals of this cut:
 | Snapshots | Full-state JSON every third tick (20 Hz), the events in per-tick batches | Binary or delta first (harder to debug, no resync) |
 | Rendering | 6 ticks behind the newest snapshot, through the existing interpolation | Prediction first (see section 9) |
 | Prediction | None in this cut | Rollback in the first cut |
-| Reconnect | A server-issued token, the seat held | Rejoin by name |
-| Pause | Online play never pauses | A host pause |
+| Reconnect | A server-issued token, the seat held | none weighed |
+| Pause | Online play never pauses | none weighed |
 | Packages | `protocol` holds a pure codec, `client` imports `protocol` | Types-only `protocol` |
 
 [ADR-006](../../architecture/decisions/ADR-006-online-first-cut.md) records the
@@ -220,7 +220,8 @@ The match ends when the step emits `matchEnded`. The room then sends
 - **Seats.** A room has twice the team size in seats, numbered from 0. A seat
   is open, a human or a bot. A seat has a team once someone sits in it.
 - **Host.** The creator is the host. If the host leaves, the human in the
-  lowest seat becomes host. A room with no human closes and its child exits.
+  lowest seat becomes host. A lobby with no human closes and its child exits
+  (a running match follows section 10).
 - **Settings.** `{ teamSize, arenaId, difficulty }`, set by the host in the
   lobby. `teamSize` is 2 or 3, `arenaId` names an arena in the server's
   `data/arenas` with enough spawns for the team size, and `difficulty` is
@@ -375,6 +376,8 @@ Further rules:
   [simulation.md](../../architecture/simulation.md#state-and-api-surface); this
   design does not copy it, so it cannot go stale. `matchEnd` repeats the result
   of `matchEnded` for the client that has not read the batches.
+- **Keepalive.** A client pings every 5 s, so the idle rule of section 11
+  does not close a lobby connection. During a match the inputs keep it busy.
 - **Data once.** `matchStart` carries the arena and the kits once, so the
   server is the authority on data and client and server cannot hold different
   kit versions.
