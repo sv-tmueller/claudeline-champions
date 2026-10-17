@@ -35,7 +35,7 @@ Sources:
 - A roster counter (an intended counter in roster-v1.md) is read as the
   favoured side inside the band: the favourite at 50 to 60 percent and the
   other side at 40 to 50. A favourite above 60 is too strong, and an
-  underdog that is ahead by more than 60 is an inverted counter.
+  underdog above 60 percent is an inverted counter.
 
 ## 3. The method
 
@@ -63,7 +63,10 @@ Sources:
   is left out of the rate, counted in the Budget hits column and listed under
   the table. One match of the baseline hit it (Quillon v Skerrow, 3v3 on
   arena01, with the fill [lumeth, hargrim], seed 6); every other match ended
-  before tick 26 000.
+  before tick 26 000. That one is a bot stall, not a kit effect: from tick
+  7521 the two surviving Hargrims stand still 2.13 m apart inside the end ring
+  with no button pressed, and round 1 never ends. It is issue #123, a bots
+  fix; the tuning pass never chases it with kit numbers.
 - **Metrics.** Ticks count from the start of the round. Round mean and round
   longest are over the rounds that did not go to sudden death. Sudden-death
   rounds are shown as a count out of all rounds of the cell. First hit mean is
@@ -178,20 +181,21 @@ Quillon v Skerrow at 94.5 percent or more for X. One 3v3 match did not end
 | Quillon v Skerrow | Skerrow | 100.0 | 100.0 | 96.5 | 94.5 | Inverted in all four cells: Quillon wins 94.5 to 100 percent. |
 
 - **Hargrim v Lumeth.** The counter is Chain Hook, which pulls Lumeth 4 m
-  closer and slows her. Limits that bear on it: nobody dodges, so Lumeth's
-  bolts and heals always land; the target is the nearest enemy, so the hook
-  goes where the targeting points and not always at Lumeth; Rally Cry is never
-  pressed. A gap of 0 to 3 percent in all four cells is wide, and several
-  numbers may be needed to close it.
+  closer and slows her. Limits that bear on it: nobody dodges, which may let
+  Lumeth's bolts and heals land (the normal tier also aims up to 6 degrees
+  off); the target is the nearest enemy, so the hook may go at another
+  champion than Lumeth; Rally Cry is never pressed. A gap of 0 to 3 percent
+  in all four cells is wide, and several numbers may be needed to close it.
 - **Lumeth v Skerrow.** The counter is Quiet Dart, which silences every Lumeth
   ability, and a dive onto 120 health. Limits that bear on it: Skerrow's Lunge
   opener waits at 6 to 8 m for its opening and she has no Lunge away; Lumeth's
   Lantern Burst is pressed as an escape when an acted enemy is within 3 m,
-  which pushes a diving Skerrow 2 m back whenever it is ready; nobody dodges.
+  which may push a diving Skerrow 2 m back each time it is ready; nobody
+  dodges.
 - **Quillon v Skerrow.** The counter is Lunge, with the Quiet Dart silence on
-  Skip. Limits that bear on it: nobody dodges, so Quillon's bolts hit an
-  approaching Skerrow; the bot presses Quiet Dart only at a target with an
-  escape ready; and Skerrow has no Lunge away.
+  Skip. Limits that bear on it: nobody dodges, which may let Quillon's bolts
+  hit an approaching Skerrow; the bot presses Quiet Dart only at a target
+  with an escape ready; and Skerrow has no Lunge away.
 
 ### 5.2 A counter that points the right way and is too strong
 
@@ -201,8 +205,8 @@ Quillon v Skerrow at 94.5 percent or more for X. One 3v3 match did not end
 
 - **Hargrim v Quillon.** The counter is range: she holds him with Bind Shot
   and Snare Orb, and Skip answers his hook. Limits that bear on it: nobody
-  dodges, so Hargrim walks into every bolt, and Rally Cry, his haste, is never
-  pressed. Hargrim won none of 200 matches in 2v2 on arena01.
+  dodges, which may let bolts hit Hargrim as he walks in, and Rally Cry, his
+  haste, is never pressed. Hargrim won none of 200 matches in 2v2 on arena01.
 
 ### 5.3 Pairings with mixed readings
 
