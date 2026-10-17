@@ -1,0 +1,42 @@
+name: Balance reproduction
+
+# A manual run only: it plays 4800 bot matches (about five minutes on a runner) and checks
+# that docs/design/balance.md reproduces on linux/amd64. Trigger it on a branch with
+#   gh workflow run balance.yml --ref <branch>
+# It never runs on pull requests or pushes.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: balance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    name: npm run balance -- --check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run balance -- --check
+      # On a difference: play again into a scratch file, put that block in place of the committed
+      # one and print the diff, so a mismatch shows the cells (the head line always differs).
+      - name: Show the differing cells
+        if: failure()
+        run: |
+          npm run balance -- --out "$RUNNER_TEMP/fresh.md"
+          awk -v f="$RUNNER_TEMP/fresh.md" '
+            /<!-- balance:report -->/ { while ((getline l < f) > 0) print l; skip = 1 }
+            !skip { print }
+            /<!-- \/balance:report -->/ { skip = 0 }
+          ' docs/design/balance.md > "$RUNNER_TEMP/balance.md"
+          cp "$RUNNER_TEMP/balance.md" docs/design/balance.md
+          git diff --no-color docs/design/balance.md
