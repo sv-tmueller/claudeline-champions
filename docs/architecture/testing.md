@@ -12,6 +12,13 @@ CI is split by cost:
 
 - Typecheck, lint, unit tests and the asset checks run on pull requests that
   touch code, drafts included, and on pushes to main.
+- The bots' heap check (`packages/bots/test/allocation.test.ts`) runs in its
+  own job on the Node majors the unit job does not run, through
+  `vitest.heap.config.ts`: Node 26.7.0 (pinned; V8 14.6) in the default tiers
+  and in Maglev alone, the tier a browser match runs the bots in, and Node 24
+  in the default tiers. The unit job runs it on Node 22. The job has no
+  `needs:`, runs on drafts in parallel with the unit job and takes about half a
+  minute. See [bots](bots.md), Testing.
 - Build and the Playwright e2e specs (`e2e/*.spec.ts`) run on pull requests
   that are ready for review and on pushes to main. They skip draft pull
   requests. They start only after the typecheck, lint, unit test and asset
@@ -391,8 +398,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   window that is the median by counted bytes) must be at most
   `LIVE_BOTS_LIMIT_BYTES`, 12 000 B (`heap-probe.ts` has the figures, and
   bots.md, Allocation, In the browser, the causes). The bytes in a browser
-  window were: 0.7 to 1.2 KB per window in the sandbox (`bot.ts:move` and
-  `rng.ts:next` of its one bot, not asserted), and in the live scene's
+  window were: 0.6 to 0.9 KB per window in the sandbox (`bot.ts:move` of its
+  one bot, not asserted; `rng.ts:next` is gone since #108), and in the live
+  scene's
   measured windows on bc1d6f1 25 to 131 KB per window on the runner, a median
   window of 52 and 40 KB in two jobs (39 to 44 KB over 15 local attempts): the
   garbage of the plan search, about 53 KB a plan, and the calls V8's Maglev

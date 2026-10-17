@@ -604,16 +604,17 @@ neither is tier timing:
   V8 14.6 on Node 26) Maglev does not inline a call with a double argument or
   result, and calls `Number.isFinite` with its argument boxed: one 16 B box
   per call. Node 22's V8 12.4 does not reproduce it (`--maglev --no-turbofan`
-  reads tens of KB a think before and after alike), and no committed test
-  checks it again. That was `bot.ts:aim` at 1.2 KB a window (a
+  reads tens of KB a think before and after alike); Node 26's does, and the
+  heap check runs it there since #108 (see Testing). That was `bot.ts:aim` at
+  1.2 KB a window (a
   `Number.isFinite` per think, and the `aimU` store), the distance of
   `steerTowardInto` with the finite test of `cellIndexAt` at about 5 KB
   together, and `clearShotWith` with `needsPlan` at about 1.5 KB. The finite
   tests are `x - x === 0` now, the distances go through `distanceInto`, and
   `segmentClear` has `hypot2` written out. The same scenes run Maglev-only
   (Node 26, `--no-turbofan`) read 18 B a think in `aim` and up to 54 KB in a
-  scene that plans; after the change every scene that does not plan reads 2 B
-  there, the rng draw.
+  scene that plans; after that change every scene that does not plan read 2 B
+  there, the rng draw, which is written out inside `aim` now (below).
 
 Not the cause: an unoptimized `aim` (Ignition, `--no-turbofan --no-maglev`)
 boxes about 755 B a think in `aim` itself (the whole think reads 44 KB a think
@@ -631,8 +632,8 @@ After, 15 local attempts: a median window of 3.5 to 4.0 KB, the five windows
 `sight.ts`, `steer.ts`, `hypot.ts` and `cellIndexAt` at 0 B. What is left is
 the path of a plan (`splitPath`, `findPath`, `cellCenter`, `plan`: 0.9 to 6.9
 KB a window), the rng draw (`rng.next` runs in the interpreter, one call in 15
-thinks: 0.5 to 0.7 KB) and the kite step in the first two windows (cold code,
-2 to 3 KB).
+thinks: 0.5 to 0.7 KB; written out inside `aim` since #108, below) and the kite
+step in the first two windows (cold code, 2 to 3 KB).
 
 On the runner (the live probe, three Playwright jobs on 04be0f9, run
 37457728094) the median window read 3588, 3912 and 3756 B, against 52.2 and
@@ -665,9 +666,9 @@ windows, 9 of 9). The -0 deopt of `aim` above is the second positive control:
 72.3 to 74.2 KB in 3 of 3 attempts. The bound does not catch one reverted Maglev
 fix: `aim`'s 1.2 KB, or the distance of `steerTowardInto` with the finite test
 of `cellIndexAt` at up to 5 KB a window, leave the median window under 12 KB.
-Nothing committed guards them singly: the Node check runs Turbofan, which
-inlines them, and the bound sits above their size; the Maglev-only scratch run
-is how they were found. A runner median above 12 000 B reopens the limit.
+The Maglev heap check guards each of them singly (see Testing): the Node check
+in the default tiers runs Turbofan, which inlines them, and the bound sits
+above their size. A runner median above 12 000 B reopens the limit.
 
 The first windows of a round are not in that figure and are not bounded. With
 the profiler on from tick 0 locally, the first window of round 1 read 2.5 MB
@@ -703,17 +704,64 @@ median read 73 KB. The rounding is `+ 0.5 - 0.5` in `aim` now: the same value as
 `+ 0` while |Math.round(x)| is below 2^52 cm (a whole number that size survives
 both additions, and -0 + 0.5 is 0.5; the aim of a champion in any arena is a few
 thousand cm), and a double constant gives the sum number feedback from its first
-run. The windows read 0 B in `aim` again. `escape.ts:landingInto` has the same
-`Math.round(...) + 0` and the same hazard, with a landing point in [-0.5, 0) cm,
-and is not changed: it runs a few times a window, not 90.
+run. The windows read 0 B in `aim` again. `escape.ts:landingInto` had the same
+`Math.round(...) + 0` and the same hazard, with a landing point in [-0.5, 0)
+cm: in Maglev alone the bot then ran about 1200 thinks at 288 B a think. Its
+two rounding lines end in `+ 0.5 - 0.5` too since #108, the same values;
+`teleportEndInto`'s `+ 0` copies the sim's operation and stays (its inputs are
+heap numbers, so its feedback is number feedback and not int32). A value pin in
+escapes.test.ts (a landing point in [-0.5, 0) cm, on x and on y, is +0 and
+equals `roundAim`; red under a bare `Math.round`) and the -0 pins of the heap
+check hold it.
+
+The rng draw. `rng.ts:next` runs once in 15 thinks (the aim error is held for
+15), so V8 never optimised it before a long run, and in the interpreter its
+double result and every int32 above the Smi range boxed: about 30 B a draw in
+the browser (the 0.5 to 0.7 KB a window above), 16 to 32 B in a block of 15
+thinks in Maglev alone. The draw is written out inside `aim` now, over a
+`Uint32Array(1)` state made in `createBot`, with the same operations in the
+same order, so it runs in the compiled code of `aim`; `rng.ts` stays as the
+reference with its own test. A seeded stream test in bot.test.ts compares the
+aim of 12 seeds (-1, 2^32 - 1 and 2^32 among them) over 2400 thinks at a
+stationary target, at each tier, with `createRng`, `rotateByHalfTangent` and
+`roundAim`, and is red under a changed constant, shift or xor. The live scene
+on the head of #108 (3 attempts): `rng.ts:next` absent from every window and
+`aim` at 0 B.
+
+`bot.ts:move` in the sandbox. The sandbox scene (`combat.spec.ts`, whose one
+bot has thought 180 to 330 times by its windows) reads 588 to 864 B a window in
+`bot.ts:move` and in no other bots function: 15 windows of 3 attempts, 7 to 10
+B a think of the 90 in a window. The live scene reads 0 B there: round 3
+(windows 4 to 8) and round 4 (4 lead windows and 5 measured ones after round 3
+ends, begun by tick 3839: a median window of 4048, 4156 and 4344 B, `move` and
+`aim` at 0 B in all 15 windows), 3 attempts each. A traced sandbox run
+(`--js-flags=--trace-opt --trace-deopt`) marks `think`, `decide` and `aim` for
+Maglev and compiles them, deoptimizes none of them, and never compiles `move`
+on its own (it is inlined into a caller or stays in a lower tier; the trace
+does not say which). The cause is not found: no scene of the heap check reads a
+byte in `move` (0 B in all 16 scenes, in Maglev alone as in the default tiers),
+so it is a state of the first few hundred thinks that a long run does not have,
+and nothing in `move` or in follow.ts changed. The sandbox figure stays
+unasserted.
+
+The Chromium question: does the push-grown `splitPath` with the spread fallback
+(`follow.ts` of 3333cb5^, the control) cost more in the browser than the array
+made at its final length? The live scene, 3 attempts twice on each, read a mean
+of 2734 and 2684 B a window in `follow.ts:splitPath` on main against 3099 and
+3065 B on the control, 454 and 428 B in `follow.ts:plan` against 431 and 455 B,
+and a bots median window of 6104 to 6616 B on main against 6464 to 7028 B on
+the control. So the final-length array saves about 370 B a window in
+`splitPath` (14 percent of it) and about 0.3 KB of a 6.5 KB median window (4
+percent) in Chromium, a good deal less than the 620 B a fallback plan it saves
+on Node 26. No code follows.
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
 polymorphic feedback), the median of single thinks hides the plans and the aim
-draw, and Node 22's V8 is not the browser's. The Maglev-only run above needs
-Node 26 and a scratch vitest config with `--no-turbofan` as `execArgv`; it is
-not part of the suite, since the CI runs Node 22, which has no Maglev by
-default.
+draw, and Node 22's V8 is not the browser's. The Maglev-only run is in the CI
+now (see Testing), on Node 26.7 and not in the browser: Node builds have no
+pointer compression, so a Smi is 32 bits there and 31 in Chromium, and an int32
+above 2^30 boxes only in the browser. The live probe stays the authority.
 
 ## Aim
 
@@ -1043,8 +1091,12 @@ think with Soothing Surge pressed on each, and a Lumeth windup: the same with
 its cast in progress, so the ally is held through the windup on every think),
 warms each bot up with 20000 thinks and reads `process.memoryUsage().heapUsed`
 around one `think`, 600 samples per round. The figure of a round is the median
-delta minus the median delta of an empty pair of reads, and the lowest of three
-rounds of every scene must be under a literal bound, 128 B per think. The think
+delta minus the median delta of an empty pair of reads taken in the same loop,
+just before each think (a call of `process.memoryUsage()` allocates its result
+object, 144 B in a tier that does not optimise it away, and a pair read in
+another function sat in another tier and moved a scene by 144 B on Node 24),
+and the lowest of three rounds of every scene must be under a literal bound,
+128 B per think. The think
 before the rewrite (b09b437) read 4 to 56 KB per think; the current think reads
 0 B, and the bound sits between the two. The test also reads the sim's baseline
 step against the floor of the sim's own check, which proves the counter moves,
@@ -1098,6 +1150,47 @@ path of #112 (the ally scan, the aim at an ally that is pressed, the ally held
 through a windup) 672 B (four slots of 168), 168 B and 168 B in the lumeth
 scenes that run it, on both majors. A double argument to `waitsFor` read 16 B a
 think on Node 26, so it takes the distance as a measure.
+
+The same file runs in a second project, `bots-heap-maglev` of
+`vitest.heap.config.ts`, on Node 26.7 (V8 14.6) with `--maglev --no-turbofan
+--no-concurrent-recompilation --no-use-osr`: Maglev alone, the tier a browser
+match runs the bots in. The last two flags keep the figures from depending on
+when V8 compiles a function and when it replaces a loop of the test on the
+stack: on a loaded host the draw block below read 480 B and a -0 pin 32 B in
+some runs of a clean tree (4 of 18 and 15 of 36 tests, six copies in parallel),
+once in about twenty runs on the runner with the first flag alone, and in none
+of 27 copies with both. The limits are literals of their own: 8 B a think for
+the scenes (they read 0 B; the smallest mutation is one 16 B box a think), and
+2900 B clear and 2500 B fallback for the plan step (clean 2784 B and 2400 to
+2416 B: Maglev allocates a little more for a fallback plan than the default
+tiers do). A guard fails with the flags a worker lacks, or a V8 below 14, and a
+control, a loop of `hypot2` calls whose result goes into a Float64Array, must
+read at least 16 B a call (it reads 40 B), so a run that reads 0 B has not lost
+its tier.
+
+The draw block reads the press scene in blocks of 15 thinks, one aim draw each,
+the median of 600 blocks, since the per-think median hides the draw: 16 to 32 B
+with `rng.next`, 0 B with the draw written out in `aim`, limit 8 B. The two -0
+pins warm the press scene and the escape press scene up on whole-centimetre
+aims, move the bots 1 to 3 m so that the aim and the landing fall in [-0.5, 0)
+cm, count the aims of +0 that result (440 and 1200 of 1200 thinks) and read the
+lower of the two windows after the move against 8 B: 768 B (aim) and 288 B
+(landing) under `+ 0`, 0 B clean. The mutation table in the header of the test
+reverts each fix of a Maglev boxing site alone, on Node 26.7 in Maglev alone,
+red in 3 of 3 runs, with the clean figures beside it (all 16 scenes at 0 B, the
+plan step 2784 B and 2400 to 2416 B, the block and both pins 0 B). Two
+mutations stay at 0 B and are listed there as unguarded: `Number.isFinite` for
+the final aim test, and `needsPlan`'s distance through `hypot2`.
+
+The CI runs the file in its own job: Node 26.7.0 (pinned: a bump means
+measuring again) with both projects, and Node 24 with the default tier; Node 22
+keeps the check in the unit job. On the runner (an AMD EPYC 7763) Node 26.7.0
+reads 0 B in all 16 scenes in both projects, the plan step 2784 B clear and
+2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2412 B in
+Maglev alone, the control 40 B a call and the block and both pins 0 B; Node 24
+reads 0 B in all 16 scenes and 2832 B clear and 2080 to 2084 B fallback for the
+plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
+the limits are 2950 and 2300 B.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
 input has `moveX` and `moveY` both 0, while some alive enemy is reachable on the
