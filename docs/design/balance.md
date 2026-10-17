@@ -367,7 +367,7 @@ One dropped run of #124 had more: Chain Hook's windup, 18 to 12 ticks (run H3),
 gave 8 budget hits in the same cell (seeds 34, 42, 72, 80, 82, 88, 90 and 98).
 Each replayed to tick 20 000 is the same stall, counted over the two Hargrims:
 both are alive in round 1, 1.0 to 2.1 m apart, and their last presses fall at
-ticks 406 to 838 (the Lumeths on both teams press until about tick 8080, so
+ticks 406 to 838 (the Lumeth on Skerrow's side presses until 7888 to 8080, so
 counted over all six champions the last press is later than in seed 6). The
 candidate was dropped by the rule, so the report has the one hit.
 
