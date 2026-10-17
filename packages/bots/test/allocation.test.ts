@@ -221,6 +221,9 @@ function hypotLoop(out: Float64Array, seed: number): void {
  */
 const DRAW_BLOCK_MAGLEV_LIMIT_BYTES = 8;
 
+/** The scenes and the plan step take about 5 s on a loaded runner; vitest's default is 5 s. */
+const HEAVY_TEST_TIMEOUT_MS = 30000;
+
 const WARM_UP = 20000;
 const WINDOW = 600;
 const ROUNDS = 3;
@@ -583,7 +586,7 @@ describe('think allocation', () => {
     ).toEqual([]);
     // think never mutates the state.
     scenes.forEach((s, i) => expect(checksum(s.state), s.name).toBe(checksums[i]));
-  });
+  }, HEAVY_TEST_TIMEOUT_MS);
 
   // Runner (ubuntu-latest, Node 22): 1.6 and 1.7 s green, 2.7, 2.6 and 2.3 s red on 5820f16
   // (runs 39001711657, 39008413462, 39009180211 x3); 0.75 s locally (Apple M5 Pro, Node 22.23.2,
@@ -670,7 +673,7 @@ describe('think allocation', () => {
         `lowest round of the median bytes per ${name} plan: ${rounds.map(Math.round).join(', ')}`,
       ).toBeLessThan(limit);
     }
-  });
+  }, HEAVY_TEST_TIMEOUT_MS);
 
   // The draw block: the per-think median hides the aim error draw, which runs once in 15 thinks
   // (AIM_ERROR_HOLD). A block of 15 thinks holds exactly one draw, wherever it starts, so the
