@@ -3,6 +3,7 @@ import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
 import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
 import { AIM_ERROR_HOLD, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
+import { TIERS } from '../src/difficulty';
 import { createFollower, followPathInto } from '../src/follow';
 import type { PathFollower } from '../src/follow';
 import { pointBlocked } from '../src/geometry';
@@ -12,6 +13,7 @@ import { hypot2 } from '../src/hypot';
 import type { Intent } from '../src/intent';
 import type { MoveCommand } from '../src/steer';
 import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKits } from './helpers';
+import { spawnBolt } from './scenes';
 
 /*
  * Platform gate: this test gates on the native runner (a GitHub-hosted x86 job or an Apple
@@ -51,8 +53,9 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  *   lumeth escape        (new scene)     (new scene)     0              (not run)
  *   lumeth heal          (new scene)     (new scene)     0              (not run)
  *   lumeth windup        (new scene)     (new scene)     0              (not run)
+ *   dodge                (new scene)     (new scene)     0              (not run)
  *
- * The last seven scenes have no main figure: they test paths main does not have. The unit job of
+ * The last eight scenes have no main figure: they test paths main does not have. The unit job of
  * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
  * skerrow wait scene (#98) reads 0 on macOS on Node 22 and Node 26, and its runner figure is the
  * unit job of that pull request. The lumeth escape scene (#106) reads 0 in every round on macOS on
@@ -83,6 +86,10 @@ import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKi
  * ally slots a think), 168 in the lumeth heal scene in the aim at an ally that is pressed and 168 in
  * the lumeth windup scene in the ally held through the windup (both in `think`), in every round on
  * Node 22, Node 26 and Node 26 with Maglev alone, where the three scenes read 0 clean.
+ * The same object (six doubles) kept in a module variable on the two paths of #137 reads 304 in the
+ * dodge scene in the threat scan of `dodgeInto` (per projectile: two bolts in the scene) on Node 22
+ * and Node 26, and 120 in the sidestep (per think), which is under the bound in the default tiers
+ * and over the Maglev one. A double argument to `dodgeInto` reads 16.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
@@ -124,8 +131,9 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * between the two.
  *
  * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
- * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 16 scenes, the plan
- * step 2784 B clear and 2400 to 2416 B fallback, the draw block 0 B, both -0 pins 0 B.
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 17 scenes, the plan
+ * step 2784 B clear and 2400 to 2416 B fallback, the draw block and the dodge block 0 B, both -0
+ * pins 0 B.
  *
  *   mutation                                       red in, and what it reads
  *   Number.isFinite for `t - t === 0` in aim       all 16 scenes 16 B; block 240 B; both pins 16 B
@@ -144,6 +152,12 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  *   a six-double object per call of plan,          the plan step, 2952 B clear and 2576 B
  *     findPath or pullString                       fallback
  *   the same object per call of nearestFreeCell    the plan step, 2736 to 2752 B fallback
+ *   a six-double object per projectile scanned     the dodge scene 304 B; the dodge block 2736 B
+ *     in dodgeInto (#137)
+ *   a six-double object per sidestep               the dodge scene 120 B; the dodge block 120 B
+ *   rng.ts:next for the dodge coin                 the dodge block, 32 B
+ *   a double argument to dodgeInto                 the dodge scene 16 B; the dodge block 144 B;
+ *                                                  the draw block 240 B
  *
  * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
  * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
@@ -221,6 +235,13 @@ function hypotLoop(out: Float64Array, seed: number): void {
  */
 const DRAW_BLOCK_MAGLEV_LIMIT_BYTES = 8;
 
+/**
+ * The same for a block of castDelay + 1 thinks over bolts with new ids, which draws one dodge coin
+ * for each of the two bolts of the dodge scene (see the test). The coin is mulberry32 written out
+ * in `dodgeInto`; through `rng.ts:next` it boxes its result, as the aim draw did.
+ */
+const DODGE_BLOCK_MAGLEV_LIMIT_BYTES = 8;
+
 const WARM_UP = 20000;
 const WINDOW = 600;
 const ROUNDS = 3;
@@ -278,7 +299,8 @@ function put(state: GameState, id: number, x: number, y: number): void {
 /**
  * A frozen mirror match on arena01 with the shipped kits: nothing steps inside a scene, and
  * `think` never mutates the state, so the same think repeats. Champions 0 and 3 are dead unless
- * a scene needs them; the bot is `id`, on a normal tier (reaction delay 15, cast delay 8).
+ * a scene needs them; the bot is `id`, on a normal tier (reaction delay 15, cast delay 8) with
+ * seed 5 unless the scene gives another.
  */
 function scene(
   name: string,
@@ -288,10 +310,11 @@ function scene(
   moves: boolean,
   arrange: (state: GameState, bot: Bot) => void,
   config: MatchConfig = configMirror(),
+  seed = 5,
 ): Scene {
   const state = createMatch(config, arena01, 1, rosterKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
-  const bot = createBot(id, 'normal', 5);
+  const bot = createBot(id, 'normal', seed);
   arrange(state, bot);
   return { name, state, bot, intent, presses, moves };
 }
@@ -480,7 +503,37 @@ function buildScenes(): Scene[] {
       },
       configLumeth(),
     ),
+    // A dodge: Quillon 8 m from Hargrim on a clear lane, every slot on cooldown, so she stands and
+    // presses nothing, and two bolts of the Hargrim's team aimed at her, one flying along an axis
+    // (vy 0) and one on a diagonal: the threat scan of both on every think, their memo entries,
+    // and the sidestep with its cell and segment tests, which moves her on every think. Seed 5:
+    // the first coin is a no and the second a yes, so the second bolt is the one she steps from.
+    scene(
+      'dodge',
+      1,
+      'engage',
+      false,
+      true,
+      (state) => {
+        arrangeDodge(state);
+      },
+      configMirror(),
+      5,
+    ),
   ];
+}
+
+/**
+ * The dodge scenes: Quillon at (-4, -3) standing 8 m from the enemy Hargrim at (4, -3), and two of
+ * his bolts that hit her standing still: A along the lane from the east (velocity (-20, 0), hits in
+ * sweep 19) and B on a diagonal from (-7, 0) (velocity (14.1, -14.1), hits in sweep 11).
+ */
+function arrangeDodge(state: GameState): void {
+  put(state, 1, -4, -3);
+  put(state, 2, 4, -3);
+  ch(state, 1).cooldowns.fill(100);
+  spawnBolt(state, { from: [3, -3], dir: [-1, 0] });
+  spawnBolt(state, { from: [-7, 0], dir: [1, -1] });
 }
 
 /** The Lumeth heal scenes: Lumeth at (-8, -3), her ally Hargrim at (-1, -3) missing 60, M2 ready. */
@@ -701,6 +754,58 @@ describe('think allocation', () => {
       Math.min(...figures),
       `lowest round of the median bytes per block of ${AIM_ERROR_HOLD} thinks: ${figures.map(Math.round).join(', ')}`,
     ).toBeLessThan(DRAW_BLOCK_MAGLEV_LIMIT_BYTES);
+  });
+
+  // The dodge draw: a projectile's coin is drawn once, castDelay thinks after the bot first predicts
+  // its hit, so the dodge scene (whose bolts stay the same) reads it in no measured think. A block of
+  // castDelay + 1 thinks, with the two bolts renumbered at its start, holds exactly one coin for each
+  // of them, wherever the block starts, so the median over blocks reads the draw. Run in Maglev alone
+  // for the reason of the draw block above.
+  it.runIf(MAGLEV)('allocates nothing in a block of thinks with a dodge coin for each of two bolts', () => {
+    const s = scene(
+      'dodge draw',
+      1,
+      'engage',
+      false,
+      true,
+      (state) => {
+        arrangeDodge(state);
+      },
+      configMirror(),
+      5,
+    );
+    const length = TIERS.normal.castDelay + 1;
+    let nextId = 1000;
+    const renumber = (): void => {
+      for (let k = 0; k < s.state.projectiles.length; k++) {
+        (s.state.projectiles[k] as { id: number }).id = nextId++;
+      }
+    };
+    for (let i = 0; i < WARM_UP / length; i++) {
+      renumber();
+      for (let k = 0; k < length; k++) s.bot.think(s.state);
+    }
+    const figures: number[] = [];
+    let moves = 0;
+    for (let round = 0; round < ROUNDS; round++) {
+      for (let i = 0; i < WINDOW; i++) {
+        renumber();
+        const before = heap();
+        for (let k = 0; k < length; k++) {
+          const input = s.bot.think(s.state);
+          if (input.moveX !== 0 || input.moveY !== 0) moves++;
+        }
+        deltas[i] = heap() - before;
+      }
+      figures.push(median(deltas, WINDOW) - emptyPairMedian());
+    }
+    console.log(`think allocation, a block of ${length} thinks with a dodge coin per bolt: ${figures.map((f) => Math.round(f)).join(', ')} B per block, ${moves} moving thinks`);
+    // The scene reaches the step: the block's last think is a dodge when a coin was a yes.
+    expect(moves, 'moving thinks').toBeGreaterThan(0);
+    expect(
+      Math.min(...figures),
+      `lowest round of the median bytes per block of ${length} thinks: ${figures.map(Math.round).join(', ')}`,
+    ).toBeLessThan(DODGE_BLOCK_MAGLEV_LIMIT_BYTES);
   });
 
   // The first aim of -0: after a warm-up on whole-centimetre aims, a point in [-0.5, 0) cm rounds
