@@ -1,5 +1,14 @@
-import { Button, SLOTS, createMatch } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, KitDef, MatchConfig, Slot } from '@claudeline/sim';
+import { Button, SLOTS, cloneState, createMatch, debug, step } from '@claudeline/sim';
+import type {
+  ArenaDef,
+  ChampionState,
+  Effect,
+  GameState,
+  KitDef,
+  MatchConfig,
+  ProjectileState,
+  Slot,
+} from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
@@ -143,6 +152,74 @@ export function walks(state: GameState, tier: Difficulty = 'hard', seed = 1, thi
   for (let i = 0; i < thinks; i++) {
     const input = bot.think(state);
     moving = input.moveX !== 0 || input.moveY !== 0;
+  }
+  return moving;
+}
+
+/** A bolt for the dodge pins. Defaults: speed 20 m/s, radius 0.3 m, 120 sweeps, owner 2 (the enemy). */
+export interface BoltOptions {
+  from: readonly [number, number];
+  /** The direction of flight; the sim normalizes it. */
+  dir: readonly [number, number];
+  speed?: number;
+  radius?: number;
+  /** The lifetime the sim spawns it with, in sweeps. */
+  lifetime?: number;
+  owner?: number;
+  pierce?: boolean;
+  effects?: readonly Effect[];
+  /** Makes it an ally bolt, like Lumeth's: with empty `effects` it passes the other team. */
+  allyEffects?: readonly Effect[];
+  /** Sweeps left, set on the projectile after the spawn. */
+  remaining?: number;
+  /** Champions it has hit already, set after the spawn. */
+  hitIds?: readonly number[];
+}
+
+/** Spawns a bolt through the sim's dev tool, so it has the shape of a real one, and returns it. */
+export function spawnBolt(state: GameState, options: BoltOptions): ProjectileState {
+  const id = debug.spawnProjectile(state, {
+    ownerId: options.owner ?? 2,
+    x: options.from[0],
+    y: options.from[1],
+    dirX: options.dir[0],
+    dirY: options.dir[1],
+    speed: options.speed ?? 20,
+    radius: options.radius ?? 0.3,
+    lifetimeTicks: options.lifetime ?? 120,
+    pierce: options.pierce ?? false,
+    effects: options.effects ?? [{ type: 'damage', amount: 10 }],
+    ...(options.allyEffects !== undefined ? { allyEffects: options.allyEffects } : {}),
+  });
+  const bolt = state.projectiles.find((p) => p.id === id) as ProjectileState;
+  if (options.remaining !== undefined) bolt.remainingTicks = options.remaining;
+  for (const hit of options.hitIds ?? []) bolt.hitIds.push(hit);
+  return bolt;
+}
+
+/**
+ * The sweep, counted from the next step, in which champion 0 standing still is hit by projectile
+ * `id`, from the sim itself, or null when it is not hit within `within` steps. The oracle of the
+ * dodge pins: the bot's own prediction is never used to set up a scene.
+ */
+export function sweepOfHit(state: GameState, id: number, within = 300): number | null {
+  const clone = cloneState(state);
+  for (let k = 1; k <= within; k++) {
+    step(clone, []);
+    if (clone.events.some((e) => e.type === 'projectileHit' && e.projectileId === id && e.targetId === 0)) {
+      return k;
+    }
+  }
+  return null;
+}
+
+/** Per think of a bot of champion 0 on the frozen state, whether it moves. */
+export function moveTrace(state: GameState, tier: Difficulty, seed: number, thinks: number): boolean[] {
+  const bot = createBot(0, tier, seed);
+  const moving: boolean[] = [];
+  for (let i = 0; i < thinks; i++) {
+    const input = bot.think(state);
+    moving.push(input.moveX !== 0 || input.moveY !== 0);
   }
   return moving;
 }
