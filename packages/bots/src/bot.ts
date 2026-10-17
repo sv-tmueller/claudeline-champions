@@ -391,8 +391,8 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
    * argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite tests
    * are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8 14.6
    * (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation a
-   * think; Node 22's V8 12.4 does not reproduce that. No committed test checks it again (see
-   * bots.md, Allocation, In the browser).
+   * think; Node 22's V8 12.4 does not reproduce that. The `bots-heap-maglev` project of
+   * vitest.heap.config.ts checks it (allocation.test.ts; see bots.md, Allocation, In the browser).
    */
   function aim(
     me: ChampionState,
@@ -405,7 +405,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       // the two over thousands of thinks): `next` runs once in 15 thinks, so V8 never optimised
       // it, and in the interpreter its double result and every int32 above the Smi range boxed
       // (about 30 B a draw). Written out here it runs in the compiled code of `aim`.
-      const state = (rngState[0] as number + 0x6d2b79f5) >>> 0;
+      const state = ((rngState[0] as number) + 0x6d2b79f5) >>> 0;
       rngState[0] = state;
       let t = state;
       t = Math.imul(t ^ (t >>> 15), t | 1);
