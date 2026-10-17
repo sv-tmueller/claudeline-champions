@@ -600,15 +600,14 @@ neither is tier timing:
 - The Maglev tier. In a traced run `aim`, `updateRuns`, `computeCues`,
   `clearShotWith`, `steerTowardInto` and `hypot2` were in Maglev, V8's middle
   tier, at tick 3029 and none of them was deoptimized or compiled again inside
-  the windows. In the engines measured (the Chromium of Playwright 1.63, and
-  V8 14.6 on Node 26) Maglev does not inline a call with a double argument or
-  result, and calls `Number.isFinite` with its argument boxed: one 16 B box
-  per call. Node 22's V8 12.4 does not reproduce it (`--maglev --no-turbofan`
-  reads tens of KB a think before and after alike); Node 26's does, and the
-  heap check runs it there since #108 (see Testing). That was `bot.ts:aim` at
-  1.2 KB a window (a
-  `Number.isFinite` per think, and the `aimU` store), the distance of
-  `steerTowardInto` with the finite test of `cellIndexAt` at about 5 KB
+  the windows. In the engines measured (the Chromium of Playwright 1.63, and V8
+  14.6 on Node 26) Maglev does not inline a call with a double argument or
+  result, and calls `Number.isFinite` with its argument boxed: one 16 B box per
+  call. Node 22's V8 12.4 does not reproduce it (`--maglev --no-turbofan` reads
+  tens of KB a think before and after alike); Node 26's does, and the heap
+  check runs it there since #108 (see Testing). That was `bot.ts:aim` at 1.2 KB
+  a window (a `Number.isFinite` per think, and the `aimU` store), the distance
+  of `steerTowardInto` with the finite test of `cellIndexAt` at about 5 KB
   together, and `clearShotWith` with `needsPlan` at about 1.5 KB. The finite
   tests are `x - x === 0` now, the distances go through `distanceInto`, and
   `segmentClear` has `hypot2` written out. The same scenes run Maglev-only
@@ -729,7 +728,7 @@ on the head of #108 (3 attempts): `rng.ts:next` absent from every window and
 `aim` at 0 B.
 
 `bot.ts:move` in the sandbox. The sandbox scene (`combat.spec.ts`, whose one
-bot has thought 180 to 330 times by its windows) reads 588 to 864 B a window in
+bot has thought 180 to 330 times by its windows) reads 588 to 912 B a window in
 `bot.ts:move` and in no other bots function: 15 windows of 3 attempts, 7 to 10
 B a think of the 90 in a window. The live scene reads 0 B there: round 3
 (windows 4 to 8) and round 4 (4 lead windows and 5 measured ones after round 3
@@ -740,9 +739,9 @@ Maglev and compiles them, deoptimizes none of them, and never compiles `move`
 on its own (it is inlined into a caller or stays in a lower tier; the trace
 does not say which). The cause is not found: no scene of the heap check reads a
 byte in `move` (0 B in all 16 scenes, in Maglev alone as in the default tiers),
-so it is a state of the first few hundred thinks that a long run does not have,
-and nothing in `move` or in follow.ts changed. The sandbox figure stays
-unasserted.
+so it is consistent with a state of the first few hundred thinks that a long
+run does not have, and nothing in `move` or in follow.ts changed. The sandbox
+figure stays unasserted.
 
 The Chromium question: does the push-grown `splitPath` with the spread fallback
 (`follow.ts` of 3333cb5^, the control) cost more in the browser than the array
@@ -752,8 +751,7 @@ of 2734 and 2684 B a window in `follow.ts:splitPath` on main against 3099 and
 and a bots median window of 6104 to 6616 B on main against 6464 to 7028 B on
 the control. So the final-length array saves about 370 B a window in
 `splitPath` (14 percent of it) and about 0.3 KB of a 6.5 KB median window (4
-percent) in Chromium, a good deal less than the 620 B a fallback plan it saves
-on Node 26. No code follows.
+percent) in Chromium. No code follows.
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks), it runs frozen states (one kit, one cast state, so no
@@ -1096,19 +1094,19 @@ just before each think (a call of `process.memoryUsage()` allocates its result
 object, 144 B in a tier that does not optimise it away, and a pair read in
 another function sat in another tier and moved a scene by 144 B on Node 24),
 and the lowest of three rounds of every scene must be under a literal bound,
-128 B per think. The think
-before the rewrite (b09b437) read 4 to 56 KB per think; the current think reads
-0 B, and the bound sits between the two. The test also reads the sim's baseline
-step against the floor of the sim's own check, which proves the counter moves,
-and it checks that `think` leaves the checksum alone and that every scene stayed
-in its intent. It gates on the native runner and not on the Linux container
-(batch #53 decision 12). Differential tests keep the allocation-free forms
-honest: `hypot2` and `distanceInto` against `Math.hypot`, `lineOfSight` against
-the sim's `hasLineOfSight`, and `segmentClear` against a copy of the
-implementation before the rewrite and against the sampled clearance oracle. The
-test helpers copy every input a bot returns, and a guard counts one distinct
-record per bot per tick, since a stream of aliases would compare a few objects
-with themselves.
+128 B per think. The think before the rewrite (b09b437) read 4 to 56 KB per
+think; the current think reads 0 B, and the bound sits between the two. The
+test also reads the sim's baseline step against the floor of the sim's own
+check, which proves the counter moves, and it checks that `think` leaves the
+checksum alone and that every scene stayed in its intent. It gates on the
+native runner and not on the Linux container (batch #53 decision 12).
+Differential tests keep the allocation-free forms honest: `hypot2` and
+`distanceInto` against `Math.hypot`, `lineOfSight` against the sim's
+`hasLineOfSight`, and `segmentClear` against a copy of the implementation
+before the rewrite and against the sampled clearance oracle. The test helpers
+copy every input a bot returns, and a guard counts one distinct record per bot
+per tick, since a stream of aliases would compare a few objects with
+themselves.
 
 A plan check in the same file reads the median `heapUsed` delta around one plan
 step of the path follower, `followPathInto` on a fresh follower (the search, the
@@ -1154,19 +1152,28 @@ think on Node 26, so it takes the distance as a measure.
 The same file runs in a second project, `bots-heap-maglev` of
 `vitest.heap.config.ts`, on Node 26.7 (V8 14.6) with `--maglev --no-turbofan
 --no-concurrent-recompilation --no-use-osr`: Maglev alone, the tier a browser
-match runs the bots in. The last two flags keep the figures from depending on
-when V8 compiles a function and when it replaces a loop of the test on the
-stack: on a loaded host the draw block below read 480 B and a -0 pin 32 B in
-some runs of a clean tree (4 of 18 and 15 of 36 tests, six copies in parallel),
-once in about twenty runs on the runner with the first flag alone, and in none
-of 27 copies with both. The limits are literals of their own: 8 B a think for
-the scenes (they read 0 B; the smallest mutation is one 16 B box a think), and
-2900 B clear and 2500 B fallback for the plan step (clean 2784 B and 2400 to
-2416 B: Maglev allocates a little more for a fallback plan than the default
-tiers do). A guard fails with the flags a worker lacks, or a V8 below 14, and a
-control, a loop of `hypot2` calls whose result goes into a Float64Array, must
-read at least 16 B a call (it reads 40 B), so a run that reads 0 B has not lost
-its tier.
+match runs the bots in. The last two flags switch off background compilation
+and on-stack replacement (OSR), which the browser keeps on, so the check
+measures what Maglev's code boxes and not how the browser tiers the bots up:
+that is the live probe's job (the Allocation section has
+`--no-concurrent-recompilation` moving which functions box in the browser).
+They are there because the figures otherwise depended on when V8 compiles a
+function and when it replaces a loop of the test on the stack: on a loaded host
+the draw block below read 480 B and a -0 pin 32 B in some runs of a clean tree
+(4 of 18 and 15 of 36 tests, six copies in parallel), and once in about twenty
+runs on the runner with the first flag alone. With both flags none of 27 copies
+read it locally, and the final head's job was green in 5 of 5 runs on the
+runner. That timing is the likely cause and not a proven one: Rosetta and
+Docker did not reproduce the runner, and a hardware difference is not excluded.
+The limits are literals of their own: 8 B a think for the scenes (they read 0
+B; the smallest mutation is one 16 B box a think), and 2900 B clear and 2500 B
+fallback for the plan step (clean 2784 B and 2400 to 2416 B: Maglev allocates a
+little more for a fallback plan than the default tiers do). A guard fails with
+the flags a worker lacks, or a V8 below 14, and a control, a loop of `hypot2`
+calls whose result goes into a Float64Array, must read at least 16 B a call (it
+reads 40 B), so a run that reads 0 B has not lost its tier. The project needs
+Node 26: on Node 22 the whole config is red by design (the guard and the Maglev
+checks fail on V8 12.4), and the Node 22 command is `--project bots-heap`.
 
 The draw block reads the press scene in blocks of 15 thinks, one aim draw each,
 the median of 600 blocks, since the per-think median hides the draw: 16 to 32 B
@@ -1186,7 +1193,7 @@ The CI runs the file in its own job: Node 26.7.0 (pinned: a bump means
 measuring again) with both projects, and Node 24 with the default tier; Node 22
 keeps the check in the unit job. On the runner (an AMD EPYC 7763) Node 26.7.0
 reads 0 B in all 16 scenes in both projects, the plan step 2784 B clear and
-2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2412 B in
+2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2416 B in
 Maglev alone, the control 40 B a call and the block and both pins 0 B; Node 24
 reads 0 B in all 16 scenes and 2832 B clear and 2080 to 2084 B fallback for the
 plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
