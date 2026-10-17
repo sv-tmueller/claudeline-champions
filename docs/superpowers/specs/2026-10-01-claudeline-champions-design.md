@@ -80,14 +80,17 @@ Amended 2026-10-17 by [batch #134 decision 1](https://github.com/sv-tmueller/cla
 - `protocol` holds the message types, `PROTOCOL_VERSION` and pure JSON encode
   and decode with validation. It has no I/O, no transport and no game logic.
   It imports relative paths and `@claudeline/sim` only. It has the host bans
-  of `sim` (no `window`, `document`, `fetch`, `Date`, `performance`,
-  `Math.random`, no Node built-ins and no dynamic `import()`) but not its math
-  ban. Its tsconfig has `lib: ["ES2023"]` and `types: []`.
+  of `sim`: the globals `Date`, `performance`, `setTimeout`, `setInterval`,
+  `window`, `document` and `fetch`, the properties `Math.random`, `Date.now`
+  and `performance.now`, no Node built-ins, and no dynamic `import()` or
+  `import()` types. It does not have sim's math ban. Its tsconfig has
+  `lib: ["ES2023"]`, `types: []` and `erasableSyntaxOnly`.
 - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with
   Node globals. It never imports `client`, and it may read the wall clock.
 - `client` imports `sim`, `bots` and `protocol`, replacing "`client` imports
   `sim` and `bots`" above. It never imports `server`, and a lint deny rule
-  names that: the client has no import rule today.
+  names that, for static and dynamic imports: the client has no import rule
+  today.
 - `sim` and `bots` are unchanged.
 
 ### 3.3 Data flow
