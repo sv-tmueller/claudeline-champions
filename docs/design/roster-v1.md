@@ -194,7 +194,7 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 | M2 | Throwing Knife: `projectile`, `applyStatus` | 12 damage | 10 m | 24 m/s / 0.2 m | 3 s | 0.1 s, free | slow 20 percent for 1.0 s |
 | SPACE | Lunge: `dash` (6 m in 0.2 s), `applyStatus` | none | 6 m | n/a | 6 s | 0, free | haste 20 percent for 1.5 s on self |
 | Q | Quiet Dart: `projectile`, `applyStatus` | 8 damage | 11 m | 20 m/s / 0.3 m | 12 s | 0.2 s, free | silence 1.5 s |
-| E | Rend: `meleeArc` (90 degree arc, `cosHalfAngle` 0.7071067812), `applyStatus` | 20 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
+| E | Rend: `meleeArc` (90 degree arc, `cosHalfAngle` 0.7071067812), `applyStatus` | 14 damage, plus 16 damage over time in total | 2.5 m | n/a | 7 s | 0.25 s, slowed | damage over time for 2.0 s (4 per tick) |
 | R | Vanish Step: `teleport` (up to 5 m toward the aim point), `applyStatus` | none | 5 m | n/a | 16 s | 0, free | invulnerable 0.5 s on self |
 | F | Reaper's Dance (ultimate): `teleport` (up to 8 m toward the aim point), `meleeArc` (360 degrees, `cosHalfAngle` -1, swung where the teleport lands), `applyStatus` | 40 damage | 8 m teleport, 2.5 m arc | n/a | 10 s | 0.3 s, locked | stun 0.5 s and silence 2.0 s, both applied on hit, so the silence outlasts the stun |
 
@@ -203,12 +203,12 @@ Max health 130 sits inside the spec range of 120 to 160. It is a mixed-role valu
 | Slot | What changes against the base ability |
 |------|----------------------------------------|
 | SPACE | Lunge EX: dash distance 6 m becomes 8 m. At the dash end an extra `meleeArc` (90 degrees, `cosHalfAngle` 0.7071067812, 2.0 m) deals 14 damage. Haste on self becomes 30 percent for 2.0 s. |
-| E | Rend EX: direct damage 20 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
+| E | Rend EX: direct damage 14 becomes 28, and damage over time becomes 24 in total over 2.0 s (6 per tick). |
 
 **Intended counters.**
 
 - Beats Quillon. Lunge closes 6 m, Quiet Dart silences Skip so she cannot blink away, and Quillon's heavy hits all have a locked windup.
-- Beats Lumeth. Quiet Dart silences her whole kit, and she has 120 health against a 20 damage Rend with a damage over time on top.
+- Beats Lumeth. Quiet Dart silences her whole kit, and she has 120 health against a 14 damage Rend with a damage over time on top.
 - Loses to Hargrim. Iron Hide soaks the first burst, Ground Slam slows the retreat, and 160 health outlasts her. Vanish Step gives only 0.5 s every 16 s.
 
 **Bot profile sketch.**

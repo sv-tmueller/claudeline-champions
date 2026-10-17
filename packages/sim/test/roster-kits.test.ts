@@ -916,16 +916,16 @@ describe('Skerrow', () => {
     rig.clean();
   });
 
-  it('E Rend does 20 damage, then four pulses of 4 over 120 ticks', () => {
+  it('E Rend does 14 damage, then four pulses of 4 over 120 ticks', () => {
     const rig = new Rig(skerrow, { 2: [X0 + 2, 0] });
     rig.run(15 + 125, press('E'));
     expect(rig.events('meleeArc').map(({ step, e }) => [step, e.radius, e.cosHalfAngle, e.targetIds])).toEqual([[15, 2.5, 0.7071067812, [2]]]);
     expect(rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health])).toEqual([
-      [2, 20, 110],
-      [2, 4, 106],
-      [2, 4, 102],
-      [2, 4, 98],
-      [2, 4, 94],
+      [2, 14, 116],
+      [2, 4, 112],
+      [2, 4, 108],
+      [2, 4, 104],
+      [2, 4, 100],
     ]);
     expect(rig.applied()).toEqual([[2, 'dot', 120]]);
     expect(rig.statuses(2)).toEqual([]);
