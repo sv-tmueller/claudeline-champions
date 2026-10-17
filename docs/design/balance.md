@@ -69,10 +69,10 @@ Sources:
   (Quillon v Skerrow, 3v3 on arena01, with the fill [lumeth, hargrim], seed 6);
   every other match ended before tick 26 000 (the longest took 25 954). That
   one is a bot stall, not a kit effect: from tick 7521 the two surviving
-  Hargrims stand still about 2.14 m apart (on the final kits; 2.13 m on the
-  baseline's) inside the end ring with no button pressed, and round 1 never
-  ends. It is issue #123, a bots fix; the tuning
-  pass never chases it with kit numbers.
+  Hargrims stand still 2.14 m apart (the same on the baseline's kits and the
+  final ones) inside the end ring with no button pressed, and round 1 never
+  ends. It is issue #123, a bots fix; the tuning pass never chases it with kit
+  numbers.
 - **Metrics.** Ticks count from the start of the round. Round mean and round
   longest are over the rounds that did not go to sudden death. Sudden-death
   rounds are shown as a count out of all rounds of the cell. First hit mean is
@@ -349,8 +349,9 @@ reached its cap of 4 kept changes or 10 runs, since every candidate screened on
 the way (at 40 seeds) either failed a check or moved nothing the rule could
 use. The fixture coverage and allocation.test.ts were run on a candidate before
 its full run only from some point on: Skerrow runs 3 and 6 and Lumeth run 2 were
-checked after theirs, and each of the three fails the coverage. Every other
-candidate with a full run passes both, and run 7 was checked first and fails.
+checked after theirs, and each of the three fails the coverage. Run 7 was
+checked first and fails as well; every remaining candidate with a full run
+passes both.
 
 | Champion | Number | Old to new | Run | Why dropped |
 |----------|--------|------------|-----|-------------|
