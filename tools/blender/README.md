@@ -36,6 +36,7 @@ newer and no packages, so they can run in CI.
 | `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
+| `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json`: the five materials, the floor field and trim border, one trim disc per spawn, the chamfered obstacle tops and the wall caps. Standard library only, no Blender |
 | `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names, a champion's rig and clips and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator, one rejection per rig and clip rule against a synthetic rigged document, and a drift test between the two tables in `assets.md` and the validator's constants. The committed-model tests need `assets/models` to exist |
@@ -73,16 +74,27 @@ not vertical.
 ### Arena
 
 - `Floor` covers exactly `size.width` by `size.height`, 0.2 m thick, with its
-  top at z = 0.
+  slab top at z = 0. It is a floor-coloured field inside a 1 m trim border,
+  a 3 by 3 grid of boxes sharing whole edges: x cuts at -15, -14, 14 and 15,
+  y cuts at -10, -9, 9 and 10, the centre cell `floor` and the other eight
+  `trim`.
+- One trim disc marks each spawn, part of the `Floor` mesh and not a node:
+  0.6 m in radius, 0.01 m above the slab top, wholly on the field.
 - The walls are 0.5 m thick and 1.0 m high. They sit outside the playable
-  area, with their inner faces on x = +-15 and y = +-10 for both arenas.
+  area, with their inner faces on x = +-15 and y = +-10 for both arenas. Each
+  is a `wall` box up to 0.9 m and a `trim` cap from 0.9 m to 1.0 m in the same
+  mesh, with the long top edges of the cap chamfered by 0.05 m.
 - `Wall_N` is at +y and `Wall_E` is at +x. `Wall_N` and `Wall_S` are longer by
   two wall thicknesses (31 m for both arenas) so the corners close.
 - Node names are exactly `Floor`, `Wall_N`, `Wall_S`, `Wall_E`, `Wall_W` and
   `Obstacle_0` to `Obstacle_<n-1>`, matching the obstacle order in the JSON.
-- Four flat materials: floor, wall, blocking obstacle (brown) and
+- Five flat materials: floor, trim, wall, blocking obstacle (brown) and
   non-blocking obstacle (blue), so a viewer can see which obstacles stop
-  projectiles.
+  projectiles. The top edge of every obstacle is chamfered by 0.08 m, with
+  its footprint, height and origin unchanged.
+- The discs and the caps are geometry inside the existing meshes, so the node
+  set and the validator are unchanged. `test_arena_models.py` checks them from
+  the vertex data.
 - The visuals come from the same JSON as the collision. The validator checks
   that each `Obstacle_i` translation is `(x_i, 0, -y_i)` within 1e-4, and a
   missing translation counts as zero. A translation that is present must be
@@ -138,9 +150,23 @@ The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
 checked by `test_champion_models.py`. No body has a blue channel more than 45
 above its green channel in 8-bit sRGB, so nothing reads as the magenta debug
 overlay. Each roster body is at least 80 away, as an RGB distance, from the
-other roster bodies, the placeholder body, the accent, the arena floor and
-the colours the client draws near a champion (bars, projectiles, impact ring,
-hit flash, dead grey and the magenta debug overlay `#ff00ff`).
+other roster bodies, the placeholder body, the accent, the floor and the trim
+of both arenas and the colours the client draws near a champion (bars,
+projectiles, impact ring, hit flash, dead grey and the magenta debug overlay
+`#ff00ff`).
+
+The arena floor (0.30, 0.32, 0.36), about `#9599a2`, and trim
+(0.50, 0.45, 0.30), about `#bcb395`, follow a surface rule in the same test.
+Each is at least 80 from every colour the client draws and from the accent,
+and no arena material has a blue channel more than 45 above its green. The
+placeholder body is left out of this rule, because the floor was never held
+to it (48.5 away). The trim is 48.6 from the floor on purpose, so the floor
+reads as one two-tone surface, and nothing compares the two.
+
+Two colours are reserved for champions five and six, Ondrel (0.03, 0.30, 0.03)
+and Brimwick (0.72, 0.19, 0.00), as `RESERVED_BODIES` in the same test. They
+obey the two body rules against the same set before their models exist, and
+move into the roster list when the models land.
 
 ## Validator
 

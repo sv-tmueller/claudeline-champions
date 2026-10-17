@@ -45,14 +45,33 @@ The commands and file list are in `tools/blender/README.md`.
 ### Arena model
 
 - `Floor` covers exactly `size.width` by `size.height`, 0.2 m thick, with its
-  top at z = 0.
+  slab top at z = 0. It is a floor-coloured field inside a 1 m trim border,
+  cut as a 3 by 3 grid of boxes that share whole edges. The cuts are at
+  x = -15, -14, 14, 15 and y = -10, -9, 9, 10 for both arenas. The centre
+  cell is `floor` and the other eight are `trim`.
+- One trim disc marks each spawn, teamA then teamB in JSON order. It is part
+  of the `Floor` mesh, not a node: 0.6 m in radius, 32 segments, standing
+  0.01 m above the slab top and wholly on the field (the generator asserts
+  it). The client draws its overlay at 0.02 m, area views at 0.03 m and
+  impact rings at 0.04 m, so every one of them stays above a disc.
 - The walls are 0.5 m thick and 1.0 m high. They sit outside the playable
   area, with their inner faces on the edge of the rectangle (x = +-15 and
-  y = +-10 for arena 1).
+  y = +-10 for arena 1). Each wall is a `wall` box up to 0.9 m and a `trim`
+  cap from 0.9 m to 1.0 m with the same footprint, in the same mesh. The
+  cap's two long top edges are chamfered by 0.05 m and its ends are square,
+  so the wall is still 1.0 m high.
 - `Wall_N` is at +y and `Wall_E` is at +x. `Wall_N` and `Wall_S` are longer by
   two wall thicknesses (31 m for arena 1) so the corners close.
 - Obstacle models use a different flat material for blocking and non-blocking
-  obstacles, so a viewer can see which obstacles stop projectiles.
+  obstacles, so a viewer can see which obstacles stop projectiles. The top
+  edge of each is chamfered by 0.08 m, in height and inwards, from explicit
+  vertices. The footprint, the height and the origin are unchanged.
+- The node set does not change: the discs and the caps are geometry inside
+  the existing meshes with the `trim` material, so `validate_glb.py` and
+  [Node naming](#node-naming) stay as they are. `test_arena_models.py` checks
+  the discs against the JSON spawns, the chamfers and the caps from the
+  vertex data.
+- Five flat materials: `floor`, `trim`, `wall`, `blocking` and `open`.
 - The visuals come from the same JSON as the collision.
 - Both arenas, `arena01` and `arena02`, have a committed glb and a case in
   `test_export_determinism.py`, and `ArenaCoverageTests` fails if an arena glb,
