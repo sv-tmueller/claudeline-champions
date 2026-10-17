@@ -73,9 +73,9 @@ Sources:
   every other match ended before tick 26 000 (the longest took 25 954). That
   one is a bot stall, not a kit effect: from tick 7521 the two surviving
   Hargrims stand still 2.14 m apart (the same on the baseline's kits and the
-  final ones) inside the end ring with no button pressed, and round 1 never
-  ends. It is issue #123, a bots fix; the tuning pass never chases it with kit
-  numbers.
+  final ones) inside the end ring with no button pressed by either (their last
+  presses are at ticks 448 and 420), and round 1 never ends. It is issue #123, a
+  bots fix; the tuning pass never chases it with kit numbers.
 - **Metrics.** Ticks count from the start of the round. Round mean and round
   longest are over the rounds that did not go to sudden death. Sudden-death
   rounds are shown as a count out of all rounds of the cell. First hit mean is
@@ -241,7 +241,7 @@ cooldown, 540 to 360 ticks (aimed at 2v2 arena01), turned the no-stall clause
 of lumeth.test.ts red by 3 ticks (a bot stalled 123 ticks against the 120
 allowed, in the 3v3 on arena02). The hook's slow duration, 60 to 120 ticks
 (aimed at 2v2 arena02), and the hook's speed, 20 to 25 m/s, failed the Hargrim
-fixture coverage, and so did Rush's cooldown. Maul Swing's damage, 12 to 16
+fixture coverage. Maul Swing's damage, 12 to 16
 (aimed at 3v3 arena01), left a Quillon stalled for 6003 ticks in the 2v2 of
 lumeth.test.ts on arena02. The one that got a full run, the hook's damage, 14
 to 20 (run H2, aimed at 3v3 arena02), left the target at 1.0 and the sum at
@@ -261,10 +261,12 @@ windup, 18 to 12 ticks (H3), took 3v3 arena01 from 3.5 to 2.5, and Ground
 Slam's slow, 30 to 40 percent (H4), took 3v3 arena02 from 6.5 to 4.5. Quillon's
 Hush Ward absorb, 30 to 20 (Q1), left 2v2 arena01 at 0.0. Each raised the
 summed distance, by 9.5 to 27.0 points, and three of the five took cells out of
-the band. Bind Shot's slow (40 to 30 percent, and 90 to 60 ticks) and Snare
-Orb's cooldown (720 to 960 ticks), the other candidates aimed at these cells,
-failed the Quillon fixture coverage. Limits that may account: nobody dodges, so
-Hargrim may walk into bolts, and Rally Cry, his haste, is never pressed.
+the band. Rush's cooldown, 420 to 300 ticks (aimed at 2v2 arena01), failed the
+Hargrim fixture coverage, and Bind Shot's slow (40 to 30 percent, and 90 to 60
+ticks) and Snare Orb's cooldown (720 to 960 ticks), the other candidates aimed
+at these cells, failed the Quillon fixture coverage. Limits that may account:
+nobody dodges, so Hargrim may walk into bolts, and Rally Cry, his haste, is
+never pressed.
 
 ### 5.4 Lumeth v Skerrow (four cells, accepted)
 
@@ -337,31 +339,37 @@ to 12.1 m (aimed at 2v2), which the bot kites to, and its cooldown, 30 to 36
 ticks (aimed at 3v3). Neither got a full run: the reach turned the no-stall
 clause of lumeth.test.ts red (a bot stalled 3392 ticks in engage in the 3v3 on
 arena01), and the cooldown failed the fixture coverage and the pinned 3v3
-ultimate run. The Quillon numbers that did get a full run moved arena01 and
-not arena02: Hush Ward's absorb (Q1) took 3v3 arena01 from 58.5 to 61.5, out of
-the band, and Lance's damage (Q2) took it to 65.0 and 2v2 arena01 from 65.5 to
-71.0, both with the arena02 cells inside 3 points. The two arena02 cells are
-accepted: no number moved them within the rule, and the layout and the limits
-of the bots may account. Limits that may account: her heals and shields are
-pressed only at an ally that needs them and count the instant heal only, the EX
-variants of Soothing Surge and Aegis Veil are never pressed, and she has no 8 m
-leash.
+ultimate run. The Quillon numbers that did get a full run moved both arenas.
+Hush Ward's absorb (Q1) took 3v3 arena01 from 58.5 to 61.5, out of the band, and
+the arena02 cells from 15.0 to 13.0 (2v2) and from 17.5 to 18.0 (3v3). Lance's
+damage (Q2) took 3v3 arena01 to 65.0 and 2v2 arena01 from 65.5 to 71.0, and the
+arena02 cells from 15.0 to 15.5 (2v2) and from 17.5 to 21.5 (3v3), a move of
+4.0 toward the band that is inside the noise and left the cell 18.5 under it.
+The two arena02 cells are accepted: no number moved them within the rule, and
+the layout and the limits of the bots may account. Limits that may account: her
+heals and shields are pressed only at an ally that needs them and count the
+instant heal only, the EX variants of Soothing Surge and Aegis Veil are never
+pressed, and she has no 8 m leash.
 
 ### 5.8 The budget hit
 
 One match of the 4800 did not end: quillon v skerrow, 3v3, arena01, with
 [lumeth, hargrim], seed 6. Replayed through `playMatch` on the final kits (the
 same on #124's head, which changed no kit) it is the stall of issue #123: from
-tick 7521 the two surviving Hargrims stand 2.14 m apart with no button pressed
-since tick 7465 and no cast, so round 1 never ends. It is a bot stall and not a
-kit effect, and no kit number was chased for it. The longest match that did end
-took 25 954 ticks.
+tick 7521 the two surviving Hargrims stand 2.14 m apart. Counted over all six
+champions, no button was pressed after tick 7465 (the last press was a
+Quillon's); counted over the two Hargrims, their last presses are at ticks 448
+and 420. No cast follows, so round 1 never ends.
+It is a bot stall and not a kit effect, and no kit number was chased for it.
+The longest match that did end took 25 954 ticks.
 
 One dropped run of #124 had more: Chain Hook's windup, 18 to 12 ticks (run H3),
 gave 8 budget hits in the same cell (seeds 34, 42, 72, 80, 82, 88, 90 and 98).
-Each replayed to tick 20 000 is the same stall: two Hargrims 1.0 to 2.1 m apart
-with no button pressed since tick 406 to 838, in round 1. The candidate was
-dropped by the rule, so the report has the one hit.
+Each replayed to tick 20 000 is the same stall, counted over the two Hargrims:
+both are alive in round 1, 1.0 to 2.1 m apart, and their last presses fall at
+ticks 406 to 838 (the Lumeths on both teams press until about tick 8080, so
+counted over all six champions the last press is later than in seed 6). The
+candidate was dropped by the rule, so the report has the one hit.
 
 ## 6. Changes made
 
@@ -475,21 +483,21 @@ names what the changed kit's replay no longer shows, as in
 roster-fixtures.test.ts; the search that found the committed fixtures is not in
 the repository, so a miss ends a candidate):
 
-| Champion | Number | Old to new | The red pre-check |
-|----------|--------|------------|-------------------|
-| Quillon | Skip (SPACE) cooldown | 540 to 720 | Fixture coverage: no energyGained of Bind Shot EX or of Lance EX. |
-| Quillon | Bind Shot (M2) slow | 40 to 30 percent | Fixture coverage: no energyGained of Lance or of Lance EX. |
-| Quillon | Rod Bolt (M1) reach | lifetime 38 to 33 ticks, 13.93 to 12.1 m | lumeth.test.ts, no-stall clause: a bot stalled 3392 ticks in engage from tick 2650 (3v3, arena01). |
-| Quillon | Rod Bolt (M1) damage | 11 to 9 | lumeth.test.ts, no-stall clause: a bot stalled 706 ticks in idle from tick 4635 (3v3, arena02). |
-| Quillon | Snare Orb (Q) cooldown | 720 to 960 | Fixture coverage: no energyGained of Lance. |
-| Quillon | Rod Bolt (M1) cooldown | 30 to 36 | Fixture coverage (Bind Shot EX, Lance, Lance EX), and the 3v3 ultimate run of headless-kits.test.ts (no F cast). |
-| Quillon | Bind Shot (M2) slow duration | 90 to 60 ticks | Fixture coverage: no energyGained of Bind Shot EX. |
-| Quillon | Lance (E) windup | 36 to 48 ticks | Fixture coverage: no energyGained of Bind Shot EX, Lance or Lance EX. |
-| Hargrim | Chain Hook (E) cooldown | 540 to 360 | lumeth.test.ts, no-stall clause: a bot stalled 123 ticks in retreat against the 120 allowed, from tick 7723 (3v3, arena02). |
-| Hargrim | Chain Hook (E) slow duration | 60 to 120 ticks | Fixture coverage: no energyGained of Rush EX. |
-| Hargrim | Rush (SPACE) cooldown | 420 to 300 | Fixture coverage: no energyGained of Ground Slam EX. |
-| Hargrim | Maul Swing (M1) damage | 12 to 16 | lumeth.test.ts, no-stall clause: a bot stalled 6003 ticks in kite from tick 956 (2v2, arena02). |
-| Hargrim | Chain Hook (E) speed and lifetime | 20 to 25 m/s, 27 to 22 ticks | Fixture coverage: no energyGained of Ground Slam or of Rush EX. |
+| Champion | Number | Old to new | Target cell | The red pre-check |
+|----------|--------|------------|-------------|-------------------|
+| Quillon | Skip (SPACE) cooldown | 540 to 720 | Q v S 2v2 arena01 | Fixture coverage: no energyGained of Bind Shot EX or of Lance EX. |
+| Quillon | Bind Shot (M2) slow | 40 to 30 percent | H v Q 2v2 arena02 | Fixture coverage: no energyGained of Lance or of Lance EX. |
+| Quillon | Rod Bolt (M1) reach | lifetime 38 to 33 ticks, 13.93 to 12.1 m | L v Q 2v2 arena02 | lumeth.test.ts, no-stall clause: a bot stalled 3392 ticks in engage from tick 2650 (3v3, arena01). |
+| Quillon | Rod Bolt (M1) damage | 11 to 9 | Q v S 2v2 arena02 | lumeth.test.ts, no-stall clause: a bot stalled 706 ticks in idle from tick 4635 (3v3, arena02). |
+| Quillon | Snare Orb (Q) cooldown | 720 to 960 | H v Q 3v3 arena01 | Fixture coverage: no energyGained of Lance. |
+| Quillon | Rod Bolt (M1) cooldown | 30 to 36 | L v Q 3v3 arena02 | Fixture coverage (Bind Shot EX, Lance, Lance EX), and the 3v3 ultimate run of headless-kits.test.ts (no F cast). |
+| Quillon | Bind Shot (M2) slow duration | 90 to 60 ticks | H v Q 3v3 arena02 | Fixture coverage: no energyGained of Bind Shot EX. |
+| Quillon | Lance (E) windup | 36 to 48 ticks | Q v S 3v3 arena01 | Fixture coverage: no energyGained of Bind Shot EX, Lance or Lance EX. |
+| Hargrim | Chain Hook (E) cooldown | 540 to 360 | H v L 2v2 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 123 ticks in retreat against the 120 allowed, from tick 7723 (3v3, arena02). |
+| Hargrim | Chain Hook (E) slow duration | 60 to 120 ticks | H v L 2v2 arena02 | Fixture coverage: no energyGained of Rush EX. |
+| Hargrim | Rush (SPACE) cooldown | 420 to 300 | H v Q 2v2 arena01 | Fixture coverage: no energyGained of Ground Slam EX. |
+| Hargrim | Maul Swing (M1) damage | 12 to 16 | H v L 3v3 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 6003 ticks in kite from tick 956 (2v2, arena02). |
+| Hargrim | Chain Hook (E) speed and lifetime | 20 to 25 m/s, 27 to 22 ticks | H v L 2v2 arena01 | Fixture coverage: no energyGained of Ground Slam or of Rush EX. |
 
 ## 7. How to regenerate
 
