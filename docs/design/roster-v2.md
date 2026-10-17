@@ -243,3 +243,105 @@ green, linear (0.03, 0.30, 0.03), about `#309530`. In 8-bit sRGB b minus g is
 the scratch run at `ae41fed` are the dead grey `#5a6070` at 93.1, Skerrow at
 101.0 and Quillon at 101.1, so the minimum distance is 93.1, above the 80 the
 test asks for.
+
+## 3. Brimwick, the burst caster
+
+**Fantasy.** Brimwick is a festival pyrotechnist, and every cast of hers is a
+lit fuse. She plants a firecracker, lights the long fuse and waits for the
+bang, and the big ones come late and hit hard. She is a glass cannon: if the
+fuse is cut short, a stun in the middle of a windup, she has nothing left.
+
+**Role and range.** Burst caster. Intended range is 7 to 10 m, and her
+longest shot reaches 12 m. Her damage comes in three beats: a Firecracker of
+16, a Starshell of 26 and a Grand Finale of 55.
+
+**Stats.**
+
+| Stat | Value |
+|------|-------|
+| Max health | 120 |
+| Move speed | 5.5 m/s, no kit modifier |
+| Collision radius | 0.5 m |
+
+**Abilities.**
+
+| Slot | Ability and effects | Amount | Range | Speed / radius | Cooldown | Windup | Statuses applied |
+|------|---------------------|--------|-------|----------------|----------|--------|------------------|
+| M1 | Spark: `projectile` | 10 damage | 11 m | 20 m/s / 0.3 m | 0.6 s | 0.15 s, free | none |
+| M2 | Firecracker: `area` (circle, radius 1.5 m, placed at the aim up to 9 m, one hit) | 16 damage | 9 m to centre | n/a | 5 s | 0.4 s, slowed | none |
+| SPACE | Flare Step: `teleport` (up to 6 m toward the aim point, not fixed) | none | 6 m | n/a | 10 s | 0, free | none |
+| Q | Flash Powder: `projectile`, `applyStatus` | 8 damage | 9 m | 18 m/s / 0.35 m | 12 s | 0.3 s, slowed | stun 0.75 s |
+| E | Starshell: `projectile`, `knockback` (2 m outward in 10 ticks) | 26 damage | 10 m | 12 m/s / 0.6 m | 9 s | 0.7 s, locked | none |
+| R | Smoke Pot: `area` (circle, radius 3.5 m around caster, one hit), `applyStatus` | none | 3.5 m radius | n/a | 14 s | 0, free | slow 40 percent for 1.5 s on enemies in the area, haste 30 percent for 1.5 s on self |
+| F | Grand Finale (ultimate): `projectile`, `applyStatus` | 55 damage | 12 m | 20 m/s / 0.5 m | 10 s | 1.0 s, locked | stun 1.0 s |
+
+Reading the rows. She has no lingering area, so every area of hers is one hit.
+Her biggest hits are projectiles on purpose: a placed area reads the aim on
+the tick it fires and follows its target through the windup, so the Firecracker
+keeps a radius of 1.5 m and is the smallest of her three hits, while Starshell
+(12 m/s, the slowest a projectile may be) and Grand Finale can be walked out
+of. Starshell's knockback pushes along the shell's path from the contact point.
+The stun of Flash Powder is 0.75 s (45 ticks) and that of Grand Finale 1.0 s,
+and both interrupt a windup (rules 2.4). Smoke Pot gives no energy, since it
+has no damage.
+
+**EX variants** (Shift plus slot, 25 energy).
+
+| Slot | What changes against the base ability |
+|------|----------------------------------------|
+| M2 | Firecracker EX: radius 1.5 m becomes 2.0 m, damage 16 becomes 24, and the area also applies slow 30 percent for 1.5 s. |
+| E | Starshell EX: windup 0.7 s becomes 0.4 s, damage 26 becomes 30, and knockback 2 m becomes 3 m. |
+
+**Intended counters.**
+
+- Beats Quillon. Firecracker (16 damage, placed up to 9 m, and areas ignore
+  cover) has a 0.4 s windup, which fits inside Lance's 0.6 s locked windup and
+  inside Sunspear's 0.8 s, and Flash Powder's 0.75 s stun cancels either one
+  (rules 2.4).
+- Beats Lumeth. Flash Powder's 0.75 s stun cancels Dawnbloom (0.6 s windup) or
+  Binding Sigil (0.5 s) with no refund of energy or cooldown, and Grand
+  Finale's 55 goes 25 past the 30 absorb of Aegis Veil.
+- Loses to Hargrim. Iron Hide's 40 absorb soaks Starshell's 26, he has 160
+  health to her 120, and Chain Hook (14 damage, 9 m) pulls her 4 m into Maul
+  Swing and Ground Slam. Smoke Pot's 40 percent slow, once every 14 s, is her
+  one answer.
+- Loses to Skerrow. Quiet Dart silences Flare Step and every other cast for
+  1.5 s from 11 m, and Lunge closes 6 m inside the 0.7 s locked windup of
+  Starshell. Rend does 14 plus 16 over time against 120 health.
+- Loses to Ondrel. A caster in a locked windup stands in the mire: Starshell
+  (0.7 s) and Grand Finale (1.0 s) cannot walk, so Mire's pulses of 8 land
+  and its 30 percent slow holds, Undertow drags her 3 m closer, and Ondrel
+  has 130 health to her 120.
+
+**Bot profile sketch.**
+
+| Field | Value | From the roster |
+|-------|-------|-----------------|
+| `rangeMin` | 7 | The roster's 7 m. A `KIT_RULES` row for `brimwick` with 7, so she kites a target closer than 7 m (batch 13). |
+| `rangeMax` | 10 | Comes from the M1 band: Spark reaches 11 m, minus `RANGE_MARGIN` 1 m, through the `KIT_RULES` row. It equals the roster's 10 m. |
+| `openers` | Q (Flash Powder), `band` null (the kit band less the margin, 8 m), `motion` `'closing'`, `when` null | Stun the target that walks in on her. The rest of her slots have no rule and are pressed on their bands. |
+| `escapes` | SPACE (Flare Step), then R (Smoke Pot) | Teleport away from the target (up to 6 m, `min(range, aim distance)` as it is not fixed), then slow and haste. |
+| `holdF` | true | Grand Finale is held for a target at 55 health or less, the damage of F, or one that is cornered. |
+| `wait` | null | She has no opener to wait for. |
+| `escapeWithin` | null | The common trigger: a retreat with the target inside 6 m, or a kite inside `rangeMin`. |
+| `allies` | empty | No slot of hers acts on an ally. |
+| Finisher (intent, not a profile field) | F (Grand Finale) on a target at 55 health or less, E (EX Starshell with 25 energy, 30 damage) on one at 30 or less | The pattern of roster v1. The bots build no per-slot finisher. |
+
+The bands (kit band less the margin) are M1 10 m, M2 10 m, Q 8 m, E 9 m, R
+3 m and F 11 m, and the band top of Firecracker EX (11.5 m) stays below F's
+(12 m), as the EX bands of Hargrim and Quillon do. An area
+press needs a clear shot of 0.5 m, so bots will not use "behind cover". Flare
+Step has no band, since a teleport reaches nobody, so only the escape rule
+presses it. Every slot is pressed, so no slot is never pressed.
+
+**Model.** Cue: a fuse cap, a box of about 0.22 m by 0.22 m by 0.16 m on top
+of the head, built in the body material and carried by the `Spine` bone like
+Lumeth's halo. It spans 1.66 m to 1.82 m, so the estimated top is 1.82 m, at
+most 1.90 m, and the footprint stays inside 0.5 m. It sits from x -0.13 m to
+0.09 m, above the visor (which ends at 1.61 m and starts at x 0.11 m) and
+well above the chest plate, so neither is hidden from the 55 degree camera.
+Body colour: burnt orange, linear (0.72, 0.19, 0.00), about `#dd7900`. In
+8-bit sRGB b minus g is -121, so the overlay rule holds (`overlay None`). The nearest colours from the scratch run at `ae41fed` are
+the enemy health bar `#ff4d4f` at 96.6, Hargrim at 99.4 and the enemy
+projectile `#ff8a5c` at 99.5, so the minimum distance is 96.6, above the 80
+the test asks for. It is 181.7 from Ondrel's body.
