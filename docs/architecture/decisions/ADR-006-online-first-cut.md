@@ -40,8 +40,9 @@ Alternatives rejected:
 - Binary or delta snapshots first. JSON full snapshots are easy to debug and
   exact against `checksum`, because `GameState` survives a JSON round trip
   unchanged. Every snapshot is also a full resync, which keeps reconnect
-  simple. At the measured 3 to 6 KB a snapshot, they are affordable. Deltas
-  come later, behind a protocol version bump.
+  simple. At the measured 3 KB mean and 8 KB largest a snapshot, in three
+  runs, they are affordable. Deltas come later, behind a protocol version
+  bump.
 - Prediction in the first cut. It adds rollback and correction smoothing, and
   it can only be checked once the authoritative path and the interpolation
   work, which is the order section 7 of the design spec already gives. The

@@ -11,7 +11,9 @@ See the [roadmap](../roadmap.md#6-online) for the packages and milestone 7.
 ## Netcode
 
 The first cut, with the numbers (each bullet links the design section that
-decides it):
+decides it; timeouts, caps and limits are defaults the owning package may tune,
+listed in
+[section 4](../superpowers/specs/2026-10-17-online-design.md#defaults-a-package-may-tune)):
 
 - **Process model.** A router process owns the one public WebSocket port and
   the room-code table, and forks one child process per room. The child runs the
@@ -28,14 +30,16 @@ decides it):
   the countdown
   ([section 5](../superpowers/specs/2026-10-17-online-design.md#5-the-lobby-and-the-ready-flow)).
 - **Inputs.** The client sends one `PlayerInput` per sampled tick with its own
-  tick counter. The server keeps up to 6 per seat and uses one a tick. `ack` in
+  tick counter. The server keeps up to 6 per seat and uses one a tick, and a
+  reconnect resets the seat's counter. `ack` in
   each snapshot is the last input tick applied
   ([section 7](../superpowers/specs/2026-10-17-online-design.md#7-inputs)).
 - **Snapshots.** The server sends the full `GameState` as JSON every third tick
   (20 Hz), without `arena`, `kits` and `events`, which travel once at match
-  start and in per-tick batches. A 3v3 snapshot measured 2.7 to 2.8 KB of
-  state and 3.0 to 3.2 KB with its events on average, 6.4 KB at most (about
-  64 KB/s a client on average)
+  start and in per-tick batches. In three measured 3v3 runs a snapshot
+  averaged 2.7 to 2.8 KB of state and 3.0 to 3.2 KB with its events, and the
+  largest message was 8.1 KB (about 61 to 64 KB/s a client on average, 161 KB/s
+  at the largest message)
   ([section 8](../superpowers/specs/2026-10-17-online-design.md#8-snapshots)).
 - **Rendering.** The client draws 6 ticks (100 ms) behind the estimated server
   tick, through the existing interpolation, and releases events when the render
@@ -44,8 +48,8 @@ decides it):
   ([section 9](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering)).
 - **No prediction yet.** The local champion is not predicted, so input reaches
   the screen after a round trip plus about 100 ms. Prediction and reconciliation
-  come after the interpolation works (package P6), and delta snapshots after
-  that (P7), behind a protocol version bump.
+  come after the interpolation works (packages P6a and P6b), and delta
+  snapshots after that (P7), behind a protocol version bump.
 - **Reconnect.** A server-issued token, which starts with the room code, holds
   the seat. For 600 ticks (10 s) the champion stands still, then a bot drives
   the seat until the player returns
@@ -60,12 +64,17 @@ decides it):
 
 - `protocol` holds the message types, `PROTOCOL_VERSION` and a pure JSON encode
   and decode with validation. No I/O, no transport, no game logic. It imports
-  relative paths and `@claudeline/sim` only, with the host bans of `sim` and
-  without its math ban.
+  relative paths and `@claudeline/sim` only. It has the host bans of `sim`: the
+  globals `Date`, `performance`, `setTimeout`, `setInterval`, `window`,
+  `document` and `fetch`, the properties `Math.random`, `Date.now` and
+  `performance.now`, no Node built-ins, and no dynamic `import()` or `import()`
+  types. It does not have sim's math ban. Its tsconfig has `lib: ["ES2023"]`,
+  `types: []` and `erasableSyntaxOnly`.
 - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, never
   `client`, and may read the wall clock. It runs from TypeScript source through
   Node's type stripping, with no build step.
-- `client` imports `sim`, `bots` and `protocol`, never `server`.
+- `client` imports `sim`, `bots` and `protocol`, never `server`. A lint deny
+  rule covers static and dynamic imports.
 - `sim` and `bots` are unchanged.
 
 The rules and the lint blocks are in

@@ -38,15 +38,18 @@ docs/superpowers/specs/     approved designs (the design spec)
   3.2, [online design section 3](../superpowers/specs/2026-10-17-online-design.md#3-package-layout-and-rules)):
   - `protocol` holds the message types, `PROTOCOL_VERSION` and pure JSON encode
     and decode with validation: no I/O, no transport, no game logic. It imports
-    relative paths and `@claudeline/sim` only. It has the host bans of `sim` (no
-    `window`, `document`, `fetch`, `Date`, `performance`, `Math.random`, no Node
-    built-ins and no dynamic `import()`) but not its math ban. Its tsconfig is
-    `lib: ["ES2023"]` and `types: []`.
+    relative paths and `@claudeline/sim` only. It has the host bans of `sim`:
+    the globals `Date`, `performance`, `setTimeout`, `setInterval`, `window`,
+    `document` and `fetch`, the properties `Math.random`, `Date.now` and
+    `performance.now`, no Node built-ins, and no dynamic `import()` or
+    `import()` types. It does not have sim's math ban. Its tsconfig has
+    `lib: ["ES2023"]`, `types: []` and `erasableSyntaxOnly`.
   - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with
     Node globals. It never imports `client`, and it may read the wall clock.
   - `client` then imports `sim`, `bots` and `protocol`, and never `server`. A
-    lint deny rule says so: `eslint.config.js` has no import rule for the
-    client today, so the first package adds it.
+    lint deny rule says so, for static and dynamic imports:
+    `eslint.config.js` has no import rule for the client today, so the first
+    package adds it.
 - `tools/balance` imports relative paths, `node:` builtins, `vitest` and the
   entry points of `@claudeline/sim` and `@claudeline/bots`. It reads `data/`
   and never a package's own files.
