@@ -228,7 +228,7 @@ export function playCells(
   let done = 0;
   for (const mode of ['2v2', '3v3'] as const) {
     for (const arena of inputs.arenas) {
-      for (const pairing of pairings(kitIds)) {
+      for (const pairing of allPairings) {
         const cell: Cell = { mode, arena: arena.id, x: pairing.x, y: pairing.y, played: [] };
         const mine = all.filter((c) => c.mode === mode && c.x === pairing.x && c.y === pairing.y);
         for (const config of mine) {
