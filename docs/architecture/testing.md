@@ -170,8 +170,8 @@ port 5173, which Playwright starts itself.
   its 90 ticks, a scripted kill counts on the scoreboard), decision 6 of batch
   #134. The test makes 18 hook reads and runs the flights and waits as batches
   of one `runFor`, and sets a 60 s timeout. It takes 5.1 s locally. On the
-  runner a frame is 17 to 24 ms at the probe viewport (about 600 of them: the
-  warmup, the 130 ticks of a shot's flight, the 240 of the shield and some 25
+  runner a frame is 17 to 24 ms at the probe viewport (about 560 of them: the
+  warmup, the 130 ticks of a shot's flight, the 240 of the shield and about 11
   read one by one) and 105 to 210 ms at 1280x720 (about 6), and a read costs 32
   to 75 ms, so the body takes about 17 s and the page load and the screenshot
   make it about 22 s. The timeout is more than twice that, as the rule asks.
@@ -710,13 +710,14 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   3100 B), against clean medians of 324 to 456 B and 432 to 576 B.
 
   The row of #138 and two reruns, each applied alone on the last code commit
-  of the PR (01414c7) with 3 attempts per scene: the template per `Scoreboard.update`
-  fails 6 of 6 (`scoreboard.ts:update` at 756 to 1032 B a window), the template
-  per `Hud.update` reruns red 6 of 6 (sandbox 1188 to 1344 B, live 1328 to 1468
-  B; `hud.ts:update` at 756 to 952 B) and so does the closure in `routeEvents`
-  (1612 to 1748 B and 1672 to 1772 B; `feedback.ts:routeEvents` at 1156 to
-  1268 B). The clean medians of the same code are 408 to 456 B on the sandbox
-  and 456 to 480 B on the live scene (bots 5856 to 6376 B).
+  of the PR (01414c7) with 3 attempts per scene: the template per
+  `Scoreboard.update` fails 6 of 6 (`scoreboard.ts:update` at 756 to 1032 B a
+  window), the template per `Hud.update` reruns red 6 of 6 (sandbox 1188 to 1344
+  B, live 1328 to 1468 B; `hud.ts:update` at 756 to 952 B) and so does the
+  closure in `routeEvents` (1612 to 1748 B and 1672 to 1772 B;
+  `feedback.ts:routeEvents` at 1156 to 1268 B). The clean medians of the same
+  code are 408 to 456 B on the sandbox and 456 to 480 B on the live scene (bots
+  5856 to 6376 B).
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure

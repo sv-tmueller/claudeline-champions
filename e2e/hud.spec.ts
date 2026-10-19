@@ -41,8 +41,8 @@ const SLOT_COUNT = 7;
 // The warmup, the 8 shots and the 240 ticks of the shield run at the probe viewport, where a frame
 // costs a sixteenth of the pixels; the reads that need geometry and the screenshot run at 1280x720.
 // The test makes 18 hook reads, and the flights and waits are batches of one runFor. Locally it takes
-// 5.1 s. On the runner a frame is 17 to 24 ms at the probe viewport (about 600 of them: the warmup,
-// the 130 ticks of a shot's flight, the 240 of the shield and some 25 read one by one) and 105 to
+// 5.1 s. On the runner a frame is 17 to 24 ms at the probe viewport (about 560 of them: the warmup,
+// the 130 ticks of a shot's flight, the 240 of the shield and about 11 read one by one) and 105 to
 // 210 ms at 1280x720 (about 6), and a read costs 32 to 75 ms, so the body takes about 17 s and the
 // page load and the screenshot make it about 22 s. The 60 s timeout is more than twice that (the
 // rule of testing.md); a run past half of it applies the rule again.
