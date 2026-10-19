@@ -525,12 +525,27 @@ export function enemyReachable(grid: NavGrid, state: GameState, c: ChampionState
   return false;
 }
 
+function emptyCounts(): Record<Intent, number> {
+  return { engage: 0, kite: 0, retreat: 0, idle: 0 };
+}
+
 export interface WorstStall {
   id: number;
   /** The tick the run started on. */
   from: number;
   length: number;
+  /** The intent of the run's last tick. It names the run, which may have been another intent before. */
   intent: Intent;
+  /** The ticks of the run by intent, the last tick included. */
+  intents: Record<Intent, number>;
+}
+
+const INTENTS: readonly Intent[] = ['engage', 'kite', 'retreat', 'idle'];
+
+/** The message of a no-stall clause: the run and its intents by count, like "engage 691, idle 15". */
+export function stallMessage(worst: WorstStall): string {
+  const counts = INTENTS.filter((i) => worst.intents[i] > 0).map((i) => `${i} ${worst.intents[i]}`);
+  return `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent} (${counts.join(', ')})`;
 }
 
 export interface StallTracker {
@@ -545,8 +560,8 @@ export interface StallTracker {
  */
 export function createStallTracker(state: GameState, bots: readonly Bot[]): StallTracker {
   const grid = buildNavGrid(state.arena);
-  const runs = bots.map(() => ({ from: 0, length: 0 }));
-  let worst: WorstStall = { id: -1, from: 0, length: 0, intent: 'idle' };
+  const runs = bots.map(() => ({ from: 0, length: 0, intents: emptyCounts() }));
+  let worst: WorstStall = { id: -1, from: 0, length: 0, intent: 'idle', intents: emptyCounts() };
   return {
     observe(inputs: readonly PlayerInput[]): void {
       bots.forEach((bot, id) => {
@@ -566,15 +581,19 @@ export function createStallTracker(state: GameState, bots: readonly Bot[]): Stal
           run.length = 0;
           return;
         }
-        if (run.length === 0) run.from = state.tick;
+        if (run.length === 0) {
+          run.from = state.tick;
+          run.intents = emptyCounts();
+        }
         run.length++;
+        run.intents[acted.intent]++;
         if (run.length > worst.length) {
-          worst = { id, from: run.from, length: run.length, intent: acted.intent };
+          worst = { id, from: run.from, length: run.length, intent: acted.intent, intents: { ...run.intents } };
         }
       });
     },
     worst(): WorstStall {
-      return { ...worst };
+      return { ...worst, intents: { ...worst.intents } };
     },
   };
 }
