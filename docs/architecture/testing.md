@@ -693,7 +693,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   | binding table per frame | `clip-sampler.ts:poseChampion`, first line | `(globalThis as unknown as { __m?: unknown }).__m = rig.bones.map((bone) => bone.quaternion);` | 3604 to 3740 | 3588 to 3848 |
   | clip time as an argument | `champion-anim.ts:updateAnims` and `updateAnim` | `updateAnim(anim, champion, now)` and the `now` parameter in place of the `D_NOW` write and read | 1548 to 1692 | 1596 to 1764 |
   | closure per transition | `champion-anim.ts:stepRun`, after `anim.mode = RUN_SETTLE;` | `(globalThis as unknown as { __m?: unknown }).__m = () => RUN_SETTLE;` | 384 to 408 (passes) | 460 to 544 (passes) |
-  | template per `Scoreboard.update` | `scoreboard.ts:update`, first line | `` (globalThis as unknown as { __s?: unknown }).__s = `s${(state as unknown as { tick: number }).tick}`; `` | 1176 to 1392 | 1212 to 1436 |
+  | template per `Scoreboard.update` | `scoreboard.ts:update`, first line | `` (globalThis as unknown as { __s?: unknown }).__s = `s${(state as unknown as { tick: number }).tick}`; `` | 1124 to 1320 | 1260 to 1368 |
 
   The four rows of #111, each applied alone on 415ba94 with 3 attempts per
   scene: the first three fail 6 of 6 (the object and the table name
@@ -709,15 +709,15 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   1768 B) and the object in the entity views' `draw` (3072 to 3120 B and 3000 to
   3100 B), against clean medians of 324 to 456 B and 432 to 576 B.
 
-  The row of #138 and two reruns, each applied alone on the last code commit
-  of the PR (01414c7) with 3 attempts per scene: the template per
-  `Scoreboard.update` fails 6 of 6 (`scoreboard.ts:update` at 756 to 1032 B a
-  window), the template per `Hud.update` reruns red 6 of 6 (sandbox 1188 to 1344
-  B, live 1328 to 1468 B; `hud.ts:update` at 756 to 952 B) and so does the
-  closure in `routeEvents` (1612 to 1748 B and 1672 to 1772 B;
-  `feedback.ts:routeEvents` at 1156 to 1268 B). The clean medians of the same
-  code are 408 to 456 B on the sandbox and 456 to 480 B on the live scene (bots
-  5856 to 6376 B).
+  The row of #138 and two reruns, each applied alone on b44efbd (the PR
+  rebased onto the bots dodge of #137, d3c0902) with 3 attempts per scene: the
+  template per `Scoreboard.update` fails 6 of 6 (`scoreboard.ts:update` at 684
+  to 896 B a window), the template per `Hud.update` reruns red 6 of 6 (sandbox
+  1096 to 1284 B, live 1276 to 1488 B; `hud.ts:update` at 764 to 984 B) and so
+  does the closure in `routeEvents` (1680 to 1720 B and 1752 to 1768 B;
+  `feedback.ts:routeEvents` at 1256 to 1372 B). The clean medians of the same
+  code are 300 to 564 B on the sandbox and 456 to 468 B on the live scene (bots
+  11 344 to 11 776 B).
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
   into (`stepSim`, `frameMany`), so read the function names of the failure
@@ -768,9 +768,10 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   `readShieldView` at 48 to 480 B a window before `primeStatusReads` (client.md,
   the frame path); with it they read 0 B in 3 attempts. The change writes (the
   shield's start and width, the silenced flag) are on review, like the other
-  per-change writes. The medians of the local `--repeat-each=3` runs on the
-  last code commit are 408 to 456 B on the sandbox (limit 600) and 456 to 480 B
-  on the live scene (limit 780), the live bots 5856 to 6376 B (limit 12 000).
+  per-change writes. The medians of the local `--repeat-each=3` runs on b44efbd
+  (the rebased head) are 300 to 564 B on the sandbox (limit 600; 348 to 480 B in
+  a further six) and 456 to 468 B on the live scene (limit 780), the live bots
+  11 344 to 11 776 B (limit 18 000, at the lead of 2 of #137).
 - The history, which is why the windows use a hook: with the windows on the fake
   clock, `onAnimationFrame` had two modes. Playwright's fake clock hands out ids
   of 1e12 and up, so each `requestAnimationFrame` call boxes about three heap
