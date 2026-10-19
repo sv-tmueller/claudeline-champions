@@ -54,3 +54,26 @@ export function parseLaunch(
   const teamSize = !sandbox && params.get('teamsize') === '3' ? 3 : 2;
   return { scene: sandbox ? 'sandbox' : 'match', champion, difficulty, arena, teamSize };
 }
+
+/** The keys of the address that start a match without the select, in every build. */
+const LAUNCH_KEYS: readonly string[] = ['champion', 'difficulty', 'arena', 'teamsize'];
+
+/**
+ * Whether the page opens on the pre-match select: when the query string has
+ * none of the four launch keys and none of `devKeys`. "Has" is
+ * `URLSearchParams.has`, so a key with any value, an empty or unknown one
+ * included, skips the screen and plays as the address says; keys are
+ * case-sensitive, like `parseLaunch` reads them. A bare address, a lone
+ * question mark and unrelated keys open it. `devKeys` are the dev-only keys
+ * (`DEV_LAUNCH_KEYS`, passed only in a dev build), so their names live in
+ * dev-launch.ts and never ship.
+ */
+export function opensSelect(search: string, devKeys: readonly string[]): boolean {
+  const params = new URLSearchParams(search);
+  return !LAUNCH_KEYS.some((key) => params.has(key)) && !devKeys.some((key) => params.has(key));
+}
+
+/** The query of a relaunch: the setup is the address, so a link is the whole choice. */
+export function relaunch(champion: string, difficulty: Difficulty, arena: string, teamSize: 2 | 3): string {
+  return `?${new URLSearchParams({ champion, difficulty, arena, teamsize: String(teamSize) }).toString()}`;
+}

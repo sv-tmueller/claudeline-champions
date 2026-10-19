@@ -1,0 +1,110 @@
+/*
+ * The pre-match select, shown before the match is built. The rules of hud.css
+ * and result.css hold here too, and packages/client/src/hud-palette.test.ts
+ * checks them over this file:
+ * - colours are hex literals, and only in the custom properties of #select;
+ * - every size derives from --select-u, so the panel scales with the window;
+ * - no colour lands in the pixel boxes the e2e specs count or near a champion
+ *   body colour, and none is blue, purple or magenta;
+ * - as in result.css, the visible panel takes pointer events, and its links
+ *   inherit them. #select itself takes none, and so does a hidden panel.
+ * The palette is the one of result.css. The rows are the rows of buildSelect,
+ * so the entries are drawn the way the result panel draws them, plus the
+ * champion being picked: a heavier border, as for the arena, team size and tier.
+ */
+#select {
+  --select-u: min(1vw, 1.78vh);
+  --select-panel: #000000d9;
+  --select-text: #e6e9ee;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--select-text);
+  font-family: system-ui, sans-serif;
+  font-size: calc(var(--select-u) * 1.8);
+  line-height: 1.2;
+}
+
+#select * {
+  box-sizing: border-box;
+}
+
+#select [data-select='panel'] {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--select-u) * 1.2);
+  min-width: calc(var(--select-u) * 36);
+  padding: calc(var(--select-u) * 3) calc(var(--select-u) * 4);
+  background: var(--select-panel);
+  border-radius: calc(var(--select-u) * 1);
+  text-align: center;
+}
+
+#select [data-select='panel'][data-visible='true'] {
+  display: flex;
+  pointer-events: auto;
+}
+
+/* The rows sit in one box, so it is a column of its own, as the result panel is. */
+#select [data-part='rows'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--select-u) * 0.5);
+}
+
+#select [data-part='title'] {
+  font-size: calc(var(--select-u) * 5);
+  font-weight: 700;
+}
+
+#select [data-part='select-label'] {
+  margin-top: calc(var(--select-u) * 1);
+  font-size: calc(var(--select-u) * 1.4);
+}
+
+#select [data-part='select'],
+#select [data-part='arena-select'],
+#select [data-part='team-select'],
+#select [data-part='difficulty-select'] {
+  display: flex;
+  gap: calc(var(--select-u) * 1.5);
+}
+
+#select [data-champion],
+#select [data-arena-id],
+#select [data-team-size],
+#select [data-difficulty],
+#select [data-action='start'] {
+  padding: calc(var(--select-u) * 0.6) calc(var(--select-u) * 1.2);
+  border: calc(var(--select-u) * 0.15) solid var(--select-text);
+  border-radius: calc(var(--select-u) * 0.5);
+  color: var(--select-text);
+  text-decoration: none;
+}
+
+#select [data-champion][data-available='false'],
+#select [data-team-size][data-available='false'] {
+  opacity: 0.35;
+}
+
+/* The pick of each row: a heavier border, since a colour would break the palette. */
+#select [data-champion][data-current='true'],
+#select [data-arena-id][data-current='true'],
+#select [data-team-size][data-current='true'],
+#select [data-difficulty][data-current='true'] {
+  border-width: calc(var(--select-u) * 0.4);
+}
+
+#select [data-action='start'] {
+  margin-top: calc(var(--select-u) * 1.5);
+  padding: calc(var(--select-u) * 0.8) calc(var(--select-u) * 3);
+  border-width: calc(var(--select-u) * 0.4);
+  font-size: calc(var(--select-u) * 2.4);
+  font-weight: 700;
+}

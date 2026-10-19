@@ -21,3 +21,11 @@ export function readDevLaunch(search: string): DevLaunch {
   const scale = PLAIN_INTEGER.test(asked) ? Number(asked) : 1;
   return { timeScale: scale <= MAX_TIME_SCALE ? scale : 1 };
 }
+
+/**
+ * The keys of the address that start a match without the pre-match select, in
+ * a dev build only: `?scene=sandbox` and `?timescale=<n>`. The names live here,
+ * not in launch.ts, so the string never reaches a production file.
+ * `main.ts` passes this list to `opensSelect` as `import.meta.env.DEV ? DEV_LAUNCH_KEYS : []`.
+ */
+export const DEV_LAUNCH_KEYS: readonly string[] = ['scene', 'timescale'];

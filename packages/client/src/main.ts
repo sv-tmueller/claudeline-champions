@@ -25,7 +25,7 @@ import { ANIM_TEXTS, createAnims, updateAnims } from './champion-anim';
 import { createChampionLooks, lookMode, type ChampionLooks } from './champion-look';
 import { createClipRig, poseChampion, type ClipRig } from './clip-sampler';
 import { buildDebugOverlay, updateChampionCircles } from './debug-overlay';
-import { readDevLaunch } from './dev-launch';
+import { DEV_LAUNCH_KEYS, readDevLaunch } from './dev-launch';
 import { createAreaViews, createProjectileViews } from './entity-views';
 import { CombatFeedback, flashText, flashTexts, routeEvents } from './feedback';
 import { createHealthBars } from './health-bars';
@@ -35,7 +35,7 @@ import { buildHud } from './hud-dom';
 import { primeStatusReads } from './hud-views';
 import { createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
-import { parseLaunch } from './launch';
+import { opensSelect, parseLaunch } from './launch';
 import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { bindInput, createInputCore } from './input';
 import { capturePoses, createPoses, interpolatePoses, placeChampion } from './interpolate';
@@ -46,12 +46,14 @@ import { arenaModelUrl, championModelUrl } from './models';
 import { createBrowserPlatform, type SettingsStorage } from './platform';
 import { buildResult } from './result-dom';
 import { ResultScreen } from './result-screen';
+import { runSelect } from './select-dom';
 import { Scoreboard } from './scoreboard';
 import { bindScoreboard, buildScoreboard } from './scoreboard-dom';
 import './style.css';
 import './hud.css';
 import './result.css';
 import './menu.css';
+import './select.css';
 
 const HUMAN_ID = 0;
 
@@ -70,6 +72,15 @@ const kits = (Object.values(
   import.meta.glob('../../../data/kits/*.json', { eager: true, import: 'default' }),
 ) as KitDef[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 const kitIds = kits.map((kit) => kit.id);
+
+// A bare address opens the pre-match select, before any renderer or match exists. Start writes the
+// chosen setup into the address, so everything below reads it like any parameter launch (launch.ts).
+// The dev keys are passed only in a dev build, so their names never ship (dev-launch.ts).
+if (opensSelect(location.search, import.meta.env.DEV ? DEV_LAUNCH_KEYS : [])) {
+  const selectRoot = document.getElementById('select');
+  if (!selectRoot) throw new Error('missing #select container');
+  await runSelect(selectRoot, kitIds, arenas, parseLaunch('', kitIds, arenaIds, false));
+}
 const launch = parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV);
 const arena = arenaById(arenas, launch.arena);
 
