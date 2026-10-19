@@ -360,7 +360,10 @@ describe('the report', () => {
 });
 
 describe('a run', () => {
-  it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 120_000 }, () => {
+  // Runner (ubuntu-latest, Node 22): 47.3 to 59.6 s before the dodge of #137, 62.4 s on 787cd0c (unit job
+  // 117369238607); 22.4 s locally (Apple M5 Pro, Node 22.23.2; 18.6 s before). Timeout: twice the slowest runner
+  // time is 124.8 s, so 150 s (testing.md, Check suite; it was 120 s).
+  it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 150_000 }, () => {
     const run = () => {
       const cells = playCells(DATA, 2);
       return { cells, text: renderReport({ head: 'abc1234', seeds: 2, kitIds: KIT_IDS, cells }) };

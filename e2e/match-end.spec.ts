@@ -24,11 +24,12 @@ const RING_END_M = 3;
 // The match: this test's own run ended at tick 5184 on the bots of #137 (read in frames of
 // 96 ticks, with an idle human; 4936 in the headless run of match-setup.test.ts; on 57dd52f
 // it read 5184 too, with 5053 headless). Bot output moves with the bots package, so
-// re-measure it when the bots change. The budget is 14 000 ticks: the headless 4936 plus two
-// more rounds of about 1000 each and one round to sudden death of about 7000 is 13 936.
-// Passing it fails the test.
+// re-measure it when the bots change. The budget is 14 000 ticks. Its base is the headless
+// 4936, the convention of every other row (it was the e2e 5184 before this budget moved, which
+// did not change): 4936 plus two more rounds of about 1000 each and one round to sudden death
+// of about 7000 is 13 936. Passing it fails the test.
 const MATCH_BUDGET_TICKS = 14_000;
-// The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 15 000 ticks
+// The same budget in frames: at scale 100 a 16 ms frame runs 96 ticks, so 14 000 ticks
 // are at most 146 frames, and the budget is that plus 25. Without the scale the match
 // takes thousands of frames, and this fails the test at once, where the 60 s timeout
 // alone would only fail it on a slow machine (a frame costs 2 ms here and 17 to 24 ms

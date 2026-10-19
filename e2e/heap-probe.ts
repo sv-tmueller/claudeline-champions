@@ -108,7 +108,7 @@ export const COMBAT_ALLOCATION_LIMIT_BYTES = 600;
 // the earlier 12, so it is not a live gate; 892 to 944 B against 600 B on the
 // sandbox). See testing.md.
 export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
-// The live match's bots limit: 12 000 B, its own literal (the bots stay out of
+// The live match's bots limit: 14 300 B, its own literal (the bots stay out of
 // COMBAT_CODE), on the median of the five measured windows' own bots figures, not on the
 // bots figure of the window that is the median by counted bytes. On bc1d6f1 the bots read
 // a median window of 39 to 44 KB over 15 local attempts and 52 and 40 KB on the runner
@@ -132,9 +132,27 @@ export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
 // control. The 50 percent clause is the lower one here, so it sets the limit. It does not
 // catch one reverted Maglev fix alone: `bot.ts:aim` adds about 1.2 KB, the distance of
 // `steerTowardInto` and the finite test of `cellIndexAt` up to 5 KB a window together,
-// and the median window stays under 12 KB then. A runner median above 12 000 B reopens
+// and the median window stays under 12 KB then. A runner median above the limit reopens
 // the limit. See bots.md and testing.md.
-export const LIVE_BOTS_LIMIT_BYTES = 12_000;
+//
+// Moved to 14 300 B by #137 (12 000 B before). The dodge lengthens the rounds before round 3,
+// which now begins by tick 4289, and the lead is 2 windows, the window of the first
+// projectile (live-probe.spec.ts), so the measured windows are windows 2 to 6, ticks 4349 to
+// 4499, and hold the first plans of the round's chase. The median window reads 8908 to 9484 B
+// over 12 clean local attempts (8908, 9012, 9056, 9056, 9200, 9296, 9296, 9368, 9388, 9416,
+// 9480, 9484) and 11 720, 11 844 and 11 980 B in three attempts with one interpreted call
+// of 2.5 to 2.9 KB in window 3 (`distanceInto`, `segmentClear`, `openPop`), the kind of event
+// the limit has to tolerate. The bytes of windows 2 and 3 are the follower's plan path
+// (`splitPath` 13.3 to 13.9 KB and 6.4 to 6.7 KB, `plan`, `findPath`, `cellCenter`): the same
+// functions read 14.5 and 14.6 KB in those two windows with the dodge off (chance 0, 3
+// attempts, round 3 begun by tick 2609), so they are the cold plans of the chase and not a
+// cost of the sidestep; `dodge.ts` is in no
+// window. The rule is the one above: 50 percent above the largest clean local median,
+// 9484 B, is 14 226, rounded up to 100 (the runner figures are the lead's: a median above it
+// reopens the limit). The other clause is not the lower one: reverting the plan search and
+// the Maglev fixes (`packages/bots/src` as on bc1d6f1) reads 208.2, 209.2 and 210.0 KB on
+// these windows and fails 3 of 3 local attempts, so the limit is about 14 times under it.
+export const LIVE_BOTS_LIMIT_BYTES = 14_300;
 // The profiler must see garbage outside the sweep files in every window: the
 // sim's collision, step and sight code and three's render. About 265 KB per
 // window was the lowest figure measured with the hook on a head that contains

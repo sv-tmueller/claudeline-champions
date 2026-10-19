@@ -18,7 +18,8 @@ import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
-// The tick budget of e2e/match-end.spec.ts for the default match to its result screen.
+// The tick budget of e2e/match-end.spec.ts for the default match to its result screen: the headless end
+// tick, 4936, plus two rounds of about 1000 and one of about 7000, rounded up to 1000 (as every other row's).
 const MATCH_END_BUDGET_TICKS = 14_000;
 
 function launch(champion: string, scene: Launch['scene'] = 'match'): Launch {

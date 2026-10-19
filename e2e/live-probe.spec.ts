@@ -70,19 +70,19 @@ const WARM_UP_BUDGET_TICKS = 9100;
 // dash hold of #98, and by 2879 before it; the aim changes the human's own M1 and its
 // facing from round 1 on): the first projectile spawns in window 2 (ticks 4349 to 4379,
 // 60 ticks into the windows of the round), the first hits land in window 4 (three at
-// once), then 1 to 3 hits land per window and 0 to 2 projectiles are live at the reads
-// to the end of the 17 windows (tick 4799). The first death of the round is read at
-// tick 4859 (3419 on 57dd52f). The lead is a count of windows, not a tick, because
-// windows are the unit the spec runs in; a bots change moves the first projectile, and
-// the assertion that the measured windows hold one fails then, so re-measure. The lead
-// is 4, the window of the first hits, as it was when the first projectile spawned in
-// window 4: the measured windows then hold the hits and the later bolts (one is spawned
-// in window 4 too, and 0 to 2 are live), and not the cold first windows, where the bots'
-// median read about 9 KB with a lead of 2 against 3.4 to 4.1 KB with 4.
-const EVENT_LEAD_WINDOWS = 4;
-// The windows measured, after the lead: windows 4 to 8 of round 3, ticks 4409 to 4559.
+// once), then 0 to 2 hits land per window (window 6 reads none) and 0 to 2 projectiles are
+// live at the reads to the end of the 17 windows (tick 4799). The first death of the round
+// is read at tick 4859 (3419 on 57dd52f). The lead is a count of windows, not a tick,
+// because windows are the unit the spec runs in; a bots change moves the first projectile,
+// and the assertion that the measured windows hold one fails then, so re-measure. The lead
+// is 2, the window of the first projectile, by the derivation of #97 (decision 9 of batch
+// #134): the measured windows are the first ones of the round's chase, where the bots'
+// plans read the most (13 KB and 6 KB of `splitPath`, in windows 2 and 3), and the
+// bots limit of heap-probe.ts is derived from them.
+const EVENT_LEAD_WINDOWS = 2;
+// The windows measured, after the lead: windows 2 to 6 of round 3, ticks 4349 to 4499.
 // The median of the five is the asserted figure, as in the sandbox (see testing.md).
-// The last of them ends 300 ticks before the first death of the round (the floor is 60).
+// The last of them ends 360 ticks before the first death of the round (the floor is 60).
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
