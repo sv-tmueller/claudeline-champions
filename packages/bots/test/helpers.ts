@@ -540,7 +540,7 @@ export interface WorstStall {
   intents: Record<Intent, number>;
 }
 
-const INTENTS: readonly Intent[] = ['engage', 'kite', 'retreat', 'idle'];
+const INTENTS = Object.keys(emptyCounts()) as Intent[];
 
 /** The message of a no-stall clause: the run and its intents by count, like "engage 691, idle 15". */
 export function stallMessage(worst: WorstStall): string {
