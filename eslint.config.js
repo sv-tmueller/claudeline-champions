@@ -178,6 +178,30 @@ export default defineConfig(
     },
   },
   {
+    // The fixture search shares the format, the replay, the coverage and the oracle with the sim's
+    // roster fixture test, so it imports the sim entry and these two files of sim/test and no other
+    // file of a package. It reads data/ and writes packages/sim/test/fixtures/ by file path.
+    files: ['tools/fixtures/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': boundaryRule([
+        {
+          regex: '^(?!\\.{1,2}(/|$)|node:|@claudeline/sim$|vitest(/|$))',
+          message: 'The fixture tool imports relative paths, node: builtins, vitest and the entry point of @claudeline/sim only.',
+        },
+        {
+          regex: '(^|/)(node_modules|tests|e2e)(/|$)',
+          message: 'The fixture tool must not reach into node_modules, tests or e2e.',
+        },
+        {
+          regex: '(^|/)packages/(?!sim/test/(roster-fixture|ability-watch)\\.ts$)',
+          message: 'The fixture tool imports packages/sim/test/roster-fixture.ts and ability-watch.ts and no other file of a package.',
+        },
+      ]),
+      'no-restricted-syntax': noDynamicImport,
+    },
+  },
+  {
     files: ['packages/sim/src/**'],
     // An inline eslint-disable must not silence the determinism bans.
     linterOptions: { noInlineConfig: true },

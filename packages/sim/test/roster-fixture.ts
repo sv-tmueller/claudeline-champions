@@ -233,6 +233,11 @@ export function mirrorConfig(kitId: string): MatchConfig {
   };
 }
 
+/** The match the fixture search plays live, before it has a fixture: the mirror config on arena01. */
+export function mirrorMatch(kit: KitDef, seed: number): GameState {
+  return createMatch(mirrorConfig(kit.id), arena01, seed, [kit]);
+}
+
 /** The match a fixture replays: its config on arena01 with its own seed and the kit. */
 export function startMatch(fixture: Fixture, kit: KitDef): GameState {
   return createMatch(fixture.config, arena01, fixture.seed, [kit]);

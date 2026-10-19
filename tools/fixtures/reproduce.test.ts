@@ -17,7 +17,6 @@ describe('the fixture search reproduces the committed fixtures on the current ki
   it.each([
     ['hargrim', 1],
     ['quillon', 23],
-    ['skerrow', 6],
   ])('%s settles on attempt %i and writes the whole committed file', (kit, attempt) => {
     const outcome = searchFixture(loadKit(kit));
     if (!outcome.ok) throw new Error(`${kit}: ${JSON.stringify(outcome)}`);
@@ -26,26 +25,45 @@ describe('the fixture search reproduces the committed fixtures on the current ki
   });
 });
 
-describe('the fixture search reproduces the committed Lumeth fixture on the kit it was searched on', () => {
-  // #125 changed Binding Sigil's radius from 1.5 to 2.0 and regenerated only the checkpoints of the
-  // Lumeth fixture, so its segments and actions come from the search on the kit before #125. On
-  // today's kit the search departs from the committed script from about tick 1716. The pre-#125 kit
-  // is today's with the radius put back in memory; the current kit's checkpoints then give the file.
-  it('lumeth settles on attempt 2 and, with the checkpoints of the current kit, writes the committed file', () => {
-    const current = loadKit('lumeth');
-    const before = structuredClone(current) as unknown as {
-      slots: { Q: { effects: { radius: number }[] } };
-    };
-    const sigil = before.slots.Q.effects[0];
-    if (sigil === undefined || sigil.radius !== 2) throw new Error('Binding Sigil is not the Q area of radius 2');
-    sigil.radius = 1.5;
+/** The kit as it was before #125 changed one number, put back in memory only. */
+function before125(id: string, put: (kit: Record<string, unknown>) => void): KitDef {
+  const kit = structuredClone(loadKit(id)) as unknown as Record<string, unknown>;
+  put(kit);
+  return kit as unknown as KitDef;
+}
 
-    const outcome = searchFixture(before as unknown as KitDef);
-    if (!outcome.ok) throw new Error(`lumeth: ${JSON.stringify(outcome)}`);
-    expect(outcome.attempt).toBe(2);
-
-    const rebuilt = buildFixture(current, outcome.fixture.segments, outcome.fixture.actions);
+describe('the fixture search reproduces the committed fixtures that #125 regenerated, on the kits they were searched on', () => {
+  // #125 changed one number of Skerrow and one of Lumeth and regenerated only the checkpoints and
+  // the checksum of their fixtures, so the segments and actions come from the search on the kit
+  // before #125. On today's kits the search departs from the committed scripts: Skerrow settles on
+  // another attempt, and Lumeth's script departs from about tick 1716. A kit is today's with the
+  // number put back in memory; the current kit's checkpoints then give the committed file.
+  function reproduces(id: string, searched: KitDef, attempt: number): void {
+    const outcome = searchFixture(searched);
+    if (!outcome.ok) throw new Error(`${id}: ${JSON.stringify(outcome)}`);
+    expect(outcome.attempt).toBe(attempt);
+    const rebuilt = buildFixture(loadKit(id), outcome.fixture.segments, outcome.fixture.actions);
     expect(rebuilt.problems).toEqual([]);
-    expect(formatFixture(rebuilt.fixture)).toBe(committed('lumeth'));
+    expect(rebuilt.missing).toEqual([]);
+    expect(formatFixture(rebuilt.fixture)).toBe(committed(id));
+  }
+
+  it('skerrow, with Rend at 20 damage, settles on attempt 6 and, with the current checkpoints, writes the committed file', () => {
+    const searched = before125('skerrow', (kit) => {
+      const rend = (kit as { slots: { E: { effects: { effects: { amount: number }[] }[] } } }).slots.E.effects[0]
+        ?.effects[0];
+      if (rend?.amount !== 14) throw new Error('Rend is not the 14 damage of the current kit');
+      rend.amount = 20;
+    });
+    reproduces('skerrow', searched, 6);
+  });
+
+  it('lumeth, with Binding Sigil at radius 1.5, settles on attempt 2 and, with the current checkpoints, writes the committed file', () => {
+    const searched = before125('lumeth', (kit) => {
+      const sigil = (kit as { slots: { Q: { effects: { radius: number }[] } } }).slots.Q.effects[0];
+      if (sigil?.radius !== 2) throw new Error('Binding Sigil is not the radius 2 of the current kit');
+      sigil.radius = 1.5;
+    });
+    reproduces('lumeth', searched, 2);
   });
 });
