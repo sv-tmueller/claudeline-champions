@@ -563,9 +563,9 @@ tried.
   linux/amd64 container (testing.md, "Fixture search").
 
 What either change does to `tools/fixtures/reproduce.test.ts`, which pins the
-attempt each committed fixture is the output of (decision 13 of batch #134). A
-red row after a kit change is not a failed pre-check: it says that row's pin is
-out of date, and it is no ground to drop a candidate.
+attempt each committed fixture is the output of (decision 13 of batch #134), is
+set out below. A red row after a kit change is not a failed pre-check: it says
+that row's pin is out of date, and it is no ground to drop a candidate.
 
 - After a rebuild, the row takes the new attempt the tool printed, its kit is
   the current one, and the header of roster-fixtures.test.ts records the new

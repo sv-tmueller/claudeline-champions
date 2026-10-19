@@ -137,8 +137,8 @@ export const LIVE_ALLOCATION_LIMIT_BYTES = 780;
 // and the median window stays under 12 KB then. A runner median above the limit reopens
 // the limit. See bots.md and testing.md.
 //
-// Moved to 18 000 B by #137 (12 000 B before; the first line above and the figures of #98
-// are the earlier derivation). The dodge lengthens the rounds before round 3, which now
+// Moved to 18 000 B by #137 (12 000 B before; the paragraph above with the figures of #98
+// is the earlier derivation). The dodge lengthens the rounds before round 3, which now
 // begins by tick 4289, and the lead is 2 windows, the window of the first projectile
 // (live-probe.spec.ts), so the measured windows are windows 2 to 6, ticks 4349 to 4499, and
 // hold the first plans of the round's chase. The median window of the 15 local attempts
