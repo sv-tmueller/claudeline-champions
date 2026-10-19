@@ -17,10 +17,11 @@ import {
   jsonKits,
   kitOf,
   rosterKits,
+  stallMessage,
   tallyTeleports,
   validInput,
 } from './helpers';
-import type { TeleportTally } from './helpers';
+import type { TeleportTally, WorstStall } from './helpers';
 import { hargrimKit, quillonKit } from './kits';
 
 export const TICKS = 3600;
@@ -490,7 +491,7 @@ function explained(events: readonly SimEvent[], press: Press): boolean {
 /** What a played match leaves for the tests to assert on. */
 export interface Played {
   state: GameState;
-  worst: { id: number; from: number; length: number; intent: string };
+  worst: WorstStall;
   started: number[];
   /** Casts started per `champion:SLOT` (an EX variant counts under its slot). */
   slots: Record<string, number>;
@@ -718,6 +719,6 @@ export function expectNoStall(played: Played): void {
   const { worst } = played;
   expect(
     worst.length,
-    `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent}`,
+    stallMessage(worst),
   ).toBeLessThanOrEqual(120);
 }

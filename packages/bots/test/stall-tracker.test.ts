@@ -3,7 +3,7 @@ import { createMatch } from '@claudeline/sim';
 import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
 import type { Bot } from '../src/bot';
 import type { Intent } from '../src/intent';
-import { arena01, config2v2, createStallTracker, ownSpawnOf } from './helpers';
+import { arena01, config2v2, createStallTracker, ownSpawnOf, stallMessage } from './helpers';
 import { sceneOf } from './scenes';
 
 function setHealth(state: GameState, id: number, fraction: number): void {
@@ -190,7 +190,53 @@ describe('createStallTracker', () => {
     const bots = [stub('engage', 2)];
     const tracker = createStallTracker(state, bots);
     for (let i = 0; i < 3; i++) tracker.observe(zeros());
-    expect(tracker.worst()).toEqual({ id: 0, from: 0, length: 3, intent: 'engage' });
+    expect(tracker.worst()).toEqual({
+      id: 0,
+      from: 0,
+      length: 3,
+      intent: 'engage',
+      intents: { engage: 3, kite: 0, retreat: 0, idle: 0 },
+    });
+  });
+
+  // The filed stall of #129 read "in idle" for a run of 691 ticks of engage and 15 of idle once the
+  // target died: the intent of the last tick names the run, so the counts say what it was made of.
+  it('reports the intents over the run: engage, then idle, gives both counts', () => {
+    const state = duel(0);
+    place(state, 0, -12, 0);
+    place(state, 2, 12, 0);
+    let intent: Intent = 'engage';
+    const bots: Bot[] = [{ think: () => ZERO, inspect: () => ({ intent, targetId: 2 }) }];
+    const tracker = createStallTracker(state, bots);
+    for (let i = 0; i < 4; i++) tracker.observe(zeros());
+    intent = 'idle';
+    for (let i = 0; i < 2; i++) tracker.observe(zeros());
+    const worst = tracker.worst();
+    expect(worst.intent).toBe('idle');
+    expect(worst.length).toBe(6);
+    expect(worst.intents).toEqual({ engage: 4, kite: 0, retreat: 0, idle: 2 });
+    expect(stallMessage(worst)).toBe('champion 0 stalled from tick 0 for 6 ticks in idle (engage 4, idle 2)');
+  });
+
+  it('counts the intents of the worst run only: a run that ended does not carry over', () => {
+    const state = duel(0);
+    place(state, 0, -12, 0);
+    place(state, 2, 12, 0);
+    let intent: Intent = 'kite';
+    const bots: Bot[] = [{ think: () => ZERO, inspect: () => ({ intent, targetId: 2 }) }];
+    const tracker = createStallTracker(state, bots);
+    for (let i = 0; i < 2; i++) tracker.observe(zeros());
+    tracker.observe([WALK, ZERO]);
+    intent = 'engage';
+    for (let i = 0; i < 3; i++) tracker.observe(zeros());
+    expect(tracker.worst().intents).toEqual({ engage: 3, kite: 0, retreat: 0, idle: 0 });
+  });
+
+  it('prints a run of one intent with that one count', () => {
+    const none = { id: 3, from: 9, length: 7, intent: 'kite' as const };
+    expect(stallMessage({ ...none, intents: { engage: 0, kite: 7, retreat: 0, idle: 0 } })).toBe(
+      'champion 3 stalled from tick 9 for 7 ticks in kite (kite 7)',
+    );
   });
 });
 

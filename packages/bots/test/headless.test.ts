@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checksum, step } from '@claudeline/sim';
 import type { Intent } from '../src/intent';
-import { checkInvariants, createRun, createStallTracker, validInput } from './helpers';
+import { checkInvariants, createRun, createStallTracker, stallMessage, validInput } from './helpers';
 
 const TICKS = 3600;
 const LOW_HEALTH_TICK = 1800;
@@ -71,7 +71,7 @@ describe('headless 2v2 match of bots', () => {
     const worst = tracker.worst();
     expect(
       worst.length,
-      `champion ${worst.id} stalled from tick ${worst.from} for ${worst.length} ticks in ${worst.intent}`,
+      stallMessage(worst),
     ).toBeLessThanOrEqual(120);
   }, 30_000);
 });
