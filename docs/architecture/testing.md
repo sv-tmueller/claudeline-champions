@@ -168,11 +168,13 @@ port 5173, which Playwright starts itself.
   scene of `hud-scene.test.ts` on the real sim (a client unit test: R shows 40
   absorb, Skerrow's Quiet Dart takes 8 of it and silences all seven slots for
   its 90 ticks, a scripted kill counts on the scoreboard), decision 6 of batch
-  #134. The test sets a 60 s timeout. It takes 3.9 to 4.5 s locally. On the
-  runner a frame is 17 to 24 ms at the probe viewport (about 450 of them, in
-  batches of one `runFor`) and 105 to 210 ms at 1280x720, and about 20
-  tick-exact frames also pay a hook read of 32 to 75 ms, so about 20 s, which
-  is the margin of 3x of the rule.
+  #134. The test makes 18 hook reads and runs the flights and waits as batches
+  of one `runFor`, and sets a 60 s timeout. It takes 5.1 s locally. On the
+  runner a frame is 17 to 24 ms at the probe viewport (about 600 of them: the
+  warmup, the 130 ticks of a shot's flight, the 240 of the shield and some 25
+  read one by one) and 105 to 210 ms at 1280x720 (about 6), and a read costs 32
+  to 75 ms, so the body takes about 17 s and the page load and the screenshot
+  make it about 22 s. The timeout is more than twice that, as the rule asks.
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.
@@ -707,13 +709,13 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   1768 B) and the object in the entity views' `draw` (3072 to 3120 B and 3000 to
   3100 B), against clean medians of 324 to 456 B and 432 to 576 B.
 
-  The row of #138 and two reruns, each applied alone on the final head of the
-  PR (01414c7) with 3 attempts per scene: the template per `Scoreboard.update`
+  The row of #138 and two reruns, each applied alone on the last code commit
+  of the PR (01414c7) with 3 attempts per scene: the template per `Scoreboard.update`
   fails 6 of 6 (`scoreboard.ts:update` at 756 to 1032 B a window), the template
   per `Hud.update` reruns red 6 of 6 (sandbox 1188 to 1344 B, live 1328 to 1468
   B; `hud.ts:update` at 756 to 952 B) and so does the closure in `routeEvents`
   (1612 to 1748 B and 1672 to 1772 B; `feedback.ts:routeEvents` at 1156 to
-  1268 B). The clean medians of the same head are 408 to 456 B on the sandbox
+  1268 B). The clean medians of the same code are 408 to 456 B on the sandbox
   and 456 to 480 B on the live scene (bots 5856 to 6376 B).
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
@@ -758,14 +760,16 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   `readShieldView` read 636 to 936 B a window in `hud-views.ts:readShieldView`:
   the function is called once per frame, so it is still in the lower tiers,
   where a loaded or added double boxes. With an `Int32Array` sum of per-shield
-  ceilings `hud.ts` and `hud-views.ts` read 0 B in all 15 windows (counted
-  medians 408 to 504 B). The live scene showed `readSlotViews` and
+  ceilings the shield readers (`readShieldView` and `readSlotViews`) read 0 B in
+  all 15 windows (counted medians 408 to 504 B); `hud.ts` as a whole does not
+  always, since one-off blips in `updateRound` and `updateEnergy` also occur on
+  the unmodified spec. The live scene showed `readSlotViews` and
   `readShieldView` at 48 to 480 B a window before `primeStatusReads` (client.md,
   the frame path); with it they read 0 B in 3 attempts. The change writes (the
   shield's start and width, the silenced flag) are on review, like the other
   per-change writes. The medians of the local `--repeat-each=3` runs on the
-  final head are 408 to 456 B on the sandbox (limit 600) and 456 to 480 B on
-  the live scene (limit 780), the live bots 5856 to 6376 B (limit 12 000).
+  last code commit are 408 to 456 B on the sandbox (limit 600) and 456 to 480 B
+  on the live scene (limit 780), the live bots 5856 to 6376 B (limit 12 000).
 - The history, which is why the windows use a hook: with the windows on the fake
   clock, `onAnimationFrame` had two modes. Playwright's fake clock hands out ids
   of 1e12 and up, so each `requestAnimationFrame` call boxes about three heap
