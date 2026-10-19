@@ -64,6 +64,8 @@ const ROWS: Row[] = [
       },
     ],
   },
+  { kit: 'ondrel', attempt: 2, pins: [] },
+  { kit: 'brimwick', attempt: 10, pins: [] },
 ];
 
 function committed(kit: string): string {
