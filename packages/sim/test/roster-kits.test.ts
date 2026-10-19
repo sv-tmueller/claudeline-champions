@@ -187,6 +187,34 @@ function catalogProblems(kit: KitDef): string[] {
       case 'energyGain':
         bad(path, 'no v1 kit lists energyGain');
         break;
+      case 'area': {
+        // The three lingering-area rules of roster-v2 section 0; a one-hit area is outside them.
+        if (effect.durationTicks <= 1) break;
+        // An area acts in the step it spawns and then every intervalTicks: ceil(D / I) pulses (area.ts).
+        const pulses = Math.ceil(effect.durationTicks / effect.intervalTicks);
+        const top = slot === 'F' ? 60 : 30;
+        for (const type of ['damage', 'heal']) {
+          const hits = effect.effects.filter((hit): hit is Extract<Effect, { amount: number }> => hit.type === type);
+          if (hits.length === 0) continue;
+          const total = hits.reduce((sum, hit) => sum + hit.amount, 0) * pulses;
+          if (!within(total, 8, top)) bad(path, `${type} total ${total} over ${pulses} pulses is not 8 to ${top}`);
+        }
+        if (pulses > 1) {
+          effect.effects.forEach((hit, k) => {
+            if (hit.type !== 'applyStatus') return;
+            const lock = hit.status.type;
+            if (lock === 'stun' || lock === 'root' || lock === 'silence') {
+              bad(`${path}.effects[${k}].status`, `a pulsing area carries ${lock}`);
+            }
+          });
+        }
+        // The EX variant shares the cooldown of its slot (SlotSpec), so one lookup serves both.
+        const cooldown = kit.slots[slot].cooldownTicks;
+        if (effect.durationTicks >= cooldown) {
+          bad(`${path}.durationTicks`, `${effect.durationTicks} ticks is not under the ${slot} cooldown of ${cooldown}`);
+        }
+        break;
+      }
       case 'projectile':
         if (!within(effect.speed, 12, 25)) bad(`${path}.speed`, `projectile speed ${effect.speed} is not 12 to 25`);
         if (!within(effect.radius, 0.2, 0.6)) bad(`${path}.radius`, `projectile radius ${effect.radius} is not 0.2 to 0.6`);
@@ -436,6 +464,131 @@ function press(slot: Slot, options: { ex?: boolean; aim?: Spot; moveY?: -1 | 0 |
   const buttons = Button[slot] | (options.ex ? Button.SHIFT : 0);
   return input(0, options.moveY ?? 0, Math.round(aimX * 100), Math.round(aimY * 100), buttons);
 }
+
+/** The paths of the areas of a kit that last more than one step: the ones the three lingering rules bind. */
+function lingeringPaths(kit: KitDef): string[] {
+  return visitKit(kit)
+    .filter(({ effect }) => effect.type === 'area' && effect.durationTicks > 1)
+    .map(({ path }) => path);
+}
+
+/** The area at `effects[index]` of a slot, or of its EX variant; `then` reaches into a leading dash. */
+function areaOf(kit: KitDef, slot: Slot, options: { ex?: boolean; index?: number; then?: boolean } = {}) {
+  const ability = options.ex ? kit.slots[slot].ex : kit.slots[slot];
+  let effect: AbilityEffect | undefined = ability?.effects[options.index ?? 0];
+  if (options.then) {
+    if (effect?.type !== 'dash') throw new Error(`${kit.id} ${slot} does not start with a dash`);
+    effect = effect.then[0];
+  }
+  if (effect?.type !== 'area') throw new Error(`${kit.id} ${slot} has no area there`);
+  return effect;
+}
+
+describe('the lingering area rules', () => {
+  // The three rules of roster-v2 section 0, folded into catalogProblems. The v1 kits have no
+  // lingering area, so each row makes one on a copy of a v1 kit.
+  const lingering = (damage: number, durationTicks: number, intervalTicks: number): KitDef => {
+    const copy = copyOf(hargrim);
+    const area = areaOf(copy, 'M2');
+    area.durationTicks = durationTicks;
+    area.intervalTicks = intervalTicks;
+    const hit = area.effects[0];
+    if (hit?.type !== 'damage') throw new Error('Hargrim M2 does not start with a damage');
+    hit.amount = damage;
+    return copy;
+  };
+  const M2 = 'hargrim.slots.M2.effects[0]';
+
+  it('T1 sums the damage over every pulse: 18 over 180 ticks every 60 is 54 and out of range', () => {
+    expect(catalogProblems(lingering(18, 180, 60))).toEqual([`${M2}: damage total 54 over 3 pulses is not 8 to 30`]);
+  });
+
+  it('T2 counts ceil(duration / interval) pulses, as area.ts does: 11 over 121 ticks every 60 is 33', () => {
+    const copy = lingering(11, 121, 60);
+    expect(catalogProblems(copy)).toEqual([`${M2}: damage total 33 over 3 pulses is not 8 to 30`]);
+    // The same copy in the sim: three areaTick events, so the formula is the engine's and not a guess.
+    const rig = new Rig(copy, { 2: [X0 + 4.5, 0] });
+    rig.run(24 + 130, press('M2'));
+    expect(rig.events('areaTick').map(({ step }) => step)).toEqual([24, 84, 144]);
+    expect(rig.events('damage').map(({ e }) => e.amount)).toEqual([11, 11, 11]);
+    rig.clean();
+  });
+
+  it('T3 passes a total of exactly 30, and on F exactly 60 but not 65', () => {
+    expect(catalogProblems(lingering(10, 180, 60))).toEqual([]);
+    // Hargrim F fires its area in a `then`: no stun here, since a pulsing area carries none.
+    const finale = (damage: number): KitDef => {
+      const copy = copyOf(hargrim);
+      const area = areaOf(copy, 'F', { then: true });
+      area.durationTicks = 300;
+      area.intervalTicks = 60;
+      area.effects.splice(1, 1);
+      const hit = area.effects[0];
+      if (hit?.type !== 'damage') throw new Error('Hargrim F does not start with a damage');
+      hit.amount = damage;
+      return copy;
+    };
+    expect(catalogProblems(finale(12))).toEqual([]);
+    expect(catalogProblems(finale(13))).toEqual([
+      'hargrim.slots.F.effects[0].then[0]: damage total 65 over 5 pulses is not 8 to 60',
+    ]);
+  });
+
+  it('T3 sums a heal on its own, apart from the damage', () => {
+    const copy = lingering(10, 180, 60);
+    areaOf(copy, 'M2').effects.push({ type: 'heal', amount: 11 });
+    expect(catalogProblems(copy)).toEqual([`${M2}: heal total 33 over 3 pulses is not 8 to 30`]);
+  });
+
+  it.each(['stun', 'root', 'silence'] as const)('T4 refuses %s on a pulsing area, and allows it on a one-hit area', (type) => {
+    const copy = lingering(8, 180, 60);
+    areaOf(copy, 'M2').effects.push({ type: 'applyStatus', status: { type, ticks: 60 } });
+    expect(catalogProblems(copy)).toEqual([`${M2}.effects[2].status: a pulsing area carries ${type}`]);
+    const oneHit = copyOf(hargrim);
+    areaOf(oneHit, 'M2').effects.push({ type: 'applyStatus', status: { type, ticks: 60 } });
+    expect(catalogProblems(oneHit)).toEqual([]);
+  });
+
+  it('T4 allows a slow and a knockback on a pulse, and one pulse of an area that lasts as long as it ticks', () => {
+    const copy = lingering(8, 180, 60);
+    areaOf(copy, 'M2').effects.push({ type: 'knockback', distance: 1, ticks: 6, direction: 'away' });
+    expect(catalogProblems(copy)).toEqual([]);
+    // One pulse (60 ticks every 60): a stun is a single application, not a chain.
+    const single = lingering(8, 60, 60);
+    areaOf(single, 'M2').effects.push({ type: 'applyStatus', status: { type: 'stun', ticks: 60 } });
+    expect(catalogProblems(single)).toEqual([]);
+  });
+
+  it('T5 wants the duration under the cooldown: Rally Cry at 840 ticks against 840 is red and 839 is not', () => {
+    const rally = (durationTicks: number): KitDef => {
+      const copy = copyOf(hargrim);
+      const area = areaOf(copy, 'Q');
+      area.durationTicks = durationTicks;
+      area.intervalTicks = 60;
+      return copy;
+    };
+    expect(catalogProblems(rally(839))).toEqual([]);
+    expect(catalogProblems(rally(840))).toEqual([
+      'hargrim.slots.Q.effects[0].durationTicks: 840 ticks is not under the Q cooldown of 840',
+    ]);
+  });
+
+  it('T5 holds the EX variant to the cooldown it shares: Ground Slam EX at 360 against 360 names M2', () => {
+    const copy = copyOf(hargrim);
+    const area = areaOf(copy, 'M2', { ex: true });
+    area.durationTicks = 360;
+    area.intervalTicks = 360;
+    expect(catalogProblems(copy)).toEqual([
+      'hargrim.slots.M2.ex.effects[0].durationTicks: 360 ticks is not under the M2 cooldown of 360',
+    ]);
+    area.durationTicks = 359;
+    expect(catalogProblems(copy)).toEqual([]);
+  });
+
+  it('keeps the four v1 kits free of lingering areas', () => {
+    for (const kit of [hargrim, quillon, skerrow, lumeth]) expect(lingeringPaths(kit)).toEqual([]);
+  });
+});
 
 describe('every slot of the four kits', () => {
   interface Row {
