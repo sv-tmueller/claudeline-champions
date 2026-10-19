@@ -164,10 +164,8 @@ describe('opensSelect', () => {
 });
 
 describe('relaunch', () => {
-  const CHAMPIONS = ['hargrim', 'quillon'];
-
   it('writes the whole setup, so the address reads back as the same launch and skips the select', () => {
-    for (const champion of CHAMPIONS) {
+    for (const champion of KITS) {
       for (const difficulty of DIFFICULTIES) {
         for (const arena of ARENAS) {
           for (const teamSize of [2, 3] as const) {

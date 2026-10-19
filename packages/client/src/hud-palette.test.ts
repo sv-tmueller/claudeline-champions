@@ -317,9 +317,7 @@ describe('pointer events', () => {
     expect(taking.map((rule) => rule.selector)).toEqual(["#result [data-result='panel'][data-visible='true']"]);
     expect(taking[0]?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('auto');
   });
-});
 
-describe('select pointer events', () => {
   it('reach the select panel only while it is visible', () => {
     const { rules } = load(SHEETS[3] as Sheet);
     const root = rules.find((rule) => rule.selector === '#select');

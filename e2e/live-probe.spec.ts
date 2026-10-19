@@ -12,9 +12,10 @@ import {
 } from './heap-probe';
 import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
-// The second heap-probe scene: the default match, `/` at time scale 1, where the
-// hooks and the HUD change in every window (the position and facing of the
-// human on every tick, projectiles, hits and bars as the bots fight). The first
+// The second heap-probe scene: the default match, entered on `DEFAULT_MATCH` (a
+// bare `/` opens the select) at time scale 1, where the hooks and the HUD change
+// in every window (the position and facing of the human on every tick,
+// projectiles, hits and bars as the bots fight). The first
 // scene, combat.spec.ts, is a steady state. This one counts the table-driven
 // change writes with real changes, and the bots' fight through the glue. The
 // bots package itself is logged as the sixth figure of the probe line and bounded
