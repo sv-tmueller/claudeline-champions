@@ -54,9 +54,17 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
   // sets, each stopped when one champion was left) gave no F cast. A 3v3 (Hargrim and two Quillons
   // a side) lasts longer and its bar reaches 100. These seeds and tiers are pinned for this
   // criterion alone; the death run above keeps its seeds.
+  //
+  // A declared start edit (batch #134 decision 4, the precedent of the Reaper's Dance run below):
+  // every champion starts at 75 energy. Since the bots dodge (#137) the hard bots land fewer hits,
+  // and no seed set tried (101 to 106 among them) reached an F by landing hits alone, in either
+  // kit set. At 75 the energy reserve is what is tested: four (test kits) or five (shipped kits)
+  // of six champions press F, and with the reserve dropped none does, since they spend the 25 of
+  // an EX press first.
   it('a 3v3 of six bots on two kits starts an ultimate within 3600 ticks', () => {
     const config = config3v3();
     const run = createRun(ULTIMATE_SEEDS, ULTIMATE_TIERS, 7, { config, kits: set.kits() });
+    for (const champion of run.state.champions) champion.energy = 75;
     const played = play(set, run);
     expect(
       played.ultimates.some((n) => n > 0),

@@ -174,15 +174,15 @@ describe('segmentClear', () => {
 });
 
 describe('obstacle shapes of the grid', () => {
-  it('hold every obstacle as numbers, in order, with the limit the segment must keep', () => {
+  it('hold every obstacle as numbers, in order, with the limit the segment must keep, less the 1e-9 of touching', () => {
     const obstacles: Obstacle[] = [
       { type: 'circle', x: 1.5, y: -2, r: 1.25, height: 2, blocksProjectiles: true },
       { type: 'rect', x: -3, y: 4.5, w: 2, h: 0.5, height: 1, blocksProjectiles: false },
     ];
     const grid = buildNavGrid({ ...arena01, obstacles });
     expect(grid.shapes).toEqual([
-      0, 1.5, -2, 1.25, 0.5, 1.25 + CHAMPION_RADIUS,
-      1, -3, 4.5, 2, 0.5, CHAMPION_RADIUS,
+      0, 1.5, -2, 1.25, 0.5, 1.25 + CHAMPION_RADIUS - 1e-9,
+      1, -3, 4.5, 2, 0.5, CHAMPION_RADIUS - 1e-9,
     ]);
   });
 });

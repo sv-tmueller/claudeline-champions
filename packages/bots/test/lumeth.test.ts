@@ -21,8 +21,9 @@ const SEEDS_3V3 = [101, 102, 103, 104, 105, 106];
  * The tick budget of a match, by the formula of the client's match-setup.test.ts and the e2e rows:
  * the end tick when the budget was set, plus two rounds of `round` ticks and one sudden-death
  * round of 7000, rounded up to 1000. The round term is the longest round that did not go to sudden
- * death, rounded up to 100: 1653 ticks in the 2v2 runs here (1700), and 1954 in the client's 3v3 of
- * the same roster (2000; the 3v3 runs here have 1969 at most, with other seeds). A run whose longest
+ * death, rounded up to 100: 1619 ticks in the 2v2 runs here (1700), and 2801 in the client's 3v3 of
+ * the same roster (2900; the 3v3 runs here have 2722 at most, with other seeds). The bots dodge
+ * since #137, which lengthens the 3v3 rounds (2000 before). A run whose longest
  * round passes its term fails, so the term follows the rounds and not the old figures.
  */
 function budgetOf(endTick: number, round: number): number {
@@ -48,9 +49,9 @@ const ROWS: Row[] = [
     arena: arena01,
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
-    endTick: 7860,
+    endTick: 6623,
     round: 1700,
-    budget: 19_000,
+    budget: 18_000,
   },
   {
     name: 'a 2v2 on arena02',
@@ -58,9 +59,9 @@ const ROWS: Row[] = [
     arena: arena02,
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
-    endTick: 4860,
+    endTick: 7521,
     round: 1700,
-    budget: 16_000,
+    budget: 18_000,
   },
   {
     name: 'a 3v3 on arena01',
@@ -68,9 +69,9 @@ const ROWS: Row[] = [
     arena: arena01,
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
-    endTick: 11167,
-    round: 2000,
-    budget: 23_000,
+    endTick: 6773,
+    round: 2900,
+    budget: 20_000,
   },
   {
     name: 'a 3v3 on arena02',
@@ -78,9 +79,9 @@ const ROWS: Row[] = [
     arena: arena02,
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
-    endTick: 7373,
-    round: 2000,
-    budget: 19_000,
+    endTick: 10934,
+    round: 2900,
+    budget: 24_000,
   },
 ];
 

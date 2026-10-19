@@ -106,7 +106,8 @@ async function runUntil(
 // The same round on each arena and each team size. The arena02 row proves the bots and the sim play it
 // from the address, not only that the page loads it: its first death is a tick budget like arena01's.
 // The 3v3 rows read six bars. `projectile` and `hit` are the ticks measured headless on the bots of
-// #112 (a Lumeth on each team), the same figures as the log lines of these rows. They are logged and
+// #137 (a Lumeth on each team; the same as on #112, since the first dodge comes castDelay thinks
+// after the first bolt), the same figures as the log lines of these rows. They are logged and
 // never asserted: the 2v2 rows assert budgets only too, and every bots change moves them. arena01 267
 // and 290, arena02 271 and 319 (267 and 301, 275 and 307 with two Quillons a side). The budgets are
 // the 2v2 ones, 600 and 1800: the latest first hit, 319, is 139 ticks into the round.

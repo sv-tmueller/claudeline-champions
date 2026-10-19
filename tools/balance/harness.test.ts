@@ -193,12 +193,12 @@ describe('playMatch', () => {
 
   // The runs of packages/bots/test/lumeth.test.ts, with its configs, bot seeds 101 and up by champion
   // id and match seed 7: the harness plays the same match as the bots' own tests, so the end ticks
-  // they pin (7860, 4860, 11167 and 7373) come out of it too.
+  // they pin (6623, 7521, 6773 and 10934) come out of it too.
   it.each([
-    { name: 'a 2v2 on arena01', arena: 'arena01', size: 2, endTick: 7860 },
-    { name: 'a 2v2 on arena02', arena: 'arena02', size: 2, endTick: 4860 },
-    { name: 'a 3v3 on arena01', arena: 'arena01', size: 3, endTick: 11167 },
-    { name: 'a 3v3 on arena02', arena: 'arena02', size: 3, endTick: 7373 },
+    { name: 'a 2v2 on arena01', arena: 'arena01', size: 2, endTick: 6623 },
+    { name: 'a 2v2 on arena02', arena: 'arena02', size: 2, endTick: 7521 },
+    { name: 'a 3v3 on arena01', arena: 'arena01', size: 3, endTick: 6773 },
+    { name: 'a 3v3 on arena02', arena: 'arena02', size: 3, endTick: 10934 },
   ] as const)('reproduces the end tick of the Lumeth run of the bots tests, $name', ({ arena, size, endTick }) => {
     const team = (ids: readonly string[], t: TeamId) => ids.map((championId) => ({ championId, team: t }));
     const match: MatchConfig =
@@ -360,7 +360,10 @@ describe('the report', () => {
 });
 
 describe('a run', () => {
-  it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 120_000 }, () => {
+  // Runner (ubuntu-latest, Node 22): 47.3 to 59.6 s before the dodge of #137, 62.4 s on 787cd0c (unit job
+  // 117369238607); 22.4 s locally (Apple M5 Pro, Node 22.23.2; 18.6 s before). Timeout: twice the slowest runner
+  // time is 124.8 s, so 150 s (testing.md, Check suite; it was 120 s).
+  it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 150_000 }, () => {
     const run = () => {
       const cells = playCells(DATA, 2);
       return { cells, text: renderReport({ head: 'abc1234', seeds: 2, kitIds: KIT_IDS, cells }) };

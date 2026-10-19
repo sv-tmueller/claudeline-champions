@@ -16,6 +16,7 @@ import {
 import type { CastChoice } from './casting';
 import { TIERS } from './difficulty';
 import type { Difficulty } from './difficulty';
+import { clearDodgeMemo, createDodgeScratch, dodgeInto } from './dodge';
 import { chooseEscape, createEscapeScratch } from './escape';
 import { createFollower, followPathInto } from './follow';
 import { buildNavGrid, cellCenterInto } from './grid';
@@ -211,6 +212,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const spawnPoint: Vec2 = { x: 0.5, y: 0.5 };
   const goalPoint: Vec2 = { x: 0.5, y: 0.5 };
   const kiteScratch = createKiteScratch();
+  const dodgeScratch = createDodgeScratch(tier.dodgeChance, tier.castDelay);
   const kitCache = createKitCache();
   const cues = createCastCues(kiteScratch);
   const escapeScratch = createEscapeScratch(kiteScratch);
@@ -385,14 +387,15 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
 
   /**
    * Writes the aim into `input`, at `subject`: the acted target, or the ally a bolt is pressed at
-   * or winds up for. The one rng draw of a think is here. The lead and the error turn are
-   * `leadPoint` and `rotateByHalfTangent` of aim.ts written out over locals, with the same
-   * operations in the same order (the tests compare the two bit for bit): a call with a double
-   * argument that V8 does not inline boxes it, and the aim made a dozen of them. The finite tests
-   * are `x - x === 0`, true for a finite x only: in the Chromium of Playwright 1.63 and in V8 14.6
-   * (Node 26) the Maglev tier calls `Number.isFinite` with its argument boxed, one allocation a
-   * think; Node 22's V8 12.4 does not reproduce that. The `bots-heap-maglev` project of
-   * vitest.heap.config.ts checks it (allocation.test.ts; see bots.md, Allocation, In the browser).
+   * or winds up for. The aim draw of a think is here (a dodge coin, dodge.ts, follows it). The
+   * lead and the error turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over
+   * locals, with the same operations in the same order (the tests compare the two bit for bit): a
+   * call with a double argument that V8 does not inline boxes it, and the aim made a dozen of
+   * them. The finite tests are `x - x === 0`, true for a finite x only: in the Chromium of
+   * Playwright 1.63 and in V8 14.6 (Node 26) the Maglev tier calls `Number.isFinite` with its
+   * argument boxed, one allocation a think; Node 22's V8 12.4 does not reproduce that. The
+   * `bots-heap-maglev` project of vitest.heap.config.ts checks it (allocation.test.ts; see
+   * bots.md, Allocation, In the browser).
    */
   function aim(
     me: ChampionState,
@@ -501,7 +504,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       const kit = findKit(state, me.championId);
       // A rebuild means another kit or champion id: the ally held for the windup of the old one is
       // an id in another match, and must not be aimed at.
-      if (refreshKitCache(kitCache, kit, me.championId)) aimHold.allyAim = -1;
+      if (refreshKitCache(kitCache, kit, me.championId)) {
+        aimHold.allyAim = -1;
+        clearDodgeMemo(dodgeScratch);
+      }
       const profile = kitCache.profile;
       decide(state, me, profile);
 
@@ -607,6 +613,13 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       // does not change; a teleport or dash press (an escape with a landing) then overwrites the aim
       // with its landing, with no error, whatever ally the aim was held on.
       aim(me, subject, kit, pressed);
+      // The dodge, after the aim draw: a coin is one more draw of the same generator (dodge.ts). It
+      // rewrites the move alone, so the intent, the target, the follower, the casts and the aim
+      // stand as decided; a step the bot cannot take leaves the move of the intent.
+      if (dodgeInto(command, dodgeScratch, rngState, state, me, navGrid(state), sight)) {
+        input.moveX = command.moveX;
+        input.moveY = command.moveY;
+      }
       // The press starts the next cast: it holds its ally, or none.
       if (pressed) aimHold.allyAim = allyId;
       if (pressed && escapeScratch.landed) {

@@ -489,20 +489,21 @@ none.
 `e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
 `/?timescale=100` (see Launch and match), once per arena and team size (arena02
 on `/?arena=arena02&timescale=100`, a 3v3 with `teamsize=3` in the address),
-with the human idle: a 16 ms frame runs 96 ticks, so a match of 4198 to 11 095
-ticks is some 44 to 116 frames at 5 frames a read, where without the scale it
+with the human idle: a 16 ms frame runs 96 ticks, so a match of 4936 to 15 773
+ticks is some 52 to 165 frames at 5 frames a read, where without the scale it
 would be thousands of frames. The range is the end ticks the headless matches of
-`packages/client/src/match-setup.test.ts` give: 4198 (`ARENA02_END_TICK`, the
-2v2 on arena02) to 11 095 (`ARENA02_3V3_END_TICK`, the 3v3 on arena02), with
-5349 for the 3v3 on arena01 (`ARENA01_3V3_END_TICK`) and 5053 for the 2v2 on
-arena01 (the test's console line, no constant; its budget is 15 000). It reads
-the panel hidden until `data-phase` is `matchEnd`, then the title, the score
-(equal to the HUD's), the select, takes `result.png` and follows the Quillon
-link, which keeps the arena and the team size (a 3v3 has `data-bar5` after the
-reload). The headless integration tests (`match-setup.test.ts`: one round to win
-and three on arena01, three on arena02, and a 3v3 on each) give the tick budget
-of each row, and the result screen's unit tests the Victory and Defeat cases
-that the idle human cannot reach.
+`packages/client/src/match-setup.test.ts` give: 4936 for the 2v2 on arena01 (the
+test's console line, no constant; its budget is 14 000) to 15 773
+(`ARENA02_3V3_END_TICK`, the 3v3 on arena02), with 12 191 for the 2v2 on arena02
+(`ARENA02_END_TICK`) and 5774 for the 3v3 on arena01 (`ARENA01_3V3_END_TICK`);
+the dodge of the bots moved them all (5053, 4198, 5349 and 11 095 before). It
+reads the panel hidden until `data-phase` is `matchEnd`, then the title, the
+score (equal to the HUD's), the select, takes `result.png` and follows the
+Quillon link, which keeps the arena and the team size (a 3v3 has `data-bar5`
+after the reload). The headless integration tests (`match-setup.test.ts`: one
+round to win and three on arena01, three on arena02, and a 3v3 on each) give the
+tick budget of each row, and the result screen's unit tests the Victory and
+Defeat cases that the idle human cannot reach.
 
 `Hud.update` runs once per stepping frame, after all of that frame's sim steps.
 It compares integers and booleans held in cache fields with the new values and

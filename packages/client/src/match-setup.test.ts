@@ -18,8 +18,9 @@ import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
-// The tick budget of e2e/match-end.spec.ts for the default match to its result screen.
-const MATCH_END_BUDGET_TICKS = 15_000;
+// The tick budget of e2e/match-end.spec.ts for the default match to its result screen: the headless end
+// tick, 4936, plus two rounds of about 1000 and one of about 7000, rounded up to 1000 (as every other row's).
+const MATCH_END_BUDGET_TICKS = 14_000;
 
 function launch(champion: string, scene: Launch['scene'] = 'match'): Launch {
   return { scene, champion, difficulty: 'normal', arena: 'arena01', teamSize: 2 };
@@ -291,12 +292,13 @@ describe('a match of bots from setup to the result', () => {
 
 // The tick budget of the arena02 row of e2e/match-end.spec.ts: the end tick of this match
 // when the budget was set, plus two rounds of about 1000 ticks and one sudden-death round
-// of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86 and is 4198 on
-// those of #98 (the dash hold shortened the first two rounds of the live match, and lengthened
-// this one); every bots change moves it, the console line above reports the current one, and a
-// match that ends past the budget fails here before the e2e does.
-const ARENA02_END_TICK = 4198;
-const ARENA02_BUDGET_TICKS = 14_000;
+// of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86, 4198 on those of
+// #98 (the dash hold shortened the first two rounds of the live match, and lengthened this one)
+// and is 12191 on those of #137 (the dodge: a first round of 6453 ticks goes to sudden death);
+// every bots change moves it, the console line above reports the current one, and a match that
+// ends past the budget fails here before the e2e does.
+const ARENA02_END_TICK = 12_191;
+const ARENA02_BUDGET_TICKS = 22_000;
 
 describe('a match of bots on arena02', () => {
   it('ends the match to 3 rounds with a winner on 3 within the budget of the e2e', { timeout: 60_000 }, () => {
@@ -329,21 +331,21 @@ describe('playableTeamSize', () => {
 });
 
 // The tick budgets of the 3v3 rows of e2e/match-end.spec.ts: the end tick of the match when the
-// budget was set (measured through this setup and the client's bot driver on the bots of #112, with
-// Lumeth on both teams; 12431 and 7125 with two Quillons a side on 57dd52f, the bots of #98), plus
-// two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is 2000,
-// the longest non-sudden 3v3 round measured (1954 ticks, arena01, round 2, 3331 before Binding
-// Sigil's radius went from 1.5 to 2 m; 1770 and 1334 are the next), rounded up to 100: a healer
-// keeps a round going, where the longest was 1557 with two Quillons and the 2v2 rows assume 1000.
-// arena01: ceil((5349 + 2 * 2000 + 7000) / 1000) * 1000 = 17000. arena02:
-// ceil((11095 + 2 * 2000 + 7000) / 1000) * 1000 = 23000. Every kit or bots change moves the
-// end tick, the console line reports the current one, and a match that ends past the budget fails
+// budget was set (measured through this setup and the client's bot driver on the bots of #137, the
+// dodge; 5349 and 11095 on those of #112, and 12431 and 7125 with two Quillons a side on 57dd52f),
+// plus two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is
+// 2900, the longest non-sudden 3v3 round measured (2801 ticks, arena02, round 4; 2101 and 2023 are
+// the next, 1954 and 3331 on the earlier bots and kits), rounded up to 100: a healer keeps a round
+// going, and the dodge lengthens it, where the longest was 1557 with two Quillons and the 2v2 rows
+// assume 1000. arena01: ceil((5774 + 2 * 2900 + 7000) / 1000) * 1000 = 19000. arena02:
+// ceil((15773 + 2 * 2900 + 7000) / 1000) * 1000 = 29000. Every kit or bots change moves the end
+// tick, the console line reports the current one, and a match that ends past the budget fails
 // here before the e2e does.
-const THREE_V_THREE_ROUND_TICKS = 2000;
-const ARENA01_3V3_END_TICK = 5_349;
-const ARENA01_3V3_BUDGET_TICKS = 17_000;
-const ARENA02_3V3_END_TICK = 11_095;
-const ARENA02_3V3_BUDGET_TICKS = 23_000;
+const THREE_V_THREE_ROUND_TICKS = 2900;
+const ARENA01_3V3_END_TICK = 5_774;
+const ARENA01_3V3_BUDGET_TICKS = 19_000;
+const ARENA02_3V3_END_TICK = 15_773;
+const ARENA02_3V3_BUDGET_TICKS = 29_000;
 
 describe('a 3v3 match of bots from setup to the result', () => {
   it('ends on arena01 with a winner on 3 within the budget of the e2e', { timeout: 120_000 }, () => {
