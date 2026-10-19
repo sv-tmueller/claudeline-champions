@@ -1226,24 +1226,24 @@ red without the tolerance. The same file pins the four states of the stalls of
 no-stall clause of `lumeth.test.ts` red for 123 to 6003 ticks, section 6.2 of
 balance.md): a champion at rest one ulp inside an inflated obstacle, at the
 corner of a rectangle in three of them and on the circle (0, -7.5), radius
-0.75, in the fourth, at a gap of 6e-17 to 2.2e-16. Each state has both
+0.75, in the fourth, at a gap of 5.6e-17 to 2.2e-16. Each state has both
 sides: the goal side, a bot chasing an enemy that stands there (its cell is
 blocked, so the follower needs `nearestFreeCell` from the goal point, which
 needs a clear segment from it), and the start side, a bot standing there that
 must plan out of its cell. A row asserts that the oracle clearance is a hair
-below 0, that `pointBlocked` is false there and that a hard bot walks on both
-sides (69 thinks, seed 1, the shipped kits). Without the tolerance every row
-is red; with the rect limit of `obstacleShapes` without it the three rect rows
-are red (the walk) and the circle row is green; with the rect branch of
-`overlapsObstacle` without it only the `pointBlocked` asserts of the three
-rect rows are red. The
-stalls of #129 were this state. The architect of #129 replayed 600 ticks from a
-snapshot of each: the bots before the dodge and the tolerance stalled for the
-600 ticks (142 on the circle), those with the tolerance and no dodge and those
-of today for 15, which is a fresh bot's delay ring starting on idle and no
-stall, and those with the dodge and no tolerance for 600 (300 on the circle).
-So the tolerance of #137 resolved the four and the dodge did not; no rule was
-missing in the bots.
+below 0, that `pointBlocked` is false there and that a hard bot walks on each
+side, in a test of its own (69 thinks, seed 1, the shipped kits). Without the
+tolerance every row is red, both sides included; with the rect limit of
+`obstacleShapes` without it the three rect rows are red on both sides (the
+walk) and the circle row is green; with the rect branch of `overlapsObstacle`
+without it only the `pointBlocked` asserts of the three rect rows are red and
+the walks stay green. The architect of #129 replayed 600 ticks from a snapshot
+of each: the bots before the dodge and the tolerance stalled for the 600 ticks
+(142 on the circle), those with the tolerance and no dodge and those of today
+for 15, which is a fresh bot's delay ring starting on idle and no stall, and
+those with the dodge and no tolerance for 600 (300 on the circle). So the
+tolerance of #137 resolved the four and the dodge did not; no rule was missing
+in the bots.
 
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
