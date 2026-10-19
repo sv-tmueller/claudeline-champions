@@ -26,6 +26,7 @@ const botsCtsFile = 'packages/bots/src/virtual.cts';
 const botsTestFile = 'packages/bots/test/virtual.test.ts';
 const clientFile = 'packages/client/src/virtual.ts';
 const balanceFile = 'tools/balance/virtual.ts';
+const fixturesFile = 'tools/fixtures/virtual.ts';
 
 type Case = { name: string; file: string; code: string; rule: string | null };
 
@@ -290,6 +291,69 @@ const cases: Case[] = [
   {
     name: 'balance tool uses a dynamic import',
     file: balanceFile,
+    code: "export const p = import('node:fs');",
+    rule: SYNTAX,
+  },
+  {
+    // The fixture search shares the format, the replay, the coverage and the oracle with the sim's
+    // roster fixture test, so it may import those two files of sim/test and the sim entry.
+    name: 'fixture tool imports the shared roster-fixture module of sim tests',
+    file: fixturesFile,
+    code: "import '../../packages/sim/test/roster-fixture.ts';",
+    rule: null,
+  },
+  {
+    name: 'fixture tool imports the ability oracle of sim tests',
+    file: fixturesFile,
+    code: "import '../../packages/sim/test/ability-watch.ts';",
+    rule: null,
+  },
+  {
+    name: 'fixture tool imports the sim entry point',
+    file: fixturesFile,
+    code: "import '@claudeline/sim';",
+    rule: null,
+  },
+  {
+    name: 'fixture tool imports a file of sim source by relative path',
+    file: fixturesFile,
+    code: "import '../../packages/sim/src/kit.ts';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'fixture tool imports another sim test module',
+    file: fixturesFile,
+    code: "import '../../packages/sim/test/helpers.ts';",
+    rule: IMPORTS,
+  },
+  {
+    // Pins the `$` anchor: the allowed file name is not a prefix match.
+    name: 'fixture tool imports the roster fixture test itself',
+    file: fixturesFile,
+    code: "import '../../packages/sim/test/roster-fixtures.test.ts';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'fixture tool imports a bots test by relative path',
+    file: fixturesFile,
+    code: "import '../../packages/bots/test/helpers.ts';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'fixture tool imports @claudeline/bots',
+    file: fixturesFile,
+    code: "import '@claudeline/bots';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'fixture tool imports a file inside @claudeline/sim',
+    file: fixturesFile,
+    code: "import '@claudeline/sim/src/kit';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'fixture tool uses a dynamic import',
+    file: fixturesFile,
     code: "export const p = import('node:fs');",
     rule: SYNTAX,
   },
