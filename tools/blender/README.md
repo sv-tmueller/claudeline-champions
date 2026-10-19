@@ -157,11 +157,12 @@ projectiles, impact ring, hit flash, dead grey and the magenta debug overlay
 
 The arena floor (0.30, 0.32, 0.36), about `#9599a2`, and trim
 (0.50, 0.45, 0.30), about `#bcb395`, follow a surface rule in the same test.
-Each is at least 80 from every colour the client draws and from the accent,
-and no arena material has a blue channel more than 45 above its green. The
-placeholder body is left out of this rule, because the floor was never held
-to it (48.5 away). The trim is 48.6 from the floor on purpose, so the floor
-reads as one two-tone surface, and nothing compares the two.
+Each is at least 80 from the eight client colours of the body rule and from
+the accent, and no arena material has a blue channel more than 45 above its
+green. The trim is also at least 80 from the placeholder body. The floor is
+not held to it (48.5 away, as before). The trim is 48.6 from the floor on
+purpose, so the floor reads as one two-tone surface, and nothing compares the
+two.
 
 Two colours are reserved for champions five and six, Ondrel (0.03, 0.30, 0.03)
 and Brimwick (0.72, 0.19, 0.00), as `RESERVED_BODIES` in the same test. They

@@ -18,9 +18,12 @@ from test_validate_glb import table_rows
 
 REPO = Path(__file__).resolve().parents[2]
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
+# One glb per arena definition, so a new arena is checked without an edit here.
+# A definition without a glb fails the lookup, a glb without one fails
+# ArenaCoverageTests in test_export_determinism.py.
 ARENA_GLBS = {
-    "arena01": REPO / "assets" / "models" / "arenas" / "arena01.glb",
-    "arena02": REPO / "assets" / "models" / "arenas" / "arena02.glb",
+    path.stem: REPO / "assets" / "models" / "arenas" / ("%s.glb" % path.stem)
+    for path in sorted((REPO / "data" / "arenas").glob("*.json"))
 }
 
 CHUNK_JSON = 0x4E4F534A
@@ -643,16 +646,20 @@ class CommittedChampionTests(unittest.TestCase):
                     )
 
     def test_the_arena_floor_and_trim_stay_distinct_from_what_the_client_draws(self):
-        # The placeholder body is left out: the floor was never held to it (it
-        # is 48.5 away), and the placeholder is not a roster champion.
-        accent = material_rgb8(load(CHAMPIONS_DIR / "placeholder.glb")[0], "accent")
+        # The trim is also held to the placeholder body (decision 7 of batch
+        # #134). The floor is not: it was never held to it (48.5 away), and the
+        # placeholder is not a roster champion.
+        placeholder_doc = load(CHAMPIONS_DIR / "placeholder.glb")[0]
         others = dict(CLIENT_COLOURS)
-        others["accent"] = accent
+        others["accent"] = material_rgb8(placeholder_doc, "accent")
         for arena_id, path in ARENA_GLBS.items():
             arena_doc = load(path)[0]
             for surface in ("floor", "trim"):
                 colour = material_rgb8(arena_doc, surface)
-                for label, other in others.items():
+                candidates = dict(others)
+                if surface == "trim":
+                    candidates["placeholder body"] = material_rgb8(placeholder_doc, "body")
+                for label, other in candidates.items():
                     with self.subTest(arena=arena_id, surface=surface, against=label):
                         self.assertGreaterEqual(
                             distance(colour, other),

@@ -9,8 +9,8 @@ client mapping (x, 0, -y), so no axis conversion happens here.
 The visual pass lives inside the existing nodes, so the node set is the
 validator's: the Floor mesh holds a trim border, the spawn discs and the
 field, and each Wall_* mesh holds the wall and its trim cap. Every added
-shape is built from explicit vertices and faces (or `create_cone`, the op the
-circle obstacles already use), never from an op whose face order can vary
+shape is built from explicit vertices and faces (or `create_cone`, the op
+main's circle obstacles used), never from an op whose face order can vary
 between runs: `bmesh.ops.bevel` is not used.
 """
 import argparse

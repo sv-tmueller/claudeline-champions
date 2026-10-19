@@ -12,15 +12,14 @@ The constants below mirror gen_arena.py, which imports bmesh and so cannot be
 imported here. A change to one without the other fails against the committed
 glbs.
 """
-import json
 import math
 import unittest
 
-from test_champion_models import REPO, load, material_name, positions, primitives
+from test_champion_models import ARENA_GLBS, load, material_name, positions
+from test_validate_glb import load_arena
 
-ARENA_IDS = ("arena01", "arena02")
-ARENAS_DIR = REPO / "assets" / "models" / "arenas"
-DATA_DIR = REPO / "data" / "arenas"
+# Every arena definition is checked, so a new arena needs no edit here.
+ARENA_IDS = tuple(ARENA_GLBS)
 
 FLOOR_THICKNESS = 0.2
 WALL_THICKNESS = 0.5
@@ -39,12 +38,8 @@ TOLERANCE = 1e-4
 X, UP, Z = 0, 1, 2
 
 
-def arena_json(arena_id):
-    return json.loads((DATA_DIR / ("%s.json" % arena_id)).read_text())
-
-
 def arena_glb(arena_id):
-    return load(ARENAS_DIR / ("%s.glb" % arena_id))
+    return load(ARENA_GLBS[arena_id])
 
 
 def node_vertices(doc, bin_chunk, node_name):
@@ -103,7 +98,7 @@ def per_arena(check):
         for arena_id in ARENA_IDS:
             doc, bin_chunk = arena_glb(arena_id)
             with self.subTest(arena=arena_id):
-                check(self, arena_json(arena_id), doc, bin_chunk)
+                check(self, load_arena(arena_id), doc, bin_chunk)
 
     run.__name__ = check.__name__
     return run
