@@ -1221,7 +1221,29 @@ up). `touching.test.ts` pins the tolerance of `geometry.ts` on the state of the
 stall it fixed (a Hargrim at 1.4999999999999998 m from the pillar of arena02 at
 (9, -6), against 1.5): not blocked, a clear segment leaves it, a point 1e-6 m
 inside is still blocked, and a bot there walks to its enemy behind the pillar;
-red without the tolerance.
+red without the tolerance. The same file pins the four states of the stalls of
+#129 (the Hargrim and Quillon tuning candidates of #124, which turned the
+no-stall clause of `lumeth.test.ts` red for 123 to 6003 ticks, section 6.2 of
+balance.md): a champion at rest one ulp inside an inflated obstacle, at the
+corner of a rectangle in three of them and on the circle (0, -7.5), radius
+0.75, in the fourth, at a gap of 6e-17 to 2.2e-16. Each state has both
+sides: the goal side, a bot chasing an enemy that stands there (its cell is
+blocked, so the follower needs `nearestFreeCell` from the goal point, which
+needs a clear segment from it), and the start side, a bot standing there that
+must plan out of its cell. A row asserts that the oracle clearance is a hair
+below 0, that `pointBlocked` is false there and that a hard bot walks on both
+sides (69 thinks, seed 1, the shipped kits). Without the tolerance every row
+is red; with the rect limit of `obstacleShapes` without it the three rect rows
+are red (the walk) and the circle row is green; with the rect branch of
+`overlapsObstacle` without it only the `pointBlocked` asserts of the three
+rect rows are red. The
+stalls of #129 were this state. The architect of #129 replayed 600 ticks from a
+snapshot of each: the bots before the dodge and the tolerance stalled for the
+600 ticks (142 on the circle), those with the tolerance and no dodge and those
+of today for 15, which is a fresh bot's delay ring starting on idle and no
+stall, and those with the dodge and no tolerance for 600 (300 on the circle).
+So the tolerance of #137 resolved the four and the dodge did not; no rule was
+missing in the bots.
 
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
@@ -1400,6 +1422,10 @@ clear shot while her SPACE has 2 to 90 ticks left, the oracle's own literals).
 The tracker works the team sums and the reach out with its own oracle
 (`clearShotOracle`), not with the code of the bot. Idle counts as standing, and
 a cornered kiter closer than `rangeMin` counts. Any other tick resets the run.
+The tracker also counts the ticks of its worst run by intent, and the no-stall
+messages print the counts ("in idle (engage 691, idle 15)"): the intent that
+names a run is that of its last tick, so the stall of #129 filed as 706 ticks
+in idle was 691 ticks of engage and 15 of idle once the target died.
 No bot may stall for more than 120 ticks, in the headless run and in a
 corner-start run: the same match with one bot in the north-east corner of arena
 1 and a melee champion 2.83 m away on the diagonal, which the old stand rule
@@ -1412,9 +1438,11 @@ retreating at the spawn with an enemy in reach (the target or another one) 0,
 with the enemy in range behind an obstacle 10, retreating 1 m off the spawn 10,
 retreating in reach of the target with a clear shot away from the spawn 0,
 kiting closer than `rangeMin` in sight 10, engaging in range 0, no alive enemy
-0, and a non-zero input resets the run. The wait of Skerrow reads 0 from 6 to 8
-m at a SPACE cooldown of 2 to 90, and 10 at 5.95 and 8.05 m, at a cooldown of 0,
-1 and 91, with no clear shot, for a Skerrow with no kit and for a Hargrim.
+0, and a non-zero input resets the run. A run of engage and then idle reports
+both counts, and a run that ended leaves none in the next. The wait of
+Skerrow reads 0 from 6 to 8 m at a SPACE cooldown of 2 to 90, and 10 at 5.95
+and 8.05 m, at a cooldown of 0, 1 and 91, with no clear shot, for a Skerrow
+with no kit and for a Hargrim.
 
 `packages/bots/test/deadlock.test.ts` pins the rule. Unit scenes on frozen states cover
 the advance, the stay of a team that is ahead, the tie (a mirror where all four advance),
