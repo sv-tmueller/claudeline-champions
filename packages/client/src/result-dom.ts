@@ -2,7 +2,7 @@ import type { Difficulty } from '@claudeline/bots';
 import type { ArenaDef } from '@claudeline/sim';
 import type { HudElement } from './hud';
 import { make } from './hud-dom';
-import { DIFFICULTIES, type Launch } from './launch';
+import { DIFFICULTIES, relaunch, type Launch } from './launch';
 import { playableTeamSize } from './match-setup';
 import type { ResultHandles } from './result-screen';
 import { ROSTER_IDS, championName } from './roster';
@@ -13,11 +13,6 @@ export interface SelectEntry {
   name: string;
   available: boolean;
   href: string | null;
-}
-
-/** The query of a relaunch: the setup is the address, so a link is the whole choice. */
-function relaunch(champion: string, difficulty: Difficulty, arena: string, teamSize: 2 | 3): string {
-  return `?${new URLSearchParams({ champion, difficulty, arena, teamsize: String(teamSize) }).toString()}`;
 }
 
 /**
@@ -140,13 +135,15 @@ export function difficultyEntries(
  * Builds the select under `parent`: a champion row, `data-part="select"`, an
  * arena row, `data-part="arena-select"`, a team row, `data-part="team-select"`,
  * and a difficulty row, `data-part="difficulty-select"`.
- * Static: a link per champion with a kit (`data-available="true"`), a greyed entry
- * for each without one, a link per arena (`data-arena-id`, `data-current` on the
+ * Static: a link per champion with a kit (`data-available="true"`, `data-current`
+ * on the launch's champion, which only select.css draws), a greyed entry for
+ * each without one, a link per arena (`data-arena-id`, `data-current` on the
  * one being played), a link per team size (`data-team-size`, `data-current` on
- * the one being played, greyed for 3v3 on an arena that cannot play it) and a link
- * per tier (`data-difficulty`, `data-current` on the launch's tier, always available).
- * Every link writes the whole setup, the team size the address asked for included. The result
- * panel and the menu both build it, each with its own copy and its own heading.
+ * the one being played, greyed for 3v3 on an arena that cannot play it) and a
+ * link per tier (`data-difficulty`, `data-current` on the launch's tier, always
+ * available). Every link writes the whole setup, the team size the address
+ * asked for included. The result panel and the menu both build it, each with
+ * its own copy and its own heading.
  */
 export function buildSelect(
   parent: HTMLElement,
@@ -160,6 +157,7 @@ export function buildSelect(
   for (const entry of selectEntries(kitIds, launch.difficulty, launch.arena, launch.teamSize)) {
     const attributes: Record<string, string> = {
       'data-champion': entry.id,
+      'data-current': entry.id === launch.champion ? 'true' : 'false',
       'data-available': entry.available ? 'true' : 'false',
     };
     if (entry.href !== null) attributes['href'] = entry.href;

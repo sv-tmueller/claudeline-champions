@@ -62,6 +62,7 @@ const SHEETS: readonly Sheet[] = [
   { file: 'hud.css', root: '#hud', prefix: '--hud-', unit: '--hud-u' },
   { file: 'result.css', root: '#result', prefix: '--result-', unit: '--result-u' },
   { file: 'menu.css', root: '#menu', prefix: '--menu-', unit: '--menu-u' },
+  { file: 'select.css', root: '#select', prefix: '--select-', unit: '--select-u' },
 ];
 
 function load(sheet: Sheet) {
@@ -314,6 +315,15 @@ describe('pointer events', () => {
     expect(root?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('none');
     const taking = rules.filter((rule) => rule.declarations.some((d) => d.property === 'pointer-events' && d.value !== 'none'));
     expect(taking.map((rule) => rule.selector)).toEqual(["#result [data-result='panel'][data-visible='true']"]);
+    expect(taking[0]?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('auto');
+  });
+
+  it('reach the select panel only while it is visible', () => {
+    const { rules } = load(SHEETS[3] as Sheet);
+    const root = rules.find((rule) => rule.selector === '#select');
+    expect(root?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('none');
+    const taking = rules.filter((rule) => rule.declarations.some((d) => d.property === 'pointer-events' && d.value !== 'none'));
+    expect(taking.map((rule) => rule.selector)).toEqual(["#select [data-select='panel'][data-visible='true']"]);
     expect(taking[0]?.declarations.find((d) => d.property === 'pointer-events')?.value).toBe('auto');
   });
 });

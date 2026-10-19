@@ -98,9 +98,35 @@ function names do not).
 
 ## Launch and match
 
-`main.ts` starts one page, one match. `parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV)`
-in `launch.ts` is the only reader of the address, and it takes the string, so a
-later platform layer can pass its own arguments instead.
+`main.ts` starts one page, one match. Three functions read the address, and all
+of them take the string, so a later platform layer can pass its own arguments
+instead:
+
+- `opensSelect(location.search, import.meta.env.DEV ? DEV_LAUNCH_KEYS : [])` in
+  `launch.ts` decides whether the pre-match select comes first (see Pre-match
+  select).
+- `parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV)` in
+  `launch.ts` reads the setup of the match. After the select, it reads the
+  address Start wrote, so a select launch and a parameter launch take the same
+  path.
+- `readDevLaunch(location.search)` in `dev-launch.ts` reads `?timescale`, in a
+  dev build only.
+
+`relaunch(champion, difficulty, arena, teamSize)` in `launch.ts` is the writer:
+the query of every select link and of Start, which writes all four keys. The
+address is the whole setup (batch #91 decision 5).
+
+The entry rule: the select opens exactly when the query string has none of
+`champion`, `difficulty`, `arena` or `teamsize`, and in a dev build none of
+`scene` or `timescale` either. "Has" is `URLSearchParams.has`: a key with any
+value, an empty or unknown one included, skips the screen, so `?champion=`,
+`?difficulty=brutal` and `?teamsize=4` play a match as they always did. A bare
+`/`, `/?` and unrelated keys (`?utm_source=x`) open the select. Keys are
+case-sensitive, as `parseLaunch` reads them. The dev keys sit in
+`DEV_LAUNCH_KEYS` (`dev-launch.ts`), not in `launch.ts`: the name `timescale`
+must not reach a production file (the dist grep).
+
+`parseLaunch` reads these keys:
 
 - `?champion=<id>`: the champion the human plays. It must be an id with a loaded
   kit; anything else reads as the first kit in roster order (Hargrim).
@@ -132,18 +158,21 @@ later platform layer can pass its own arguments instead.
   scale of the loop clock; anything else reads as 1.
 
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
-in `main.ts`, so a later kit file joins the match and the champion select
-without a client change. `createMatch` validates them, and a bad kit file shows
-up as a page error. The arenas work the same way: every file under
-`data/arenas/` goes through `parseArenaDef` (a bad file is a page error too),
-sorted by id, and `arenaById` in `arenas.ts` hands the chosen one to
-`createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the id, so
-`arena02.glb` loads with no change in `models.ts`. Of the pure modules, `launch`
-takes the kit ids and the arena ids, `match-setup` takes the kit list and the
-arena, and `result-dom` and `menu-dom` take ids and `{ id, name, spawns }`
-records (`bot-driver`, `models` and `roster` take none of them), so the unit
-tests load the files statically instead: `tsconfig.tools.json` has `types:
-["node"]` and rejects `import.meta.glob`.
+in `main.ts`. A later kit file joins the match without a client change, reached
+by `?champion=<id>` on the placeholder model. The select shows the roster ids
+the client registers with a name and a model (`ROSTER_IDS`), each available once
+its kit file exists, so a kit without a roster entry is not on it until the
+client registers it (batch #147 decision 3, part 3). `createMatch` validates the
+kits, and a bad kit file shows up as a page error. The arenas work the same way:
+every file under `data/arenas/` goes through `parseArenaDef` (a bad file is a
+page error too), sorted by id, and `arenaById` in `arenas.ts` hands the chosen
+one to `createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the
+id, so `arena02.glb` loads with no change in `models.ts`. Of the pure modules,
+`launch` takes the kit ids and the arena ids, `match-setup` takes the kit list
+and the arena, and `result-dom` and `menu-dom` take ids and
+`{ id, name, spawns }` records (`bot-driver`, `models` and `roster` take none of
+them), so the unit tests load the files statically instead:
+`tsconfig.tools.json` has `types: ["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
 sim's constant, 3):
@@ -518,6 +547,50 @@ click; Tab's focus movement over those links is given up while it is held.
 Opening the menu hides it: the menu's `releaseInput` action also calls
 `scoreboard.hide()`.
 
+### Pre-match select
+
+A fourth root, `#select`, follows `#menu` in `index.html`. `main.ts` gates on
+`opensSelect` right after the kit ids are read and before `parseLaunch`, so
+before any renderer, match, HUD or model exists. On a bare address it awaits
+`runSelect` (`select-dom.ts`), which builds the panel
+(`data-select="panel"`, `data-visible="true"`): a title, the select of the
+result panel and the menu (`buildSelect` in `result-dom.ts`, so there is no
+third copy of the rows, with the label "Play as") and a Start link
+(`data-action="start"`). The first choice is `parseLaunch('', ...)`: Hargrim,
+normal, arena01, 2v2. The champion row is `selectEntries`, that is the roster
+ids in roster order, each available once its kit file loads; with six kit files
+it still lists four.
+
+A pick is a plain click on a row entry, handled by one listener on the panel. An
+entry's href already is the next whole setup, so the click reads it back with
+`parseLaunch`, rebuilds the rows from the new choice, puts the keyboard focus on
+the same place of the same row and sets the Start href to `relaunch(choice)`. A
+greyed entry is a span with no href, so availability comes for free. The page
+address does not change on a pick. A click with a modifier key is left to the
+browser and opens that setup in a new tab, straight into a match. Start calls
+`preventDefault`, writes the Start href with `history.replaceState`, empties
+`#select` and resolves; `main.ts` then builds the match from the address with
+the one reader, and the page looks like a parameter launch: the Restart of the
+menu and a reload play the same setup, and the result and menu links reload with
+full addresses, which skip the screen. The cost of Start not reloading is that
+Back from the match leaves the site, as `/` always did. A reload Start would
+need a top-level await that never settles in `main.ts`, and moving the match out
+of `main.ts` would move the heap probe's `^main\.ts:` key.
+
+The last choice is not stored: the settings stay
+`{ version: 2, bindings, muted }` and the select opens on the defaults on every
+visit. A stored choice added later may only pre-fill the select, never skip it
+or override the address, and needs version 3 with a migration. The online
+design's lobby follows this screen (section 9), which is why it is built in the
+page from the shared row builder and not as reload-only links.
+
+`select-dom.ts`, `launch.ts` and `result-dom.ts` are outside the counted heap
+code: they never run in a frame, and `select-dom.ts` never runs in either probe,
+whose addresses carry a key (testing.md). `select.css` is the palette of
+`result.css` with `--select-u` and `#select`, and `buildSelect` writes
+`data-current` on the champion entries, which only `select.css` draws, so the
+result and menu pictures do not move. `e2e/select.spec.ts` covers the screen.
+
 ### Result screen and champion select
 
 A second root, `#result`, sits next to `#hud` in `index.html` and is built once
@@ -549,9 +622,10 @@ label "Difficulty"): an Easy, a Normal and a Hard entry (`data-difficulty`, from
 with its own tier and the champion, arena and asked size kept. The launch's
 tier carries `data-current="true"`. A tier needs no file, so an entry is always
 a link and has no `data-available`. The tier reaches the bots through
-`createBotDriver` as before; the row only writes the address. There is no
-pre-match screen. Only the visible panel takes pointer events; the HUD takes
-none.
+`createBotDriver` as before; the row only writes the address. The champion
+entries carry `data-current` too, the launch's champion, for the pre-match
+select (above), which builds the same rows. Only the visible panel takes
+pointer events; the HUD takes none.
 
 `e2e/match-end.spec.ts` plays the default match to this screen in a browser, on
 `/?timescale=100` (see Launch and match), once per arena and team size (arena02
@@ -591,11 +665,12 @@ energy mark, `data-visible` and `data-absorb` on the shield segment,
 the timer, and on the scoreboard `data-visible`, and `data-alive` and
 `data-team` on a row.
 
-`hud.css` sizes everything from one viewport unit, `--hud-u` (`min(1vw,
-1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
-everything, so a right click reaches the canvas. `result.css` follows the same
-rules with `--result-u` and `#result`, and one difference: the visible panel
-takes pointer events. So does `menu.css`, with `--menu-u` and `#menu`. The
+`hud.css` sizes everything from one viewport unit, `--hud-u`
+(`min(1vw, 1.78vh)`), so the HUD scales with the window, and sets
+`pointer-events: none` on everything, so a right click reaches the canvas.
+`result.css` follows the same rules with `--result-u` and `#result`, and one
+difference: the visible panel takes pointer events. So do `menu.css`, with
+`--menu-u` and `#menu`, and `select.css`, with `--select-u` and `#select`. The
 colours are hex custom properties on `#hud`. Panels are neutral black with alpha
 and every foreground element sits on one, with one exception: the ring warning's
 red edge, an inset shadow in `var(--hud-enemy)` along the viewport that shows
@@ -605,7 +680,7 @@ off-white, below 250 in every channel. Allies and enemies use the health-bar
 colours. No colour is blue, purple or magenta, none falls in the pixel boxes the
 e2e specs count (white, the yellow ring, the magenta overlay) and none is within
 80 of a champion body colour. `hud-palette.test.ts` checks all of this over the
-three style sheets.
+four style sheets.
 
 A debug overlay draws collision circles, obstacles, projectiles and line of
 sight. It draws as lines in the 3D scene, not in the HTML HUD, so its shapes

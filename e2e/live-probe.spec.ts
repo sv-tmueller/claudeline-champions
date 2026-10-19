@@ -10,12 +10,13 @@ import {
   runWindow,
   type Allocations,
 } from './heap-probe';
-import { orFail, watchProblems } from './support';
+import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
-// The second heap-probe scene: the default match, `/` at time scale 1, where the
-// hooks and the HUD change in every window (the position and facing of the
-// human on every tick, projectiles, hits and bars as the bots fight). The first
-// scene, combat.spec.ts, is a steady state. This one counts the table-driven
+// The second heap-probe scene: the default match, entered on `DEFAULT_MATCH` (a
+// bare `/` opens the select) at time scale 1, where the hooks and the HUD change
+// in every window (the position and facing of the human on every tick,
+// projectiles, hits and bars as the bots fight). The first scene, combat.spec.ts,
+// is a steady state. This one counts the table-driven
 // change writes with real changes, and the bots' fight through the glue. The
 // bots package itself is logged as the sixth figure of the probe line and bounded
 // apart from the counted code, on the median of the five windows (see heap-probe.ts).
@@ -215,7 +216,7 @@ test('the live match: the writes of a changing match allocate under the limit', 
     await page.clock.install({ time: 0 });
     await page.clock.pauseAt(PAUSE_AT_MS);
     await page.setViewportSize(PROBE_VIEWPORT);
-    await page.goto('/');
+    await page.goto(DEFAULT_MATCH);
     await orFail(page.waitForSelector('canvas[data-arena][data-tick]'), failed);
     const cdp = await openProbe(page);
     // M1 is held to the end.

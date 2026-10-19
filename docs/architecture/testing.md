@@ -214,6 +214,29 @@ A new kit, the recipe for batch 12 (Ondrel and Brimwick):
 The specs are in `e2e/*.spec.ts`. They run against the Vite dev server on
 port 5173, which Playwright starts itself.
 
+A bare `/` opens the pre-match select, not a match (see
+[client](client.md#pre-match-select)). A spec that wants the default match
+enters on `DEFAULT_MATCH` of `e2e/support.ts`,
+`/?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2`, the address
+Start writes for the defaults. Its launch is the one of the old bare `/`, so the
+match, the bots, the seeds and the ticks are the same. Only `select.spec.ts`
+enters on a bare `/`, through a constant, so a grep for `goto('/')` finds no
+other spec.
+
+- `select.spec.ts`: the pre-match select (`select.png`, at 1280x720). On `/` the
+  panel shows and no canvas exists; the champion row is the four roster ids in
+  order, all available, with Hargrim, arena01, 2v2 and normal current and the
+  Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
+  each `data-current`, leaves the address search empty and makes the Start href
+  `?champion=quillon&difficulty=hard&arena=arena02&teamsize=3`. Start plays it:
+  `canvas[data-arena="arena02"][data-tick]` appears, the search equals the href,
+  health reads 120 / 120, `data-bar5` exists, `#select` is empty, and the
+  result panel's and the menu's rows read hard, arena02 and 3v3 as current with
+  links that carry them. `page.reload()` goes straight into the same match, and
+  `/?champion=quillon` and `/?difficulty=brutal` show no panel and a canvas
+  while `/?foo=1` shows the panel. A keyboard pick (focus an entry, press
+  Enter), on Quillon and then on Hard, leaves the focus on the rebuilt entry,
+  now current, and the address search stays empty.
 - `arena.spec.ts`: the arena and the F3 overlay render (`arena.png`,
   `arena-overlay.png`), and `data-arena` is set only after the first draw.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
@@ -270,14 +293,15 @@ port 5173, which Playwright starts itself.
   (it shows the corpse drawn, which is the unculled mesh), and the last read,
   300 ticks on, still reads Death. `data-anim1` reads Idle at every check
   (champion 3 is a bot and walks).
-- `live-probe.spec.ts`: the heap probe's second scene, the default match at time
-  scale 1 with a pointer that moves before every window, no picture (see the
-  heap probe below). It also reads the clips of the match: `data-anim0` starts
-  with Run at every measured read (the human walks, with M1 held), a bot reads
-  Cast and a champion reads Hit in some read, and the victim of round 3's first
-  death reads Death. The reads are the same on every attempt, since the bots are
-  deterministic and the hook paces the windows: a bot reads Cast from the first
-  read (tick 4349), Attack from 4439, and Hit comes at 4469 (Idle+Hit).
+- `live-probe.spec.ts`: the heap probe's second scene, the default match
+  (`DEFAULT_MATCH`) at time scale 1 with a pointer that moves before every
+  window, no picture (see the heap probe below). It also reads the clips of the
+  match: `data-anim0` starts with Run at every measured read (the human walks,
+  with M1 held), a bot reads Cast and a champion reads Hit in some read, and the
+  victim of round 3's first death reads Death. The reads are the same on every
+  attempt, since the bots are deterministic and the hook paces the windows: a
+  bot reads Cast from the first read (tick 4349), Attack from 4439, and Hit
+  comes at 4469 (Idle+Hit).
 - `match.spec.ts`: the first round of the default match against bots, once per
   arena and team size (`match.png`, and `match-arena02.png` for
   `/?arena=arena02`; `match-3v3.png` and `match-3v3-arena02.png` for the same
@@ -408,29 +432,29 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   before the first shot ends at 162. The end assertions prove the casting ran
   (the M1 icon is on cooldown) and that nothing else happened (the round, one
   death, the bot at 100, no flash).
-- The live scene is the default match, `/` at time scale 1, where the hooks and
-  the HUD change in every window (the human's `data-p0x` and `data-f0` on every
-  tick, projectiles, hits and bars as the bots fight) and a pointer moves before
-  every window. It is the scene that counts the table-driven change writes and
-  the pointer aim with real changes. The clock is paused before the page loads
-  and never runs a frame, so the first read is tick 0 and every tick is the
-  hook's. The warm-up is plain windows with no profiler from tick 0 to the first
-  round that begins after tick 2100 (round 3, begun by tick 4289 on the bots of
-  #137 on every run so far: the bots are deterministic), then 2 plain windows of
-  the round (the lead, 60 ticks), then the next 5 windows are measured, ticks
-  4349 to 4499. The lead is derived from three 17-window runs of round 3 with
-  the pointer on the bots of #137, all three identical: the first projectile
-  spawns in window 2 (ticks 4349 to 4379), the first hits land in window 4
-  (three at once), and then 0 to 2 hits land per window (window 6 reads none)
-  and 0 to 2 projectiles are live at the reads to the end of the run (tick
-  4799), with the first death of the round read at tick 4859. The lead is 2,
-  the first-projectile window, as #97 derived it (decision 9 of batch #134);
-  it was 4 with the first projectile in window 4 before the dodge (round 3
-  begun by tick 2609, windows 2729 to 2879, first death at 3419) and 5 before
-  the dash hold of #98 (round 3 by tick 2879, first death at 3539). The margin
-  after the last measured window is 360 ticks
-  (the floor is 60). The human walks W and D in the first window, then A and D
-  in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
+- The live scene is the default match, entered on `DEFAULT_MATCH` (a bare `/`
+  opens the select), at time scale 1, where the hooks and the HUD change in
+  every window (the human's `data-p0x` and `data-f0` on every tick, projectiles,
+  hits and bars as the bots fight) and a pointer moves before every window. It
+  is the scene that counts the table-driven change writes and the pointer aim
+  with real changes. The clock is paused before the page loads and never runs a
+  frame, so the first read is tick 0 and every tick is the hook's. The warm-up
+  is plain windows with no profiler from tick 0 to the first round that begins
+  after tick 2100 (round 3, begun by tick 4289 on the bots of #137 on every run
+  so far: the bots are deterministic), then 2 plain windows of the round (the
+  lead, 60 ticks), then the next 5 windows are measured, ticks 4349 to 4499. The
+  lead is derived from three 17-window runs of round 3 with the pointer on the
+  bots of #137, all three identical: the first projectile spawns in window 2
+  (ticks 4349 to 4379), the first hits land in window 4 (three at once), and
+  then 0 to 2 hits land per window (window 6 reads none) and 0 to 2 projectiles
+  are live at the reads to the end of the run (tick 4799), with the first death
+  of the round read at tick 4859. The lead is 2, the first-projectile window, as
+  #97 derived it (decision 9 of batch #134); it was 4 with the first projectile
+  in window 4 before the dodge (round 3 begun by tick 2609, windows 2729 to
+  2879, first death at 3419) and 5 before the dash hold of #98 (round 3 by tick
+  2879, first death at 3539). The margin after the last measured window is 360
+  ticks (the floor is 60). The human walks W and D in the first window, then A
+  and D in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
   Hargrim's M1 windup is `slowed`, so the walk goes on under the cast.
 - The live scene's pointer. Before every window of the run, from the first read
   (the warm-up, the lead, the measured windows and the run-on), a synthetic
@@ -514,7 +538,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   gesture before the first measured window, so the counted calls reach real
   Web Audio), the champions' clips (`champion-anim.ts`, the state machine, and
   `clip-sampler.ts`, which poses the bones: both run for every champion in every
-  frame) and everything in `main.ts`, including the hook's `frameMany`.
+  frame) and everything in `main.ts`, including the hook's `frameMany` and the
+  one `opensSelect` call of its module evaluation. The pre-match select
+  (`select-dom.ts`, with `launch.ts` and `result-dom.ts`, uncounted builders
+  like `hud-dom.ts`) never runs in a frame and never runs in either probe, since
+  both addresses carry a key, so `COMBAT_CODE` has no entry for it.
   Three's `onAnimationFrame` is logged and not counted: no frame
   of a measured window runs through it. A new module on the frame path goes
   into the pattern. The bots package is not counted, and its bytes are the

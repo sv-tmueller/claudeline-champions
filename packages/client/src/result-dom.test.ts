@@ -21,6 +21,13 @@ describe('champion select entries', () => {
     ]);
   });
 
+  it('lists the four roster ids when the kit files are six, since an id the client has no name or model for is not on the select', () => {
+    const six = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick'];
+    const entries = selectEntries(six, 'normal', 'arena01', 2);
+    expect(entries.map((entry) => entry.id)).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow']);
+    expect(entries.every((entry) => entry.available)).toBe(true);
+  });
+
   it('links an id with a kit to a relaunch with the current difficulty and arena', () => {
     const entries = selectEntries(['hargrim', 'quillon'], 'hard', 'arena01', 2);
     expect(entries[0]).toMatchObject({ available: true, href: '?champion=hargrim&difficulty=hard&arena=arena01&teamsize=2' });

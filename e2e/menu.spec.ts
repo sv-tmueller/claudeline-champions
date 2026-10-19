@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { orFail, watchProblems } from './support';
+import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
 // The Escape menu: the pause, restart, the champion, arena, team and difficulty select (the
 // team row, the 3v3 relaunch and a Restart that keeps it, the hard-tier relaunch likewise),
@@ -126,7 +126,7 @@ test('pauses the match while the menu is open, and a resume does not catch the p
   test.setTimeout(TEST_TIMEOUT_MS);
   const { problems, failed } = watchProblems(page);
   try {
-    await open(page, '/', failed);
+    await open(page, DEFAULT_MATCH, failed);
     await runFrames(page, 30);
     const before = await readHooks(page);
     expect(before.tick, 'the match was running').toBeGreaterThan(0);
@@ -192,7 +192,7 @@ test('goes back to the select from the menu and relaunches on another arena', as
   test.setTimeout(TEST_TIMEOUT_MS);
   const { problems, failed } = watchProblems(page);
   try {
-    await open(page, '/', failed);
+    await open(page, DEFAULT_MATCH, failed);
     await mark(page);
     await openMenu(page);
     await page.locator('[data-menu="panel"] [data-action="select"]').click();
@@ -248,7 +248,7 @@ test('relaunches as a 3v3 from the menu select, and a restart keeps the team siz
   test.setTimeout(TEST_TIMEOUT_MS);
   const { problems, failed } = watchProblems(page);
   try {
-    await open(page, '/', failed);
+    await open(page, DEFAULT_MATCH, failed);
     expect((await readHooks(page)).bars, 'a 2v2 has four bars').toBe(4);
     await mark(page);
     await openMenu(page);
@@ -366,7 +366,7 @@ test('relaunches on the hard tier from the menu select, and a restart keeps the 
   const { problems, failed } = watchProblems(page);
   const hard = () => page.locator('[data-menu="panel"] [data-difficulty="hard"]');
   try {
-    await open(page, '/', failed);
+    await open(page, DEFAULT_MATCH, failed);
     await mark(page);
     await openMenu(page);
     await page.locator('[data-menu="panel"] [data-action="select"]').click();

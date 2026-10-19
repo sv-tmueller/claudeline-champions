@@ -1,6 +1,7 @@
 import { createBot } from '@claudeline/bots';
 import { describe, expect, it } from 'vitest';
-import { DIFFICULTIES, parseLaunch } from './launch';
+import { DEV_LAUNCH_KEYS } from './dev-launch';
+import { DIFFICULTIES, opensSelect, parseLaunch, relaunch } from './launch';
 
 const KITS = ['hargrim', 'quillon'];
 const ARENAS = ['arena01', 'arena02'];
@@ -126,5 +127,68 @@ describe('DIFFICULTIES', () => {
   it('lists the three tiers of the bots, and each one makes a bot', () => {
     expect(DIFFICULTIES).toEqual(['easy', 'normal', 'hard']);
     for (const difficulty of DIFFICULTIES) expect(() => createBot(1, difficulty, 1)).not.toThrow();
+  });
+});
+
+describe('opensSelect', () => {
+  it('opens on a bare address, a lone question mark and unrelated keys', () => {
+    for (const search of ['', '?', '?foo=1', '?utm_source=x', '?server=', '?foo=1&bar=2']) {
+      expect(opensSelect(search, []), search).toBe(true);
+    }
+  });
+
+  it('skips the screen when any of the four keys is present, whatever the value', () => {
+    for (const key of ['champion', 'difficulty', 'arena', 'teamsize']) {
+      for (const value of ['', 'hargrim', 'brutal', '4', 'constructor']) {
+        expect(opensSelect(`?${key}=${value}`, []), `${key}=${value}`).toBe(false);
+      }
+      expect(opensSelect(`?foo=1&${key}=x`, []), key).toBe(false);
+      expect(opensSelect(key, []), `${key} without a value`).toBe(false);
+    }
+  });
+
+  it('reads a leading question mark like none, and the keys case-sensitively', () => {
+    expect(opensSelect('champion=quillon', [])).toBe(false);
+    expect(opensSelect('?Champion=x', [])).toBe(true);
+    expect(opensSelect('?TEAMSIZE=3', [])).toBe(true);
+  });
+
+  it('counts the dev keys it is given and no others', () => {
+    for (const search of ['?scene=sandbox', '?timescale=100', '?scene=', '?timescale=']) {
+      expect(opensSelect(search, DEV_LAUNCH_KEYS), search).toBe(false);
+      expect(opensSelect(search, []), search).toBe(true);
+    }
+    expect(opensSelect('?foo=1', DEV_LAUNCH_KEYS)).toBe(true);
+    expect(opensSelect('', DEV_LAUNCH_KEYS)).toBe(true);
+  });
+});
+
+describe('relaunch', () => {
+  it('writes the whole setup, so the address reads back as the same launch and skips the select', () => {
+    for (const champion of KITS) {
+      for (const difficulty of DIFFICULTIES) {
+        for (const arena of ARENAS) {
+          for (const teamSize of [2, 3] as const) {
+            const query = relaunch(champion, difficulty, arena, teamSize);
+            expect(query.startsWith('?'), query).toBe(true);
+            expect(parseLaunch(query, KITS, ARENAS, false), query).toEqual({
+              scene: 'match',
+              champion,
+              difficulty,
+              arena,
+              teamSize,
+            });
+            expect(opensSelect(query, []), query).toBe(false);
+            expect(opensSelect(query, DEV_LAUNCH_KEYS), query).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('writes the four keys in a fixed order', () => {
+    expect(relaunch('hargrim', 'normal', 'arena01', 2)).toBe(
+      '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2',
+    );
   });
 });

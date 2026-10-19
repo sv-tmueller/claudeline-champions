@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { countPixels, orFail, watchProblems } from './support';
+import { countPixels, DEFAULT_MATCH, orFail, watchProblems } from './support';
 
 test('the client renders the arena and the F3 overlay, and writes two screenshots', async ({ page }, testInfo) => {
   const { problems, failed } = watchProblems(page);
 
   try {
-    await page.goto('/');
+    await page.goto(DEFAULT_MATCH);
     await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
 
     const arena = await page.screenshot({ path: testInfo.outputPath('arena.png') });
@@ -43,7 +43,7 @@ test('data-arena is set only after the arena is drawn', async ({ page }) => {
   });
 
   try {
-    await page.goto('/');
+    await page.goto(DEFAULT_MATCH);
     await orFail(page.waitForSelector('canvas[data-rendered="true"]'), failed);
     expect(await page.locator('canvas').getAttribute('data-arena')).toBeNull();
     release();
