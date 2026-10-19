@@ -135,7 +135,7 @@ Batch decisions that shaped the structure (none of them is a new ADR):
 - The heap probe runs through the dev-only counted frame hook on two scenes,
   asserting the median of five windows: 600 B for the sandbox and 780 B for the
   live match, both by the limit rule (about 100 B above the largest clean
-  median, below the smallest mutation the scene gates), and 12 000 B for the
+  median, below the smallest mutation the scene gates), and 18 000 B for the
   bots' bytes in the live match (50 percent above the largest clean median):
   [batch #53 decision 9](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996986020),
   [batch #53 decision 18](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5998600236),

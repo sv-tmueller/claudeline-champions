@@ -826,7 +826,8 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   1096 to 1284 B, live 1276 to 1488 B; `hud.ts:update` at 764 to 984 B) and so
   does the closure in `routeEvents` (1680 to 1720 B and 1752 to 1768 B;
   `feedback.ts:routeEvents` at 1256 to 1372 B). The clean medians of the same
-  code are 300 to 564 B on the sandbox and 456 to 468 B on the live scene (bots
+  code are 300 to 564 B on the sandbox (the 564 B is explained below, at
+  the medians of the local runs) and 456 to 468 B on the live scene (bots
   11 344 to 11 776 B).
 
   A mutation in the bots' think or the HUD lands on the caller V8 inlines it
@@ -881,7 +882,12 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   per-change writes. The medians of the local `--repeat-each=3` runs on b44efbd
   (the rebased head) are 300 to 564 B on the sandbox (limit 600; 348 to 480 B in
   a further six) and 456 to 468 B on the live scene (limit 780), the live bots
-  11 344 to 11 776 B (limit 18 000, at the lead of 2 of #137).
+  11 344 to 11 776 B (limit 18 000, at the lead of 2 of #137). The 564 B is
+  not #138 code: the windows of that attempt read 768 B (the window-0
+  acquire), 456, 564, 324 and 1248 B, the 1248 B window holding a one-off
+  `loop.ts:advance` read of 864 B, so the median lands on a window that has
+  only `frameMany` bytes, and 564 B is inside that function's range of 252 to
+  588 B per window (the blind-mode bullet above).
 - The history, which is why the windows use a hook: with the windows on the fake
   clock, `onAnimationFrame` had two modes. Playwright's fake clock hands out ids
   of 1e12 and up, so each `requestAnimationFrame` call boxes about three heap
