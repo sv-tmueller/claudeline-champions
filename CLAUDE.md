@@ -41,8 +41,8 @@ npm run build                    # production client bundle; CI runs it, check d
 ```
 
 CI runs typecheck, lint, unit tests and the asset checks on pull requests that
-touch code and on pushes to main, and so does the bots heap job, which runs
-`vitest.heap.config.ts` on Node 26.7.0 and Node 24. Build and e2e run only on
+touch code and on pushes to main, and the bots heap job (`vitest.heap.config.ts`
+on Node 26.7.0 and Node 24) runs on the same triggers. Build and e2e run only on
 ready pull requests and on main.
 
 ## Package dependency rules

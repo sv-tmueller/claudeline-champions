@@ -20,7 +20,7 @@ function isExtensionless(specifier: string): boolean {
 
 if (typeof nodeModule.registerHooks !== 'function') {
   throw new Error(
-    `npm run balance and npm run fixtures:search need Node ${MIN_NODE} or later (module.registerHooks); this is Node ${process.versions.node}.`,
+    `This loader (tools/balance/register.ts) needs Node ${MIN_NODE} or later (module.registerHooks); this is Node ${process.versions.node}.`,
   );
 }
 
