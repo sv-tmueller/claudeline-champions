@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TIME_SCALE, readDevLaunch } from './dev-launch';
+import { DEV_LAUNCH_KEYS, MAX_TIME_SCALE, readDevLaunch } from './dev-launch';
 
 describe('readDevLaunch', () => {
   it('reads no time scale as 1', () => {
@@ -23,5 +23,11 @@ describe('readDevLaunch', () => {
 
   it('reads the scale next to the other launch parameters', () => {
     expect(readDevLaunch('?scene=sandbox&timescale=100&champion=quillon').timeScale).toBe(100);
+  });
+});
+
+describe('DEV_LAUNCH_KEYS', () => {
+  it('lists the two dev-only keys that start a match without the select', () => {
+    expect(DEV_LAUNCH_KEYS).toEqual(['scene', 'timescale']);
   });
 });
