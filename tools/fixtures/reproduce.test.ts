@@ -10,7 +10,7 @@ import { buildFixture, searchFixture } from './search.ts';
 // packages/sim/test/roster-fixtures.test.ts). Each row is one search: 1.06, 1.30, 1.52 and 1.72 s
 // on the runner (CI run 39288426574, ubuntu-latest, Node 22), 0.33 to 0.60 s locally. The Ondrel and
 // Brimwick rows took 1.23 and 0.84 s on the runner (CI run 39330753693) and 0.36 and 0.32 s locally,
-// well under the 1 s local mark of the timeout rule (testing.md), so they carry no timeout of their own.
+// under the 2.5 s runner mark of the timeout rule (testing.md), so they carry no timeout of their own.
 //
 // What a kit change does to a row (decisions 12 and 13 of batch #134, balance.md section 6.3):
 // - A change that turns the fixture coverage red rebuilds the fixture with the tool in the same

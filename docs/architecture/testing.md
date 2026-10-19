@@ -214,10 +214,10 @@ A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
    `KITS` of `tools/fixtures/format.test.ts`.
 5. Replay `roster-fixtures.test.ts` and `roster-kits.test.ts` and then
    `reproduce.test.ts` and `format.test.ts` in a `linux/amd64` container, as
-   above, and apply the timeout rule of the check suite to a reproduce row that
-   takes about 1 s locally. The rows of Ondrel (attempt 2) and Brimwick
-   (attempt 10) took 0.36 and 0.32 s locally, so they have no timeout of their
-   own.
+   above, and apply the timeout rule of the check suite to a reproduce row whose
+   runner time passes 2.5 s. The rows of Ondrel (attempt 2) and Brimwick
+   (attempt 10) took 1.23 and 0.84 s on the runner (0.36 and 0.32 s locally), so
+   they have no timeout of their own.
 
 ## Playwright e2e
 
