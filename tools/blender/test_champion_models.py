@@ -12,6 +12,7 @@ import json
 import math
 import struct
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from test_validate_glb import table_rows
@@ -29,17 +30,8 @@ ARENA_GLBS = {
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
-IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow"}
-ROSTER = ("hargrim", "quillon", "lumeth", "skerrow")
-# The body colours reserved for champions five and six (decision 2 of batch
-# #134), as linear triples like a glb's baseColorFactor. They are held to the
-# same colour rules as the roster before their models exist. Move each into
-# ROSTER, and out of here, when its model lands (batch 12).
-RESERVED_BODIES = {
-    "ondrel": (0.03, 0.30, 0.03),
-    "brimwick": (0.72, 0.19, 0.00),
-}
-
+IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick"}
+ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick")
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
 MAX_TOP = 1.90
@@ -547,11 +539,6 @@ def overlay_problem(doc):
     return overlay_colour_problem(material_rgb8(doc, "body"))
 
 
-def reserved_rgb8(linear):
-    """The 8-bit sRGB colour of a linear triple, as `material_rgb8` reads a glb."""
-    return tuple(srgb8(c) for c in linear)
-
-
 # test helpers
 
 
@@ -617,11 +604,6 @@ class CommittedChampionTests(unittest.TestCase):
             with self.subTest(file=path.name):
                 self.assertIsNone(overlay_problem(load(path)[0]))
 
-    def test_no_reserved_body_colour_can_read_as_the_debug_overlay(self):
-        for champion, linear in RESERVED_BODIES.items():
-            with self.subTest(champion=champion):
-                self.assertIsNone(overlay_colour_problem(reserved_rgb8(linear)))
-
     def test_roster_colours_stay_distinct_from_the_scene_and_each_other(self):
         placeholder_doc = load(CHAMPIONS_DIR / "placeholder.glb")[0]
         others = dict(CLIENT_COLOURS)
@@ -632,7 +614,6 @@ class CommittedChampionTests(unittest.TestCase):
         others["accent"] = material_rgb8(placeholder_doc, "accent")
         others["placeholder body"] = material_rgb8(placeholder_doc, "body")
         bodies = {i: material_rgb8(load(CHAMPIONS_DIR / ("%s.glb" % i))[0], "body") for i in ROSTER}
-        bodies.update({i: reserved_rgb8(linear) for i, linear in RESERVED_BODIES.items()})
         for champion, colour in bodies.items():
             candidates = dict(others)
             candidates.update({"%s body" % o: c for o, c in bodies.items() if o != champion})
@@ -675,6 +656,84 @@ class CommittedChampionTests(unittest.TestCase):
                 with self.subTest(arena=arena_id, material=material["name"]):
                     rgb = material_rgb8(doc, material["name"])
                     self.assertIsNone(overlay_colour_problem(rgb))
+
+
+def rounded(position):
+    return tuple(round(c, 6) for c in position)
+
+
+# The silhouette cue of each new roster id as a box on Spine in Blender
+# coordinates, (centre, size): ondrel's reed bundle on the back and brimwick's
+# fuse cap on top of the head (docs/design/roster-v2.md).
+CUE_BOXES = {
+    "ondrel": ((-0.16, 0.0, 1.56), (0.08, 0.16, 0.52)),
+    "brimwick": ((-0.02, 0.0, 1.74), (0.22, 0.22, 0.16)),
+}
+CUE_TOLERANCE = 1e-4
+
+
+class CueTests(unittest.TestCase):
+    """A cue is one box on Spine: add_box takes its faces and vertices as a slice
+    of the bmesh, so a cue that landed in the wrong slot would show here."""
+
+    def setUp(self):
+        self.placeholder = load(CHAMPIONS_DIR / "placeholder.glb")
+
+    def cue_vertices(self, champion):
+        """The cue as [(position, joint name, weight)], and its position counts.
+
+        The cue is what the model has beyond the placeholder's vertices.
+        """
+        doc, bin_chunk = load(CHAMPIONS_DIR / ("%s.glb" % champion))
+        own = skinned_vertices(doc, bin_chunk)
+        base = Counter(rounded(p) for p, _, _ in skinned_vertices(*self.placeholder))
+        now = Counter(rounded(p) for p, _, _ in own)
+        self.assertEqual(sum((base - now).values()), 0)
+        extra = now - base
+        names = [doc["nodes"][joint]["name"] for joint in doc["skins"][0]["joints"]]
+        cue = [
+            (p, names[joints[weights.index(max(weights))]], max(weights))
+            for p, joints, weights in own
+            if extra[rounded(p)] > 0
+        ]
+        return cue, extra
+
+    def test_the_cue_is_one_box_of_24_vertices_on_top_of_the_placeholder_body(self):
+        for champion in CUE_BOXES:
+            with self.subTest(champion=champion):
+                _, extra = self.cue_vertices(champion)
+                self.assertEqual(sum(extra.values()), 24)
+
+    def test_every_cue_vertex_is_on_spine_at_weight_1(self):
+        for champion in CUE_BOXES:
+            with self.subTest(champion=champion):
+                cue, _ = self.cue_vertices(champion)
+                self.assertEqual(len(cue), 24)
+                for _, joint, weight in cue:
+                    self.assertEqual(joint, "Spine")
+                    self.assertAlmostEqual(weight, 1.0, delta=WEIGHT_TOLERANCE)
+
+    def test_the_cue_bounds_are_the_box(self):
+        for champion, (centre, size) in CUE_BOXES.items():
+            with self.subTest(champion=champion):
+                cue, _ = self.cue_vertices(champion)
+                # Blender (x, y, z) is glTF (x, z, -y).
+                low = (centre[0] - size[0] / 2, centre[2] - size[2] / 2, -(centre[1] + size[1] / 2))
+                high = (centre[0] + size[0] / 2, centre[2] + size[2] / 2, -(centre[1] - size[1] / 2))
+                for axis in range(3):
+                    self.assertAlmostEqual(min(v[0][axis] for v in cue), low[axis], delta=CUE_TOLERANCE)
+                    self.assertAlmostEqual(max(v[0][axis] for v in cue), high[axis], delta=CUE_TOLERANCE)
+
+    def test_the_accent_is_the_placeholders(self):
+        placeholder_doc, placeholder_bin = self.placeholder
+        wanted = Counter(
+            rounded(p) for p in positions(placeholder_doc, placeholder_bin, accent_primitive(placeholder_doc))
+        )
+        for champion in CUE_BOXES:
+            with self.subTest(champion=champion):
+                doc, bin_chunk = load(CHAMPIONS_DIR / ("%s.glb" % champion))
+                own = Counter(rounded(p) for p in positions(doc, bin_chunk, accent_primitive(doc)))
+                self.assertEqual(own, wanted)
 
 
 class KeyFrameTableTests(unittest.TestCase):

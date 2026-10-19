@@ -3,7 +3,7 @@
 These tests run the generators in Blender, so they skip when Blender is not
 installed. They exist because `bmesh.ops.create_uvsphere` once gave a
 different vertex order inside its faces on some runs, so one matching run
-proved nothing. Each model is built several times: the placeholder, the four
+proved nothing. Each model is built several times: the placeholder, the six
 roster champions and the two arenas, four runs each. The champion files are
 rigged and carry clips, so these runs also prove the animation export is
 stable; the arena runs prove the rigged export flags left the arenas alone.
@@ -21,7 +21,7 @@ RUN = REPO / "tools" / "blender" / "run.sh"
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
 RUNS = 4
 
-CHAMPION_IDS = ("placeholder", "hargrim", "quillon", "lumeth", "skerrow")
+CHAMPION_IDS = ("placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick")
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
 ARENA_IDS = ("arena01", "arena02")

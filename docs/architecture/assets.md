@@ -95,9 +95,11 @@ The commands and file list are in `tools/blender/README.md`.
   model is about 1.7 m tall.
 - Flat colours only. Every champion model is rigged and has six clips, which
   the client plays through its own sampler ([client](client.md#animation)).
-- Each of the four roster ids has `champions/<id>.glb` with the placeholder's
+- Each of the six roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
-  in body colour and one silhouette cue that stays below 1.9 m.
+  in body colour and one silhouette cue that stays below 1.9 m. The client
+  loads four of them until batch 13 (Ondrel and Brimwick are committed and
+  checked, and nothing requests them yet).
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours and cues are in
   [`tools/blender/README.md`](../../tools/blender/README.md).
@@ -113,14 +115,14 @@ The commands and file list are in `tools/blender/README.md`.
 
 ### Rig
 
-One rig for all five models, in Blender coordinates (Z up). Every bone has roll
-0 and is not connected to its parent. L is +Y, the champion's left when it
-faces +X. The validator checks the names and the parents.
+One rig for all seven models, in Blender coordinates (Z up). Every bone has
+roll 0 and is not connected to its parent. L is +Y, the champion's left when
+it faces +X. The validator checks the names and the parents.
 
 | Bone | Parent | Head | Tail | Carries (rigid, weight 1.0) |
 |------|--------|------|------|-----------------------------|
 | `Hips` | node `Rig` | (0, 0, 0.80) | (0, 0, 0.90) | nothing; the root that moves the whole body |
-| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo |
+| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap |
 | `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box |
 | `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade |
 | `Leg_L` | `Hips` | (0, 0.12, 0.80) | (0, 0.12, 0.00) | the left leg box |
@@ -189,10 +191,11 @@ In the Channels column a bare bone name means that bone's rotation.
 - `Death` jolts `Hips` up 0.035 m at key 10 (R2, 0.100 m per radian), sinks it
   at key 20 and lies on the floor at key 30 (the lowest vertex 0.6 mm up). The
   client holds the last frame.
-- The cue meshes ride the bones that move them: Hargrim's shoulder blocks and
-  Lumeth's halo on `Spine` (the `Attack` yaw, the `Hit` lean) and Quillon's
-  staff and Skerrow's blade on `Arm_R` (the `Attack` swing, the `Hit` lift). All
-  clips are shared, with no per-champion poses.
+- The cue meshes ride the bones that move them: Hargrim's shoulder blocks,
+  Lumeth's halo, Ondrel's reed bundle and Brimwick's fuse cap on `Spine` (the
+  `Attack` yaw, the `Hit` lean) and Quillon's staff and Skerrow's blade on
+  `Arm_R` (the `Attack` swing, the `Hit` lift). All clips are shared, with no
+  per-champion poses.
 
 ### Export
 
