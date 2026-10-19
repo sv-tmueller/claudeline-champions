@@ -34,6 +34,7 @@ npm run balance                  # bot-versus-bot win-rate report: plays 4800
                                  # 22.15. The manual workflow
                                  # .github/workflows/balance.yml runs --check on
                                  # a runner, 12 to 16 minutes.
+npm run fixtures:search -- <kit>   # rebuild a kit's scripted roster fixture; Node 22.15+
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
 npm run build                    # production client bundle; CI runs it, check does not

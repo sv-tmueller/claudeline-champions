@@ -84,6 +84,14 @@ first.
   committed block. Its unit tests are the `tools` Vitest project, and a manual
   workflow reproduces the report on a runner (see [Testing](testing.md)). It
   needs Node 22.15 or later.
+- `tools/fixtures`: the scripted roster fixture search. `npm run
+  fixtures:search -- <kit>` plays the seeded random player of the header of
+  `roster-fixtures.test.ts` until an attempt covers everything the test
+  requires, and writes that kit's fixture in the committed layout; it shares
+  the format, the replay, the coverage and the oracle with the test through
+  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the four committed
+  fixtures byte for byte (see [Testing](testing.md#fixture-search)). It needs
+  Node 22.15 or later.
 - `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
 
 ## Index

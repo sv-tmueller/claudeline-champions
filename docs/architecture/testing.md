@@ -100,7 +100,10 @@ raising it is a one-line change.
   the pairings, fills and seeds, `playMatch` against a reference loop, the
   aggregation and the report text, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report.
+  report. The same project holds the fixture search's tests
+  (`tools/fixtures/*.test.ts`): the format against the committed bytes, the
+  pure search cases, the reproduction of the four roster fixtures and the CLI
+  (see [Fixture search](#fixture-search)).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
@@ -125,6 +128,71 @@ for `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 can be dispatched with `gh workflow run balance.yml --ref <branch>` once the
 file is on the default branch. Budget 12 to 16 minutes; the runs on record
 are in [balance.md](../design/balance.md#7-how-to-regenerate).
+
+## Fixture search
+
+`npm run fixtures:search -- <kit> [--out <file>] [--max-attempts N]` searches
+the scripted roster fixture of `data/kits/<kit>.json` and writes it to
+`packages/sim/test/fixtures/scripted-roster-<kit>-arena01-2v2.json` (or to
+`--out`), byte for byte in the layout of the committed files. It needs Node
+22.15 or later, like `npm run balance`, and takes well under a second for a
+short search (about 10 to 20 ms per attempt and 0.3 s for the replay; the
+default limit of 1000 attempts is 10 to 20 s). The code is `tools/fixtures/`;
+the format, the replay loop, the coverage items and the oracle wiring are
+`packages/sim/test/roster-fixture.ts`, shared with
+`roster-fixtures.test.ts`, so the search and the test have one definition of
+each (see [packages](packages.md)).
+
+What it does:
+
+- It plays attempts 1, 2, 3 and so on of the seeded random player the header of
+  `roster-fixtures.test.ts` records (mulberry32 seeded with the attempt number,
+  2400 ticks on arena01 in the 2v2 mirror of the kit, the match seed of
+  `SEEDS`), and stops at the first attempt that misses nothing of `EXPECTED`.
+- It replays that attempt with the shared loop, under the ability oracle, for
+  the checkpoints at every 100 ticks and the final checksum, which are the
+  values the test compares, and writes the file.
+- It exits 1 and writes nothing when that attempt has an oracle problem (it is
+  named, and no later attempt is tried: a drop, not a skip), when no attempt
+  within `--max-attempts` covers everything (the message names the attempt that
+  missed the fewest items and those items), when the kit has no
+  `data/kits/<kit>.json`, no `EXPECTED` entry or no `SEEDS` entry, and on bad
+  arguments. The wall time goes to stdout only.
+- Its player uses exact operations only, as the fixtures must be the same on
+  every platform: no `Math.hypot` and no transcendental function. The tools lint
+  does not ban them, so review enforces it.
+
+`tools/fixtures/reproduce.test.ts` runs the search on the four committed
+fixtures and compares the bytes: Hargrim's attempt 1 and Quillon's attempt 23 on
+the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits
+they were searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put
+back in memory, as #125 changed those numbers and regenerated only the
+checkpoints), with the checkpoints of the current kits. It runs on the CI unit
+job, on Linux x86, which is the cross-platform proof of the tool. The record is
+in the header of `roster-fixtures.test.ts`.
+
+A change to a kit file that turns the coverage red is met by rebuilding its
+fixture with the tool in the same commit ([balance.md](../design/balance.md),
+section 6.3); a change that keeps the coverage green regenerates only the
+checksums, by the method of the test's header. A rebuilt fixture is a new
+script, so its replay checksums are new: its pull request replays
+`roster-fixtures.test.ts` in a `linux/amd64` container (see
+[Cross-platform determinism](#cross-platform-determinism)) before it goes
+ready.
+
+A new kit, the recipe for batch 12 (Ondrel and Brimwick):
+
+1. Add `data/kits/<id>.json`.
+2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
+   energy gains, the dash `then`s and the statuses) and to `SEEDS` (the next
+   match seed, 5559 and up) in `packages/sim/test/roster-fixture.ts`. The tool
+   stops with a message that names the file when either is missing.
+3. Run `npm run fixtures:search -- <id>`. When no attempt within the limit
+   covers, the kit's `EXPECTED` asks for something a mirror may never show:
+   read the items the message names.
+4. Add the fixture's JSON import, the kit's JSON import and a `SUBJECTS` row to
+   `roster-fixtures.test.ts`, and the kit's attempt and match seed to its
+   header; add the kit to `tools/fixtures/reproduce.test.ts`.
 
 ## Playwright e2e
 

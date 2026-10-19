@@ -25,11 +25,28 @@
 // 1 each missed an item of the coverage test, and none had an oracle problem); each one's output is
 // that fixture's segments and actions exactly.
 //
+// The search is now in the repository: `npm run fixtures:search -- <kit>` (tools/fixtures, which
+// shares this file's format, replay, coverage and oracle through `roster-fixture.ts`). It stops at
+// the first attempt that covers everything and replays it for the checkpoints and the checksum. An
+// oracle problem on that attempt makes it exit 1 and write nothing, naming the attempt: it stops
+// there and does not skip to a later attempt, which is a drop for the tuning rules (balance.md,
+// section 6.3). That picks the same attempts as the sentence above, since none of them had an
+// oracle problem. The original script of the committed fixtures is not committed.
+//
 // The player. The abilities header leaves draw-level detail open, so this is the order the
-// committed Hargrim, Quillon and Skerrow fixtures fix. The player was written again from that
-// header (the original script is not committed either, nor is the rebuild: it lives in a
-// git-ignored directory), and it reproduces Hargrim attempt 1, Quillon attempt 23 and Skerrow
-// attempt 6 byte for byte, the whole file, which is what makes this record exact. The Lumeth search
+// committed Hargrim, Quillon and Skerrow fixtures fix. The player of the tool
+// (`tools/fixtures/player.ts`) was written again from that header. The reproduction record, run by
+// `tools/fixtures/reproduce.test.ts` and byte for byte on the whole file, with Node 22.23.2 and
+// 26.7.0 alike: on the current kits the search settles on Hargrim attempt 1 and Quillon attempt 23
+// and writes the committed files. #125 changed Skerrow's Rend damage from 20 to 14 and Lumeth's
+// Binding Sigil radius from 1.5 m to 2.0 m and regenerated only the checkpoints and the checksum of
+// those two fixtures, so their segments and actions are the ones searched on the kits before #125.
+// With the number put back in memory, the search settles on Skerrow attempt 6 and Lumeth attempt 2,
+// and, with the checkpoints of the current kits, writes the committed files. On the current kits the
+// search does not: Skerrow settles on attempt 2 and Lumeth's script departs from the committed one
+// from about tick 1716. So the pin of those two rests on the kits before #125 and on reading (b)
+// below, and a Skerrow or Lumeth fixture rebuilt by the tool on today's kit would replace the
+// committed one, not reproduce it. This record is what makes the player exact. The Lumeth search
 // ran that player unchanged. At the start of a tick, for each champion in id order (a dead one too)
 // whose window ran out, from the state before that tick's step, it draws in this order: (1) the
 // length, 5 + floor(rnd * 14) ticks; (2) a flag, where below 0.3 the target is a random living
@@ -66,9 +83,12 @@
 // The checksums were then generated as for the other fixtures: set every checksum to 0, run
 // `npx vitest run --project sim packages/sim/test/roster-fixtures.test.ts`, copy the actual values
 // from the failing checkpoint and checksum assertions into the fixture, and rerun until it is green.
-// Changing a number in `data/kits/<id>.json` on purpose means changing `docs/design/roster-v1.md`
-// and regenerating that kit's checksums the same way in the same change (the search need not run
-// again unless the coverage test fails).
+// The tool's replay gives the same values. Changing a number in `data/kits/<id>.json` on purpose
+// means changing `docs/design/roster-v1.md` and regenerating that kit's checksums the same way in
+// the same change while the coverage test stays green (the search need not run again). When the
+// coverage test turns red, the fixture is rebuilt with `npm run fixtures:search -- <kit>` in the
+// same change instead (balance.md, section 6.3), and the rebuilt fixture moves every checkpoint, so
+// its pull request also replays this file in a linux/amd64 container (testing.md).
 //
 // "Replay once in a separate process" is met by the committed checksums, which the authoring run
 // produced, plus every CI run that replays them again, on Linux x86 as well as on a Mac.
