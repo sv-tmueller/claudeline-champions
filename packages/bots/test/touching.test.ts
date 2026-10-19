@@ -66,7 +66,7 @@ interface Recorded {
   point: { x: number; y: number };
   /** The goal side: this champion chases an enemy standing at the point. */
   chaser: { id: string; x: number; y: number };
-  /** The start side: this champion (the dummy has no kit) stands at the point. */
+  /** The start side: this champion (the dummy has no kit) stands at the point and chases the chaser. */
   at: string;
 }
 
@@ -115,18 +115,22 @@ describe.each(RECORDED)('the #129 state, $name', (row) => {
     expect(pointBlocked(grid, row.point)).toBe(false);
   });
 
-  it('walks on both sides: a bot chases an enemy standing there, and a bot standing there chases one', () => {
+  it('walks on the goal side: a bot chases an enemy standing there', () => {
     const goal = sceneOf(row.chaser.id, 0, {
       arena: row.arena,
       me: [row.chaser.x, row.chaser.y],
       enemy: [row.point.x, row.point.y],
     });
-    expect(walks(goal, 'hard', 1, THINKS), 'the goal side: the target stands at the point').toBe(true);
+    expect(walks(goal, 'hard', 1, THINKS)).toBe(true);
+  });
+
+  it('walks on the start side: a bot standing there chases an enemy', () => {
     const start = sceneOf(row.at, 0, {
       arena: row.arena,
       me: [row.point.x, row.point.y],
       enemy: [row.chaser.x, row.chaser.y],
+      enemyId: row.chaser.id,
     });
-    expect(walks(start, 'hard', 1, THINKS), 'the start side: the bot stands at the point').toBe(true);
+    expect(walks(start, 'hard', 1, THINKS)).toBe(true);
   });
 });
