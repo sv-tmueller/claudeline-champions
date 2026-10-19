@@ -85,11 +85,12 @@ the second.
   state, and the snap back" (five models): 0.41 to 0.54 s locally, up to 1.5
   s green, 1.1 to 3.0 s red, timeout 10 s.
 
-`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" keeps
-its 120 s timeout, and it is the thinnest margin in the suite: 18.6 s locally,
-47.3 to 59.6 s on the runner. By the rule, twice the slowest runner time is
-119.2 s, which is 0.8 s under the timeout. It sits at half its timeout, and
-raising it is a one-line change.
+`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" has a
+150 s timeout (120 s before the dodge of #137), and it is the thinnest margin in
+the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on the runner before
+the dodge and 62.4 s after it (job 117369238607). By the rule, twice the
+slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s over it;
+the test sits at 42 percent of its timeout.
 
 ## Test types
 
@@ -166,7 +167,7 @@ port 5173, which Playwright starts itself.
   Cast and a champion reads Hit in some read, and the victim of round 3's first
   death reads Death. The reads are the same on every attempt, since the bots are
   deterministic and the hook paces the windows: a bot reads Cast from the first
-  read (tick 4409), Attack from 4439, and Hit comes at 4469 (Idle+Hit).
+  read (tick 4349), Attack from 4439, and Hit comes at 4469 (Idle+Hit).
 - `match.spec.ts`: the first round of the default match against bots, once per
   arena and team size (`match.png`, and `match-arena02.png` for
   `/?arena=arena02`; `match-3v3.png` and `match-3v3-arena02.png` for the same
@@ -301,20 +302,19 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   and never runs a frame, so the first read is tick 0 and every tick is the
   hook's. The warm-up is plain windows with no profiler from tick 0 to the first
   round that begins after tick 2100 (round 3, begun by tick 4289 on the bots of
-  #137 on every run so far: the bots are deterministic), then 4 plain windows of
-  the round (the lead, 120 ticks), then the next 5 windows are measured, ticks
-  4409 to 4559. The lead is derived from three 17-window runs of round 3 with
+  #137 on every run so far: the bots are deterministic), then 2 plain windows of
+  the round (the lead, 60 ticks), then the next 5 windows are measured, ticks
+  4349 to 4499. The lead is derived from three 17-window runs of round 3 with
   the pointer on the bots of #137, all three identical: the first projectile
   spawns in window 2 (ticks 4349 to 4379), the first hits land in window 4
-  (three at once), and then 1 to 3 hits land per window and 0 to 2 projectiles
-  are live at the reads to the end of the run (tick 4799), with the first death
-  of the round read at tick 4859. The lead is 4, the window of the first hits:
-  a lead of 2 (the first projectile) reads a bots median of about 9 KB in the
-  cold first windows, a lead of 4 reads 3.4 to 4.1 KB. Before the dodge the
-  round began by tick 2609 and the first projectile spawned in window 4 (windows
-  2729 to 2879, first death at 3419), and before the dash hold of #98 by tick
-  2879 (first projectile in window 5, first death at 3539). The margin after
-  the last measured window is 300 ticks
+  (three at once), and then 0 to 2 hits land per window (window 6 reads none)
+  and 0 to 2 projectiles are live at the reads to the end of the run (tick
+  4799), with the first death of the round read at tick 4859. The lead is 2,
+  the first-projectile window, as #97 derived it (decision 9 of batch #134);
+  it was 4 with the first projectile in window 4 before the dodge (round 3
+  begun by tick 2609, windows 2729 to 2879, first death at 3419) and 5 before
+  the dash hold of #98 (round 3 by tick 2879, first death at 3539). The margin
+  after the last measured window is 360 ticks
   (the floor is 60). The human walks W and D in the first window, then A and D
   in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
   Hargrim's M1 windup is `slowed`, so the walk goes on under the cast.
@@ -420,17 +420,22 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   tick 2609, and there the median window reads 6404 to 7996 B over 15 local
   attempts, 6952, 7348 and 7200 B in three runner jobs on 4ea802d and up to
   7568 B in the tester's twelve attempts (main's bots read 5744 to 6416 B
-  there). The dodge of #137 moved them again, to windows 4 to 8 of a round 3
-  that begins at tick 4289 (ticks 4409 to 4559): the median window reads 3428 to
-  4068 B over 15 local attempts (the windows 0.9 to 1.3 KB, 12.3 to 13.1 KB,
-  3.3 to 4.0 KB, 5.5 to 8.8 KB and 3.4 to 4.0 KB; the second is the cold kite
-  and escape code), under the 7996 B of #98. The limit is 50 percent above the
-  largest clean median of the three (#98's),
-  7996 B, a local one (11 994, rounded up to 100), and it is also under a
-  quarter of the smallest median with the fixes reverted (61.9 KB on these
-  windows, 38.9 KB on the old ones), which fails the bound in every attempt (3
-  of 3 local, 9 of 9 before). It does not catch one reverted fix alone (`aim`'s
-  1.2 KB leaves the median under 12 KB). The windows after a round starts are
+  there). The dodge of #137 moved the round to begin at tick 4289, and the lead
+  of 2 puts the measured windows at windows 2 to 6 (ticks 4349 to 4499), the
+  first plans of the chase: the median window reads 8908 to 9484 B over 12 clean
+  local attempts and 11 720, 11 844 and 11 980 B in 3 with one interpreted call
+  of 2.5 to 2.9 KB in window 3 (the windows 17.5 to 20.6 KB, 8.9 to 11.9 KB, 1.0
+  to 1.4 KB, 12.6 to 13.3 KB and 3.7 to 4.0 KB). Windows 2 and 3 are the
+  follower's plans by function (`splitPath` 13.3 to 13.9 KB and 6.4 to 6.7 KB),
+  and with the dodge off they read 14.5 and 14.6 KB, so they are the cold plans
+  of the chase and not a cost of the sidestep. The limit is now 14 300 B: 50
+  percent above the largest clean median, 9484 B (14 226, rounded up to 100;
+  it was 12 000 B, 50 percent above #98's 7996 B), the same rule. It is under
+  a quarter of the smallest median with the fixes reverted (208.2 KB on these
+  windows, 61.9 KB on #98's, 38.9 KB on the old ones), which fails the bound in
+  every attempt (3 of 3 local on these windows). It does not catch one reverted
+  fix alone (`aim`'s 1.2 KB leaves the median under the bound). A runner median
+  above the limit reopens it. The windows after a round starts are
   not asserted: megabytes before the fixes, 0.04 to 0.72 MB in the first window
   of a round after them, locally (bots.md). `summarise` gives the bots' files
   the prefix `bots/`, as it gives the sim's `sim/`, so a bots file such as

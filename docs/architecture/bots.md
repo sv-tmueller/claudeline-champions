@@ -78,11 +78,13 @@ local steering to avoid champions and projectiles.
 
 Utility scoring over candidate intents: engage, kite, retreat, peel for an ally,
 hold position, use the ultimate; dodging a predicted projectile is no intent but
-an override of the move (see Dodge). Each champion has a small bot profile with
-a preferred range. The kit does not ship it: the bots derive the range from the
-kit data (see Profiles), and the openers and escapes are stateless slot
-conditions of the profile (see Openers and escapes). The one finisher is the
-rule under Finisher below; per-slot finishers are not built.
+an override of the move (see Dodge). Each
+champion has a small bot profile with a preferred range. The kit does not ship
+it: the bots derive the range from the kit data (see Profiles), and the openers
+and
+escapes are stateless slot conditions of the profile (see Openers and escapes).
+The one
+finisher is the rule under Finisher below; per-slot finishers are not built.
 
 Built so far: engage, kite, retreat, plus idle, casting (see Casting), the
 openers, escapes, dash hold and wait of a profile (see Openers and escapes) and
@@ -169,9 +171,9 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
   as retreat does. Once it has started, it keeps walking that path while it is
   closer than `rangeMin` and the path gives a move; the five points are not
   tried again meanwhile. Trying them on every think made the bot alternate
-  between one step along the wall and the step back into the corner, so it never
-  left. At the spawn, or when no path exists, it stands for one think and then
-  tries the five points again. The escape has no progress bound until local
+  between one step along the wall and the step back into the corner, so it
+  never left. At the spawn, or when no path exists, it stands for one think and
+  then tries the five points again. The escape has no progress bound until local
   avoidance exists: a champion standing on the route, or within 0.9 m of the
   spawn cell centre, keeps the bot pushing with a non-zero input and no kite
   retry for as long as the chaser stays inside `rangeMin`.
@@ -179,9 +181,10 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
   clear shot the bot follows the path to the nearest sight cell: a free cell
   within 8 cells (4 m) of the bot, not the bot's own, whose centre has a clear
   shot of 0.5 m at a distance in `[rangeMin, rangeMax]`. Ties go to the smaller
-  squared distance from the bot, then the lower cell index. With no such cell it
-  follows the path to the target, which ends in line of sight.
-- No randomness in the step itself. The bot's rng has the aim draw and the
+  squared
+  distance from the bot, then the lower cell index. With no such cell it follows
+  the path to the target, which ends in line of sight.
+  - No randomness in the step itself. The bot's rng has the aim draw and the
   dodge's coin (see Dodge) and no other use.
 
 Profiles live in `packages/bots/src/profile.ts`, keyed by champion id:
@@ -259,7 +262,7 @@ it is (its own move is not in the prediction):
 Reaction and the coin. The first think a projectile is a threat, the bot
 writes it into a memo: eight entries of projectile id, the think count and
 the coin (typed arrays, a ring that replaces the oldest entry). Once
-`castDelay` thinks (15, 8, 3: bots.md already reads the cast delay as a
+`castDelay` thinks (15, 8, 3: which Difficulty already reads as a
 reaction delay) have passed since that think and the hit is still predicted,
 one coin is drawn for the projectile, kept in the memo and never drawn again:
 a yes when it is under the tier's `dodgeChance` (0.25, 0.5, 0.75). A draw on
@@ -591,25 +594,22 @@ A think allocates nothing in the steady state: the bot runs in the frame path of
 browser, and `packages/bots/test/allocation.test.ts` measures it (see Testing). What
 makes that true, and what stays outside it:
 
-- Every record a think reads or writes is made once, in `createBot`, and
-  rewritten field by field: the decision and the acted decision, the delay ring,
-  the move command, the scores, the cast choice, the returned input, the scratch
-  points of the shot test and the kit cache. Loops on the think path are
-  indexed. Fields that hold doubles start as doubles (0.5), so no field changes
-  representation and boxes.
-- A double passed to a call that V8 does not inline, or returned from one, is
-  boxed (16 B), and so is a double loaded from a field that holds a small
-  integer in one object and a double in another. So the hot helpers take objects
-  and write a field of one (`distanceInto`, `scoreIntentsInto`, `clearShotWith`,
-  `nearestSightCellIn`, `steerTowardInto`, `followPathInto`), the numbers a scan
-  reads come from typed arrays or arrays of doubles (the kit cache,
-  `NavGrid.shapes`, the obstacle table of the shot test), and the aim is written
-  out over locals. `scoreIntents`, `clearShot`, `nearestSightCell`,
-  `steerToward` and `followPath` are wrappers over those forms, so there is one
-  implementation of each and nothing to keep in step. The aim is the one place
-  with two: `leadPoint`, `rotateByHalfTangent` and `roundAim` of aim.ts stay as
-  the independent reference, and a seeded test compares `think`'s inlined aim
-  with them.
+- Every record a think reads or writes is made once, in `createBot`, and rewritten
+  field by field: the decision and the acted decision, the delay ring, the move
+  command, the scores, the cast choice, the returned input, the scratch points of the
+  shot test and the kit cache. Loops on the think path are indexed. Fields that hold
+  doubles start as doubles (0.5), so no field changes representation and boxes.
+- A double passed to a call that V8 does not inline, or returned from one, is boxed
+  (16 B), and so is a double loaded from a field that holds a small integer in one
+  object and a double in another. So the hot helpers take objects and write a field of
+  one (`distanceInto`, `scoreIntentsInto`, `clearShotWith`, `nearestSightCellIn`,
+  `steerTowardInto`, `followPathInto`), the numbers a scan reads come from typed
+  arrays or arrays of doubles (the kit cache, `NavGrid.shapes`, the obstacle table of
+  the shot test), and the aim is written out over locals. `scoreIntents`, `clearShot`,
+  `nearestSightCell`, `steerToward` and `followPath` are wrappers over those forms, so
+  there is one implementation of each and nothing to keep in step. The aim is the one
+  place with two: `leadPoint`, `rotateByHalfTangent` and `roundAim` of aim.ts stay as the
+  independent reference, and a seeded test compares `think`'s inlined aim with them.
 - The cache of the rules is typed arrays and double fields too: per slot
   `hasOpen`, `openMin`, `openMax`, `motion` (Int8), `needsNearAlly`, `isEscape`,
   `escapeRange`, `escapeFixed`, `escapeDash`, `escapeWithin` (one double) and
@@ -620,36 +620,40 @@ makes that true, and what stays outside it:
   `allyFor`, an Int32 per slot) are fields of one object, the landing is a
   record of seven doubles and a boolean, and the kite points, the cornered
   test's move and the landing are scratch the bot owns: the landing search and
-  the cornered test allocate nothing. The dodge's `DodgeScratch` is the same
-  kind: two points that start as doubles, the tier's chance as a double field
-  and its reaction as an integer, the think count and the ring position as
-  integer fields, and the memo as an `Int32Array` of ids, an `Int32Array` of
-  first thinks and an `Int8Array` of coins, all made in `createBot`; `dodgeInto`
-  takes objects only, keeps every double in a local, passes no double to a call,
-  writes the coin as mulberry32 over the bot's `Uint32Array` state and uses
-  `sqrt` and `ceil`.
-- `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32
-  B per call, so a bot that measures a dozen distances allocated 400 B for them.
-  A test compares it, bit for bit, with `Math.hypot`. That test pins the
-  `Math.hypot` of current V8 (Node 22). If it fails after a Node upgrade, V8
-  changed `Math.hypot`: that is a decision to make (follow it or keep these
-  bits), not a bug in the bots.
-- `lineOfSight` is the sim's `hasLineOfSight` over a Float64Array of the
-  obstacles, because the sim's allocates about 128 B per call (each sweep
-  returns a double). A test compares the two on random segments. The table is
-  rebuilt when the arena is another object.
+  the cornered test allocate nothing.
+  The dodge's `DodgeScratch` is the same kind: two points that start as doubles,
+  the tier's chance as a double field and its reaction as an integer, the think
+  count and the ring position as integer fields, and the memo as an `Int32Array`
+  of ids, an `Int32Array` of first thinks and an `Int8Array` of coins, all made
+  in `createBot`; `dodgeInto` takes objects only, keeps every double in a local,
+  passes no double to a call, writes the coin as mulberry32 over the bot's
+  `Uint32Array` state and uses `sqrt` and `ceil`. - `hypot2` is V8's algorithm
+  for `Math.hypot` of two numbers, which allocates 32 B per
+  call, so a bot that measures a dozen distances allocated 400 B for them. A
+  test
+  compares it, bit for bit, with `Math.hypot`. That test pins the `Math.hypot`
+  of current
+  V8 (Node 22). If it fails after a Node upgrade, V8 changed `Math.hypot`: that
+  is a
+  decision to make (follow it or keep these bits), not a bug in the bots.
+  - `lineOfSight` is the sim's `hasLineOfSight` over a Float64Array of the
+  obstacles,
+  because the sim's allocates about 128 B per call (each sweep returns a
+  double). A
+  test compares the two on random segments. The table is rebuilt when the arena
+  is
+  another object.
 - `segmentClear` reads the obstacles from `NavGrid.shapes` (a flat array of
-  numbers, kept next to `obstacles` in the grid, which stays plain JSON) and has
-  `hypot2` written out at its one site.
-- The scratch of the shot test and the scan is per bot, so two bots never share
-  it. A direct call of `clearShot` or `nearestSightCell` without a scratch
-  allocates one.
-- V8 gives every object literal with the same keys in the same order one shape,
-  across all code in the process, and a field that any of them filled with a
-  small integer or an object is no longer a double field. A store into such a
-  field boxes the double (16 B). A scratch with a key as common as `value` was
-  measured doing that under Vitest, so the distance box has the key `metres`.
-  The heap check is what notices a scratch that loses its double fields.
+  numbers, kept next to `obstacles` in the grid, which stays plain JSON) and
+  has `hypot2` written out at its one site.
+- The scratch of the shot test and the scan is per bot, so two bots never share it.
+  A direct call of `clearShot` or `nearestSightCell` without a scratch allocates one.
+- V8 gives every object literal with the same keys in the same order one shape, across
+  all code in the process, and a field that any of them filled with a small integer or an
+  object is no longer a double field. A store into such a field boxes the double (16 B).
+  A scratch with a key as common as `value` was measured doing that under Vitest, so the
+  distance box has the key `metres`. The heap check is what notices a scratch that
+  loses its double fields.
 
 Outside the steady state, by design: a plan, which allocates its path (the
 waypoints of `findPath`, the points of `splitPath`, the follower's goal) and
@@ -733,33 +737,45 @@ code, no hot path: `aim`, `updateRuns` and `computeCues` read 0 B.
 
 The dodge of #137 lengthens the rounds before round 3, which now begins by tick
 4289, with the first projectile in window 2 and the first hits in window 4 of
-it (three 17-window runs, identical). The lead stays 4 windows, the window of
-the first hits, so the measured windows are windows 4 to 8, ticks 4409 to 4559:
-15 local attempts read a median window of 3428 to 4068 B (the windows 0.9 to
-1.3 KB, 12.3 to 13.1 KB, 3.3 to 4.0 KB, 5.5 to 8.8 KB and 3.4 to 4.0 KB; the
-second is the cold kite and escape code, as before). With a lead of 2, the
-first projectile, the measured windows hold that cold window and the median
-read about 9 KB. `dodge.ts` is in no window's list of functions (3 attempts
-read by function).
+it (three 17-window runs, identical; window 6 reads no hit, the other windows
+after window 4 read 1 or 2). The lead is 2 windows, the window of the first
+projectile, as #97 derived it (decision 9 of batch #134), so the measured
+windows are windows 2 to 6, ticks 4349 to 4499. They hold the first plans of
+the chase: 15 local attempts read the five windows at 17.5 to 20.6 KB, 8.9 to
+11.9 KB, 1.0 to 1.4 KB, 12.6 to 13.3 KB and 3.7 to 4.0 KB, a median window of
+8908 to 9484 B in 12 attempts and of 11 720, 11 844 and 11 980 B in 3 that have
+one interpreted call of 2.5 to 2.9 KB (`distanceInto`, `segmentClear` or
+`openPop`) in window 3. Read by function, windows 2 and 3 are the follower's
+plans: `splitPath` 13.3 to 13.9 KB and 6.4 to 6.7 KB, then `plan`,
+`findPath`, `needsPlan` and `cellCenter`, and nothing else counts. They are
+not a cost of the sidestep: with the dodge off (chance 0, 3 attempts, round 3
+begun by tick 2609) the same two windows read 14.5 and 14.6 KB, `splitPath`
+10.4 to 10.9 KB and 10.4 to 10.7 KB, so they are the cold plans of the chase
+that the old lead of 4 skipped (at 4 the median read 3428 to 4068 B).
+`dodge.ts` is in no window's list of functions.
 
 The live scene bounds the bots: the median of its five windows' own bots figures
-must be at most 12 000 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
-is 50 percent above the largest median of any clean attempt of the three
-sources, 7996 B, one of the 15 local attempts on the head of #98 (the runner's
-largest is 7348 B, the tester's 7568 B; 11 994, rounded up to 100; decision 12
-of #91 set 9600 B on 6.4 KB, the one attempt where a single interpreted call of
-`lineOfSight` read 2.7 KB in the median window, and the move of the windows is
-why it was set again). The other clause, at most a quarter of the smallest
-median with the plan search and the Maglev fixes reverted, is not the lower one
-now: the revert reads 61.9, 65.8 and 66.7 KB on these windows (a quarter of 61.9
-KB is 15.5 KB), and fails 3 of 3 local attempts (38.9 to 43.4 KB on the old
-windows, 9 of 9). The -0 deopt of `aim` above is the second positive control:
-72.3 to 74.2 KB in 3 of 3 attempts. The bound does not catch one reverted Maglev
-fix: `aim`'s 1.2 KB, or the distance of `steerTowardInto` with the finite test
-of `cellIndexAt` at up to 5 KB a window, leave the median window under 12 KB.
+must be at most 14 300 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
+is 50 percent above the largest median of any clean attempt, 9484 B, one of the
+12 clean local attempts on the head of #137 (14 226, rounded up to 100; the
+three with one interpreted call, up to 11 980 B, are under it, as the limit
+has to tolerate one; the runner figures are the lead's, and a runner median
+over the limit reopens it). It was 12 000 B on #98's windows (7996 B, the
+runner's 7348 B and the tester's 7568 B; decision 12 of #91 set 9600 B on 6.4
+KB, the one attempt where a single interpreted call of `lineOfSight` read 2.7
+KB in the median window), and it moved with the windows: the lead of 2 puts the
+first plans of the chase in them. The other clause, at most a quarter of the
+smallest median with the plan search and the Maglev fixes reverted, is not the
+lower one: the revert reads 208.2, 209.2 and 210.0 KB on these windows (a
+quarter of 208.2 KB is 52 KB), and fails 3 of 3 local attempts (61.9, 65.8 and
+66.7 KB on #98's windows, 38.9 to 43.4 KB on the old ones, 9 of 9). The -0 deopt
+of `aim` above is the second positive control: 72.3 to 74.2 KB in 3 of 3
+attempts. The bound does not catch one reverted Maglev fix: `aim`'s 1.2 KB, or
+the distance of `steerTowardInto` with the finite test of `cellIndexAt` at up to
+5 KB a window, can leave the median window under the bound.
 The Maglev heap check guards each of them singly (see Testing): the Node check
 in the default tiers runs Turbofan, which inlines them, and the bound sits
-above their size. A runner median above 12 000 B reopens the limit.
+above their size. A runner median above 14 300 B reopens the limit.
 
 The first windows of a round are not in that figure and are not bounded. With
 the profiler on from tick 0 locally, the first window of round 1 read 2.5 MB
@@ -830,7 +846,7 @@ ends, begun by tick 3839: a median window of 4048, 4156 and 4344 B, `move` and
 Maglev and compiles them, deoptimizes none of them, and never compiles `move`
 on its own (it is inlined into a caller or stays in a lower tier; the trace
 does not say which). The cause is not found: no scene of the heap check reads a
-byte in `move` (0 B in all 16 scenes, in Maglev alone as in the default tiers),
+byte in `move` (0 B in all 17 scenes, in Maglev alone as in the default tiers),
 so it is consistent with a state of the first few hundred thinks that a long
 run does not have, and nothing in `move` or in follow.ts changed. The sandbox
 figure stays unasserted.
@@ -859,13 +875,14 @@ Lead moving targets using their current velocity; add a tier-dependent angular
 error.
 
 - Lead: with `D` the vector from shooter to target, `V` the target velocity and
-  `s` the projectile speed, solve `a t^2 + b t + c = 0` with `a = V.V - s^2`, `b
-  = 2 D.V`, `c = D.D`. The time is the positive root, `(b + sqrt(b^2 - 4ac)) /
-  (-2a)` for `b >= 0` and `2c / (sqrt(b^2 - 4ac) - b)` otherwise, which avoids a
-  cancelling subtraction. The aim point is the target position plus `V t`.
+  `s` the projectile speed, solve `a t^2 + b t + c = 0` with
+  `a = V.V - s^2`, `b = 2 D.V`, `c = D.D`. The time is the positive root,
+  `(b + sqrt(b^2 - 4ac)) / (-2a)` for `b >= 0` and `2c / (sqrt(b^2 - 4ac) - b)`
+  otherwise, which avoids a cancelling subtraction. The aim point is the target
+  position plus `V t`.
 - Subject: the point the lead aims at is the acted target, except for a bolt
-  pressed at an ally (kind 1 of the ally slots, never herself): that is aimed at
-  the ally, led with the bolt's own speed, and the error is the same single
+  pressed at an ally (kind 1 of the ally slots, never herself): that is aimed
+  at the ally, led with the bolt's own speed, and the error is the same single
   draw, so the cadence is unchanged. R and F keep the acted enemy as the aim
   point, since an aim at her own centre is a zero-length vector.
 - Held ally: the sim fires at the aim of the firing tick and Soothing Surge
@@ -875,15 +892,15 @@ error.
   the tick that fires another cast (`windupLeft` 1) aims for that cast and then
   holds its own ally, the aim falls back to the acted target when the held ally
   dies, and the hold is cleared on a think with no cast in progress.
-- Speed: the first top-level projectile of the ability winding up, or else of
-  the ability pressed on this think, or else the nominal 20 m/s (no kit, or no
+- Speed: the first top-level projectile of the ability winding up, or else of the
+  ability pressed on this think, or else the nominal 20 m/s (no kit, or no
   projectile in it).
 - Fallback: aim at the target when `c = 0`, `a >= 0` (the target is at least as
   fast as the projectile) or `t` is not finite.
-- Error: the vector to the aim point turns by `2 atan(u)` with the rational form
-  `cos = (1 - u^2) / (1 + u^2)`, `sin = 2u / (1 + u^2)`, so no trigonometry
-  runs. `u` is drawn uniformly from `[-T, T]` and redrawn every 15 ticks while
-  the bot has a target.
+- Error: the vector to the aim point turns by `2 atan(u)` with the rational
+  form `cos = (1 - u^2) / (1 + u^2)`, `sin = 2u / (1 + u^2)`, so no
+  trigonometry runs. `u` is drawn uniformly from `[-T, T]` and redrawn every 15
+  ticks while the bot has a target.
 - Rounding: `Math.round(v * 100) + 0` gives whole centimetres and never `-0`.
 - Order of draws: within a think the aim draw comes first, then the dodge coins
   in projectile index order (see Dodge); the aim draw is the one made when the
@@ -904,15 +921,16 @@ is half the reaction delay, rounded up.
 
 | Tier   | Reaction delay | Cast delay | Aim error (largest) | T (`tan` of half the error) | Dodge probability |
 | ------ | -------------- | ---------- | ------------------- | --------------------------- | ----------------- |
-| easy   | 30 ticks       | 15 thinks  | 12 degrees          | 0.10510423526567646         | 0.25              |
-| normal | 15 ticks       | 8 thinks   | 6 degrees           | 0.0524077792830412          | 0.5               |
-| hard   | 6 ticks        | 3 thinks   | 2 degrees           | 0.017455064928217585        | 0.75              |
+| easy | 30 ticks | 15 thinks | 12 degrees | 0.10510423526567646 | 0.25 |
+| normal | 15 ticks | 8 thinks | 6 degrees | 0.0524077792830412 | 0.5 |
+| hard | 6 ticks | 3 thinks | 2 degrees | 0.017455064928217585 | 0.75 |
 
 The dodge probability is the chance of the coin drawn once for a projectile (see
 Dodge), and the reaction of a dodge is the cast delay; profiles and scores are
-the same for every tier. The delay is a ring of `delay` records: the bot decides
-on the current state every tick, stores the decision, and acts on the one it
-stored `delay` ticks earlier. Movement and aim use the current positions.
+the same for
+every tier. The delay is a ring of `delay` records: the bot decides on the
+current state every tick, stores the decision, and acts on the one it stored
+`delay` ticks earlier. Movement and aim use the current positions.
 
 ## Determinism
 
@@ -921,24 +939,31 @@ seeded from `seed`), and `think` is a pure function of the state plus the bot's
 private state. A bot keeps no module-level state, iterates arrays in index
 order, never reads the wall clock or `Math.random`, never reads or writes
 `state.rng`, never mutates the state, adds no random draw for casting (the bot's
-rng has two uses, the aim draw and the dodge's coin), and stores copies of
-numbers and ids rather than references into the state. The exceptions are three
-references the bot keeps for identity checks, each rebuilt when the object it
-was built from is another one: `state.arena` (the navigation grid and the path
-follower stay while it is the same object; a new arena object, for example from
-`cloneState` each tick, rebuilds the grid and resets the follower, so such a
-caller pays a rebuild every tick), the same arena for the obstacle table of the
-shot test (see Allocation), and the kit object found in `state.kits` together
-with the champion id (the kit cache). The caches are per bot and a kit or an
-arena mutated in place is not supported. The tier table and each tier are frozen
-and readonly. Decisions use only `+ - * /`, comparisons, `sqrt`, `abs`, `min`,
-`max`, `floor`, `ceil`, `round`, `imul`, the sim's public exports, the
-arithmetic of the landing below and `hypot2` of `packages/bots/src/hypot.ts`,
-which gives the bits `Math.hypot` gives (see Allocation). Bots do not use the
-sim's `dmath`. Lint bans `Date`, `performance`, `Math.random`, `Date.now` and
-`performance.now` in bots source (the sim's transcendental-math ban is not
-copied: bots output is not promised bit-identical across platforms); review
-enforces the rest.
+rng has two uses, the aim
+draw and the dodge's coin), and stores copies of numbers and ids
+rather than references into the state. The exceptions are three references the
+bot
+keeps for identity checks, each rebuilt when the object it was built from is
+another
+one: `state.arena` (the navigation grid and the path follower stay while it is
+the
+same object; a new arena object, for example from `cloneState` each tick,
+rebuilds
+the grid and resets the follower, so such a caller pays a rebuild every tick),
+the
+same arena for the obstacle table of the shot test (see Allocation), and the kit
+object found in `state.kits` together with the champion id (the kit cache). The
+caches are per bot and a kit or an arena mutated in place is not supported.
+The tier table and each tier are frozen and readonly. Decisions use only
+`+ - * /`, comparisons, `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`,
+`imul`,
+the sim's public exports, the arithmetic of the landing below and `hypot2` of
+`packages/bots/src/hypot.ts`, which gives the
+bits `Math.hypot` gives (see Allocation). Bots do not use the sim's `dmath`.
+Lint
+bans `Date`, `performance`, `Math.random`, `Date.now` and `performance.now` in
+bots source (the sim's transcendental-math ban is not copied: bots output is not
+promised bit-identical across platforms); review enforces the rest.
 
 The landing of an escape teleport copies the sim's arithmetic operation for operation: `fireFrom`
 and the teleport case of cast.ts and `direction` of geometry.ts (a divide by the larger axis, one
@@ -956,8 +981,9 @@ match replays exactly from its input stream.
   fixed 3600 ticks of free play, and only Lumeth's four seeded runs play to the
   end (see Testing).
 - Local steering around champions (the dodge ignores them), and ally logic
-  beyond Lumeth's ally slots (peeling for an ally). Dodging an area is not
-  built either; the dodge is built for projectiles (see Dodge).
+  beyond Lumeth's ally slots (peeling for an ally).
+  Dodging an area is not built either; the dodge is built for projectiles (see
+  Dodge).
 - The rest of Lumeth's ally play: staying within 8 m of an ally (the roster's
   leash), her M1 finisher on an enemy at 10 health or less, and the EX variants
   of M2 and R. Abilities that land on allies or on the caster that no rule
@@ -1036,34 +1062,35 @@ start edit (decision 4 of batch #134): every champion starts at 75 energy,
 because no seed set reached an F by landing hits alone. Four (test kits) and
 five (shipped kits) of the six press F, and with the reserve dropped none does,
 so the energy reserve is still what lets it fire. A Skerrow 2v2 pins the Skerrow
-profile: Skerrow and Quillon against Hargrim and Quillon on the shipped kits in
-free play, seeds 101 to 104, every bot on normal, match seed 7; a team is
-eliminated by tick 3600 (a round is 5400 ticks in match flow, which would decide
-the same way), Skerrow starts a Lunge, every press passes the oracle and no bot
-stalls for more than 120 ticks. Hargrim and Lumeth against Hargrim and Quillon
-on the four shipped kits (seeds 101 to 104, normal, match seed 7, 3600 ticks)
-run the same checks, with two runs that declare a start edit because her escape
-never fires in free play: the enemy Hargrim 2 m east of her on tick 0, once with
-Lantern Burst ready (it is pressed) and once with it on cooldown (Glide is
-pressed, and the oracle checks its landing and the dash the sim starts). The
-same match with a start edit declared in the test, Skerrow at 100 energy and
-both enemies at 40 health, runs the oracle's F row on a real press: Skerrow
-starts Reaper's Dance, the tally counts a teleport of it apart, the escape
-teleports are exactly 2 and none is blocked. One run only, with the seeds above
-(a miss is governed by decision 8.3 of batch #53; the declared fallback is
-Skerrow against a Quillon at 40 health, the other two dead, 9 m apart).
-`reaper.test.ts` also blocks it: a target at 40 health steps behind the pillar
-of arena 1 during F's 18 tick windup, the sim fires toward the current aim,
-reports the teleport blocked, Skerrow stays where the cast began, and the tally
-counts it apart with no blocked escape. A shadow-edge test on arena 1 pins that
-a position where the centre line is clear and a shifted line hits the pillar
-gets no press and is not chosen as a sight cell. The determinism test runs the
-same match twice, and two matches stepped in turn, on the test kits and on the
-shipped kits (the second one interleaved with a match on the test kits), and
-compares input streams and final checksums in memory; a Skerrow 2v2 block does
-the same on the shipped kits, interleaved with a match on the test kits and
-against another match seed, each with the guard of one distinct record per bot
-per tick. See [testing](testing.md).
+profile: Skerrow and
+Quillon against Hargrim and Quillon on the shipped kits in free play, seeds 101
+to 104, every bot on normal, match seed 7; a team is eliminated by tick 3600 (a
+round is 5400 ticks in match flow, which would decide the same way), Skerrow
+starts a Lunge, every press passes the oracle and no bot stalls for more than
+120 ticks. Hargrim and Lumeth against Hargrim and Quillon on the four shipped
+kits (seeds 101 to 104, normal, match seed 7, 3600 ticks) run the same checks,
+with two runs that declare a start edit because her escape never fires in free
+play: the enemy Hargrim 2 m east of her on tick 0, once with Lantern Burst ready
+(it is pressed) and once with it on cooldown (Glide is pressed, and the oracle
+checks its landing and the dash the sim starts). The same match with a start
+edit declared in the test, Skerrow at 100 energy and both enemies at 40 health,
+runs the oracle's F row on a real press: Skerrow starts Reaper's Dance, the
+tally counts a teleport of it apart, the escape teleports are exactly 2 and none
+is blocked. One run only, with the seeds above (a miss is governed by decision
+8.3 of batch #53; the declared fallback is Skerrow against a Quillon at 40
+health, the other two dead, 9 m apart). `reaper.test.ts` also blocks it: a
+target at 40 health steps behind the pillar of arena 1 during F's 18 tick
+windup, the sim fires toward the current aim, reports the teleport blocked,
+Skerrow stays where the cast began, and the tally counts it apart with no
+blocked escape. A shadow-edge test on arena 1 pins that a position where the
+centre line is clear and a shifted line hits the pillar gets no press and is not
+chosen as a sight cell. The determinism test runs the same match twice, and two
+matches stepped in turn, on the test kits and on the shipped kits (the second
+one interleaved with a match on the test kits), and compares input streams and
+final checksums in memory; a Skerrow 2v2 block does the same on the shipped
+kits, interleaved with a match on the test kits and against another match seed,
+each with the guard of one distinct record per bot per tick. See
+[testing](testing.md).
 
 The rules have their own pins on frozen states of the shipped kits
 (`openers.test.ts`, `escapes.test.ts`, `reserve.test.ts`, `reaper.test.ts`, with
@@ -1201,11 +1228,12 @@ ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
 tick when the budget was set (6623, 7521, 6773 and 10934 on the bots of #137),
-plus two rounds of the longest round that did not go to sudden death, rounded up
-to 100 (1700 in the 2v2 runs, whose longest is 1619, and 2900 in the 3v3 runs,
-the client's longest for the same roster, 2801), and one of 7000, rounded up to
-1000 (18000, 18000, 20000 and 24000); a run whose longest round passes its term
-fails. Every run has
+plus two rounds of
+the longest round that did not go to sudden death, rounded up to 100 (1700 in
+the 2v2 runs, whose longest is 1619, and 2900 in the 3v3 runs, the client's
+longest for the same roster, 2801), and one of 7000, rounded up to 1000 (18000,
+18000, 20000 and 24000); a run whose longest round passes its term fails. Every
+run has
 a Lumeth heal an ally; across the four, Soothing Surge heals an ally, Aegis Veil
 is cast, Mend Bolt hits an enemy, and Lantern Burst and Glide are pressed (both
 in the 3v3 on arena02). The two start-edit runs of headless-kits.test.ts stay as
@@ -1234,20 +1262,21 @@ around one `think`, 600 samples per round. The figure of a round is the median
 delta minus the median delta of an empty pair of reads taken in the same loop,
 just before each think (a call of `process.memoryUsage()` allocates its result
 object, 144 B in a tier that does not optimise it away, and a pair read in
-another function sat in another tier and moved a scene by 144 B on Node 24), and
-the lowest of three rounds of every scene must be under a literal bound, 128 B
-per think. The think before the rewrite (b09b437) read 4 to 56 KB per think; the
-current think reads 0 B, and the bound sits between the two. The test also reads
-the sim's baseline step against the floor of the sim's own check, which proves
-the counter moves, and it checks that `think` leaves the checksum alone and that
-every scene stayed in its intent. It gates on the native runner and not on the
-Linux container (batch #53 decision 12). Differential tests keep the
-allocation-free forms honest: `hypot2` and `distanceInto` against `Math.hypot`,
-`lineOfSight` against the sim's `hasLineOfSight`, and `segmentClear` against a
-copy of the implementation before the rewrite and against the sampled clearance
-oracle. The test helpers copy every input a bot returns, and a guard counts one
-distinct record per bot per tick, since a stream of aliases would compare a few
-objects with themselves.
+another function sat in another tier and moved a scene by 144 B on Node 24),
+and the lowest of three rounds of every scene must be under a literal bound,
+128 B per think. The think before the rewrite (b09b437) read 4 to 56 KB per
+think; the current think reads 0 B, and the bound sits between the two. The
+test also reads the sim's baseline step against the floor of the sim's own
+check, which proves the counter moves, and it checks that `think` leaves the
+checksum alone and that every scene stayed in its intent. It gates on the
+native runner and not on the Linux container (batch #53 decision 12).
+Differential tests keep the allocation-free forms honest: `hypot2` and
+`distanceInto` against `Math.hypot`, `lineOfSight` against the sim's
+`hasLineOfSight`, and `segmentClear` against a copy of the implementation
+before the rewrite and against the sampled clearance oracle. The test helpers
+copy every input a bot returns, and a guard counts one distinct record per bot
+per tick, since a stream of aliases would compare a few objects with
+themselves.
 
 A plan check in the same file reads the median `heapUsed` delta around one plan
 step of the path follower, `followPathInto` on a fresh follower (the search, the
@@ -1345,10 +1374,10 @@ B; the other three are Maglev's.
 The CI runs the file in its own job: Node 26.7.0 (pinned: a bump means
 measuring again) with both projects, and Node 24 with the default tier; Node 22
 keeps the check in the unit job. On the runner (an AMD EPYC 7763) Node 26.7.0
-reads 0 B in all 16 scenes in both projects, the plan step 2784 B clear and
+reads 0 B in all 17 scenes in both projects, the plan step 2784 B clear and
 2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2416 B in
 Maglev alone, the control 40 B a call and the block and both pins 0 B; Node 24
-reads 0 B in all 16 scenes and 2832 B clear and 2080 to 2084 B fallback for the
+reads 0 B in all 17 scenes and 2832 B clear and 2080 to 2084 B fallback for the
 plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
 the limits are 2950 and 2300 B.
 
