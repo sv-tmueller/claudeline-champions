@@ -11,13 +11,16 @@ import { ALLY_BAR_COLOUR, ENEMY_BAR_COLOUR } from './health-bars';
 type Rgb = readonly [number, number, number];
 
 // The body colours of tools/blender/README.md (placeholder, hargrim, quillon,
-// lumeth, skerrow), copied the way test_champion_models.py copies the client's.
+// lumeth, skerrow, ondrel, brimwick), copied the way test_champion_models.py
+// copies the client's.
 const BODY_COLOURS: Record<string, string> = {
   placeholder: '#7ca0cb',
   hargrim: '#a63027',
   quillon: '#009589',
   lumeth: '#95c827',
   skerrow: '#303030',
+  ondrel: '#309530',
+  brimwick: '#dd7900',
 };
 const MIN_BODY_DISTANCE = 80;
 // combat.spec: WHITE is 255 within 5 per channel, RING is #ffd23f within 8.
