@@ -20,6 +20,13 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'protocol',
+          environment: 'node',
+          include: ['packages/protocol/test/**/*.test.ts'],
+        },
+      },
+      {
+        test: {
           name: 'client',
           environment: 'node',
           include: ['packages/client/src/**/*.test.ts'],
