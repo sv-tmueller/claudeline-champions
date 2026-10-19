@@ -97,8 +97,8 @@ healer and support, mobile assassin. Three gaps stay, and neither champion
 below needs a new primitive to fill them.
 
 - **No lingering area.** Every area in the four kit files is one hit
-  (`durationTicks` 1). The toolkit has lingering areas and no kit uses one.
-  The zone controller is the champion built on them.
+  (`durationTicks` 1). The toolkit has lingering areas and none of the four
+  uses one. The zone controller is the champion built on them.
 - **No range between 3 and 6 m.** The intended bands are these.
 
   | Champion | Intended range | Source |
@@ -135,7 +135,7 @@ line "Ondrel beats Skerrow" is conditional on a Mire being down before Quiet
 Dart lands (section 2).
 
 The measured state of roster v1 is the reason to read the web with care. In
-the report of [balance](balance.md) (sections 4 and 5), over the cells each
+the report of [balance](balance.md) (section 6), over the cells each
 champion is in, Hargrim wins 16.4 percent, Lumeth 79.1, Quillon 85.3 and
 Skerrow 19.2, and three of the six v1 counters measure inverted in every
 cell. The bots, which did not dodge in that report and never press some
@@ -221,7 +221,9 @@ carries stun, root or silence. Each lingering duration (3.0, 2.0, 2.0, 3.0 and
   130 + 40 - 69 = 101 after the plain burst, and with 87 against the 83 of
   Lunge EX. These sums replace the "above 90" of
   [decision 5 of batch #134](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232419091),
-  as [decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667) says.
+  as package A of
+  [batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147)
+  says ("with its sum stated").
   Under the Screen's 30 percent alone she walks 3.85 m/s, faster than the
   push, so the Fence holds her only with the Mire's slow on top. An open race
   from the dart is roughly even, and Skerrow's with EX.
