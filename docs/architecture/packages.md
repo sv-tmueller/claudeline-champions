@@ -12,7 +12,7 @@ packages/sim/               pure TypeScript, zero runtime deps, no DOM types
 packages/bots/              depends on sim only
 packages/client/            Vite + Three.js, depends on sim, bots and (milestone 6) protocol
 packages/server/            Node authoritative match server (milestone 6)
-packages/protocol/          shared network message types and pure codec (milestone 6)
+packages/protocol/          shared network message types and pure codec, depends on sim (types only)
 packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
 tools/balance/              bot-versus-bot win-rate harness, `npm run balance`
@@ -35,22 +35,30 @@ docs/superpowers/specs/     approved designs (the design spec)
   `document`, `fetch` or Node built-ins.
 - `bots` imports `sim` only.
 - `client` imports `sim` and `bots`. It owns all rendering, input, audio and UI.
+- `protocol` (built, #151) holds the message types, `PROTOCOL_VERSION` and
+  pure JSON encode and decode with validation: no I/O, no transport, no game
+  logic. It imports relative paths and `@claudeline/sim` only (`import type`;
+  its runtime graph has no sim module). It has the host bans of `sim`: the
+  globals `Date`, `performance`, `setTimeout`, `setInterval`, `window`,
+  `document` and `fetch`, the properties `Math.random`, `Date.now` and
+  `performance.now`, no Node built-ins, and no dynamic `import()` or
+  `import()` types. It does not have sim's math ban, `**` ban or
+  `noInlineConfig`: floats cross the wire only inside the opaque `state`,
+  `arena` and `kits`, which the codec passes through `JSON.stringify` and
+  `JSON.parse` and computes nothing with. Its tsconfig has `lib: ["ES2023"]`,
+  `types: []` and `erasableSyntaxOnly`. Lint has a source block and a test
+  block (relative paths, `@claudeline/sim` and `vitest`).
 - Designed for milestone 6 and not built yet (the amendment under spec section
   3.2, [online design section 3](../superpowers/specs/2026-10-17-online-design.md#3-package-layout-and-rules)):
-  - `protocol` holds the message types, `PROTOCOL_VERSION` and pure JSON encode
-    and decode with validation: no I/O, no transport, no game logic. It imports
-    relative paths and `@claudeline/sim` only. It has the host bans of `sim`:
-    the globals `Date`, `performance`, `setTimeout`, `setInterval`, `window`,
-    `document` and `fetch`, the properties `Math.random`, `Date.now` and
-    `performance.now`, no Node built-ins, and no dynamic `import()` or
-    `import()` types. It does not have sim's math ban. Its tsconfig has
-    `lib: ["ES2023"]`, `types: []` and `erasableSyntaxOnly`.
   - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with
     Node globals. It never imports `client`, and it may read the wall clock.
-  - `client` then imports `sim`, `bots` and `protocol`, and never `server`. A
-    lint deny rule says so, for static and dynamic imports:
-    `eslint.config.js` has no import rule for the client today, so the first
-    package adds it.
+    Its lint block comes with the server package.
+- `client` imports `sim` and `bots`, and will import `protocol` (its
+  dependency is added with the first client package that uses it). It never
+  imports `server`. A lint block denies that today, for static imports, for
+  `import()` expressions and for `import()` types: `@claudeline/server` and any
+  relative path with a `server` segment. A client file cannot be named
+  `server`; `./server-socket` is fine.
 - `tools/balance` imports relative paths, `node:` builtins, `vitest` and the
   entry points of `@claudeline/sim` and `@claudeline/bots`. It reads `data/`
   and never a package's own files.
@@ -64,8 +72,12 @@ docs/superpowers/specs/     approved designs (the design spec)
   `e2e`. It reads `data/` and writes `packages/sim/test/fixtures/` by file path.
   The sim test lint is unchanged: the sim suite does not import the tool.
 - Lint enforces these boundaries. A violation fails `npm run check`. Today
-  that holds for `sim`, `bots`, `tools/balance` and `tools/fixtures`; the
-  blocks for `protocol`, `server` and the client arrive with milestone 6.
+  that holds for `sim`, `bots`, `protocol`, `tools/balance` and
+  `tools/fixtures`, and for the client's deny of `server`; the `server` block
+  comes with the server package. The segment bans of `sim` and `bots` name
+  `protocol` too, so a relative path such as `../../protocol/src/index` is red
+  there as the package name already was (batch #147 decision 4); the server
+  package does the same for `server`.
 
 ## Data flow
 
