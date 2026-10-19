@@ -115,9 +115,9 @@ The commands and file list are in `tools/blender/README.md`.
 
 ### Rig
 
-One rig for all seven models, in Blender coordinates (Z up). Every bone has roll
-0 and is not connected to its parent. L is +Y, the champion's left when it
-faces +X. The validator checks the names and the parents.
+One rig for all seven models, in Blender coordinates (Z up). Every bone has
+roll 0 and is not connected to its parent. L is +Y, the champion's left when
+it faces +X. The validator checks the names and the parents.
 
 | Bone | Parent | Head | Tail | Carries (rigid, weight 1.0) |
 |------|--------|------|------|-----------------------------|
@@ -193,9 +193,9 @@ In the Channels column a bare bone name means that bone's rotation.
   client holds the last frame.
 - The cue meshes ride the bones that move them: Hargrim's shoulder blocks,
   Lumeth's halo, Ondrel's reed bundle and Brimwick's fuse cap on `Spine` (the
-  `Attack` yaw, the `Hit` lean) and Quillon's
-  staff and Skerrow's blade on `Arm_R` (the `Attack` swing, the `Hit` lift). All
-  clips are shared, with no per-champion poses.
+  `Attack` yaw, the `Hit` lean) and Quillon's staff and Skerrow's blade on
+  `Arm_R` (the `Attack` swing, the `Hit` lift). All clips are shared, with no
+  per-champion poses.
 
 ### Export
 

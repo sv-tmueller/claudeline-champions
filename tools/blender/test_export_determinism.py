@@ -3,7 +3,7 @@
 These tests run the generators in Blender, so they skip when Blender is not
 installed. They exist because `bmesh.ops.create_uvsphere` once gave a
 different vertex order inside its faces on some runs, so one matching run
-proved nothing. Each model is built several times: the placeholder, the four
+proved nothing. Each model is built several times: the placeholder, the six
 roster champions and the two arenas, four runs each. The champion files are
 rigged and carry clips, so these runs also prove the animation export is
 stable; the arena runs prove the rigged export flags left the arenas alone.

@@ -256,8 +256,8 @@ presses it otherwise. Every slot is pressed, so no slot is never pressed.
 by 0.16 m by 0.52 m, built in the body material and carried by the `Spine`
 bone like Hargrim's shoulder blocks. Its centre is at (-0.16, 0, 1.56), so it
 spans x from -0.20 m to -0.12 m and 1.30 m to 1.82 m high. It stands 5 cm
-proud of the torso's back face and 12 cm above the head, so the estimated top
-is 1.82 m, at most 1.90 m, and the footprint stays inside 0.5 m. It is behind
+proud of the torso's back face and 12 cm above the head, so the top is
+1.82 m, at most 1.90 m, and the footprint stays inside 0.5 m. It is behind
 the torso and clear of the visor (x from 0.11 m) and the chest plate (x from
 0.14 m), so neither is hidden from the 55 degree camera. The bundle is
 shorter and higher than the first draft (x from -0.25 m to -0.15 m, 1.00 m to
@@ -377,7 +377,7 @@ slot is pressed, so no slot is never pressed.
 **Model.** Cue: a fuse cap, a box of 0.22 m by 0.22 m by 0.16 m on top of
 the head, built in the body material and carried by the `Spine` bone like
 Lumeth's halo. Its centre is at (-0.02, 0, 1.74), so it spans 1.66 m to 1.82 m
-and the estimated top is 1.82 m, at most 1.90 m, and the footprint stays
+and the top is 1.82 m, at most 1.90 m, and the footprint stays
 inside 0.5 m. It sits from x -0.13 m to 0.09 m, above the visor (which ends
 at 1.61 m and starts at x 0.11 m) and well above the chest plate, so neither
 is hidden from the 55 degree camera. At the shared `Death` clip's key 30 its

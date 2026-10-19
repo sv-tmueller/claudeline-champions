@@ -74,10 +74,10 @@ first.
   (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the six roster ids and the
-  placeholder, each rigged, with six clips (the client plays the placeholder and
-  four of the roster until batch 13). The kits carry
-  the first tuning pass's two numbers, Skerrow's Rend damage and Lumeth's
-  Binding Sigil radius (see [balance.md](../design/balance.md)).
+  placeholder, each rigged, with six clips (the client plays the placeholder
+  and four of the roster until batch 13). The kits carry the first tuning
+  pass's two numbers, Skerrow's Rend damage and Lumeth's Binding Sigil radius
+  (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every
   champion pairing bot against bot, in 2v2 and 3v3 on both arenas, over a seed
   set and writes the win-rate report into
