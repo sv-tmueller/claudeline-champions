@@ -658,20 +658,6 @@ class CommittedChampionTests(unittest.TestCase):
                     self.assertIsNone(overlay_colour_problem(rgb))
 
 
-def body_skinned(doc, bin_chunk):
-    """Every vertex of the body primitive as (position, joint name, weight)."""
-    attributes = body_primitive(doc)["attributes"]
-    joint_nodes = doc["skins"][0]["joints"]
-    return [
-        (position, doc["nodes"][joint_nodes[indices[weights.index(max(weights))]]]["name"], max(weights))
-        for position, indices, weights in zip(
-            read_accessor(doc, bin_chunk, attributes["POSITION"]),
-            read_accessor(doc, bin_chunk, attributes["JOINTS_0"]),
-            read_accessor(doc, bin_chunk, attributes["WEIGHTS_0"]),
-        )
-    ]
-
-
 def rounded(position):
     return tuple(round(c, 6) for c in position)
 
@@ -694,23 +680,34 @@ class CueTests(unittest.TestCase):
         self.placeholder = load(CHAMPIONS_DIR / "placeholder.glb")
 
     def cue_vertices(self, champion):
+        """The cue as [(position, joint name, weight)], and its position counts.
+
+        The cue is what the model has beyond the placeholder's vertices.
+        """
         doc, bin_chunk = load(CHAMPIONS_DIR / ("%s.glb" % champion))
-        own = body_skinned(doc, bin_chunk)
-        base = Counter(rounded(p) for p, _, _ in body_skinned(*self.placeholder))
-        extra = Counter(rounded(p) for p, _, _ in own) - base
-        self.assertEqual(sum((base - Counter(rounded(p) for p, _, _ in own)).values()), 0)
-        return doc, bin_chunk, [v for v in own if extra[rounded(v[0])] > 0], extra
+        own = skinned_vertices(doc, bin_chunk)
+        base = Counter(rounded(p) for p, _, _ in skinned_vertices(*self.placeholder))
+        now = Counter(rounded(p) for p, _, _ in own)
+        self.assertEqual(sum((base - now).values()), 0)
+        extra = now - base
+        names = [doc["nodes"][joint]["name"] for joint in doc["skins"][0]["joints"]]
+        cue = [
+            (p, names[joints[weights.index(max(weights))]], max(weights))
+            for p, joints, weights in own
+            if extra[rounded(p)] > 0
+        ]
+        return cue, extra
 
     def test_the_cue_is_one_box_of_24_vertices_on_top_of_the_placeholder_body(self):
         for champion in CUE_BOXES:
             with self.subTest(champion=champion):
-                _, _, _, extra = self.cue_vertices(champion)
+                _, extra = self.cue_vertices(champion)
                 self.assertEqual(sum(extra.values()), 24)
 
     def test_every_cue_vertex_is_on_spine_at_weight_1(self):
         for champion in CUE_BOXES:
             with self.subTest(champion=champion):
-                _, _, cue, _ = self.cue_vertices(champion)
+                cue, _ = self.cue_vertices(champion)
                 self.assertEqual(len(cue), 24)
                 for _, joint, weight in cue:
                     self.assertEqual(joint, "Spine")
@@ -719,7 +716,7 @@ class CueTests(unittest.TestCase):
     def test_the_cue_bounds_are_the_box(self):
         for champion, (centre, size) in CUE_BOXES.items():
             with self.subTest(champion=champion):
-                _, _, cue, _ = self.cue_vertices(champion)
+                cue, _ = self.cue_vertices(champion)
                 # Blender (x, y, z) is glTF (x, z, -y).
                 low = (centre[0] - size[0] / 2, centre[2] - size[2] / 2, -(centre[1] + size[1] / 2))
                 high = (centre[0] + size[0] / 2, centre[2] + size[2] / 2, -(centre[1] - size[1] / 2))
