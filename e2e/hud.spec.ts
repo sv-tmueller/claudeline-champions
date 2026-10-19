@@ -23,6 +23,9 @@ const SCREENSHOT_VIEWPORT = { width: 1280, height: 720 };
 // Champion 2 is the first enemy and the target of the F4 shots: four hits kill it.
 const TARGET = 2;
 const SHOTS = 8;
+// Ticks of the batch before the death is read frame by frame: a little under the flight of a shot
+// from the spawn (-12, 2) to Lumeth at (12, 2), 24 m at 10 m/s, 144 ticks.
+const SHOT_FLIGHT_TICKS = 130;
 // Hargrim's R (data/kits/hargrim.json): a shield of 40 absorb for 240 ticks on 160 health.
 const SHIELD_ABSORB = 40;
 const SHIELD_TICKS = 240;
@@ -37,10 +40,12 @@ const ROSTER = [
 const SLOT_COUNT = 7;
 // The warmup, the 8 shots and the 240 ticks of the shield run at the probe viewport, where a frame
 // costs a sixteenth of the pixels; the reads that need geometry and the screenshot run at 1280x720.
-// Locally the test takes 3.9 s. On the runner a frame is 17 to 24 ms at the probe viewport (about
-// 450 of them here, in batches of one runFor) and 105 to 210 ms at 1280x720, and a tick-exact frame
-// also pays a hook read of 32 to 75 ms (about 20 of them), which makes some 20 s. The 60 s timeout
-// is a margin of 3x (the rule of testing.md); a row over half of it applies the rule again.
+// The test makes 18 hook reads, and the flights and waits are batches of one runFor. Locally it takes
+// 5.1 s. On the runner a frame is 17 to 24 ms at the probe viewport (about 600 of them: the warmup,
+// the 130 ticks of a shot's flight, the 240 of the shield and some 25 read one by one) and 105 to
+// 210 ms at 1280x720 (about 6), and a read costs 32 to 75 ms, so the body takes about 17 s and the
+// page load and the screenshot make it about 22 s. The 60 s timeout is more than twice that (the
+// rule of testing.md); a run past half of it applies the rule again.
 const TEST_TIMEOUT_MS = 60_000;
 
 interface Hooks {
@@ -168,7 +173,9 @@ test('shows the shield, the scoreboard on Tab and the silence flag', async ({ pa
     await page.clock.runFor(WARMUP_TICKS * FRAME_MS);
     hooks = await runUntil(page, 'the round phase', WARMUP_BUDGET_TICKS, (h) => h.phase === 'round');
     for (let shot = 0; shot < SHOTS; shot++) await page.keyboard.press('F4');
-    hooks = await runUntil(page, 'the death of the target', 200, (h) => h.deaths >= 1);
+    // The flight of a shot is one batch, and only its end is read frame by frame.
+    await runTicks(page, SHOT_FLIGHT_TICKS);
+    hooks = await runUntil(page, 'the death of the target', 60, (h) => h.deaths >= 1);
     expect(hooks.deaths).toBe(1);
 
     // 3. R: the shield shows 40 absorb as the last quarter of the health track, which is full.

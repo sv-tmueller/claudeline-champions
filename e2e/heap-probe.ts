@@ -10,7 +10,8 @@ import type { CDPSession, Page } from '@playwright/test';
 // module, the pose and overlay helpers that run each frame, the loop clock, the
 // input sampler, the pointer aim (camera.ts), the HUD writer with its views and the
 // kill feed, the scoreboard writer (scoreboard.ts), the text tables of the hooks and the
-// HUD (hook-text.ts), the champion names, the result screen's writer, the client's bot-driving glue (bot-driver.ts),
+// HUD (hook-text.ts), the champion names, the result screen's writer, the client's
+// bot-driving glue (bot-driver.ts),
 // the sound (audio.ts: routeSounds and play run on every step's events, and both
 // probe specs unlock the audio with a real gesture before the first measured window),
 // the champions' clips (champion-anim.ts, the state machine, and clip-sampler.ts, the

@@ -4,6 +4,29 @@ import { make } from './hud-dom';
 import { championName } from './roster';
 import type { Scoreboard, ScoreboardHandles } from './scoreboard';
 
+/** One row of the scoreboard, before it is built. */
+export interface ScoreboardEntry {
+  id: number;
+  championId: string;
+  side: 'ally' | 'enemy';
+}
+
+/**
+ * The rows in the order they show: the local team first, each team in id order. Pure, so a test
+ * can say it for a local team that is not A (the online client's, P4b of the online design).
+ */
+export function scoreboardEntries(
+  champions: readonly { championId: string; team: TeamId }[],
+  localTeam: TeamId,
+): ScoreboardEntry[] {
+  const entries: ScoreboardEntry[] = champions.map((champion, id) => ({
+    id,
+    championId: champion.championId,
+    side: champion.team === localTeam ? 'ally' : 'enemy',
+  }));
+  return entries.sort((a, b) => (a.side === b.side ? a.id - b.id : a.side === 'ally' ? -1 : 1));
+}
+
 /**
  * Builds the scoreboard under `root` (#hud), once at startup, hidden: the eighth HUD element of
  * rules.md section 8, `data-hud="scoreboard"` with `data-visible`. A header row (`data-row="header"`)
@@ -27,24 +50,15 @@ export function buildScoreboard(
   make(header, 'span', { 'data-part': 'deaths' }, 'D');
 
   const rows: ScoreboardHandles['rows'][number][] = [];
-  const order = champions.map((_, id) => id);
-  // Stable: the local team first, each team in id order.
-  order.sort((a, b) => {
-    const aLocal = champions[a]?.team === localTeam ? 0 : 1;
-    const bLocal = champions[b]?.team === localTeam ? 0 : 1;
-    return aLocal - bLocal || a - b;
-  });
-  for (const id of order) {
-    const champion = champions[id];
-    if (champion === undefined) continue;
-    const ally = champion.team === localTeam;
+  for (const { id, side, championId } of scoreboardEntries(champions, localTeam)) {
+    const ally = side === 'ally';
     const row = make(board, 'div', {
       'data-row': String(id),
       'data-team': ally ? 'ally' : 'enemy',
       'data-alive': 'true',
     });
     make(row, 'span', { 'data-part': 'team' }, ally ? 'Ally' : 'Enemy');
-    make(row, 'span', { 'data-part': 'name' }, championName(champion.championId));
+    make(row, 'span', { 'data-part': 'name' }, championName(championId));
     const state = make(row, 'span', { 'data-part': 'state' }, 'Alive');
     const kills = make(row, 'span', { 'data-part': 'kills' }, '0');
     const deaths = make(row, 'span', { 'data-part': 'deaths' }, '0');

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { bindScoreboard } from './scoreboard-dom';
+import type { TeamId } from '@claudeline/sim';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { bindScoreboard, buildScoreboard, scoreboardEntries } from './scoreboard-dom';
 
 interface KeyInit {
   code: string;
@@ -121,5 +122,117 @@ describe('bindScoreboard', () => {
     win.dispatchEvent(key('keyup', { code: 'Tab' }));
     win.dispatchEvent(new Event('blur'));
     expect(calls).toEqual([]);
+  });
+});
+
+const TEAMS_2V2: { championId: string; team: TeamId }[] = [
+  { championId: 'hargrim', team: 'A' },
+  { championId: 'quillon', team: 'A' },
+  { championId: 'lumeth', team: 'B' },
+  { championId: 'skerrow', team: 'B' },
+];
+const TEAMS_3V3: { championId: string; team: TeamId }[] = [
+  { championId: 'hargrim', team: 'A' },
+  { championId: 'quillon', team: 'A' },
+  { championId: 'lumeth', team: 'A' },
+  { championId: 'hargrim', team: 'B' },
+  { championId: 'quillon', team: 'B' },
+  { championId: 'lumeth', team: 'B' },
+];
+
+describe('scoreboardEntries', () => {
+  it('lists the local team first, each team in id order', () => {
+    expect(scoreboardEntries(TEAMS_2V2, 'A').map((entry) => [entry.id, entry.side])).toEqual([
+      [0, 'ally'],
+      [1, 'ally'],
+      [2, 'enemy'],
+      [3, 'enemy'],
+    ]);
+  });
+
+  it('puts team B first when it is the local team, and calls it ally', () => {
+    expect(scoreboardEntries(TEAMS_2V2, 'B').map((entry) => [entry.id, entry.side])).toEqual([
+      [2, 'ally'],
+      [3, 'ally'],
+      [0, 'enemy'],
+      [1, 'enemy'],
+    ]);
+  });
+
+  it('carries the champion id, and lists six rows of a 3v3', () => {
+    const entries = scoreboardEntries(TEAMS_3V3, 'A');
+    expect(entries).toHaveLength(6);
+    expect(entries.map((entry) => entry.championId)).toEqual(TEAMS_3V3.map((champion) => champion.championId));
+  });
+});
+
+// A document that builds fake elements, so buildScoreboard can run in node and the test reads what
+// it built: the attributes, the text and the children, in order.
+interface BuiltElement {
+  tag: string;
+  attributes: Record<string, string>;
+  textContent: string | null;
+  children: BuiltElement[];
+  setAttribute(name: string, value: string): void;
+  appendChild(child: BuiltElement): void;
+}
+
+function builtElement(tag: string): BuiltElement {
+  const element: BuiltElement = {
+    tag,
+    attributes: {},
+    textContent: null,
+    children: [],
+    setAttribute(name, value) {
+      element.attributes[name] = value;
+    },
+    appendChild(child) {
+      element.children.push(child);
+    },
+  };
+  return element;
+}
+
+describe('buildScoreboard', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function build(champions: typeof TEAMS_2V2, localTeam: TeamId) {
+    vi.stubGlobal('document', { createElement: builtElement });
+    const root = builtElement('div');
+    const handles = buildScoreboard(root as unknown as HTMLElement, champions, localTeam);
+    const board = root.children[0] as BuiltElement;
+    return { root, board, handles };
+  }
+
+  it('builds the hidden board with a header and six rows of a 3v3, handles by champion id', () => {
+    const { root, board, handles } = build(TEAMS_3V3, 'A');
+    expect(root.children).toHaveLength(1);
+    expect(board.attributes).toEqual({ 'data-hud': 'scoreboard', 'data-visible': 'false' });
+    expect(board.children.map((row) => row.attributes['data-row'])).toEqual(['header', '0', '1', '2', '3', '4', '5']);
+    expect(handles.rows).toHaveLength(6);
+    expect(handles.root).toBe(board);
+    const [, ...rows] = board.children;
+    expect(rows.map((row) => row.attributes['data-team'])).toEqual(['ally', 'ally', 'ally', 'enemy', 'enemy', 'enemy']);
+    for (const row of rows) expect(row.attributes['data-alive']).toBe('true');
+  });
+
+  it('writes the start values into the cells, and the handles are the page elements', () => {
+    const { board, handles } = build(TEAMS_2V2, 'A');
+    const lumeth = board.children[3] as BuiltElement;
+    expect(lumeth.children.map((cell) => [cell.attributes['data-part'], cell.textContent])).toEqual([
+      ['team', 'Enemy'],
+      ['name', 'Lumeth'],
+      ['state', 'Alive'],
+      ['kills', '0'],
+      ['deaths', '0'],
+    ]);
+    expect(handles.rows[2]?.row).toBe(lumeth);
+  });
+
+  it('orders the page rows by the local team but keeps the handles by champion id', () => {
+    const { board, handles } = build(TEAMS_2V2, 'B');
+    expect(board.children.map((row) => row.attributes['data-row'])).toEqual(['header', '2', '3', '0', '1']);
+    expect((board.children[1] as BuiltElement).attributes['data-team']).toBe('ally');
+    expect(handles.rows[0]?.row).toBe(board.children[3]);
   });
 });

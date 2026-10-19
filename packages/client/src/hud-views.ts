@@ -103,8 +103,10 @@ const PRIME_ROUNDS = 100;
  * and holds objects after the first push. In the live heap probe (testing.md) the readers deopted
  * on a map their loads had not seen ("wrong map" at `statuses.length` and at `.type`, found with
  * --trace-deopt), and the frames in the lower tier until the next compile boxed numbers: 48 to
- * 480 B in a window. With the loads fed six shapes and both array maps before the first frame they
- * see no map that is new to them. The shapes are the client's own and need not be the sim's maps.
+ * 480 B in a window. A load that has seen four maps or fewer is polymorphic and deopts on the next
+ * new one; fed six different maps it is past V8's four-map limit and megamorphic, and a later map
+ * causes no deopt. So the shapes need not be the sim's maps (the sim's shield even puts its fields
+ * in another order), they only have to be six, and four or fewer would bring the deopts back.
  */
 export function primeStatusReads(): void {
   const base = { sourceId: 0, slot: null, remainingTicks: 1 };

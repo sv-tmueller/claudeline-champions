@@ -165,9 +165,8 @@ describe('Scoreboard', () => {
     expect(writeCount(rigged)).toBe(1);
   });
 
-  it('tallies a match of six champions, one row each', () => {
+  it('tallies a match of six champions, one row each (the built rows are scoreboard-dom.test.ts)', () => {
     const rigged = rig(TEAMS_3V3);
-    expect(rigged.rows).toHaveLength(6);
     rigged.board.update(rigged.state);
     rigged.feedback.death(1, 5, 0);
     rigged.feedback.death(2, 4, 0);

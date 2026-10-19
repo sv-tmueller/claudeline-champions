@@ -207,7 +207,7 @@ describe('shield view', () => {
     expect(view.absorb).toBe(10);
   });
 
-  it('reads a real champion after a shield cast as the kit absorb', () => {
+  it('reads a shield status put on a real champion as its absorb', () => {
     const champion = localChampion();
     champion.statuses.push(status('shield', { absorb: 40 }));
     const view = createShieldView();
