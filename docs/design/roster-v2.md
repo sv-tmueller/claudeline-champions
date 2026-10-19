@@ -1,7 +1,7 @@
 # Roster v2: champions five and six
 
-Status: the two models are built (#149); no kit or bot profile yet (batches
-12 and 13)
+Status: the kits (#148) and the two models (#149) are built; no bot profile
+yet (batch 13)
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.5, 4.6, 6 and 10, and [rules](rules.md), sections 4.1 and 5
 
 This document defines champions five and six of the roster: a zone controller
@@ -20,7 +20,7 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
   is a support kit (`support` is false), so neither earns energy by healing,
   and neither has a heal.
 - Fixed values. The roster test of batch 12 (`catalogProblems` in
-  `packages/sim/test/roster-kits.test.ts`) will run on both kits, so these
+  `packages/sim/test/roster-kits.test.ts`) runs on both kits, so these
   are not tuning values: move speed 5.5 m/s, F cooldown 600 ticks, max health
   120 to 160 in steps of 10, and every `damage` 8 to 30 and up to 60 on F.
   The damage range holds for every effect, so every area pulse counts on its
@@ -29,7 +29,7 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
   over 6 to 15 ticks. A projectile has a speed of 12 to 25 m/s and a radius of
   0.2 to 0.6 m (spec 10). No kit lists `energyGain`.
 - Lingering areas. Three rules, which are roster choices like the heal range
-  of roster-v1 section 0:
+  of roster-v1 section 0 and are pinned by `catalogProblems`:
   - The total of the damage over the full duration of a lingering area stays
     inside 8 to 30, and inside 8 to 60 on F. The total is the damage of one
     pulse times the number of pulses, which is `ceil(durationTicks /
@@ -73,11 +73,11 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
   circle, listed in the order the table names them. Effects listed after a
   `dash` act at the start point, because the dash only starts to move the
   caster.
-- **Kit data (not built).** `data/kits/ondrel.json` and
+- **Kit data (built).** `data/kits/ondrel.json` and
   `data/kits/brimwick.json`, one file per champion named after its id, built
-  by batch 12 under roster-v1 section 0. Until then this document alone holds
-  the numbers. From then on a number changes in the file, here and in the
-  scripted fixture in the same change.
+  by batch 12 (#148) under roster-v1 section 0, with a scripted fixture each
+  (`scripted-roster-ondrel-arena01-2v2.json` and the Brimwick one). A number
+  changes in the file, here and in the scripted fixture in the same change.
 - **Models (built).** `assets/models/champions/ondrel.glb` and
   `assets/models/champions/brimwick.glb`, built by `tools/blender` (#149) as
   roster-v1 section 0 describes: the shared body in the champion's body
@@ -131,7 +131,7 @@ closed, and the six counters of roster v1 stand unchanged.
 
 Over six champions the records are Hargrim 3 wins and 2 losses, Quillon 2 and
 3, Lumeth 2 and 3, Skerrow 3 and 2, Ondrel 3 and 2, Brimwick 2 and 3. The
-line "Ondrel beats Skerrow" is conditional on ground being down before Quiet
+line "Ondrel beats Skerrow" is conditional on a Mire being down before Quiet
 Dart lands (section 2).
 
 The measured state of roster v1 is the reason to read the web with care. In
@@ -205,19 +205,26 @@ carries stun, root or silence. Each lingering duration (3.0, 2.0, 2.0, 3.0 and
   beats the push (Rush 3.3 m/s, Rally Cry 3.85, Rush with Iron Hide 4.4), so
   the Fence holds Hargrim only while no haste is up. Rush is one 5 m hop
   every 7 s, and Chain Hook is one 14 damage pull every 9 s.
-- Beats Skerrow, if a Mire, a Reed Fence or a Reed Screen is down before Quiet
-  Dart lands. The dart (silence 1.5 s) stops every cast, Reed Step, Reed
-  Screen and Reed Fence included, but not a windup already running (rules
-  2.4) and not ground already down. From 9 m it lands 0.61 s after she
-  presses it (a 0.2 s windup, then 8.2 m at 20 m/s). In the 1.5 s of silence
-  she deals Rend 14, two pulses of its damage over time 8, Throwing Knife 12,
-  three Twin Cuts 27 and the dart's 8: 69, or 83 with Lunge EX and about 100
-  with Lunge EX and Rend EX (50 energy). With ground down first, the Mire and
-  Reed Screen's field slow her 60 percent, she walks 2.2 m/s against Reed
-  Fence's 3 m/s push, and Ondrel stays above 90. Under the Screen's 30 percent
-  alone she walks 3.85 m/s, faster than the push, so the Fence holds her only
-  with the Mire's slow on top. An open race from the dart is roughly even,
-  and Skerrow's with EX.
+- Beats Skerrow, if a Mire is down before Quiet Dart lands, with Reed Screen
+  and Reed Fence on top for the full hold. The dart puts the silence of 1.5 s
+  on Ondrel: it stops every cast of hers, Reed Step, Reed Screen and Reed
+  Fence included, but not a windup already running (rules 2.4) and not
+  ground already down. Skerrow is not silenced, so she can press Lunge EX in
+  those 1.5 s. From 9 m the dart lands 0.61 s after she presses it (a 0.2 s
+  windup, then 8.2 m at 20 m/s). In the 1.5 s of silence she deals Rend 14,
+  two pulses of its damage over time 8, Throwing Knife 12, three Twin Cuts 27
+  and the dart's 8: 69, and at most 83 with Lunge EX and at most about 100
+  with Lunge EX and Rend EX (50 energy), both upper bounds that need the
+  energy and every hit. With ground down first, the Mire and Reed Screen's
+  field slow her 60 percent and she walks 2.2 m/s against Reed Fence's 3 m/s
+  push. With Reed Screen's 40 absorb up before the dart, Ondrel is left with
+  130 + 40 - 69 = 101 after the plain burst, and with 87 against the 83 of
+  Lunge EX. These sums replace the "above 90" of
+  [decision 5 of batch #134](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232419091),
+  as [decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667) says.
+  Under the Screen's 30 percent alone she walks 3.85 m/s, faster than the
+  push, so the Fence holds her only with the Mire's slow on top. An open race
+  from the dart is roughly even, and Skerrow's with EX.
 - Beats Brimwick. A caster in a locked windup stands in the mire: Starshell
   (0.7 s) and Grand Finale (1.0 s) cannot walk, so two of the Mire's three
   pulses land, 16 in all, the second while she is still inside its 2.5 m
@@ -402,7 +409,7 @@ ask for. It is 188.8 from Ondrel's body.
 ## 4. The range table
 
 Every number of sections 2 and 3 that a range binds has one row. The rows are
-the leaves that `catalogProblems` visits once the kits are data. An EX variant
+the leaves that `catalogProblems` visits on the kit files. An EX variant
 is a complete ability there, so its rows repeat the numbers it does not change.
 Added to them are `maxHealth`, `moveSpeed`, the F cooldown, the costs of the EX
 variants and of F, the count of EX variants, and a total row for each lingering

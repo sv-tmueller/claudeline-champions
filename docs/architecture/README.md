@@ -73,24 +73,27 @@ first.
   screen, music, the scoreboard, the other three `Platform` methods
   (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
-  Quillon, Skerrow and Lumeth kits; models for the six roster ids and the
-  placeholder, each rigged, with six clips (the client plays the placeholder
-  and four of the roster until batch 13). The kits carry the first tuning
-  pass's two numbers, Skerrow's Rend damage and Lumeth's Binding Sigil radius
-  (see [balance.md](../design/balance.md)).
+  Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (data
+  only: no client name and no bot profile yet); models for the six roster ids
+  and the placeholder, each rigged, with six clips (the client plays the
+  placeholder and four of the roster until batch 13). The v1 kits carry the
+  first tuning pass's two numbers, Skerrow's Rend damage and Lumeth's Binding
+  Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every
   champion pairing bot against bot, in 2v2 and 3v3 on both arenas, over a seed
   set and writes the win-rate report into
   [balance.md](../design/balance.md); `--check` compares a fresh run with the
   committed block. Its unit tests are the `tools` Vitest project, and a manual
   workflow reproduces the report on a runner (see [Testing](testing.md)). It
-  needs Node 22.15 or later.
+  needs Node 22.15 or later. It plays the four v1 kits, the `HARNESS_KITS` of
+  `tools/balance/inputs.ts`: Ondrel and Brimwick are in `data/kits` and not in
+  the harness roster until the six-kit report of batch 13.
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test
   requires, and writes that kit's fixture in the committed layout; it shares
   the format, the replay, the coverage and the oracle with the test through
-  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the four committed
+  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the six committed
   fixtures byte for byte (see [Testing](testing.md#fixture-search)). It needs
   Node 22.15 or later.
 - `server`, `protocol`, `desktop`: not started (milestones 6 and 8).

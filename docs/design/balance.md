@@ -35,13 +35,13 @@ Sources:
 ## 2. The bands
 
 - A cell is one mode (2v2 or 3v3), one arena and one pairing, so there are
-  24 cells with four kits and two arenas.
+  24 cells with the four kits of the harness roster and two arenas.
 - The band is 40 to 60 percent inclusive on X's win rate in the cell. The test
   is on the exact rate (wins times 100 against 40 and 60 times the decided
   matches), not on the rounded figure in the table.
-- X is the first kit of the pairing in the order of the kit files
-  (`hargrim`, `lumeth`, `quillon`, `skerrow`). A rate under 50 means Y is
-  ahead.
+- X is the first kit of the pairing in the order of the kit files of the
+  harness roster (`hargrim`, `lumeth`, `quillon`, `skerrow`). A rate under 50
+  means Y is ahead.
 - A roster counter (an intended counter in roster-v1.md) is read as the
   favoured side inside the band: the favourite at 50 to 60 percent and the
   other side at 40 to 50. A favourite above 60 is too strong, and an
@@ -49,8 +49,14 @@ Sources:
 
 ## 3. The method
 
-- **Pairing.** An unordered pair X v Y of different kits over the files in
-  `data/kits`, so six pairings with four kits. "Pairing" is read as the
+- **Pairing.** An unordered pair X v Y of different kits of the harness
+  roster, so six pairings with four kits. The roster is the fixed list
+  `HARNESS_KITS` in `tools/balance/inputs.ts`, the four v1 kits, and a listed
+  kit with no file is an error. `data/kits` also holds Ondrel and Brimwick
+  (#148); they are not in the harness roster until the six-kit report of
+  batch 13 ([decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
+  so the 24 cells, the 4800 matches and the block of section 4 are those of
+  four kits. "Pairing" is read as the
   matchup of two champions, as decision 6 words it, and not as the duo of
   roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
