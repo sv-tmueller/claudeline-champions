@@ -25,7 +25,7 @@ describe('the harness roster', () => {
         cpSync(fileURLToPath(new URL(`data/kits/${id}.json`, ROOT)), join(dir, 'data', 'kits', `${id}.json`));
       }
       const root = pathToFileURL(`${dir}/`);
-      expect(() => loadInputs(root)).toThrow(/skerrow/);
+      expect(() => loadInputs(root)).toThrow(new Error('the harness kit skerrow has no file in data/kits'));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
