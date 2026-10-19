@@ -7,7 +7,8 @@ import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
 const PICKED = '?champion=quillon&difficulty=hard&arena=arena02&teamsize=3';
 const PANEL = '[data-select="panel"]';
-// The bare address, the one that opens the select; every other spec enters with DEFAULT_MATCH.
+// The bare address, the one that opens the select; every spec that wants the default match
+// enters with DEFAULT_MATCH.
 const BARE = '/';
 
 interface Row {
@@ -139,6 +140,40 @@ test('skips the select when the address names a key, and opens it for an unrelat
     await page.goto('/?foo=1');
     await orFail(page.waitForSelector(`${PANEL}[data-visible="true"]`), failed);
     expect(await page.locator('canvas').count()).toBe(0);
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('keeps the keyboard focus on the picked entry after the rows are rebuilt', async ({ page }) => {
+  const { problems, failed } = watchProblems(page);
+  try {
+    await page.goto(BARE);
+    await orFail(page.waitForSelector(`${PANEL}[data-visible="true"]`), failed);
+
+    // A pick rebuilds the rows, so the entry that held the focus is a new element: the focus
+    // must land on its successor in the same place of the same row, now the current one.
+    await page.focus(`${PANEL} [data-champion="quillon"]`);
+    await page.keyboard.press('Enter');
+    const read = await page.evaluate(() => {
+      const active = document.activeElement;
+      return {
+        champion: active?.getAttribute('data-champion') ?? null,
+        current: active?.getAttribute('data-current') ?? null,
+        inPanel: active?.closest('[data-select="panel"]') !== null,
+      };
+    });
+    expect(read).toEqual({ champion: 'quillon', current: 'true', inPanel: true });
+
+    // The same on another row, reached by the keyboard alone.
+    await page.focus(`${PANEL} [data-difficulty="hard"]`);
+    await page.keyboard.press('Enter');
+    const hard = await page.evaluate(() => ({
+      tier: document.activeElement?.getAttribute('data-difficulty') ?? null,
+      current: document.activeElement?.getAttribute('data-current') ?? null,
+    }));
+    expect(hard).toEqual({ tier: 'hard', current: 'true' });
+    expect(new URL(page.url()).search).toBe('');
   } finally {
     expect(problems).toEqual([]);
   }
