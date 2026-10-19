@@ -69,9 +69,10 @@ first.
   the projectile colour of its team. The six clips play: a state machine per
   champion (Idle and Run, an Attack, Cast or Hit over the upper body, Death
   held) and a sampler of our own on the clip data, with `data-anim0` to
-  `data-animN` hooks, both counted by the heap probe. Not built: a pre-match
-  screen, music, the scoreboard, the other three `Platform` methods
-  (`identity`, `unlockAchievement`, `openUrl`).
+  `data-animN` hooks, both counted by the heap probe. A bare address opens the
+  pre-match select (champion, arena, team size and difficulty), and any launch
+  key plays a match as before. Not built: music, the other three `Platform`
+  methods (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits; models for the six roster ids and the
   placeholder, each rigged, with six clips (the client plays the placeholder
