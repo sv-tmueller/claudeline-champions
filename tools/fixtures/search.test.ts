@@ -120,21 +120,21 @@ describe('searchFixture', () => {
   });
 
   it('throws for a kit with an EXPECTED entry and no SEEDS entry', () => {
-    EXPECTED.d128probe = { fired: [], gains: [], thens: [], statuses: [] };
+    EXPECTED.probe = { fired: [], gains: [], thens: [], statuses: [] };
     try {
-      expect(SEEDS.d128probe).toBeUndefined();
-      expect(() => searchFixture({ id: 'd128probe' } as KitDef, { maxAttempts: 1 })).toThrow(/SEEDS.*roster-fixture\.ts/s);
+      expect(SEEDS.probe).toBeUndefined();
+      expect(() => searchFixture({ id: 'probe' } as KitDef, { maxAttempts: 1 })).toThrow(/SEEDS.*roster-fixture\.ts/s);
     } finally {
-      delete EXPECTED.d128probe;
+      delete EXPECTED.probe;
     }
   });
 
   it('throws for a kit with a SEEDS entry and no EXPECTED entry', () => {
-    SEEDS.d128probe = 1;
+    SEEDS.probe = 1;
     try {
-      expect(() => searchFixture({ id: 'd128probe' } as KitDef, { maxAttempts: 1 })).toThrow(/EXPECTED.*roster-fixture\.ts/s);
+      expect(() => searchFixture({ id: 'probe' } as KitDef, { maxAttempts: 1 })).toThrow(/EXPECTED.*roster-fixture\.ts/s);
     } finally {
-      delete SEEDS.d128probe;
+      delete SEEDS.probe;
     }
   });
 
