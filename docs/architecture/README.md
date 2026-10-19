@@ -73,8 +73,9 @@ first.
   screen, music, the scoreboard, the other three `Platform` methods
   (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
-  Quillon, Skerrow and Lumeth kits; models for the four roster ids and the
-  placeholder, each rigged, with six clips the client plays. The kits carry
+  Quillon, Skerrow and Lumeth kits; models for the six roster ids and the
+  placeholder, each rigged, with six clips (the client plays the placeholder and
+  four of the roster until batch 13). The kits carry
   the first tuning pass's two numbers, Skerrow's Rend damage and Lumeth's
   Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every

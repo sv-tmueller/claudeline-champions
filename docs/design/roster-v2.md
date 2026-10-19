@@ -1,6 +1,7 @@
 # Roster v2: champions five and six
 
-Status: on paper; no kit, model or bot profile yet (batches 12 and 13)
+Status: the two models are built (#149); no kit or bot profile yet (batches
+12 and 13)
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.5, 4.6, 6 and 10, and [rules](rules.md), sections 4.1 and 5
 
 This document defines champions five and six of the roster: a zone controller
@@ -77,13 +78,15 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
   by batch 12 under roster-v1 section 0. Until then this document alone holds
   the numbers. From then on a number changes in the file, here and in the
   scripted fixture in the same change.
-- **Models (not built).** `assets/models/champions/ondrel.glb` and
-  `assets/models/champions/brimwick.glb`, built by `tools/blender` as
+- **Models (built).** `assets/models/champions/ondrel.glb` and
+  `assets/models/champions/brimwick.glb`, built by `tools/blender` (#149) as
   roster-v1 section 0 describes: the shared body in the champion's body
-  colour, one cue, the shared rig and the six clips. The two body colours are
-  reserved by decision 2 of batch #134. A scratch run of the colour functions
-  of `tools/blender/test_champion_models.py` at commit `ae41fed` checked
-  both, and its figures are in the model subsections.
+  colour, one cue, the shared rig and the six clips. Ondrel's colour is the
+  one decision 2 of batch #134 reserved. Brimwick's moved, by decision 1 of
+  batch #147, and her model paragraph says why. The committed
+  `test_champion_models.py` checks both files, and the figures in the model
+  subsections come from its functions. The client loads neither before
+  batch 13.
 - The names were checked by hand against the Bloodline Champions and
   Battlerite rosters. They are original (ADR-005).
 
@@ -249,18 +252,28 @@ not use "behind cover". Reed Step has a band of 1.0 m from its own area, so the
 usual walk presses it only at a target that touches her, and the escape rule
 presses it otherwise. Every slot is pressed, so no slot is never pressed.
 
-**Model.** Cue: a reed bundle strapped to her back, one thin box of about
-0.10 m by 0.16 m by 0.80 m, built in the body material and carried by the
-`Spine` bone like Hargrim's shoulder blocks. It sits against the back of the
-torso (x from -0.25 m to -0.15 m, 1.00 m to 1.80 m high), so the estimated top
-is 1.80 m, at most 1.90 m, and the footprint stays inside 0.5 m. It is behind
+**Model.** Cue: a reed bundle strapped to her back, one thin box of 0.08 m
+by 0.16 m by 0.52 m, built in the body material and carried by the `Spine`
+bone like Hargrim's shoulder blocks. Its centre is at (-0.16, 0, 1.56), so it
+spans x from -0.20 m to -0.12 m and 1.30 m to 1.82 m high. It stands 5 cm
+proud of the torso's back face and 12 cm above the head, so the estimated top
+is 1.82 m, at most 1.90 m, and the footprint stays inside 0.5 m. It is behind
 the torso and clear of the visor (x from 0.11 m) and the chest plate (x from
-0.14 m), so neither is hidden from the 55 degree camera. Body colour: moss
-green, linear (0.03, 0.30, 0.03), about `#309530`. In 8-bit sRGB b minus g is
--101, so the overlay rule holds (`overlay None`). The nearest colours from
-the scratch run at `ae41fed` are the dead grey `#5a6070` at 93.1, Skerrow at
-101.0 and Quillon at 101.1, so the minimum distance is 93.1, above the 80 the
-test asks for.
+0.14 m), so neither is hidden from the 55 degree camera. The bundle is
+shorter and higher than the first draft (x from -0.25 m to -0.15 m, 1.00 m to
+1.80 m high) because of the shared `Death` clip. At its key 30 the body lies
+on its back (`Hips` turned -85 degrees and 0.64 m down), and the draft's
+lowest corner would be 71.6 mm under the floor, where the tolerance is 0.1
+mm. The clips are shared and the four existing models must not move, so the
+cue moved. At key 30 the bundle's lowest point is 4.3 mm above the floor. The
+clip tops with it are 1.8364 m (Idle), 1.8758 m (Run), 1.8339 m (Attack),
+1.8359 m (Cast), 1.8200 m (Hit) and 1.8200 m (Death), all under 1.90 m.
+
+Body colour: moss green, linear (0.03, 0.30, 0.03), about `#309530`. In 8-bit
+sRGB b minus g is -101, so the overlay rule holds (`overlay None`). The
+nearest colours are the dead grey `#5a6070` at 93.1, Skerrow at 101.0 and
+Quillon at 101.1, so the minimum distance is 93.1, above the 80 the test
+asks for. The model is 37 544 bytes and 264 triangles.
 
 ## 3. Brimwick, the burst caster
 
@@ -361,18 +374,30 @@ shot of 0.5 m, so bots will not use "behind cover". Flare Step has no band,
 since a teleport reaches nobody, so only the escape rule presses it. Every
 slot is pressed, so no slot is never pressed.
 
-**Model.** Cue: a fuse cap, a box of about 0.22 m by 0.22 m by 0.16 m on top
-of the head, built in the body material and carried by the `Spine` bone like
-Lumeth's halo. It spans 1.66 m to 1.82 m, so the estimated top is 1.82 m, at
-most 1.90 m, and the footprint stays inside 0.5 m. It sits from x -0.13 m to
-0.09 m, above the visor (which ends at 1.61 m and starts at x 0.11 m) and
-well above the chest plate, so neither is hidden from the 55 degree camera.
-Body colour: burnt orange, linear (0.72, 0.19, 0.00), about `#dd7900`. In
-8-bit sRGB b minus g is -121, so the overlay rule holds (`overlay None`). The
-nearest colours from the scratch run at `ae41fed` are the enemy health bar
-`#ff4d4f` at 96.6, Hargrim at 99.4 and the enemy projectile `#ff8a5c` at 99.5,
-so the minimum distance is 96.6, above the 80 the test asks for. It is 181.7
-from Ondrel's body.
+**Model.** Cue: a fuse cap, a box of 0.22 m by 0.22 m by 0.16 m on top of
+the head, built in the body material and carried by the `Spine` bone like
+Lumeth's halo. Its centre is at (-0.02, 0, 1.74), so it spans 1.66 m to 1.82 m
+and the estimated top is 1.82 m, at most 1.90 m, and the footprint stays
+inside 0.5 m. It sits from x -0.13 m to 0.09 m, above the visor (which ends
+at 1.61 m and starts at x 0.11 m) and well above the chest plate, so neither
+is hidden from the 55 degree camera. At the shared `Death` clip's key 30 its
+lowest point is 105 mm above the floor. The clip tops are 1.8340 m (Idle),
+1.8636 m (Run), 1.8278 m (Attack), 1.8285 m (Cast), 1.8244 m (Hit) and
+1.8327 m (Death), all under 1.90 m. The model is 37 524 bytes and 264
+triangles.
+
+Body colour: burnt orange, linear (0.74, 0.12, 0.00), about `#df6100`. In
+8-bit sRGB b minus g is -97, so the overlay rule holds (`overlay None`). The
+colour moved from the reserved value of decision 2 of batch #134, linear
+(0.72, 0.19, 0.00), about `#dd7900`, by decision 1 of batch #147. The
+reserved value passed the model test's colour set, but it is 64.7 from the
+HUD's energy colour `#ffb000`, and the client's `hud-palette.test.ts` holds
+every body 80 from the colours of the HUD, the result panel and the menu. The
+body moved 24.1 from the reserved value, and the HUD and its screenshots
+stayed. The nearest colours are Hargrim at 84.7, the HUD energy colour at
+85.2 and the enemy health bar `#ff4d4f` at 87.5, then the enemy projectile
+`#ff8a5c` at 105.7, so the minimum distance is 84.7, above the 80 the tests
+ask for. It is 188.8 from Ondrel's body.
 
 ## 4. The range table
 

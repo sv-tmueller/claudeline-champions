@@ -19,6 +19,8 @@ tools/blender/run.sh tools/blender/gen_champion.py -- --champion hargrim --out a
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion quillon --out assets/models/champions/quillon.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion lumeth --out assets/models/champions/lumeth.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion skerrow --out assets/models/champions/skerrow.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion ondrel --out assets/models/champions/ondrel.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion brimwick --out assets/models/champions/brimwick.glb
 python3 tools/blender/validate_glb.py assets/models
 python3 -B -m unittest discover -s tools/blender -p 'test_*.py'
 ```
@@ -32,7 +34,7 @@ newer and no packages, so they can run in CI.
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
-| `gen_champion.py` | Builds the placeholder or one of the four roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
+| `gen_champion.py` | Builds the placeholder or one of the six roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
 | `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
@@ -103,7 +105,7 @@ not vertical.
 ### Champion
 
 - `--champion <id>` writes `assets/models/champions/<id>.glb`. The ids are
-  `placeholder`, the generic model, and the four roster ids below.
+  `placeholder`, the generic model, and the six roster ids below.
 - One mesh node named `Champion`, built in one bmesh with a material per part.
   The head sphere and the halo ring are built from explicit vertices and
   faces, because `bmesh.ops.create_uvsphere` changes its face vertex order
@@ -113,7 +115,7 @@ not vertical.
   `rotation.y = aimAngle` directly. An accent-coloured visor and chest plate
   mark the front.
 - Body and accent are flat colours.
-- All five files share the node layout, the origin, the facing, the body
+- All seven files share the node layout, the origin, the facing, the body
   geometry, the rig, the clips and the accent. A roster champion differs only
   in the body colour and one cue mesh, which is in the body colour so the
   accent still marks only the front.
@@ -145,6 +147,8 @@ not vertical.
 | `quillon` | ranged | (0.00, 0.30, 0.25) | `#009589` | staff in the right hand, top at 1.85 m |
 | `lumeth` | healer | (0.30, 0.58, 0.02) | `#95c827` | halo ring above the head, top at 1.815 m |
 | `skerrow` | assassin | (0.03, 0.03, 0.03) | `#303030` | short blade forward from the right hand |
+| `ondrel` | zone controller | (0.03, 0.30, 0.03) | `#309530` | reed bundle on the back, top at 1.82 m |
+| `brimwick` | burst caster | (0.74, 0.12, 0.00) | `#df6100` | fuse cap on top of the head, top at 1.82 m |
 
 The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
 checked by `test_champion_models.py`. No body has a blue channel more than 45
@@ -164,10 +168,17 @@ not held to it (48.5 away, as before). The trim is 48.6 from the floor on
 purpose, so the floor reads as one two-tone surface, and nothing compares the
 two.
 
-Two colours are reserved for champions five and six, Ondrel (0.03, 0.30, 0.03)
-and Brimwick (0.72, 0.19, 0.00), as `RESERVED_BODIES` in the same test. They
-obey the two body rules against the same set before their models exist, and
-move into the roster list when the models land.
+Ondrel keeps the colour decision 2 of batch #134 reserved for it. Brimwick's
+reserved colour, (0.72, 0.19, 0.00), about `#dd7900`, is superseded by decision
+1 of batch #147. It was 64.7 from the HUD's energy colour `#ffb000`, and the
+client's `hud-palette.test.ts` holds every body 80 from the colours of the HUD,
+the result panel and the menu, so one of the two had to move. The body moved,
+24.1 from the reserved value, and the HUD stayed. Its nearest colours are
+Hargrim at 84.7, the HUD energy colour at 85.2 and the enemy bar at 87.5. The
+nearest to Ondrel are the dead grey at 93.1 and Skerrow at 101.0.
+
+That client test keeps its own `BODY_COLOURS` table with the bodies above, so
+change both in the same commit.
 
 ## Validator
 
