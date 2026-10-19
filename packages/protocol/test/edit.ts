@@ -16,9 +16,12 @@ export function edit(sample: unknown, ...edits: [path: string, value: unknown][]
   return JSON.stringify(copy);
 }
 
-/** A valid sample by type, so a row can name the message it edits. */
-export function byType<T extends { t: string }>(messages: readonly T[], t: string): T {
+/** The valid sample of one type, typed as that message, so a row can name the message it edits. */
+export function byType<T extends { t: string }, K extends T['t']>(
+  messages: readonly T[],
+  t: K,
+): Extract<T, { t: K }> {
   const found = messages.find((m) => m.t === t);
   if (found === undefined) throw new Error(`no sample of type ${t}`);
-  return found;
+  return found as Extract<T, { t: K }>;
 }

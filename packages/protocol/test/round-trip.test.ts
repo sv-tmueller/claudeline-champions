@@ -109,11 +109,11 @@ describe('the encoders ignore the caller key order and stray fields', () => {
   });
 
   it.each(clientMessages)('$t: a stray field is not written', (m) => {
-    expect(encodeClientMessage({ ...m, extra: 1 } as typeof m)).toBe(goldens[m.t]);
+    expect(encodeClientMessage({ ...m, extra: 1 } as unknown as typeof m)).toBe(goldens[m.t]);
   });
 
   it.each(serverMessages)('$t: a stray field is not written', (m) => {
-    expect(encodeServerMessage({ ...m, extra: 1 } as typeof m)).toBe(goldens[m.t]);
+    expect(encodeServerMessage({ ...m, extra: 1 } as unknown as typeof m)).toBe(goldens[m.t]);
   });
 
   it('writes no stray field inside nested records either', () => {

@@ -2,7 +2,7 @@ import arena02Json from '../../../data/arenas/arena02.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import lumethJson from '../../../data/kits/lumeth.json';
 import quillonJson from '../../../data/kits/quillon.json';
-import { Button, checksum, createMatch, parseArenaDef, step } from '@claudeline/sim';
+import { Button, checksum, createMatch, debug, parseArenaDef, step } from '@claudeline/sim';
 import type { GameState, KitDef, MatchConfig, MoveAxis, PlayerInput } from '@claudeline/sim';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -122,6 +122,21 @@ function play(rebuildEvents: (batches: EventBatch[], tick: number) => GameState[
   };
   let pending: EventBatch[] = [];
   for (let i = 0; i < TICKS; i++) {
+    // The shipped kits of this roster only make areas that last one tick, which never reach a
+    // snapshot, so the script places a short-lived area through the sim's toolkit now and then.
+    if (i % 300 === 150) {
+      const owner = live.champions[i % 6] as GameState['champions'][number];
+      debug.spawnArea(live, {
+        ownerId: owner.id,
+        x: owner.x,
+        y: owner.y,
+        radius: 3,
+        durationTicks: 30,
+        intervalTicks: 10,
+        targets: 'enemies',
+        effects: [{ type: 'damage', amount: 1 }],
+      });
+    }
     step(live, script.next(live));
     // step clears state.events in place on the next call, so the batch holds a copy.
     if (live.events.length > 0) {
