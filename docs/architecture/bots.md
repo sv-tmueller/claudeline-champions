@@ -748,23 +748,29 @@ one interpreted call of 2.5 to 2.9 KB (`distanceInto`, `segmentClear` or
 `openPop`) in window 3. Read by function, windows 2 and 3 are the follower's
 plans: `splitPath` 13.3 to 13.9 KB and 6.4 to 6.7 KB, then `plan`,
 `findPath`, `needsPlan` and `cellCenter`, and nothing else counts. They are
-not a cost of the sidestep: with the dodge off (chance 0, 3 attempts, round 3
-begun by tick 2609) the same two windows read 14.5 and 14.6 KB, `splitPath`
-10.4 to 10.9 KB and 10.4 to 10.7 KB, so they are the cold plans of the chase
-that the old lead of 4 skipped (at 4 the median read 3428 to 4068 B).
-`dodge.ts` is in no window's list of functions.
+mostly the cold plans of the chase: with the dodge off (chance 0, 3 attempts)
+the same two windows read 14.5 and 14.6 KB, `splitPath` 10.4 to 10.9 KB and
+10.4 to 10.7 KB, against 17.5 to 20.6 KB and 8.9 to 11.9 KB here. That control
+is a different match, with round 3 begun by tick 2609, and a replan after a
+sidestep lands in `follow.ts` too, so the dodge may add to them. The old lead
+of 4 skipped them (at 4 the median read 3428 to 4068 B). `dodge.ts` is in no
+window's list of functions.
 
 The live scene bounds the bots: the median of its five windows' own bots figures
-must be at most 14 300 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
-is 50 percent above the largest median of any clean attempt, 9484 B, one of the
-12 clean local attempts on the head of #137 (14 226, rounded up to 100; the
-three with one interpreted call, up to 11 980 B, are under it, as the limit
-has to tolerate one; the runner figures are the lead's, and a runner median
-over the limit reopens it). It was 12 000 B on #98's windows (7996 B, the
-runner's 7348 B and the tester's 7568 B; decision 12 of #91 set 9600 B on 6.4
-KB, the one attempt where a single interpreted call of `lineOfSight` read 2.7
-KB in the median window), and it moved with the windows: the lead of 2 puts the
-first plans of the chase in them. The other clause, at most a quarter of the
+must be at most 18 000 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
+is 50 percent above the largest median of any clean attempt, 11 980 B (17 970,
+rounded up to 100). The 15 local attempts on the head of #137 read 8908, 9012,
+9056, 9056, 9200, 9296, 9296, 9368, 9388, 9416, 9480, 9484, 11 720, 11 844 and
+11 980 B; the last three have one interpreted call in window 3, a first-time
+deoptimisation that falls back to the interpreter, which decision 12 of #91
+counts as clean, so they are in the set. At the merge the rule is applied again
+over every source, the tester's attempts and the runner's three (the decision
+18 addendum of #91, the lead's step), and a median over the limit reopens it.
+It was 12 000 B on #98's windows (7996 B, the runner's 7348 B and the
+tester's 7568 B; decision 12 of #91 set 9600 B on 6.4 KB, the one attempt where
+a single interpreted call of `lineOfSight` read 2.7 KB in the median window),
+and it moved with the windows: the lead of 2 puts the first plans of the chase
+in them. The other clause, at most a quarter of the
 smallest median with the plan search and the Maglev fixes reverted, is not the
 lower one: the revert reads 208.2, 209.2 and 210.0 KB on these windows (a
 quarter of 208.2 KB is 52 KB), and fails 3 of 3 local attempts (61.9, 65.8 and
@@ -775,7 +781,7 @@ the distance of `steerTowardInto` with the finite test of `cellIndexAt` at up to
 5 KB a window, can leave the median window under the bound.
 The Maglev heap check guards each of them singly (see Testing): the Node check
 in the default tiers runs Turbofan, which inlines them, and the bound sits
-above their size. A runner median above 14 300 B reopens the limit.
+above their size. A runner median above 18 000 B reopens the limit.
 
 The first windows of a round are not in that figure and are not bounded. With
 the profiler on from tick 0 locally, the first window of round 1 read 2.5 MB

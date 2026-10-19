@@ -405,7 +405,7 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   sixth figure of the probe line; the live scene bounds them apart: the median
   of the five measured windows' bots figures (not the bots figure of the
   window that is the median by counted bytes) must be at most
-  `LIVE_BOTS_LIMIT_BYTES`, 12 000 B (`heap-probe.ts` has the figures, and
+  `LIVE_BOTS_LIMIT_BYTES`, 18 000 B (`heap-probe.ts` has the figures, and
   bots.md, Allocation, In the browser, the causes). The bytes in a browser
   window were: 0.6 to 0.9 KB per window in the sandbox (`bot.ts:move` of its
   one bot, not asserted; `rng.ts:next` is gone since #108), and in the live
@@ -422,15 +422,21 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   7568 B in the tester's twelve attempts (main's bots read 5744 to 6416 B
   there). The dodge of #137 moved the round to begin at tick 4289, and the lead
   of 2 puts the measured windows at windows 2 to 6 (ticks 4349 to 4499), the
-  first plans of the chase: the median window reads 8908 to 9484 B over 12 clean
-  local attempts and 11 720, 11 844 and 11 980 B in 3 with one interpreted call
+  first plans of the chase: the median window reads 8908 to 11 980 B over 15
+  local attempts, the top three (11 720 to 11 980 B) with one interpreted call
   of 2.5 to 2.9 KB in window 3 (the windows 17.5 to 20.6 KB, 8.9 to 11.9 KB, 1.0
   to 1.4 KB, 12.6 to 13.3 KB and 3.7 to 4.0 KB). Windows 2 and 3 are the
   follower's plans by function (`splitPath` 13.3 to 13.9 KB and 6.4 to 6.7 KB),
-  and with the dodge off they read 14.5 and 14.6 KB, so they are the cold plans
-  of the chase and not a cost of the sidestep. The limit is now 14 300 B: 50
-  percent above the largest clean median, 9484 B (14 226, rounded up to 100;
-  it was 12 000 B, 50 percent above #98's 7996 B), the same rule. It is under
+  mostly the cold plans of the chase: with the dodge off (a different match,
+  round 3 by tick 2609) they read 14.5 and 14.6 KB against 17.5 to 20.6 KB and
+  8.9 to 11.9 KB here, and a replan after a sidestep lands in `follow.ts` too.
+  The limit is now 18 000 B: 50 percent above the largest clean median, 11 980
+  B (17 970, rounded up to 100; it was 12 000 B, 50 percent above #98's
+  7996 B), the same rule, with the three attempts that have one interpreted
+  call counted clean (decision 12 of #91). The 15 medians are 8908, 9012, 9056,
+  9056, 9200, 9296, 9296, 9368, 9388, 9416, 9480, 9484, 11 720, 11 844 and
+  11 980 B. At the merge the rule is applied again over every source (the
+  decision 18 addendum of #91). It is under
   a quarter of the smallest median with the fixes reverted (208.2 KB on these
   windows, 61.9 KB on #98's, 38.9 KB on the old ones), which fails the bound in
   every attempt (3 of 3 local on these windows). It does not catch one reverted
