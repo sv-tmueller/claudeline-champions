@@ -238,6 +238,52 @@ describe('ring warning (hud.css)', () => {
   });
 });
 
+describe('shield and silence (hud.css)', () => {
+  const { rules } = load(SHEETS[0] as Sheet);
+
+  function value(selectorPart: string, property: string): string | undefined {
+    return rules
+      .find((rule) => rule.selector.includes(selectorPart))
+      ?.declarations.find((d) => d.property === property)?.value;
+  }
+
+  it('draws the shield segment in the HUD text colour, so it adds no colour', () => {
+    expect(value("[data-part='shield-fill']", 'background')).toBe('var(--hud-text)');
+  });
+
+  it('draws the silenced slots dim with the enemy colour border', () => {
+    expect(value("[data-slot][data-silenced='true']", 'border-color')).toBe('var(--hud-enemy)');
+    expect(value("[data-slot][data-silenced='true']", 'opacity')).toBe('0.35');
+  });
+
+  it('places the silenced rule after every other slot rule, so it wins by source order', () => {
+    const slotRules = rules.filter((rule) => rule.selector.includes('[data-slot'));
+    const silenced = slotRules.findIndex((rule) => rule.selector.includes("[data-silenced='true']"));
+    expect(silenced).toBeGreaterThanOrEqual(0);
+    expect(silenced).toBe(slotRules.length - 1);
+  });
+
+  it('hides the segment while it shows no absorb', () => {
+    expect(value("[data-part='shield'][data-visible='false']", 'display')).toBe('none');
+  });
+});
+
+describe('scoreboard (hud.css)', () => {
+  const { rules } = load(SHEETS[0] as Sheet);
+
+  function value(selector: string, property: string): string | undefined {
+    return rules.find((rule) => rule.selector === selector)?.declarations.find((d) => d.property === property)?.value;
+  }
+
+  it('is not displayed while hidden', () => {
+    expect(value("#hud [data-hud='scoreboard'][data-visible='false']", 'display')).toBe('none');
+  });
+
+  it('draws above the result panel, which comes later in the page', () => {
+    expect(value("#hud [data-hud='scoreboard']", 'z-index')).toBe('1');
+  });
+});
+
 describe('pointer events', () => {
   it('reach the menu panel only while it is visible', () => {
     const { rules } = load(SHEETS[2] as Sheet);

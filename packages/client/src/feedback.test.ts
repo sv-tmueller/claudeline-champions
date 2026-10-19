@@ -725,3 +725,102 @@ describe('the animation triggers of real sim events', () => {
     expect(anims.map((anim) => anim.pendHit)).toEqual([0, 0, 1, 0]);
   });
 });
+
+describe('the kill and death tallies', () => {
+  function feedbackOf(teams: readonly { readonly team: TeamId }[] = TEAMS_2V2): CombatFeedback {
+    return new CombatFeedback(teams, 'A', createImpactRings(), createKillFeed(), createAnims(teams.length));
+  }
+
+  it('starts with a zero count per champion and no change', () => {
+    const feedback = feedbackOf();
+    expect(Array.from(feedback.killCounts)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 0, 0, 0]);
+    expect(feedback.tallyChanges).toBe(0);
+  });
+
+  it('counts a kill for the source and a death for the victim, as one change', () => {
+    const feedback = feedbackOf();
+    feedback.death(1, 2, 0);
+    expect(Array.from(feedback.killCounts)).toEqual([1, 0, 0, 0]);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 0, 1, 0]);
+    expect(feedback.tallyChanges).toBe(1);
+    feedback.death(2, 0, 3);
+    expect(Array.from(feedback.killCounts)).toEqual([1, 0, 0, 1]);
+    expect(Array.from(feedback.deathCounts)).toEqual([1, 0, 1, 0]);
+    expect(feedback.tallyChanges).toBe(2);
+  });
+
+  it('counts a death of the ring for the victim and credits nobody', () => {
+    const feedback = feedbackOf();
+    feedback.death(1, 1, RING_SOURCE_ID);
+    expect(Array.from(feedback.killCounts)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 1, 0, 0]);
+    expect(feedback.tallyChanges).toBe(1);
+  });
+
+  it('credits no kill for a death by the champion itself', () => {
+    const feedback = feedbackOf();
+    feedback.death(1, 2, 2);
+    expect(Array.from(feedback.killCounts)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 0, 1, 0]);
+  });
+
+  it('ignores a source or a victim that is not a champion of the match', () => {
+    const feedback = feedbackOf();
+    feedback.death(1, 2, 9);
+    expect(Array.from(feedback.killCounts)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 0, 1, 0]);
+    feedback.death(2, 9, 0);
+    feedback.death(3, -1, 0);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 0, 1, 0]);
+    expect(Array.from(feedback.killCounts)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('keeps the totals of a match across rounds: nothing resets them', () => {
+    const feedback = feedbackOf();
+    feedback.death(1, 2, 0);
+    feedback.roundEnded();
+    feedback.roundStarted();
+    feedback.death(500, 3, 0);
+    expect(feedback.killCounts[0]).toBe(2);
+  });
+
+  it('counts the deaths of a real sim, through routeEvents', () => {
+    const state = createMatch(
+      {
+        teamSize: 2,
+        players: [
+          { championId: 'hargrim', team: 'A' },
+          { championId: 'quillon', team: 'A' },
+          { championId: 'hargrim', team: 'B' },
+          { championId: 'quillon', team: 'B' },
+        ],
+      },
+      parseArenaDef(arena01Json),
+      1,
+      TEST_KITS,
+    );
+    const target = state.champions[2];
+    if (!target) throw new Error('no champion 2');
+    debug.spawnProjectile(state, {
+      ownerId: 0,
+      x: target.x - 3,
+      y: target.y,
+      dirX: 1,
+      dirY: 0,
+      speed: 10,
+      radius: 0.25,
+      lifetimeTicks: 180,
+      pierce: false,
+      effects: [{ type: 'damage', amount: 500 }],
+    });
+    const feedback = feedbackOf(state.champions);
+    for (let i = 0; i < 60 && feedback.deaths === 0; i++) {
+      step(state, []);
+      routeEvents(state, feedback);
+    }
+    expect(Array.from(feedback.killCounts)).toEqual([1, 0, 0, 0]);
+    expect(Array.from(feedback.deathCounts)).toEqual([0, 0, 1, 0]);
+    expect(feedback.tallyChanges).toBe(1);
+  });
+});

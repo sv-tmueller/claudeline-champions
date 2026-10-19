@@ -5,6 +5,7 @@ import {
   ULTIMATE_ENERGY_COST,
   type ChampionState,
   type MatchState,
+  type StatusInstance,
 } from '@claudeline/sim';
 
 /** The slot that is the ultimate, F. */
@@ -13,9 +14,10 @@ const ULTIMATE_INDEX = SLOTS.length - 1;
 /**
  * What the HUD reads from a champion: the sim's own fields, so a rename there
  * breaks the build. `cooldowns` holds one remaining-tick entry per slot in
- * `SLOTS` order and `cast` is non-null during a windup.
+ * `SLOTS` order, `cast` is non-null during a windup and `statuses` holds the
+ * silence and the shields.
  */
-export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast'>;
+export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast' | 'statuses'>;
 
 export interface SlotView {
   /** Whole seconds of cooldown left, 0 when the slot is ready. */
@@ -24,24 +26,112 @@ export interface SlotView {
   windup: boolean;
   /** The slot cannot be used for lack of energy. */
   blocked: boolean;
+  /** The champion is silenced: the same for all seven slots (rules.md section 2). */
+  silenced: boolean;
 }
 
 /** Seven views in `SLOTS` order, made once and filled in place by `readSlotViews`. */
 export function createSlotViews(): SlotView[] {
-  return SLOTS.map(() => ({ seconds: 0, windup: false, blocked: false }));
+  return SLOTS.map(() => ({ seconds: 0, windup: false, blocked: false, silenced: false }));
 }
 
 /** Fills `out` from the champion. Allocates nothing. */
 export function readSlotViews(source: SlotSource, out: readonly SlotView[]): void {
   const cooldowns = source.cooldowns;
   const windup = source.cast !== null;
+  // An indexed scan that keeps a boolean: no number is merged, so nothing is boxed.
+  const statuses = source.statuses;
+  let silenced = false;
+  for (let i = 0; i < statuses.length; i++) {
+    if ((statuses[i] as StatusInstance).type === 'silence') {
+      silenced = true;
+      break;
+    }
+  }
   for (let i = 0; i < out.length; i++) {
     const view = out[i] as SlotView;
     const ticks = cooldowns[i] ?? 0;
     view.seconds = ticks > 0 ? Math.ceil(ticks / TICK_RATE) : 0;
     view.windup = windup;
-    // Only the ultimate has an energy gate to show; silence is not built yet.
+    // Only the ultimate has an energy gate to show; the silence has its own flag.
     view.blocked = i === ULTIMATE_INDEX && source.energy < ULTIMATE_ENERGY_COST;
+    view.silenced = silenced;
+  }
+}
+
+/** What the HUD shows of the local champion's shield. */
+export interface ShieldView {
+  /** The absorb left over all shield statuses, rounded up to a whole number; 0 without a shield. */
+  absorb: number;
+}
+
+export function createShieldView(): ShieldView {
+  return { absorb: 0 };
+}
+
+// The running sum of `readShieldView`, whole numbers in an Int32Array slot. The function is called
+// once per frame, so it stays in the lower tiers for its first thousand frames, where every double
+// that is loaded, added or read from a Float64Array is a new heap number: the scratch run of
+// combat.spec with R held read 636 to 936 B a window in `readShieldView` with a Float64Array sum,
+// and 0 B with this. A `let total = 0` loop would also merge the integer constant with a double
+// at the loop's phi in the tiers above (see client.md, the probe).
+const ABSORB_SUM = new Int32Array(1);
+
+/**
+ * Fills `out` from the champion's shield statuses, which the sim stacks: the absorb is their sum,
+ * each shield rounded up like the health, so a fraction left by the ring's damage shows as the
+ * next whole point. The number is stored into the view record and never returned, so no double
+ * crosses a call. Allocates nothing.
+ */
+export function readShieldView(source: Pick<SlotSource, 'statuses'>, out: ShieldView): void {
+  const statuses = source.statuses;
+  ABSORB_SUM[0] = 0;
+  for (let i = 0; i < statuses.length; i++) {
+    const status = statuses[i] as StatusInstance;
+    if (status.type === 'shield') ABSORB_SUM[0] = (ABSORB_SUM[0] as number) + Math.ceil(status.absorb);
+  }
+  out.absorb = ABSORB_SUM[0] as number;
+}
+
+// Rounds of the priming below: enough for V8 to allocate the feedback vector of both readers.
+const PRIME_ROUNDS = 100;
+
+/**
+ * Runs both status readers at startup over empty and filled lists of statuses of six shapes. The
+ * sim builds a status with the fields of its type, so a champion's `statuses` holds objects of
+ * five shapes (stun, root, silence and invulnerable share one), in an array that is empty at first
+ * and holds objects after the first push. In the live heap probe (testing.md) the readers deopted
+ * on a map their loads had not seen ("wrong map" at `statuses.length` and at `.type`, found with
+ * --trace-deopt), and the frames in the lower tier until the next compile boxed numbers: 48 to
+ * 480 B in a window. A load that has seen four maps or fewer is polymorphic and deopts on the next
+ * new one; fed six different maps it is past V8's four-map limit and megamorphic, and a later map
+ * causes no deopt. So the shapes need not be the sim's maps (the sim's shield even puts its fields
+ * in another order), they only have to be six, and four or fewer would bring the deopts back.
+ */
+export function primeStatusReads(): void {
+  const base = { sourceId: 0, slot: null, remainingTicks: 1 };
+  const statuses = [
+    { ...base, type: 'stun' },
+    { ...base, type: 'slow', percent: 1 },
+    { ...base, type: 'shield', absorb: 1 },
+    { ...base, type: 'dot', perPulse: 1, ticksToNextPulse: 1 },
+    { ...base, type: 'knockback', dirX: 1, dirY: 0, distance: 1, totalTicks: 1 },
+    { type: 'haste', percent: 1, sourceId: 0, slot: null, remainingTicks: 1 },
+  ] as StatusInstance[];
+  const slots = createSlotViews();
+  const shield = createShieldView();
+  // The arrays too: the sim's `statuses` is an empty literal (small integers kind) that becomes
+  // an array of objects at the first push, and the load of `.length` deoptimizes on the map it has
+  // not seen. An empty array, then arrays of objects, so both maps are in the feedback.
+  const lists: StatusInstance[][] = [[], statuses, [], statuses.slice(0, 1), [], statuses.slice(2)];
+  // V8 allocates the feedback vector of a function only after it has run for a while, and a load
+  // records its maps only from then on, so the reads repeat until the vectors exist.
+  for (let round = 0; round < PRIME_ROUNDS; round++) {
+    for (const list of lists) {
+      const source: SlotSource = { energy: 0, cooldowns: [], cast: null, statuses: list };
+      readSlotViews(source, slots);
+      readShieldView(source, shield);
+    }
   }
 }
 

@@ -9,6 +9,7 @@ import {
   parseArenaDef,
   type CastState,
   type MatchPhase,
+  type StatusInstance,
   type MatchState,
 } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
@@ -16,10 +17,13 @@ import arena01Json from '../../../data/arenas/arena01.json';
 import {
   TIMER_TEXT,
   createRingView,
+  createShieldView,
   createRoundView,
   createSlotViews,
+  primeStatusReads,
   readRingView,
   readRoundView,
+  readShieldView,
   readSlotViews,
   scoreIndex,
   scoreTexts,
@@ -60,7 +64,7 @@ describe('HUD constants', () => {
 
 /** A source with ready slots, the shape of a real champion. */
 function source(overrides: Partial<SlotSource> = {}): SlotSource {
-  return { energy: 0, cooldowns: [0, 0, 0, 0, 0, 0, 0], cast: null, ...overrides };
+  return { energy: 0, cooldowns: [0, 0, 0, 0, 0, 0, 0], cast: null, statuses: [], ...overrides };
 }
 
 const WINDUP: CastState = { castId: 1, slot: 'Q', ex: false, windupTicks: 12, windupLeft: 12 };
@@ -111,6 +115,120 @@ describe('slot views', () => {
     const views = createSlotViews();
     readSlotViews(source({ energy: 100, cooldowns: [90] }), views);
     expect(views.map((v) => v.seconds)).toEqual([2, 0, 0, 0, 0, 0, 0]);
+  });
+});
+
+function status(type: StatusInstance['type'], extra: Record<string, number> = {}): StatusInstance {
+  return { type, sourceId: 3, slot: null, remainingTicks: 60, ...extra } as StatusInstance;
+}
+
+describe('silence in the slot views', () => {
+  it('starts every view not silenced', () => {
+    expect(createSlotViews().some((v) => v.silenced)).toBe(false);
+  });
+
+  it('marks all seven slots silenced while any silence status exists, and none after', () => {
+    const views = createSlotViews();
+    readSlotViews(source({ statuses: [status('slow', { percent: 20 }), status('silence')] }), views);
+    expect(views.map((v) => v.silenced)).toEqual([true, true, true, true, true, true, true]);
+    readSlotViews(source({ statuses: [] }), views);
+    expect(views.some((v) => v.silenced)).toBe(false);
+  });
+
+  it('is not triggered by the other statuses', () => {
+    const views = createSlotViews();
+    const others = [
+      status('stun'),
+      status('root'),
+      status('invulnerable'),
+      status('slow', { percent: 30 }),
+      status('haste', { percent: 20 }),
+      status('shield', { absorb: 40 }),
+      status('dot', { perPulse: 4, ticksToNextPulse: 10 }),
+      status('hot', { perPulse: 4, ticksToNextPulse: 10 }),
+    ];
+    readSlotViews(source({ statuses: others }), views);
+    expect(views.some((v) => v.silenced)).toBe(false);
+  });
+
+  it('leaves blocked to the energy gate alone', () => {
+    const views = createSlotViews();
+    readSlotViews(source({ energy: 100, statuses: [status('silence')] }), views);
+    expect(views.some((v) => v.blocked)).toBe(false);
+    readSlotViews(source({ energy: 0, statuses: [] }), views);
+    expect(views.map((v) => v.blocked)).toEqual([false, false, false, false, false, false, true]);
+  });
+});
+
+describe('shield view', () => {
+  it('starts at 0', () => {
+    expect(createShieldView()).toEqual({ absorb: 0 });
+  });
+
+  it('reads 0 without a shield', () => {
+    const view = createShieldView();
+    readShieldView(source({ statuses: [status('haste', { percent: 20 }), status('silence')] }), view);
+    expect(view.absorb).toBe(0);
+    readShieldView(source(), view);
+    expect(view.absorb).toBe(0);
+  });
+
+  it('reads the absorb of one shield', () => {
+    const view = createShieldView();
+    readShieldView(source({ statuses: [status('shield', { absorb: 40 })] }), view);
+    expect(view.absorb).toBe(40);
+  });
+
+  it('adds the shields, as the sim stacks them', () => {
+    const view = createShieldView();
+    const statuses = [status('shield', { absorb: 40 }), status('slow', { percent: 20 }), status('shield', { absorb: 15 })];
+    readShieldView(source({ statuses }), view);
+    expect(view.absorb).toBe(55);
+  });
+
+  it('rounds a fraction up, like the health', () => {
+    const view = createShieldView();
+    readShieldView(source({ statuses: [status('shield', { absorb: 31.2 })] }), view);
+    expect(view.absorb).toBe(32);
+    readShieldView(source({ statuses: [status('shield', { absorb: 0.2 })] }), view);
+    expect(view.absorb).toBe(1);
+  });
+
+  it('rounds each shield up before it adds them', () => {
+    const view = createShieldView();
+    readShieldView(source({ statuses: [status('shield', { absorb: 0.5 }), status('shield', { absorb: 0.5 })] }), view);
+    expect(view.absorb).toBe(2);
+  });
+
+  it('forgets the last read: a fresh read starts from nothing', () => {
+    const view = createShieldView();
+    readShieldView(source({ statuses: [status('shield', { absorb: 40 })] }), view);
+    readShieldView(source({ statuses: [status('shield', { absorb: 10 })] }), view);
+    expect(view.absorb).toBe(10);
+  });
+
+  it('reads a shield status put on a real champion as its absorb', () => {
+    const champion = localChampion();
+    champion.statuses.push(status('shield', { absorb: 40 }));
+    const view = createShieldView();
+    readShieldView(champion, view);
+    expect(view.absorb).toBe(40);
+  });
+});
+
+describe('priming the status readers', () => {
+  it('runs at startup and leaves the readers with nothing of its own', () => {
+    primeStatusReads();
+    const views = createSlotViews();
+    const shield = createShieldView();
+    readSlotViews(source(), views);
+    readShieldView(source(), shield);
+    expect(views.some((v) => v.silenced)).toBe(false);
+    expect(shield.absorb).toBe(0);
+    readSlotViews(source({ statuses: [status('silence')] }), views);
+    readShieldView(source({ statuses: [status('shield', { absorb: 7 })] }), shield);
+    expect(views.every((v) => v.silenced)).toBe(true);
+    expect(shield.absorb).toBe(7);
   });
 });
 

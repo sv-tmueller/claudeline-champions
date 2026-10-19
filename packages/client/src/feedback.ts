@@ -123,6 +123,16 @@ export class CombatFeedback implements FeedbackHandlers {
   hits = 0;
   /** Running total of deaths. */
   deaths = 0;
+  /**
+   * Match totals per champion id, for the scoreboard: the deaths of the champion and the kills it
+   * got. A death counts for its victim always. A kill counts for the source only when the source
+   * is another champion of the match, so the ring (`RING_SOURCE_ID`, -1) credits nobody. Never
+   * reset: a page is one match, and Restart reloads it.
+   */
+  readonly killCounts: Int32Array;
+  readonly deathCounts: Int32Array;
+  /** Deaths that changed a count so far, so the scoreboard can skip its cells while it stands still. */
+  tallyChanges = 0;
   private readonly flashEndTick: number[];
 
   /**
@@ -139,6 +149,8 @@ export class CombatFeedback implements FeedbackHandlers {
     private readonly anims: readonly ChampionAnim[],
   ) {
     this.flashEndTick = Array.from({ length: champions.length }, () => 0);
+    this.killCounts = new Int32Array(champions.length);
+    this.deathCounts = new Int32Array(champions.length);
   }
 
   damage(tick: number, targetId: number, sourceId: number): void {
@@ -194,9 +206,21 @@ export class CombatFeedback implements FeedbackHandlers {
 
   death(tick: number, targetId: number, sourceId: number): void {
     this.deaths += 1;
+    this.tally(targetId, sourceId);
     this.killFeed.push(tick, sourceId, targetId);
     const anim = this.anims[targetId];
     if (anim !== undefined) triggerDeath(anim);
+  }
+
+  /** Integers only, like the handlers: a death is cold, and the counts are typed arrays. */
+  private tally(targetId: number, sourceId: number): void {
+    const count = this.deathCounts.length;
+    if (targetId < 0 || targetId >= count) return;
+    this.deathCounts[targetId] = (this.deathCounts[targetId] ?? 0) + 1;
+    if (sourceId >= 0 && sourceId < count && sourceId !== targetId) {
+      this.killCounts[sourceId] = (this.killCounts[sourceId] ?? 0) + 1;
+    }
+    this.tallyChanges += 1;
   }
 
   isFlashing(id: number, tick: number): boolean {

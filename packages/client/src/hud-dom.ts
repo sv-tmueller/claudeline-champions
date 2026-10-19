@@ -12,20 +12,26 @@ export function make(parent: HTMLElement, tag: string, attributes: Record<string
 
 /**
  * Builds the HUD under `root`, once at startup, and returns the elements the
- * `Hud` writes. The seven `data-hud` elements carry the names of rules.md
- * section 8. States are data attributes that the e2e specs read: `data-ready`,
- * `data-windup` and `data-blocked` on a slot, `data-ready` on an energy mark,
+ * `Hud` writes. The seven `data-hud` elements built here carry the names of
+ * rules.md section 8 (the eighth, the scoreboard, is built by scoreboard-dom.ts).
+ * States are data attributes that the e2e specs read: `data-ready`,
+ * `data-windup`, `data-blocked` and `data-silenced` on a slot (the silence is
+ * the same for all seven), `data-ready` on an energy mark,
  * `data-visible` on a kill-feed line and `data-team` on its names.
+ * The shield segment sits inside the health track: `data-part="shield"` carries
+ * `data-visible` and `data-absorb`, and its `shield-fill` child the width.
  * The timer also carries `data-sudden`, true while it shows the sudden death
  * text. The ring warning carries `data-visible`, `data-counting` (the countdown
  * before the ring) and `data-outside` (the red edge). `roundsToWin` is the
- * "first to N" of the score. The shield segment and the silence state are not
- * built yet.
+ * "first to N" of the score.
  */
 export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
   const health = make(root, 'div', { 'data-hud': 'health-bar' });
   const healthTrack = make(health, 'div', { 'data-part': 'track' });
   const healthFill = make(healthTrack, 'div', { 'data-part': 'fill' });
+  // Built hidden at 0 absorb, which `Hud` starts from, so the first update writes nothing for it.
+  const shield = make(healthTrack, 'div', { 'data-part': 'shield', 'data-visible': 'false', 'data-absorb': '0' });
+  const shieldFill = make(shield, 'div', { 'data-part': 'shield-fill' });
   const healthText = make(health, 'span', { 'data-part': 'health-text' });
 
   const energy = make(root, 'div', { 'data-hud': 'energy-bar' });
@@ -82,6 +88,7 @@ export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
     energyFill,
     exMark,
     ultimateMark,
+    shield: { root: shield as HudElement, fill: shieldFill as HudElement },
     slots,
     score: scoreText,
     timer,

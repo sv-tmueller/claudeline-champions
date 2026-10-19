@@ -136,6 +136,23 @@ async function readHooks(page: Page): Promise<Hooks> {
   });
 }
 
+/** The scoreboard's visibility and its two columns, and the canvas's own count of deaths. */
+async function readTotals(page: Page): Promise<{ visible: string | null; kills: number[]; deaths: number[]; hook: number }> {
+  return page.evaluate(() => {
+    const board = document.querySelector('[data-hud="scoreboard"]');
+    const column = (part: string): number[] =>
+      [...(board?.querySelectorAll(`[data-row]:not([data-row="header"]) [data-part="${part}"]`) ?? [])].map((cell) =>
+        Number(cell.textContent),
+      );
+    return {
+      visible: board?.getAttribute('data-visible') ?? null,
+      kills: column('kills'),
+      deaths: column('deaths'),
+      hook: Number(document.querySelector('canvas')?.dataset['deaths']),
+    };
+  });
+}
+
 async function runFrames(page: Page, frames: number): Promise<void> {
   await page.clock.runFor(frames * FRAME_MS);
 }
@@ -239,6 +256,22 @@ for (const arena of ROWS) {
       const available = hooks.entries.filter((entry) => entry.available === 'true').map((entry) => entry.champion);
       expect(available).toContain('hargrim');
       expect(available).toContain('quillon');
+
+      // The scoreboard works in every phase, so over the result panel too: held at the match end
+      // it shows the final tally. Every death counts for its victim, so the deaths column is the
+      // canvas's own count of deaths, and a ring death credits no kill, so the kills column is at
+      // most that. (The scoreboard's rows are hud.spec.ts's.) Tab up hides it again.
+      if (arena.id === 'arena01' && arena.size === 2) {
+        await page.keyboard.down('Tab');
+        const held = await readTotals(page);
+        expect(held.visible, 'the scoreboard at the match end').toBe('true');
+        expect(held.deaths).toHaveLength(2 * arena.size);
+        expect(held.deaths.reduce((sum, count) => sum + count, 0), 'the deaths column sums to data-deaths').toBe(held.hook);
+        expect(held.hook, 'a match has deaths').toBeGreaterThan(0);
+        expect(held.kills.reduce((sum, count) => sum + count, 0), 'no more kills than deaths').toBeLessThanOrEqual(held.hook);
+        await page.keyboard.up('Tab');
+        expect((await readTotals(page)).visible).toBe('false');
+      }
 
       await page.setViewportSize(SCREENSHOT_VIEWPORT);
       await runFrames(page, 2);

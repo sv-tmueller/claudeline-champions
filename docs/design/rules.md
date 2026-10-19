@@ -264,6 +264,12 @@ Default controls `[spec]`:
   through the platform with the bindings and read back on the next launch
   `[tuned]`.
 - Tab shows the scoreboard while it is held `[tuned]`. The scoreboard lists every champion with its team, its champion, alive or dead, kills and deaths.
+  The kills and deaths are totals of the match, not of the round `[tuned]`. A
+  death always counts for the champion that died; a kill counts for the
+  champion that dealt the last damage, so a death by the sudden death ring
+  counts a death and no kill `[tuned]`. It shows in every phase, over the
+  result panel too, where the final tally is the useful one `[tuned]`, and
+  not while the menu is open (Tab then moves focus in the menu) `[tuned]`.
 - In local matches the menu pauses the sim `[tuned]`. It opens in every phase
   and has these actions: Resume (Escape again does the same), Restart the
   match with the same champion, difficulty, arena and team size, back to the
