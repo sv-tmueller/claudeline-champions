@@ -20,8 +20,9 @@ Sources:
   pairing, on both arenas, in 2v2 and 3v3. A pairing outside the band gets a
   kit change inside the ranges of spec section 10 and
   [rules.md](rules.md) section 4.1, pinned by the roster tests with its fixture
-  regenerated in the same change. A pairing left outside is named as accepted,
-  with the reason.
+  regenerated in the same change (rebuilt with the search tool when its
+  coverage turns red, section 6.3). A pairing left outside is named as
+  accepted, with the reason.
 - Decision 21 of batch #105 splits the work: #109 builds the harness, the
   baseline and this document; #121 and #124 change numbers (decision 28 gives
   Skerrow and Lumeth to #121 and Hargrim and Quillon to #124). It also fixes the
@@ -325,8 +326,9 @@ at 3v3 arena02, 95.0 to 95.5); neither moved a Quillon v Skerrow cell by 5
 points. Eight failed before a full run: six on the fixture coverage (Skip's
 cooldown, Bind Shot's slow and its duration, Snare Orb's cooldown, Rod Bolt's
 cooldown and Lance's windup; the committed Quillon fixture is attempt 23 of its
-search, and the search is not in the repository) and two on the no-stall clause
-of lumeth.test.ts (Rod Bolt's reach and its damage). Limits that may account:
+search, and the search is not in the repository (at the time; #128 added the
+tool)) and two on the no-stall clause of lumeth.test.ts (Rod Bolt's reach and
+its damage). Limits that may account:
 the target is the nearest enemy (or the current one within 1 m of it), so in a
 replayed Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01,
 seed 1, round 1) Skerrow hit the other Hargrim while Quillon's bolts hit her
@@ -469,7 +471,8 @@ R's cooldown, F's windup and M1's cooldown to 70 ticks; for Skerrow the M1 and
 E cooldowns, Lunge's and Quiet Dart's and Vanish Step's cooldowns, max health
 140 and Throwing Knife's slow. The fixtures are the shipped scripts, and the
 search that found them is not in the repository (roster-fixtures.test.ts,
-header), so a coverage miss ends a candidate.
+header), so a coverage miss ends a candidate (at the time; #128 added the
+tool, and section 6.3 gives the rule for the next pass).
 
 ### 6.2 Candidates of #124, all dropped
 
@@ -509,7 +512,8 @@ after):
 The thirteen that failed a pre-check and got no run (the fixture coverage
 names what the changed kit's replay no longer shows, as in
 roster-fixtures.test.ts; the search that found the committed fixtures is not in
-the repository, so a miss ends a candidate):
+the repository, so a miss ends a candidate (at the time; #128 added the tool,
+section 6.3)):
 
 | Champion | Number | Old to new | Target cell | The red pre-check |
 |----------|--------|------------|-------------|-------------------|
@@ -526,6 +530,47 @@ the repository, so a miss ends a candidate):
 | Hargrim | Rush (SPACE) cooldown | 420 to 300 | H v Q 2v2 arena01 | Fixture coverage: no energyGained of Ground Slam EX. |
 | Hargrim | Maul Swing (M1) damage | 12 to 16 | H v L 3v3 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 6003 ticks in kite from tick 956 (2v2, arena02). |
 | Hargrim | Chain Hook (E) speed and lifetime | 20 to 25 m/s, 27 to 22 ticks | H v L 2v2 arena01 | Fixture coverage: no energyGained of Ground Slam or of Rush EX. |
+
+### 6.3 The rule for the next pass: the fixture search
+
+#128 put the search in the repository: `npm run fixtures:search -- <kit>`
+(testing.md, "Fixture search"). The clause of decisions 28 and 32 that dropped
+a candidate on a red fixture coverage rested on there being no search, so it
+changes for the next pass; the records of 6.1 and 6.2 stand as they were
+tried.
+
+- A candidate whose fixture coverage turns red gets its fixture rebuilt with
+  `npm run fixtures:search -- <kit>` in the same commit as the kit change, with
+  the roster-v1 text and the roster-kits.test.ts literals, and the pre-checks
+  continue.
+- The candidate is still dropped when the tool exits 1: the first attempt that
+  covers everything has an oracle problem, or no attempt within the limit
+  covers. The tool stops on the oracle problem instead of skipping that
+  attempt, so the oracle check stays a drop.
+- A dropped candidate takes its rebuilt fixture with it: the file goes back to
+  the committed one with the kit change.
+- A change whose coverage stays green regenerates only the checksums, by the
+  method in the header of roster-fixtures.test.ts. No fixture is rebuilt for
+  it.
+- A rebuilt fixture is a new script, so every one of its checkpoints moves and
+  its replay checksums are new: the pull request replays it in the
+  linux/amd64 container (testing.md, "Fixture search").
+
+What either change does to `tools/fixtures/reproduce.test.ts`, which pins the
+attempt each committed fixture is the output of (decision 13 of batch #134). A
+red row after a kit change is not a failed pre-check: it says that row's pin is
+out of date, and it is no ground to drop a candidate.
+
+- After a rebuild, the row takes the new attempt the tool printed, its kit is
+  the current one, and the header of roster-fixtures.test.ts records the new
+  attempt.
+- After a green change, the row is pinned on the kit as searched: the number
+  the committed script was searched on goes back in memory, as the Skerrow and
+  Lumeth rows are pinned today, with the change that moved it named in a
+  comment, and the checkpoints written are those of the current kit. A search
+  on the current kit may settle on another attempt without any rebuild (#125
+  moved Skerrow from attempt 6 to 2 and Lumeth from 2 to 5). The header
+  records which kit numbers each search ran on.
 
 ## 7. How to regenerate
 

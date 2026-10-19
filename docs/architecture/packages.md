@@ -16,6 +16,7 @@ packages/protocol/          shared network message types and pure codec (milesto
 packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
 tools/balance/              bot-versus-bot win-rate harness, `npm run balance`
+tools/fixtures/             scripted roster fixture search, `npm run fixtures:search`
 data/arenas/                arena definitions (JSON), read by sim and by Blender scripts
 data/kits/                  roster kit definitions (JSON, one `KitDef` per champion), read like arenas
 assets/models/              generated .glb files, committed
@@ -53,9 +54,18 @@ docs/superpowers/specs/     approved designs (the design spec)
 - `tools/balance` imports relative paths, `node:` builtins, `vitest` and the
   entry points of `@claudeline/sim` and `@claudeline/bots`. It reads `data/`
   and never a package's own files.
+- `tools/fixtures` imports relative paths, `node:` builtins, `vitest` and the
+  entry point of `@claudeline/sim`, and two sim test support modules by
+  relative path, `packages/sim/test/roster-fixture.ts` and
+  `packages/sim/test/ability-watch.ts`, so that the search and
+  `roster-fixtures.test.ts` share one definition of the fixture format, the
+  replay loop, the coverage and the oracle. It imports no other file of a
+  package, no `@claudeline/bots` and nothing under `node_modules`, `tests` or
+  `e2e`. It reads `data/` and writes `packages/sim/test/fixtures/` by file path.
+  The sim test lint is unchanged: the sim suite does not import the tool.
 - Lint enforces these boundaries. A violation fails `npm run check`. Today
-  that holds for `sim`, `bots` and `tools/balance`; the blocks for `protocol`,
-  `server` and the client arrive with milestone 6.
+  that holds for `sim`, `bots`, `tools/balance` and `tools/fixtures`; the
+  blocks for `protocol`, `server` and the client arrive with milestone 6.
 
 ## Data flow
 
