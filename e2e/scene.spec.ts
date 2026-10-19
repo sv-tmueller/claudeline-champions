@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { orFail, waitForPhase, watchProblems } from './support';
+import { DEFAULT_MATCH, orFail, waitForPhase, watchProblems } from './support';
 
 // The slots in the order of SLOTS in the sim, which is the order on screen.
 const SLOT_NAMES = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'];
@@ -122,7 +122,7 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
   const { problems, failed } = watchProblems(page);
 
   try {
-    await page.goto('/');
+    await page.goto(DEFAULT_MATCH);
     // data-arena is set after the first HUD write.
     await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
 

@@ -10,7 +10,7 @@ import {
   runWindow,
   type Allocations,
 } from './heap-probe';
-import { orFail, watchProblems } from './support';
+import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
 // The second heap-probe scene: the default match, `/` at time scale 1, where the
 // hooks and the HUD change in every window (the position and facing of the
@@ -215,7 +215,7 @@ test('the live match: the writes of a changing match allocate under the limit', 
     await page.clock.install({ time: 0 });
     await page.clock.pauseAt(PAUSE_AT_MS);
     await page.setViewportSize(PROBE_VIEWPORT);
-    await page.goto('/');
+    await page.goto(DEFAULT_MATCH);
     await orFail(page.waitForSelector('canvas[data-arena][data-tick]'), failed);
     const cdp = await openProbe(page);
     // M1 is held to the end.

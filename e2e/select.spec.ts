@@ -7,6 +7,8 @@ import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
 const PICKED = '?champion=quillon&difficulty=hard&arena=arena02&teamsize=3';
 const PANEL = '[data-select="panel"]';
+// The bare address, the one that opens the select; every other spec enters with DEFAULT_MATCH.
+const BARE = '/';
 
 interface Row {
   key: string | null;
@@ -53,7 +55,7 @@ function current(rows: Row[]): (string | null)[] {
 test('opens on the select at a bare address, with the defaults current and no canvas', async ({ page }, testInfo) => {
   const { problems, failed } = watchProblems(page);
   try {
-    await page.goto('/');
+    await page.goto(BARE);
     await orFail(page.waitForSelector(`${PANEL}[data-visible="true"]`), failed);
     expect(await page.locator('canvas').count()).toBe(0);
     expect(await page.locator('#select').count()).toBe(1);
@@ -78,7 +80,7 @@ test('opens on the select at a bare address, with the defaults current and no ca
 test('picks update the rows and the Start link on the page, and Start plays the setup', async ({ page }) => {
   const { problems, failed } = watchProblems(page);
   try {
-    await page.goto('/');
+    await page.goto(BARE);
     await orFail(page.waitForSelector(`${PANEL}[data-visible="true"]`), failed);
 
     await page.click(`${PANEL} [data-champion="quillon"]`);

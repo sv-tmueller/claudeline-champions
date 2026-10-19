@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { orFail, watchProblems } from './support';
+import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
 // The default match: the local Hargrim and an ally Quillon against an enemy
 // Hargrim and Quillon, all three bots on normal. The 3v3 rows play the same round
@@ -112,7 +112,7 @@ async function runUntil(
 // and 290, arena02 271 and 319 (267 and 301, 275 and 307 with two Quillons a side). The budgets are
 // the 2v2 ones, 600 and 1800: the latest first hit, 319, is 139 ticks into the round.
 const ROWS = [
-  { id: 'arena01', size: 2, address: '/', picture: 'match.png' },
+  { id: 'arena01', size: 2, address: DEFAULT_MATCH, picture: 'match.png' },
   { id: 'arena02', size: 2, address: '/?arena=arena02', picture: 'match-arena02.png' },
   { id: 'arena01', size: 3, address: '/?teamsize=3', picture: 'match-3v3.png', projectile: 267, hit: 290 },
   { id: 'arena02', size: 3, address: '/?arena=arena02&teamsize=3', picture: 'match-3v3-arena02.png', projectile: 271, hit: 319 },

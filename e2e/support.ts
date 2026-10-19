@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test';
 
+/**
+ * The address the pre-match select's Start writes for its defaults (Hargrim, normal, arena01,
+ * 2v2). A bare `/` opens the select, so a spec that wants the default match enters here: the
+ * launch is the same one, so the match, the bots, the seeds and the ticks are too.
+ */
+export const DEFAULT_MATCH = '/?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2';
+
 export interface Problems {
   /** Every page error and console error seen so far, for the final assertion. */
   problems: string[];
