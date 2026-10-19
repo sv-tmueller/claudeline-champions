@@ -234,7 +234,9 @@ other spec.
   result panel's and the menu's rows read hard, arena02 and 3v3 as current with
   links that carry them. `page.reload()` goes straight into the same match, and
   `/?champion=quillon` and `/?difficulty=brutal` show no panel and a canvas
-  while `/?foo=1` shows the panel.
+  while `/?foo=1` shows the panel. A keyboard pick (focus an entry, press
+  Enter), on Quillon and then on Hard, leaves the focus on the rebuilt entry,
+  now current, and the address search stays empty.
 - `arena.spec.ts`: the arena and the F3 overlay render (`arena.png`,
   `arena-overlay.png`), and `data-arena` is set only after the first draw.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
