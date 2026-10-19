@@ -271,14 +271,16 @@ the damage change did not pass the rule (section 6). The Hargrim numbers that
 could close the gap were #124's, and none passed (section 6.2). The hook's
 cooldown, 540 to 360 ticks (aimed at 2v2 arena01), turned the no-stall clause
 of lumeth.test.ts red by 3 ticks (a bot stalled 123 ticks against the 120
-allowed, in the 3v3 on arena02). The hook's slow duration, 60 to 120 ticks
+allowed, in the 3v3 on arena02; at the time, see 6.2). The hook's slow
+duration, 60 to 120 ticks
 (aimed at 2v2 arena02), and the hook's speed, 20 to 25 m/s, failed the Hargrim
 fixture coverage. Maul Swing's damage, 12 to 16
 (aimed at 3v3 arena01), left a Quillon stalled for 6003 ticks in the 2v2 of
-lumeth.test.ts on arena02. The one that got a full run, the hook's damage, 14
-to 20 (run H2, aimed at 3v3 arena02), left the target at 1.0 and the sum at
-675.5, with 14 cells moved by at most 3.5 points. So no Hargrim number moved
-the cells within the rule, and the limits above may account.
+lumeth.test.ts on arena02 (at the time, see 6.2). The one that got a full run,
+the hook's damage, 14 to 20 (run H2, aimed at 3v3 arena02), left the target at
+1.0 and the sum at 675.5, with 14 cells moved by at most 3.5 points. So no
+Hargrim number moved the cells within the rule, and the limits above may
+account.
 
 ### 5.3 Hargrim v Quillon (four cells, accepted)
 
@@ -331,7 +333,7 @@ cooldown, Bind Shot's slow and its duration, Snare Orb's cooldown, Rod Bolt's
 cooldown and Lance's windup; the committed Quillon fixture is attempt 23 of its
 search, and the search is not in the repository (at the time; #128 added the
 tool)) and two on the no-stall clause of lumeth.test.ts (Rod Bolt's reach and
-its damage). Limits that may account:
+its damage; at the time, see 6.2). Limits that may account:
 the target is the nearest enemy (or the current one within 1 m of it), so in a
 replayed Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01,
 seed 1, round 1) Skerrow hit the other Hargrim while Quillon's bolts hit her
@@ -371,8 +373,9 @@ points. #124 tried the Quillon numbers aimed at arena02: Rod Bolt's reach, 13.93
 to 12.1 m (aimed at 2v2), which the bot kites to, and its cooldown, 30 to 36
 ticks (aimed at 3v3). Neither got a full run: the reach turned the no-stall
 clause of lumeth.test.ts red (a bot stalled 3392 ticks in engage in the 3v3 on
-arena01), and the cooldown failed the fixture coverage and the pinned 3v3
-ultimate run. The Quillon numbers that did get a full run moved both arenas.
+arena01; at the time, see 6.2), and the cooldown failed the fixture coverage
+and the pinned 3v3 ultimate run. The Quillon numbers that did get a full run
+moved both arenas.
 Hush Ward's absorb (Q1) took 3v3 arena01 from 58.5 to 61.5, out of the band, and
 the arena02 cells from 15.0 to 13.0 (2v2) and from 17.5 to 18.0 (3v3). Lance's
 damage (Q2) took 3v3 arena01 to 65.0 and 2v2 arena01 from 65.5 to 71.0, and the
@@ -522,16 +525,16 @@ section 6.3)):
 |----------|--------|------------|-------------|-------------------|
 | Quillon | Skip (SPACE) cooldown | 540 to 720 | Q v S 2v2 arena01 | Fixture coverage: no energyGained of Bind Shot EX or of Lance EX. |
 | Quillon | Bind Shot (M2) slow | 40 to 30 percent | H v Q 2v2 arena02 | Fixture coverage: no energyGained of Lance or of Lance EX. |
-| Quillon | Rod Bolt (M1) reach | lifetime 38 to 33 ticks, 13.93 to 12.1 m | L v Q 2v2 arena02 | lumeth.test.ts, no-stall clause: a bot stalled 3392 ticks in engage from tick 2650 (3v3, arena01). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over the four rows of 26 ticks. |
-| Quillon | Rod Bolt (M1) damage | 11 to 9 | Q v S 2v2 arena02 | lumeth.test.ts, no-stall clause: a bot stalled 706 ticks in idle from tick 4635 (3v3, arena02). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over the four rows of 25 ticks. |
+| Quillon | Rod Bolt (M1) reach | lifetime 38 to 33 ticks, 13.93 to 12.1 m | L v Q 2v2 arena02 | lumeth.test.ts, no-stall clause: a bot stalled 3392 ticks in engage from tick 2650 (3v3, arena01). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over lumeth.test.ts's four matches (2v2 and 3v3 on both arenas) of 26 ticks. |
+| Quillon | Rod Bolt (M1) damage | 11 to 9 | Q v S 2v2 arena02 | lumeth.test.ts, no-stall clause: a bot stalled 706 ticks in idle from tick 4635 (3v3, arena02). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over lumeth.test.ts's four matches (2v2 and 3v3 on both arenas) of 25 ticks. |
 | Quillon | Snare Orb (Q) cooldown | 720 to 960 | H v Q 3v3 arena01 | Fixture coverage: no energyGained of Lance. |
 | Quillon | Rod Bolt (M1) cooldown | 30 to 36 | L v Q 3v3 arena02 | Fixture coverage (Bind Shot EX, Lance, Lance EX), and the 3v3 ultimate run of headless-kits.test.ts (no F cast). |
 | Quillon | Bind Shot (M2) slow duration | 90 to 60 ticks | H v Q 3v3 arena02 | Fixture coverage: no energyGained of Bind Shot EX. |
 | Quillon | Lance (E) windup | 36 to 48 ticks | Q v S 3v3 arena01 | Fixture coverage: no energyGained of Bind Shot EX, Lance or Lance EX. |
-| Hargrim | Chain Hook (E) cooldown | 540 to 360 | H v L 2v2 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 123 ticks in retreat against the 120 allowed, from tick 7723 (3v3, arena02). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over the four rows of 27 ticks. |
+| Hargrim | Chain Hook (E) cooldown | 540 to 360 | H v L 2v2 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 123 ticks in retreat against the 120 allowed, from tick 7723 (3v3, arena02). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over lumeth.test.ts's four matches (2v2 and 3v3 on both arenas) of 27 ticks. |
 | Hargrim | Chain Hook (E) slow duration | 60 to 120 ticks | H v L 2v2 arena02 | Fixture coverage: no energyGained of Rush EX. |
 | Hargrim | Rush (SPACE) cooldown | 420 to 300 | H v Q 2v2 arena01 | Fixture coverage: no energyGained of Ground Slam EX. |
-| Hargrim | Maul Swing (M1) damage | 12 to 16 | H v L 3v3 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 6003 ticks in kite from tick 956 (2v2, arena02). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over the four rows of 24 ticks. |
+| Hargrim | Maul Swing (M1) damage | 12 to 16 | H v L 3v3 arena01 | lumeth.test.ts, no-stall clause: a bot stalled 6003 ticks in kite from tick 956 (2v2, arena02). Gone since #137 (#129): a champion one ulp inside an obstacle reads as touching, and on the bots of f0e8781 the clause passes, with a worst stall over lumeth.test.ts's four matches (2v2 and 3v3 on both arenas) of 24 ticks. |
 | Hargrim | Chain Hook (E) speed and lifetime | 20 to 25 m/s, 27 to 22 ticks | H v L 2v2 arena01 | Fixture coverage: no energyGained of Ground Slam or of Rush EX. |
 
 ### 6.3 The rule for the next pass: the fixture search
