@@ -135,13 +135,15 @@ export function difficultyEntries(
  * Builds the select under `parent`: a champion row, `data-part="select"`, an
  * arena row, `data-part="arena-select"`, a team row, `data-part="team-select"`,
  * and a difficulty row, `data-part="difficulty-select"`.
- * Static: a link per champion with a kit (`data-available="true"`, `data-current` on
- * the launch's champion, which only select.css draws), a greyed entry for each without one, a link per arena (`data-arena-id`, `data-current` on the
+ * Static: a link per champion with a kit (`data-available="true"`, `data-current`
+ * on the launch's champion, which only select.css draws), a greyed entry for
+ * each without one, a link per arena (`data-arena-id`, `data-current` on the
  * one being played), a link per team size (`data-team-size`, `data-current` on
- * the one being played, greyed for 3v3 on an arena that cannot play it) and a link
- * per tier (`data-difficulty`, `data-current` on the launch's tier, always available).
- * Every link writes the whole setup, the team size the address asked for included. The result
- * panel and the menu both build it, each with its own copy and its own heading.
+ * the one being played, greyed for 3v3 on an arena that cannot play it) and a
+ * link per tier (`data-difficulty`, `data-current` on the launch's tier, always
+ * available). Every link writes the whole setup, the team size the address
+ * asked for included. The result panel and the menu both build it, each with
+ * its own copy and its own heading.
  */
 export function buildSelect(
   parent: HTMLElement,
