@@ -20,7 +20,7 @@ const BODY_COLOURS: Record<string, string> = {
   lumeth: '#95c827',
   skerrow: '#303030',
   ondrel: '#309530',
-  brimwick: '#dd7900',
+  brimwick: '#df6100',
 };
 const MIN_BODY_DISTANCE = 80;
 // combat.spec: WHITE is 255 within 5 per channel, RING is #ffd23f within 8.

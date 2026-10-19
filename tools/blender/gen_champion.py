@@ -3,8 +3,8 @@
 Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
     --champion placeholder --out assets/models/champions/placeholder.glb
 
-The ids are placeholder (the generic model), hargrim, quillon, lumeth and
-skerrow. They share the placeholder's body and accent and differ only in the
+The ids are placeholder (the generic model), hargrim, quillon, lumeth, skerrow,
+ondrel and brimwick. They share the placeholder's body and accent and differ only in the
 body colour and one silhouette cue, listed in tools/blender/README.md.
 
 The glb holds a node `Rig` with the six bones as joints and the skinned mesh
@@ -37,6 +37,8 @@ BODY_COLOURS = {
     "quillon": (0.00, 0.30, 0.25),  # teal
     "lumeth": (0.30, 0.58, 0.02),  # lime
     "skerrow": (0.03, 0.03, 0.03),  # charcoal
+    "ondrel": (0.03, 0.30, 0.03),  # moss green
+    "brimwick": (0.74, 0.12, 0.00),  # burnt orange
 }
 
 # The shared rig in Blender coordinates: (name, parent, head, tail). Every part
@@ -306,12 +308,22 @@ def add_blade(bm):  # skerrow, assassin, pointing forward from the right hand
     carry(bm, "Arm_R", common.add_box, (0.18, -0.34, 0.86), (0.28, 0.05, 0.10), BODY)
 
 
+def add_reed_bundle(bm):  # ondrel, zone controller, on the back
+    carry(bm, "Spine", common.add_box, (-0.16, 0, 1.56), (0.08, 0.16, 0.52), BODY)
+
+
+def add_fuse_cap(bm):  # brimwick, burst caster, on top of the head
+    carry(bm, "Spine", common.add_box, (-0.02, 0, 1.74), (0.22, 0.22, 0.16), BODY)
+
+
 CUES = {
     "placeholder": None,
     "hargrim": add_shoulder_blocks,
     "quillon": add_staff,
     "lumeth": add_halo,
     "skerrow": add_blade,
+    "ondrel": add_reed_bundle,
+    "brimwick": add_fuse_cap,
 }
 
 
