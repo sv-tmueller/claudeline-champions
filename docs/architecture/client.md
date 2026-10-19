@@ -126,6 +126,8 @@ case-sensitive, as `parseLaunch` reads them. The dev keys sit in
 `DEV_LAUNCH_KEYS` (`dev-launch.ts`), not in `launch.ts`: the name `timescale`
 must not reach a production file (the dist grep).
 
+`parseLaunch` reads these keys:
+
 - `?champion=<id>`: the champion the human plays. It must be an id with a loaded
   kit; anything else reads as the first kit in roster order (Hargrim).
 - `?difficulty=easy|normal|hard`: the tier of every bot. Anything else
@@ -169,9 +171,8 @@ id, so `arena02.glb` loads with no change in `models.ts`. Of the pure modules,
 `launch` takes the kit ids and the arena ids, `match-setup` takes the kit list
 and the arena, and `result-dom` and `menu-dom` take ids and
 `{ id, name, spawns }` records (`bot-driver`, `models` and `roster` take none of
-them), so the unit
-tests load the files statically instead: `tsconfig.tools.json` has `types:
-["node"]` and rejects `import.meta.glob`.
+them), so the unit tests load the files statically instead:
+`tsconfig.tools.json` has `types: ["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
 sim's constant, 3):
@@ -578,11 +579,10 @@ of `main.ts` would move the heap probe's `^main\.ts:` key.
 
 The last choice is not stored: the settings stay
 `{ version: 2, bindings, muted }` and the select opens on the defaults on every
-visit. A stored choice added
-later may only pre-fill the select, never skip it or override the address, and
-needs version 3 with a migration. The online design's lobby follows this screen
-(section 9), which is why it is built in the page from the shared row builder
-and not as reload-only links.
+visit. A stored choice added later may only pre-fill the select, never skip it
+or override the address, and needs version 3 with a migration. The online
+design's lobby follows this screen (section 9), which is why it is built in the
+page from the shared row builder and not as reload-only links.
 
 `select-dom.ts`, `launch.ts` and `result-dom.ts` are outside the counted heap
 code: they never run in a frame, and `select-dom.ts` never runs in either probe,
@@ -665,12 +665,12 @@ energy mark, `data-visible` and `data-absorb` on the shield segment,
 the timer, and on the scoreboard `data-visible`, and `data-alive` and
 `data-team` on a row.
 
-`hud.css` sizes everything from one viewport unit, `--hud-u` (`min(1vw,
-1.78vh)`), so the HUD scales with the window, and sets `pointer-events: none` on
-everything, so a right click reaches the canvas. `result.css` follows the same
-rules with `--result-u` and `#result`, and one difference: the visible panel
-takes pointer events. So do `menu.css`, with `--menu-u` and `#menu`, and
-`select.css`, with `--select-u` and `#select`. The
+`hud.css` sizes everything from one viewport unit, `--hud-u`
+(`min(1vw, 1.78vh)`), so the HUD scales with the window, and sets
+`pointer-events: none` on everything, so a right click reaches the canvas.
+`result.css` follows the same rules with `--result-u` and `#result`, and one
+difference: the visible panel takes pointer events. So do `menu.css`, with
+`--menu-u` and `#menu`, and `select.css`, with `--select-u` and `#select`. The
 colours are hex custom properties on `#hud`. Panels are neutral black with alpha
 and every foreground element sits on one, with one exception: the ring warning's
 red edge, an inset shadow in `var(--hud-enemy)` along the viewport that shows
