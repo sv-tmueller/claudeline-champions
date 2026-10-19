@@ -140,6 +140,21 @@ export const EXPECTED: Record<string, Expected> = {
     thens: [],
     statuses: ['hot', 'haste', 'root', 'knockback', 'shield', 'slow'],
   },
+  // Reed Step's `then` is empty, so Ondrel shows no dash then. Reed Step, Reed Screen and the
+  // knockback of Reed Fence's second area carry no damage, so none of them gains energy.
+  ondrel: {
+    fired: ['M1/false', 'M2/false', 'M2/true', 'SPACE/false', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
+    gains: ['M1/false', 'M2/false', 'M2/true', 'Q/false', 'E/false', 'E/true', 'F/false'],
+    thens: [],
+    statuses: ['slow', 'knockback', 'shield'],
+  },
+  // Flare Step and Smoke Pot carry no damage, so neither gains energy.
+  brimwick: {
+    fired: ['M1/false', 'M2/false', 'M2/true', 'SPACE/false', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
+    gains: ['M1/false', 'M2/false', 'M2/true', 'Q/false', 'E/false', 'E/true', 'F/false'],
+    thens: [],
+    statuses: ['stun', 'knockback', 'slow', 'haste'],
+  },
 };
 
 /** Collects what the coverage test needs from the events of every step. */
@@ -207,7 +222,14 @@ export class RosterCoverage {
 }
 
 /** The match seed of each fixture, so no two kits share a stream. */
-export const SEEDS: Record<string, number> = { hargrim: 5555, quillon: 5556, lumeth: 5557, skerrow: 5558 };
+export const SEEDS: Record<string, number> = {
+  hargrim: 5555,
+  quillon: 5556,
+  lumeth: 5557,
+  skerrow: 5558,
+  ondrel: 5559,
+  brimwick: 5560,
+};
 
 export interface Observer {
   /** Before the actions of the tick the state is about to run. */

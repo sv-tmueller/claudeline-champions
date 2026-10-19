@@ -103,7 +103,7 @@ the test sits at 42 percent of its timeout.
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
   report. The same project holds the fixture search's tests
   (`tools/fixtures/*.test.ts`): the format against the committed bytes, the
-  pure search cases, the reproduction of the four roster fixtures and the CLI
+  pure search cases, the reproduction of the six roster fixtures and the CLI
   (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
@@ -128,7 +128,9 @@ one (the head line is not compared), `-- --out <file>` writes the block to a
 file and `-- --seeds N` plays the seeds 1 to N. It needs Node 22.15 or later,
 for `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: a full run took about 5.5 minutes on Apple silicon.
+`npm run check`: a full run took about 5.5 minutes on Apple silicon. It plays
+the four v1 kits of `HARNESS_KITS` in `tools/balance/inputs.ts`, not every file
+of `data/kits`: Ondrel and Brimwick wait for the six-kit report of batch 13.
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check` on a runner
 (`workflow_dispatch` only, so it never runs on a pull request or a push). It
@@ -169,15 +171,16 @@ What it does:
   every platform: no `Math.hypot` and no transcendental function. The tools lint
   does not ban them, so review enforces it.
 
-`tools/fixtures/reproduce.test.ts` runs the search on the four committed
-fixtures and compares the bytes: Hargrim's attempt 1 and Quillon's attempt 23 on
-the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits
-they were searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put
-back in memory, as #125 changed those numbers and regenerated only the
-checkpoints), with the checkpoints of the current kits. Each row of the test
-names the kit numbers it is pinned on, with the change that moved them. It runs
-on the CI unit job, on Linux x86, which is the cross-platform proof of the
-tool. The record is in the header of `roster-fixtures.test.ts`.
+`tools/fixtures/reproduce.test.ts` runs the search on the six committed
+fixtures and compares the bytes: Hargrim's attempt 1, Quillon's attempt 23,
+Ondrel's attempt 2 and Brimwick's attempt 10 on the current kits, and Skerrow's
+attempt 6 and Lumeth's attempt 2 on the kits they were searched on (the Rend
+damage 20 and the Binding Sigil radius 1.5 put back in memory, as #125 changed
+those numbers and regenerated only the checkpoints), with the checkpoints of
+the current kits. Each row of the test names the kit numbers it is pinned on,
+with the change that moved them. It runs on the CI unit job, on Linux x86,
+which is the cross-platform proof of the tool. The record is in the header of
+`roster-fixtures.test.ts`.
 
 A change to a kit file that turns the coverage red is met by rebuilding its
 fixture with the tool in the same commit ([balance.md](../design/balance.md),
@@ -201,19 +204,26 @@ failed pre-check (decision 13 of batch #134):
   current kit may settle on another attempt without any rebuild (after #125,
   Skerrow on 2 and Lumeth on 5).
 
-A new kit, the recipe for batch 12 (Ondrel and Brimwick):
+A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
 
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
    energy gains, the dash `then`s and the statuses) and to `SEEDS` (the next
-   match seed, 5559 and up) in `packages/sim/test/roster-fixture.ts`. The tool
+   match seed, 5561 and up) in `packages/sim/test/roster-fixture.ts`. The tool
    stops with a message that names the file when either is missing.
 3. Run `npm run fixtures:search -- <id>`. When no attempt within the limit
    covers, the kit's `EXPECTED` asks for something a mirror may never show:
    read the items the message names.
 4. Add the fixture's JSON import, the kit's JSON import and a `SUBJECTS` row to
    `roster-fixtures.test.ts`, and the kit's attempt and match seed to its
-   header; add the kit to `tools/fixtures/reproduce.test.ts`.
+   header; add the kit to `tools/fixtures/reproduce.test.ts` and to the
+   `KITS` of `tools/fixtures/format.test.ts`.
+5. Replay `roster-fixtures.test.ts` and `roster-kits.test.ts` and then
+   `reproduce.test.ts` and `format.test.ts` in a `linux/amd64` container, as
+   above, and apply the timeout rule of the check suite to a reproduce row whose
+   runner time passes 2.5 s. The rows of Ondrel (attempt 2) and Brimwick
+   (attempt 10) took 1.23 and 0.84 s on the runner (0.36 and 0.32 s locally), so
+   they have no timeout of their own.
 
 ## Playwright e2e
 

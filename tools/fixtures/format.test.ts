@@ -4,7 +4,7 @@ import { decodeFixture, mirrorConfig } from '../../packages/sim/test/roster-fixt
 import type { Fixture } from '../../packages/sim/test/roster-fixture.ts';
 import { formatFixture } from './format.ts';
 
-const KITS = ['hargrim', 'quillon', 'skerrow', 'lumeth'];
+const KITS = ['hargrim', 'quillon', 'skerrow', 'lumeth', 'ondrel', 'brimwick'];
 
 function committedText(kit: string): string {
   const url = new URL(`../../packages/sim/test/fixtures/scripted-roster-${kit}-arena01-2v2.json`, import.meta.url);
