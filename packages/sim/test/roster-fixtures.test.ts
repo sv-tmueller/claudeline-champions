@@ -43,11 +43,24 @@
 // those two fixtures, so their segments and actions are the ones searched on the kits before #125.
 // With the number put back in memory, the search settles on Skerrow attempt 6 and Lumeth attempt 2,
 // and, with the checkpoints of the current kits, writes the committed files. On the current kits the
-// search does not: Skerrow settles on attempt 2 and Lumeth's script departs from the committed one
-// from about tick 1716. So the pin of those two rests on the kits before #125 and on reading (b)
-// below, and a Skerrow or Lumeth fixture rebuilt by the tool on today's kit would replace the
-// committed one, not reproduce it. This record is what makes the player exact. The Lumeth search
-// ran that player unchanged. At the start of a tick, for each champion in id order (a dead one too)
+// search does not: Skerrow settles on attempt 2, and on Lumeth's current kit attempt 2 misses
+// `energyGained M2/true` (its inputs first differ from the committed ones at tick 1723) and the
+// search settles on attempt 5, whose file differs from the committed one from its first segment. So
+// the committed Skerrow and Lumeth fixtures are pinned on the kits before #125: the kit numbers the
+// searches ran on are Skerrow's Rend damage 20 (E, the base only) and Lumeth's Binding Sigil radius
+// 1.5 m (Q), every other number as in `data/kits` today, and the Lumeth pin also rests on reading
+// (b) below. A Skerrow or Lumeth fixture rebuilt by the tool on today's kit would replace the
+// committed one, not reproduce it. This record is what makes the player exact.
+//
+// What a kit change does to this record: a change that turns the coverage red rebuilds the fixture
+// (balance.md, section 6.3), and the kit's row of `reproduce.test.ts` and its attempt above take
+// the attempt the tool printed, on the current kit. A change that keeps the coverage green
+// regenerates only the checksums, so the row is pinned on the kit as searched, as the two rows
+// above are, and this record names the kit numbers the search ran on. A red row is not a failed
+// pre-check.
+//
+// The Lumeth search ran the earlier rebuild of the player, not `tools/fixtures/player.ts`,
+// unchanged. At the start of a tick, for each champion in id order (a dead one too)
 // whose window ran out, from the state before that tick's step, it draws in this order: (1) the
 // length, 5 + floor(rnd * 14) ticks; (2) a flag, where below 0.3 the target is a random living
 // enemy and otherwise the nearest one (a tie goes to the lower id); (3) the random enemy index,

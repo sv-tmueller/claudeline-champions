@@ -167,9 +167,10 @@ fixtures and compares the bytes: Hargrim's attempt 1 and Quillon's attempt 23 on
 the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits
 they were searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put
 back in memory, as #125 changed those numbers and regenerated only the
-checkpoints), with the checkpoints of the current kits. It runs on the CI unit
-job, on Linux x86, which is the cross-platform proof of the tool. The record is
-in the header of `roster-fixtures.test.ts`.
+checkpoints), with the checkpoints of the current kits. Each row of the test
+names the kit numbers it is pinned on, with the change that moved them. It runs
+on the CI unit job, on Linux x86, which is the cross-platform proof of the
+tool. The record is in the header of `roster-fixtures.test.ts`.
 
 A change to a kit file that turns the coverage red is met by rebuilding its
 fixture with the tool in the same commit ([balance.md](../design/balance.md),
@@ -179,6 +180,19 @@ script, so its replay checksums are new: its pull request replays
 `roster-fixtures.test.ts` in a `linux/amd64` container (see
 [Cross-platform determinism](#cross-platform-determinism)) before it goes
 ready.
+
+A kit change also touches the kit's row in `reproduce.test.ts` and its attempt
+record in the header of `roster-fixtures.test.ts`, and a red row is not a
+failed pre-check (decision 13 of batch #134):
+
+- After a rebuild, the row's attempt is the one the tool printed, its kit is the
+  current one (no pins), and the header records the attempt.
+- After a coverage-green change, the committed script stays the one searched on
+  the kit before the change, so the row is pinned on the kit as searched: add a
+  pin that puts the old number back in memory, with a comment naming the change,
+  and let the header say which kit numbers the search ran on. The search on the
+  current kit may settle on another attempt without any rebuild (after #125,
+  Skerrow on 2 and Lumeth on 5).
 
 A new kit, the recipe for batch 12 (Ondrel and Brimwick):
 
