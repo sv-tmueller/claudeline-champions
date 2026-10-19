@@ -2,9 +2,8 @@
 
 Milestone 6 design. P1 is built: `packages/protocol` (#151). The rest is not:
 `packages/server` and the client's online path do not exist. The approved
-source is the
-[online design](../superpowers/specs/2026-10-17-online-design.md) (batch #134
-decision 1), recorded in
+source is the [online design](../superpowers/specs/2026-10-17-online-design.md)
+(batch #134 decision 1), recorded in
 [ADR-006](decisions/ADR-006-online-first-cut.md), and it extends section 7 of
 the [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md).
 See the [roadmap](../roadmap.md#6-online) for the packages and milestone 7.

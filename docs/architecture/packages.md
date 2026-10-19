@@ -34,7 +34,12 @@ docs/superpowers/specs/     approved designs (the design spec)
   reads the wall clock, never calls `Math.random`, never touches `window`,
   `document`, `fetch` or Node built-ins.
 - `bots` imports `sim` only.
-- `client` imports `sim` and `bots`. It owns all rendering, input, audio and UI.
+- `client` imports `sim` and `bots`, and will import `protocol` (its dependency
+  is added with the first client package that uses it). It owns all rendering,
+  input, audio and UI. It never imports `server`: a lint block denies that
+  today, for static imports, for `import()` expressions and for `import()`
+  types, for `@claudeline/server` and any relative path with a `server`
+  segment. A client file cannot be named `server`; `./server-socket` is fine.
 - `protocol` (built, #151) holds the message types, `PROTOCOL_VERSION` and
   pure JSON encode and decode with validation: no I/O, no transport, no game
   logic. It imports relative paths and `@claudeline/sim` only (`import type`;
@@ -53,12 +58,6 @@ docs/superpowers/specs/     approved designs (the design spec)
   - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with
     Node globals. It never imports `client`, and it may read the wall clock.
     Its lint block comes with the server package.
-- `client` imports `sim` and `bots`, and will import `protocol` (its
-  dependency is added with the first client package that uses it). It never
-  imports `server`. A lint block denies that today, for static imports, for
-  `import()` expressions and for `import()` types: `@claudeline/server` and any
-  relative path with a `server` segment. A client file cannot be named
-  `server`; `./server-socket` is fine.
 - `tools/balance` imports relative paths, `node:` builtins, `vitest` and the
   entry points of `@claudeline/sim` and `@claudeline/bots`. It reads `data/`
   and never a package's own files.

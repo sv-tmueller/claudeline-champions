@@ -97,7 +97,7 @@ first.
 - `protocol`: the message types of the online design, `PROTOCOL_VERSION`, three
   total decoders (first message, session message, server message), the
   encoders in the spec's key order and the snapshot splice, with the lint
-  blocks that keep it to `sim` types and relative paths (see
+  blocks that keep it to `@claudeline/sim` and relative paths (see
   [Online](online.md)). Nothing imports it yet.
 - `server`, `desktop`: not started (milestones 6 and 8).
 

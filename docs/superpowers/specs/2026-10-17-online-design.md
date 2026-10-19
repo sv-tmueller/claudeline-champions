@@ -1,7 +1,7 @@
 # Claudeline Champions: the online design (milestone 6)
 
 Date: 2026-10-17
-Status: approved design (batch #134 decision 1), in implementation (P1 landed; section 13)
+Status: approved design (batch #134 decision 1), in implementation
 Owner: Thomas Mueller (sv-tmueller)
 
 This extends section 7 of the
@@ -63,11 +63,17 @@ deployment, and confines a crash or a slow bot think to one room.
 [packages.md](../../architecture/packages.md) and
 [online.md](../../architecture/online.md). The rules are in section 3. The
 types-only `protocol` was rejected: each side would duplicate the decoder, and
-the round-trip test would test nothing real. CLAUDE.md keeps its pointer to
-design spec section 3.2, which stays true because the amendment line sits under
-3.2. Three of its lines were edited when `protocol` landed (batch #147
-decision 4): the workspaces sentence, the typecheck comment and the bullet
-about future packages.
+the round-trip test would test nothing real. CLAUDE.md is not edited. Its
+pointer to design spec section 3.2 stays true, because the amendment line sits
+under 3.2.
+
+Amended 2026-10-20 by [batch #147 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6274855460): when
+`protocol` landed, three lines of CLAUDE.md read wrong and were edited, and
+nothing else in it: the workspaces sentence, the typecheck comment and the
+bullet about future packages. The pointer to section 3.2 stays. The segment
+bans of `sim` and `bots` in `eslint.config.js` also name `protocol`, so a
+relative path into it is red, which enforces the rules of section 3 and does
+not change them.
 
 **No pause online.** Escape opens the menu over the running match. The menu
 offers Leave where a local match offers Restart. The lines in
@@ -152,6 +158,12 @@ fixed here.
   `import()` type of `@claudeline/server` fail. The cost, as for bots and
   `sim`: a client file cannot be named `server`, so package P4a names its
   socket file otherwise.
+
+Amended 2026-10-20 by [batch #147 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6274855460), for
+package P1: the `import()` type selector reads `source.value`, as the
+`ImportExpression` selector does, and not `argument.literal.value`, because
+typescript-eslint 8.71 deprecates `argument` on `TSImportType` in favour of
+`source`. Both match today; the trial above holds for it.
 
 ### bots and sim
 
@@ -470,18 +482,16 @@ Further rules:
   aim values), so the limit leaves room for a name and a token. `ws` closes an
   oversize frame itself with code 1009. `name` is 1 to 16 code points after
   trimming (a default), without control characters (U+0000 to U+001F and
-  U+007F to U+009F). `roomCode` is five
-  characters of the alphabet in section 5. `token` is a room code, a dot and 22
-  base64url characters.
+  U+007F to U+009F). `roomCode` is five characters of the alphabet in section
+  5. `token` is a room code, a dot and 22 base64url characters.
 - **Validation.** The server's decoder checks every field of every client
   message against its type and range (`aimX` and `aimY` are integers from
   -100 000 to 100 000 cm, both included, a default, and `buttons` an integer
-  from 0 to 255), keeps only the
-  known fields, and builds a fresh object, so an extra field or a `__proto__`
-  key reaches nothing. An invalid message is answered with `error` and ignored,
-  never thrown on. The client's decoder checks the envelope and the scalar
-  fields of each server message, and not the inside of `state`, `arena` and
-  `kits`: the server is the authority on them.
+  from 0 to 255), keeps only the known fields, and builds a fresh object, so an
+  extra field or a `__proto__` key reaches nothing. An invalid message is
+  answered with `error` and ignored, never thrown on. The client's decoder
+  checks the envelope and the scalar fields of each server message, and not the
+  inside of `state`, `arena` and `kits`: the server is the authority on them.
 - **Version.** One integer, `PROTOCOL_VERSION`. A server and a client with
   different versions refuse each other with `version`. Delta snapshots (P7)
   bump it.
@@ -752,7 +762,7 @@ and every row is S or M, or parked.
 
 | # | Package | Size | Blocked by |
 |---|---------|------|------------|
-| P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project. Landed 2026-10-19 (#151, PR #157). | M | this spec |
+| P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project. Lands with PR #157 (#151). | M | this spec |
 | P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test | M | P1 |
 | P3 | Server transport and processes: the `ws` dependency, the router and a fork per room, room codes and tokens, `npm run server`, the socket test | M | P2 |
 | P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests | M | P1 |
