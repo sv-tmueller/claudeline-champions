@@ -23,7 +23,7 @@ export const ROOM_CODE_LENGTH = 5;
 
 /** The size limit of a client message in UTF-8 bytes; the socket's `maxPayload` is the same number. */
 export const MAX_CLIENT_MESSAGE_BYTES = 1024;
-/** Aim is whole centimeters within this distance of the origin, both bounds included. */
+/** Each of aimX and aimY is whole centimeters within +-this many cm, both bounds included. */
 export const MAX_AIM_CM = 100000;
 /** A name is 1 to this many code points after trimming. */
 export const NAME_MAX = 16;

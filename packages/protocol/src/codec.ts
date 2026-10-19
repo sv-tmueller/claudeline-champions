@@ -525,13 +525,8 @@ export function encodeServerMessage(m: ServerMessage): string {
       });
     }
     case 'snapshot':
-      return JSON.stringify({
-        t: m.t,
-        tick: m.tick,
-        ack: m.ack,
-        state: m.state,
-        events: batchesOf(m.events),
-      });
+      // The key order of a snapshot is written once, in encodeSnapshot.
+      return encodeSnapshot(m.tick, m.ack, JSON.stringify(m.state), m.events);
     case 'matchEnd':
       return JSON.stringify({ t: m.t, winner: m.winner, scoreA: m.scoreA, scoreB: m.scoreB });
     case 'error':
