@@ -11,7 +11,7 @@ describe('the harness roster', () => {
   it('plays the four v1 kits, whatever else data/kits holds', () => {
     expect(HARNESS_KITS).toEqual(['hargrim', 'lumeth', 'quillon', 'skerrow']);
     const files = readdirSync(fileURLToPath(new URL('data/kits/', ROOT))).filter((n) => n.endsWith('.json'));
-    expect(files.length).toBeGreaterThanOrEqual(HARNESS_KITS.length);
+    expect(files).toHaveLength(6);
     for (const id of HARNESS_KITS) expect(files).toContain(`${id}.json`);
     expect(loadInputs(ROOT).kits.map((kit) => kit.id)).toEqual([...HARNESS_KITS]);
   });

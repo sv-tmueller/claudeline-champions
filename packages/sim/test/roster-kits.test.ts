@@ -1,6 +1,7 @@
-// The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json` and
-// `lumeth.json`, whose numbers come from docs/design/roster-v1.md (ticks = seconds x 60, one hit =
-// durationTicks 1 / intervalTicks 1).
+// The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json`, `lumeth.json`,
+// `ondrel.json` and `brimwick.json`, whose numbers come from docs/design/roster-v1.md and
+// docs/design/roster-v2.md (ticks = seconds x 60, one hit = durationTicks 1 / intervalTicks 1, and
+// the lingering areas of Ondrel carry the three rules of roster-v2 section 0).
 //
 // Every number the doc fixes is written out again here as a literal, so a kit file that drifts from
 // the doc fails a named test. The catalog ranges that `validateKit` leaves to roster tests (rules.md
@@ -11,6 +12,8 @@ import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
 import lumethJson from '../../../data/kits/lumeth.json';
+import ondrelJson from '../../../data/kits/ondrel.json';
+import brimwickJson from '../../../data/kits/brimwick.json';
 import { Button, SLOTS, createMatch, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -23,12 +26,16 @@ const KITS = [
   { stem: 'quillon', json: quillonJson },
   { stem: 'skerrow', json: skerrowJson },
   { stem: 'lumeth', json: lumethJson },
+  { stem: 'ondrel', json: ondrelJson },
+  { stem: 'brimwick', json: brimwickJson },
 ];
 
 const hargrim = validateKit(hargrimJson);
 const quillon = validateKit(quillonJson);
 const skerrow = validateKit(skerrowJson);
 const lumeth = validateKit(lumethJson);
+const ondrel = validateKit(ondrelJson);
+const brimwick = validateKit(brimwickJson);
 
 function mirror(id: string) {
   return {
@@ -85,6 +92,8 @@ describe('the kit stats', () => {
     expect(stats(quillon)).toEqual({ id: 'quillon', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(skerrow)).toEqual({ id: 'skerrow', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['SPACE', 'E'] });
     expect(stats(lumeth)).toEqual({ id: 'lumeth', maxHealth: 120, moveSpeed: 5.5, support: true, ex: ['M2', 'R'] });
+    expect(stats(ondrel)).toEqual({ id: 'ondrel', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
+    expect(stats(brimwick)).toEqual({ id: 'brimwick', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
   });
 
   it('gives a path-precise message for a number outside the contract', () => {
@@ -243,6 +252,14 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(lumeth)).toEqual([]);
   });
 
+  it('hold for the Ondrel kit', () => {
+    expect(catalogProblems(ondrel)).toEqual([]);
+  });
+
+  it('hold for the Brimwick kit', () => {
+    expect(catalogProblems(brimwick)).toEqual([]);
+  });
+
   it('name the path of a number outside them', () => {
     const copy = copyOf(hargrim);
     const dash = copy.slots.F.effects[0];
@@ -355,6 +372,14 @@ describe('the EX variants', () => {
       ['effects[0].allyEffects[0].amount', 'effects[0].allyEffects[1].status.perPulse', 'effects[0].allyEffects[1].status.ticks'].sort(),
     );
     expect(exDiff(lumeth, 'R')).toEqual(['effects[0].effects[0].absorb', 'effects[0].effects[0].ticks', 'effects[0].effects[1]'].sort());
+    expect(exDiff(ondrel, 'M2')).toEqual(
+      ['effects[0].radius', 'effects[0].effects[0].amount', 'effects[0].effects[1].status.percent', 'effects[0].effects[1].status.ticks'].sort(),
+    );
+    expect(exDiff(ondrel, 'E')).toEqual(
+      ['effects[0].pierce', 'effects[0].effects[0].amount', 'effects[0].effects[2].status.percent', 'effects[0].effects[2].status.ticks'].sort(),
+    );
+    expect(exDiff(brimwick, 'M2')).toEqual(['effects[0].radius', 'effects[0].effects[0].amount', 'effects[0].effects[1]'].sort());
+    expect(exDiff(brimwick, 'E')).toEqual(['windupTicks', 'effects[0].effects[0].amount', 'effects[0].effects[1].distance'].sort());
   });
 });
 
@@ -590,7 +615,7 @@ describe('the lingering area rules', () => {
   });
 });
 
-describe('every slot of the four kits', () => {
+describe('every slot of the six kits', () => {
   interface Row {
     kit: KitDef;
     slot: Slot;
@@ -638,6 +663,24 @@ describe('every slot of the four kits', () => {
     { kit: lumeth, slot: 'R', ex: false, cooldown: 720, windup: 0, cost: 0 },
     { kit: lumeth, slot: 'R', ex: true, cooldown: 720, windup: 0, cost: 25 },
     { kit: lumeth, slot: 'F', ex: false, cooldown: 600, windup: 36, walk: 2.75, cost: 100 },
+    { kit: ondrel, slot: 'M1', ex: false, cooldown: 36, windup: 9, walk: 5.5, cost: 0 },
+    { kit: ondrel, slot: 'M2', ex: false, cooldown: 360, windup: 24, walk: 2.75, cost: 0 },
+    { kit: ondrel, slot: 'M2', ex: true, cooldown: 360, windup: 24, walk: 2.75, cost: 25 },
+    { kit: ondrel, slot: 'SPACE', ex: false, cooldown: 480, windup: 0, cost: 0 },
+    { kit: ondrel, slot: 'Q', ex: false, cooldown: 720, windup: 18, walk: 2.75, cost: 0 },
+    { kit: ondrel, slot: 'E', ex: false, cooldown: 480, windup: 24, walk: 2.75, cost: 0 },
+    { kit: ondrel, slot: 'E', ex: true, cooldown: 480, windup: 24, walk: 2.75, cost: 25 },
+    { kit: ondrel, slot: 'R', ex: false, cooldown: 840, windup: 0, cost: 0 },
+    { kit: ondrel, slot: 'F', ex: false, cooldown: 600, windup: 42, walk: 0, cost: 100 },
+    { kit: brimwick, slot: 'M1', ex: false, cooldown: 36, windup: 9, walk: 5.5, cost: 0 },
+    { kit: brimwick, slot: 'M2', ex: false, cooldown: 300, windup: 24, walk: 2.75, cost: 0 },
+    { kit: brimwick, slot: 'M2', ex: true, cooldown: 300, windup: 24, walk: 2.75, cost: 25 },
+    { kit: brimwick, slot: 'SPACE', ex: false, cooldown: 600, windup: 0, cost: 0 },
+    { kit: brimwick, slot: 'Q', ex: false, cooldown: 660, windup: 6, walk: 5.5, cost: 0 },
+    { kit: brimwick, slot: 'E', ex: false, cooldown: 540, windup: 42, walk: 0, cost: 0 },
+    { kit: brimwick, slot: 'E', ex: true, cooldown: 540, windup: 24, walk: 0, cost: 25 },
+    { kit: brimwick, slot: 'R', ex: false, cooldown: 780, windup: 0, cost: 0 },
+    { kit: brimwick, slot: 'F', ex: false, cooldown: 600, windup: 60, walk: 0, cost: 100 },
   ];
 
   it.each(rows)('$kit.id $slot ex=$ex casts with its cooldown, windup, cost and walk rule', (row) => {
@@ -1391,5 +1434,447 @@ describe('Lumeth', () => {
     expect(rig.health(3)).toBe(120);
     expectOneHit(rig);
     rig.clean();
+  });
+});
+
+describe('Ondrel', () => {
+  const gains = (rig: Rig) => rig.events('energyGained').map(({ e }) => [e.championId, e.targetId, e.amount]);
+  const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
+  /** The champion ids an area hit, per pulse, for the area with this index of its spawn order. */
+  const ticksOf = (rig: Rig, which: number) => {
+    const id = rig.events('areaSpawned')[which]?.e.areaId;
+    return rig.events('areaTick').filter(({ e }) => e.areaId === id);
+  };
+
+  it('M1 Clod Toss flies 10 m in 30 sweeps', () => {
+    const rig = new Rig(ondrel);
+    rig.run(9 + 30, press('M1'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(9);
+    expect(spawned?.e.radius).toBe(0.3);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 9 + 1).toBe(30);
+    expect(expired?.e.x).toBeCloseTo(X0 + 10, 9);
+    rig.clean();
+  });
+
+  it('M1 Clod Toss does 9 damage at 8 m', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 8, 0] });
+    rig.run(9 + 25, press('M1'));
+    expect(damages(rig)).toEqual([[2, 9, 121]]);
+    expect(rig.applied()).toEqual([]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('M2 Mire lands where it is aimed and pulses on steps 24, 84 and 144: 8 damage and a slow each, 10 energy once', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.6] });
+    rig.run(24 + 180, press('M2', { aim: [X0 + 6, 0] }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 6, 9);
+    expect(spawned?.e.radius).toBe(2);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [24, [2]],
+      [84, [2]],
+      [144, [2]],
+    ]);
+    expect(damages(rig)).toEqual([[2, 8, 122], [2, 8, 114], [2, 8, 106]]);
+    expect(rig.applied()).toEqual([[2, 'slow', 90], [2, 'slow', 90], [2, 'slow', 90]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 30 }]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([203]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(130);
+    expect(rig.state.areas).toEqual([]);
+    rig.clean();
+  });
+
+  it('M2 Mire aimed far ahead lands 8 m away', () => {
+    const rig = new Rig(ondrel);
+    rig.run(24 + 1, press('M2'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 8, 9);
+    rig.clean();
+  });
+
+  it('M2 EX Mire is 2.5 m wide, does 10 per pulse and slows 40 percent for 120 ticks', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.9], 1: [X0 + 6, -2.9] }, 25);
+    rig.run(24 + 180, press('M2', { ex: true, aim: [X0 + 6, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.radius).toBe(2.5);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [24, [2, 3]],
+      [84, [2, 3]],
+      [144, [2, 3]],
+    ]);
+    expect(damages(rig)).toEqual([
+      [2, 10, 120],
+      [3, 10, 120],
+      [2, 10, 110],
+      [3, 10, 110],
+      [2, 10, 100],
+      [3, 10, 100],
+    ]);
+    expect(rig.applied()).toEqual([
+      [2, 'slow', 120],
+      [3, 'slow', 120],
+      [2, 'slow', 120],
+      [3, 'slow', 120],
+      [2, 'slow', 120],
+      [3, 'slow', 120],
+    ]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 40 }]);
+    expect(rig.statuses(1)).toEqual([]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([203]);
+    rig.clean();
+  });
+
+  it('SPACE Reed Step leaves its patch at the start point: radius 1.5, two pulses that slow 40 percent for 60 ticks and hurt nobody', () => {
+    const rig = new Rig(ondrel, { 2: [X0, 1.2], 3: [X0, 2.1] });
+    rig.run(120, press('SPACE'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(0);
+    expect(spawned?.e.x).toBe(X0);
+    expect(spawned?.e.radius).toBe(1.5);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [0, [2]],
+      [60, [2]],
+    ]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([119]);
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 4.5, 15]]);
+    const ended = rig.events('dashEnded');
+    expect(ended.map(({ step, e }) => [step, e.reason])).toEqual([[14, 'complete']]);
+    expect(ended[0]?.e.x).toBeCloseTo(X0 + 4.5, 9);
+    expect(rig.applied()).toEqual([[2, 'slow', 60], [2, 'slow', 60]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 40 }]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    expect(rig.health(3)).toBe(130);
+    expect(rig.state.areas).toEqual([]);
+    rig.clean();
+  });
+
+  it('Q Reed Fence hits once for 10 and earns 10, then pushes 1 m away on pulses every 20 ticks', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 1.2, 0], 3: [X0 + 3.2, 0] });
+    rig.run(18 + 120, press('Q'));
+    const spawned = rig.events('areaSpawned');
+    expect(spawned.map(({ step }) => step)).toEqual([18, 18]);
+    const [first, second] = spawned;
+    expect([second?.e.x, second?.e.y, second?.e.radius]).toEqual([first?.e.x, first?.e.y, first?.e.radius]);
+    expect(first?.e.x).toBe(X0);
+    expect(first?.e.radius).toBe(2.5);
+    // The one-hit area (the damage) comes first and ends in its own step; the push lasts 120 ticks.
+    expect(ticksOf(rig, 0).map(({ step }) => step)).toEqual([18]);
+    expect(ticksOf(rig, 1).map(({ step }) => step)).toEqual([18, 38, 58, 78, 98, 118]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([18, 137]);
+    expect(damages(rig)).toEqual([[2, 10, 120]]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.applied()[0]).toEqual([2, 'knockback', 6]);
+    expect(rig.health(3)).toBe(130);
+    rig.clean();
+  });
+
+  it('Q Reed Fence pushes the enemy it holds in reach out of the circle: dirX 1, 1 m in 6 ticks per pulse', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 1.2, 0] });
+    rig.step(press('Q'));
+    rig.run(18);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 1, totalTicks: 6, dirX: 1, dirY: 0 }]);
+    rig.run(6);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 2.2, 9);
+    rig.clean();
+  });
+
+  it('E Undertow flies 8 m in 30 sweeps', () => {
+    const rig = new Rig(ondrel);
+    rig.run(24 + 30, press('E'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.radius).toBe(0.5);
+    expect(spawned?.e.vx).toBe(16);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 24 + 1).toBe(30);
+    expect(expired?.e.x).toBeCloseTo(X0 + 8, 9);
+    rig.clean();
+  });
+
+  it('E Undertow hurts, pulls the enemy 3 m toward the caster in 15 ticks and slows it, and stops on the hit', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 6, 0] });
+    rig.run(24 + 22, press('E'));
+    expect(damages(rig)).toEqual([[2, 10, 120]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 15], [2, 'slow', 90]]);
+    expect(rig.statuses(2)).toEqual([
+      { type: 'knockback', distance: 3, totalTicks: 15, dirX: -1, dirY: 0 },
+      { type: 'slow', percent: 40 },
+    ]);
+    rig.run(15);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 3, 9);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E EX Undertow pierces both enemies in line: each takes 12, is pulled and slowed 50 percent for 120 ticks once', () => {
+    const rig = new Rig(ondrel, { 2: [X0 + 5, 0], 3: [X0 + 7.5, 0] }, 25);
+    rig.run(24 + 30, press('E', { ex: true }));
+    expect(rig.events('projectileHit').map(({ e }) => e.targetId)).toEqual([2, 3]);
+    expect(damages(rig)).toEqual([[2, 12, 118], [3, 12, 118]]);
+    expect(rig.applied()).toEqual([
+      [2, 'knockback', 15],
+      [2, 'slow', 120],
+      [3, 'knockback', 15],
+      [3, 'slow', 120],
+    ]);
+    expect(rig.statuses(3)).toEqual([
+      { type: 'knockback', distance: 3, totalTicks: 15, dirX: -1, dirY: 0 },
+      { type: 'slow', percent: 50 },
+    ]);
+    expect(rig.events('projectileExpired').map(({ e }) => e.reason)).toEqual(['lifetime']);
+    rig.clean();
+  });
+
+  it('R Reed Screen shields the caster for 40 and slows the enemies in reach on steps 0, 60 and 120, never the caster or an ally, and earns nothing', () => {
+    const rig = new Rig(ondrel, { 1: [X0 - 2, 1], 2: [X0 + 2.5, 0] });
+    rig.run(180, press('R'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(0);
+    expect(spawned?.e.radius).toBe(3);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [0, [2]],
+      [60, [2]],
+      [120, [2]],
+    ]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([179]);
+    expect(rig.applied()).toEqual([[0, 'shield', 240], [2, 'slow', 60], [2, 'slow', 60], [2, 'slow', 60]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 40 }]);
+    expect(rig.statuses(1)).toEqual([]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 30 }]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    rig.clean();
+  });
+
+  it('F Drowned Ground pulses 5 times from step 42: 50 damage in all, a slow each, 15 energy once, never an ally', () => {
+    const rig = new Rig(ondrel, { 1: [X0 + 6, 1], 2: [X0 + 6, 0] }, 100);
+    rig.run(42 + 300, press('F', { aim: [X0 + 6, 0] }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(42);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 6, 9);
+    expect(spawned?.e.radius).toBe(4);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [42, [2]],
+      [102, [2]],
+      [162, [2]],
+      [222, [2]],
+      [282, [2]],
+    ]);
+    expect(damages(rig)).toEqual([[2, 10, 120], [2, 10, 110], [2, 10, 100], [2, 10, 90], [2, 10, 80]]);
+    expect(rig.applied()).toEqual([
+      [2, 'slow', 90],
+      [2, 'slow', 90],
+      [2, 'slow', 90],
+      [2, 'slow', 90],
+      [2, 'slow', 90],
+    ]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 40 }]);
+    expect(gains(rig)).toEqual([[0, 2, 15]]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([341]);
+    expect(rig.health(1)).toBe(130);
+    expect(rig.statuses(1)).toEqual([]);
+    rig.clean();
+  });
+
+  it('keeps six lingering areas over five slots, the paths the three rules bind', () => {
+    expect(lingeringPaths(ondrel)).toEqual([
+      'ondrel.slots.M2.effects[0]',
+      'ondrel.slots.M2.ex.effects[0]',
+      'ondrel.slots.SPACE.effects[1]',
+      'ondrel.slots.Q.effects[1]',
+      'ondrel.slots.R.effects[1]',
+      'ondrel.slots.F.effects[0]',
+    ]);
+  });
+});
+
+describe('Brimwick', () => {
+  const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
+
+  it('M1 Spark flies 11 m in 33 sweeps', () => {
+    const rig = new Rig(brimwick);
+    rig.run(9 + 33, press('M1'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(9);
+    expect(spawned?.e.radius).toBe(0.3);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 9 + 1).toBe(33);
+    expect(expired?.e.x).toBeCloseTo(X0 + 11, 9);
+    rig.clean();
+  });
+
+  it('M1 Spark does 10 damage at 8 m', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 8, 0] });
+    rig.run(9 + 25, press('M1'));
+    expect(damages(rig)).toEqual([[2, 10, 110]]);
+    expect(rig.applied()).toEqual([]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('M2 Firecracker lands where it is aimed for 12 in one hit, and misses the enemy 2.1 m off', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.1] });
+    rig.run(24 + 1, press('M2', { aim: [X0 + 6, 0] }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 6, 9);
+    expect(spawned?.e.radius).toBe(1.5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(damages(rig)).toEqual([[2, 12, 108]]);
+    expect(rig.applied()).toEqual([]);
+    expect(rig.health(3)).toBe(120);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('M2 Firecracker aimed far ahead lands 9 m away', () => {
+    const rig = new Rig(brimwick);
+    rig.run(24 + 1, press('M2'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 9, 9);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('M2 EX Firecracker is 2 m wide, does 20 and slows 30 percent for 90 ticks: the enemy 2.4 m off is hit now', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 6, 0], 3: [X0 + 6, 2.4] }, 25);
+    rig.run(24 + 1, press('M2', { ex: true, aim: [X0 + 6, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.radius).toBe(2);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2, 3]]);
+    expect(damages(rig)).toEqual([[2, 20, 100], [3, 20, 100]]);
+    expect(rig.applied()).toEqual([[2, 'slow', 90], [3, 'slow', 90]]);
+    expect(rig.statuses(3)).toEqual([{ type: 'slow', percent: 30 }]);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('SPACE Flare Step goes as far as the aim up to 6 m', () => {
+    for (const [aim, to] of [[[X0 + 3, 0], X0 + 3], [AHEAD, X0 + 6]] as [Spot, number][]) {
+      const rig = new Rig(brimwick);
+      rig.step(press('SPACE', { aim }));
+      const [teleport] = rig.events('teleport');
+      expect(teleport?.e.blocked).toBe(false);
+      expect(teleport?.e.fromX).toBe(X0);
+      expect(teleport?.e.toX).toBeCloseTo(to, 9);
+      expect(champion(rig.state, 0).x).toBeCloseTo(to, 9);
+      expect(rig.applied()).toEqual([]);
+      rig.clean();
+    }
+  });
+
+  it('Q Flash Powder flies 10 m in 25 sweeps', () => {
+    const rig = new Rig(brimwick);
+    rig.run(6 + 25, press('Q'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(6);
+    expect(spawned?.e.radius).toBe(0.35);
+    expect(spawned?.e.vx).toBe(24);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 6 + 1).toBe(25);
+    expect(expired?.e.x).toBeCloseTo(X0 + 10, 9);
+    rig.clean();
+  });
+
+  it('Q Flash Powder does 10 damage and stuns for 45 ticks, and an enemy 7 m away is hit on step 21 (the doc says 0.36 s)', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 7, 0] });
+    rig.run(6 + 25, press('Q'));
+    expect(damages(rig)).toEqual([[2, 10, 110]]);
+    expect(rig.applied()).toEqual([[2, 'stun', 45]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'stun' }]);
+    // Step 21 is the 22nd tick, 0.367 s after the press: the doc's 0.36 s, to the tick.
+    expect(rig.events('projectileHit').map(({ step }) => step)).toEqual([21]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E Starshell flies 10 m in 50 sweeps', () => {
+    const rig = new Rig(brimwick);
+    rig.run(42 + 50, press('E'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(42);
+    expect(spawned?.e.radius).toBe(0.6);
+    expect(spawned?.e.vx).toBe(12);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 42 + 1).toBe(50);
+    expect(expired?.e.x).toBeCloseTo(X0 + 10, 9);
+    rig.clean();
+  });
+
+  it('E Starshell does 26 damage and pushes the enemy 2 m away in 10 ticks', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 6, 0] });
+    rig.run(42 + 26, press('E'));
+    expect(damages(rig)).toEqual([[2, 26, 94]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 10]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 2, totalTicks: 10, dirX: 1, dirY: 0 }]);
+    rig.run(10);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 8, 9);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E EX Starshell winds up in 24 ticks, does 30 damage and pushes 3 m', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 6, 0] }, 25);
+    rig.run(24 + 26, press('E', { ex: true }));
+    expect(rig.events('projectileSpawned')[0]?.step).toBe(24);
+    expect(damages(rig)).toEqual([[2, 30, 90]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 3, totalTicks: 10, dirX: 1, dirY: 0 }]);
+    rig.run(10);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 9, 9);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('R Smoke Pot slows the enemy within 4.0 m for 90 ticks and not the one at 4.1 m, hastes the caster and earns nothing', () => {
+    const rig = new Rig(brimwick, { 2: [X0 + 4, 0], 3: [X0, 4.1] });
+    rig.step(press('R'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.e.x).toBe(X0);
+    expect(spawned?.e.radius).toBe(3.5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(rig.applied()).toEqual([[0, 'haste', 90], [2, 'slow', 90]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 40 }]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 40 }]);
+    expect(rig.statuses(3)).toEqual([]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('F Grand Finale winds up 60 ticks locked, then does 55 damage and stuns for 60 ticks, flying 12 m in 36 sweeps', () => {
+    const flight = new Rig(brimwick, {}, 100);
+    flight.run(60 + 36, press('F'));
+    const [spawned] = flight.events('projectileSpawned');
+    expect(spawned?.step).toBe(60);
+    expect(spawned?.e.radius).toBe(0.5);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = flight.events('projectileExpired');
+    expect((expired?.step ?? 0) - 60 + 1).toBe(36);
+    expect(expired?.e.x).toBeCloseTo(X0 + 12, 9);
+    flight.clean();
+    const rig = new Rig(brimwick, { 2: [X0 + 8, 0] }, 100);
+    rig.run(60 + 25, press('F'));
+    expect(damages(rig)).toEqual([[2, 55, 65]]);
+    expect(rig.applied()).toEqual([[2, 'stun', 60]]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('keeps no lingering area: every area is one hit', () => {
+    expect(lingeringPaths(brimwick)).toEqual([]);
   });
 });
