@@ -1,9 +1,9 @@
 # Online and ladder
 
-Milestone 6 design. Nothing here is built yet: `packages/server` and
-`packages/protocol` do not exist. The approved source is the
-[online design](../superpowers/specs/2026-10-17-online-design.md) (batch #134
-decision 1), recorded in
+Milestone 6 design. P1 is built: `packages/protocol` (#151). The rest is not:
+`packages/server` and the client's online path do not exist. The approved
+source is the [online design](../superpowers/specs/2026-10-17-online-design.md)
+(batch #134 decision 1), recorded in
 [ADR-006](decisions/ADR-006-online-first-cut.md), and it extends section 7 of
 the [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md).
 See the [roadmap](../roadmap.md#6-online) for the packages and milestone 7.
@@ -69,12 +69,17 @@ listed in
   `document` and `fetch`, the properties `Math.random`, `Date.now` and
   `performance.now`, no Node built-ins, and no dynamic `import()` or `import()`
   types. It does not have sim's math ban. Its tsconfig has `lib: ["ES2023"]`,
-  `types: []` and `erasableSyntaxOnly`.
+  `types: []` and `erasableSyntaxOnly`. The API is three total decoders
+  (`decodeFirstMessage` and `decodeClientMessage` for the server,
+  `decodeServerMessage` for the client), which return `{ ok, message }` or
+  `{ ok: false, code, reason }` and never throw, two encoders that write the
+  keys in the spec's order, and `snapshotStateJson` with `encodeSnapshot`, the
+  splice of section 8, byte-equal to the full encoder.
 - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, never
   `client`, and may read the wall clock. It runs from TypeScript source through
   Node's type stripping, with no build step.
 - `client` imports `sim`, `bots` and `protocol`, never `server`. A lint deny
-  rule covers static and dynamic imports.
+  rule covers static and dynamic imports, and is built.
 - `sim` and `bots` are unchanged.
 
 The rules and the lint blocks are in
@@ -87,8 +92,11 @@ of the design.
 One line a layer
 ([section 12](../superpowers/specs/2026-10-17-online-design.md#12-test-strategy)):
 
-- Protocol round trips: every message encodes and decodes to itself, a real 3v3
-  snapshot rebuilds to the server's `checksum`, bad messages are rejected.
+- Protocol (the `protocol` Vitest project, built): every message encodes and
+  decodes to itself and to one golden text, a real 3v3 on arena02 rebuilds to
+  the server's `checksum` at every snapshot, and a table rejects each bound
+  with its edge pair (size in UTF-8 bytes, aim, buttons, names in code points,
+  room codes, tokens, the version and every server field).
 - Server headless test: `Room` on a loopback transport and a manual clock, from
   create and ready to `matchEnd`, with a checksum match at every snapshot and
   the reconnect rows.

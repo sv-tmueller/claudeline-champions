@@ -24,6 +24,8 @@ const simTestFile = 'packages/sim/test/virtual.test.ts';
 const botsFile = 'packages/bots/src/virtual.ts';
 const botsCtsFile = 'packages/bots/src/virtual.cts';
 const botsTestFile = 'packages/bots/test/virtual.test.ts';
+const protocolFile = 'packages/protocol/src/virtual.ts';
+const protocolTestFile = 'packages/protocol/test/virtual.test.ts';
 const clientFile = 'packages/client/src/virtual.ts';
 const balanceFile = 'tools/balance/virtual.ts';
 const fixturesFile = 'tools/fixtures/virtual.ts';
@@ -62,6 +64,23 @@ const exactMath = [
   'Math.max(1, 2)',
   'Math.imul(3, 4)',
   'Math.PI',
+];
+
+const protocolBannedImports: [string, string][] = [
+  ['@claudeline/bots', "import '@claudeline/bots';"],
+  ['a type from @claudeline/bots', "import type { Difficulty } from '@claudeline/bots'; export type D = Difficulty;"],
+  ['@claudeline/client', "import '@claudeline/client';"],
+  ['@claudeline/server', "import '@claudeline/server';"],
+  ['ws', "import 'ws';"],
+  ['a node: builtin', "import 'node:fs';"],
+  ['a node builtin without the prefix', "import 'fs';"],
+  ['bots by relative path', "import '../../bots/src/index';"],
+  ['client by relative path', "import '../../client/src/main';"],
+  ['server by relative path', "import '../../server/src/room';"],
+  ['sim source by relative path', "import '../../sim/src/input';"],
+  ['tests by relative path', "import '../../../tests/x';"],
+  ['node_modules by relative path', "import '../../../node_modules/three';"],
+  ['another package through packages by relative path', "import '../../../packages/sim/src/index';"],
 ];
 
 const cases: Case[] = [
@@ -112,7 +131,7 @@ const cases: Case[] = [
     rule: IMPORTS,
   },
   {
-    name: 'bots imports a future package through packages by relative path',
+    name: 'bots imports protocol through packages by relative path',
     file: botsFile,
     code: "import '../../../packages/protocol/src/index';",
     rule: IMPORTS,
@@ -362,6 +381,168 @@ const cases: Case[] = [
     file: clientFile,
     code: 'export const v = Math.sin(1) + Math.cos(1);',
     rule: null,
+  },
+  // The protocol source imports relative paths and the sim entry only (online design section 3).
+  ...protocolBannedImports.map(([what, code]) => ({
+    name: `protocol imports ${what}`,
+    file: protocolFile,
+    code,
+    rule: IMPORTS,
+  })),
+  {
+    name: 'protocol uses a dynamic import of a sibling file',
+    file: protocolFile,
+    code: "export const p = import('./other');",
+    rule: SYNTAX,
+  },
+  {
+    name: 'protocol uses an import type of the sim',
+    file: protocolFile,
+    code: "export type T = import('@claudeline/sim').PlayerInput;",
+    rule: SYNTAX,
+  },
+  ...simGlobalNames.map((name) => ({
+    name: `protocol reads the global ${name}`,
+    file: protocolFile,
+    code: `export const x = ${name};`,
+    rule: GLOBALS,
+  })),
+  { name: 'protocol calls Math.random', file: protocolFile, code: 'export const r = Math.random();', rule: PROPERTIES },
+  { name: 'protocol calls Date.now', file: protocolFile, code: 'export const t = Date.now();', rule: PROPERTIES },
+  {
+    name: 'protocol calls performance.now',
+    file: protocolFile,
+    code: 'export const t = performance.now();',
+    rule: PROPERTIES,
+  },
+  { name: 'protocol imports sim', file: protocolFile, code: "import '@claudeline/sim';", rule: null },
+  {
+    name: 'protocol imports a type from sim',
+    file: protocolFile,
+    code: "import type { PlayerInput } from '@claudeline/sim'; export type P = PlayerInput;",
+    rule: null,
+  },
+  { name: 'protocol imports a sibling file', file: protocolFile, code: "import './codec';", rule: null },
+  {
+    name: 'protocol imports a sibling file with sim in its name',
+    file: protocolFile,
+    code: "import './simple';",
+    rule: null,
+  },
+  {
+    // The determinism ban on math is not the codec's: floats cross the wire only inside the opaque
+    // state, arena and kits, and the codec computes nothing with them.
+    name: 'protocol uses Math.sin and the ** operator',
+    file: protocolFile,
+    code: 'export const v = Math.sin(1) + 2 ** 3;',
+    rule: null,
+  },
+  { name: 'protocol test imports vitest', file: protocolTestFile, code: "import 'vitest';", rule: null },
+  { name: 'protocol test imports sim', file: protocolTestFile, code: "import '@claudeline/sim';", rule: null },
+  { name: 'protocol test imports protocol source', file: protocolTestFile, code: "import '../src/codec';", rule: null },
+  {
+    name: 'protocol test imports the arena data file',
+    file: protocolTestFile,
+    code: "import arena from '../../../data/arenas/arena02.json'; export { arena };",
+    rule: null,
+  },
+  {
+    name: 'protocol test imports bots',
+    file: protocolTestFile,
+    code: "import '@claudeline/bots';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'protocol test imports sim test helpers by relative path',
+    file: protocolTestFile,
+    code: "import '../../sim/test/helpers';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'protocol test imports a node builtin',
+    file: protocolTestFile,
+    code: "import 'node:fs';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'protocol test imports server by relative path',
+    file: protocolTestFile,
+    code: "import '../../server/src/room';",
+    rule: IMPORTS,
+  },
+  // The client never imports the server, statically or dynamically (online design section 3).
+  { name: 'client imports @claudeline/server', file: clientFile, code: "import '@claudeline/server';", rule: IMPORTS },
+  {
+    name: 'client imports a file inside @claudeline/server',
+    file: clientFile,
+    code: "import '@claudeline/server/src/room';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'client imports server by relative path',
+    file: clientFile,
+    code: "import '../../server/src/room';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'client uses a dynamic import of @claudeline/server',
+    file: clientFile,
+    code: "export const p = import('@claudeline/server');",
+    rule: SYNTAX,
+  },
+  {
+    name: 'client uses a dynamic import of server by relative path',
+    file: clientFile,
+    code: "export const p = import('../../server/src/room');",
+    rule: SYNTAX,
+  },
+  {
+    name: 'client uses an import type of @claudeline/server',
+    file: clientFile,
+    code: "export type T = import('@claudeline/server').Room;",
+    rule: SYNTAX,
+  },
+  { name: 'client imports protocol', file: clientFile, code: "import '@claudeline/protocol';", rule: null },
+  {
+    name: 'client keeps its dev-only dynamic import of the debug shot',
+    file: clientFile,
+    code: "export const p = import('./debug-shot');",
+    rule: null,
+  },
+  {
+    name: 'client uses a dynamic import of a file whose name starts with server',
+    file: clientFile,
+    code: "export const p = import('./server-socket');",
+    rule: null,
+  },
+  { name: 'client imports a file whose name starts with server', file: clientFile, code: "import './serverless';", rule: null },
+  // The segment bans of sim and bots name protocol too: the unchanged rules, enforced for it.
+  { name: 'sim imports protocol', file: simFile, code: "import '@claudeline/protocol';", rule: IMPORTS },
+  {
+    name: 'sim imports protocol by relative path',
+    file: simFile,
+    code: "import '../../protocol/src/index';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'sim test imports protocol by relative path',
+    file: simTestFile,
+    code: "import '../../protocol/src/index';",
+    rule: IMPORTS,
+  },
+  { name: 'bots imports protocol', file: botsFile, code: "import '@claudeline/protocol';", rule: IMPORTS },
+  {
+    name: 'bots imports protocol by relative path',
+    file: botsFile,
+    code: "import '../../protocol/src/index';",
+    rule: IMPORTS,
+  },
+  { name: 'bots test imports protocol', file: botsTestFile, code: "import '@claudeline/protocol';", rule: IMPORTS },
+  {
+    name: 'bots test imports protocol by relative path',
+    file: botsTestFile,
+    code: "import '../../protocol/src/index';",
+    rule: IMPORTS,
   },
 ];
 

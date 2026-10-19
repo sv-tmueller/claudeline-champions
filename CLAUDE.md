@@ -4,8 +4,9 @@ A top-down arena fighter. The approved design is in
 `docs/superpowers/specs/2026-10-01-claudeline-champions-design.md`. The living
 architecture reference is in `docs/architecture/`.
 
-The repo is an npm workspaces monorepo: `packages/sim`, `packages/bots` and
-`packages/client`. TypeScript is `~6.0` only. Node `^22.15` or `>=24`.
+The repo is an npm workspaces monorepo: `packages/sim`, `packages/bots`,
+`packages/protocol` and `packages/client`. TypeScript is `~6.0` only. Node
+`^22.15` or `>=24`.
 
 ## Useful commands
 
@@ -16,7 +17,7 @@ npm run dev                      # dev server at http://127.0.0.1:5173
 npm run check                    # lint, typecheck, unit tests, asset checks, Playwright e2e: the check suite
 npm run test                     # Vitest unit tests (all projects)
 npm run lint                     # ESLint, includes the package boundary rules
-npm run typecheck                # tsc for sim, bots, client and the tools/tests config
+npm run typecheck                # tsc for sim, bots, protocol, client and the tools/tests config
 npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # arena.png, arena-overlay.png, walk.png,
                                  # combat.png, death.png, match.png, result.png,
@@ -71,4 +72,6 @@ ready pull requests and on main.
   browser or Node global a type error.
 - Review, the replay tests and the dmath bit-pattern fixtures enforce the other
   determinism rules (spec section 4.8).
-- Rules for future packages (`server`, `protocol`) are in spec section 3.2.
+- Rules for `protocol` (built) and the future `server` are in the amendment
+  under spec section 3.2; lint has a `protocol` block and denies `server`
+  imports in the client.

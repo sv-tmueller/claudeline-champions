@@ -19,9 +19,10 @@ first.
 - `client` maps keyboard and mouse to `PlayerInput`, steps the sim, and renders
   the result with Three.js and an HTML HUD.
 - Online (milestone 6, designed in the
-  [online design](../superpowers/specs/2026-10-17-online-design.md) and not
-  built yet), the same sim runs on the server (`server`, `protocol`): clients
-  send their input stream and the server stays authoritative.
+  [online design](../superpowers/specs/2026-10-17-online-design.md); only
+  `protocol` is built so far), the same sim runs on the server (`server`):
+  clients send their input stream, the server stays authoritative, and both
+  sides read and write the messages through the `protocol` codec.
 - Arenas are JSON. The sim reads them for collision and Blender scripts read
   them to generate the committed `.glb` models.
 - Roster kits are JSON too, under `data/kits/<id>.json`: plain data that the
@@ -94,7 +95,12 @@ first.
   `packages/sim/test/roster-fixture.ts`. Its tests reproduce the four committed
   fixtures byte for byte (see [Testing](testing.md#fixture-search)). It needs
   Node 22.15 or later.
-- `server`, `protocol`, `desktop`: not started (milestones 6 and 8).
+- `protocol`: the message types of the online design, `PROTOCOL_VERSION`, three
+  total decoders (first message, session message, server message), the
+  encoders in the spec's key order and the snapshot splice, with the lint
+  blocks that keep it to `@claudeline/sim` and relative paths (see
+  [Online](online.md)). Nothing imports it yet.
+- `server`, `desktop`: not started (milestones 6 and 8).
 
 ## Index
 

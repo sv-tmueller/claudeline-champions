@@ -105,6 +105,12 @@ the test sits at 42 percent of its timeout.
   (`tools/fixtures/*.test.ts`): the format against the committed bytes, the
   pure search cases, the reproduction of the four roster fixtures and the CLI
   (see [Fixture search](#fixture-search)).
+- Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
+  round trips and one golden text of all sixteen messages, the key-order and
+  stray-field tests, a reject table with the edge pair of every bound, and a
+  3v3 on arena02 whose snapshots, spliced and decoded, rebuild to the live
+  `checksum` (with checks that it saw a projectile, an area, a status, and
+  snapshot ticks with and without events). See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).

@@ -20,12 +20,12 @@ function boundaryRule(patterns) {
 }
 
 const intoBotsOrClient = {
-  regex: '(^|/)(bots|client)(/|$)',
-  message: 'sim must not reach into the bots or client packages.',
+  regex: '(^|/)(bots|client|protocol)(/|$)',
+  message: 'sim must not reach into the bots, client or protocol packages.',
 };
 const intoClient = {
-  regex: '(^|/)client(/|$)',
-  message: 'bots must not reach into the client package.',
+  regex: '(^|/)(client|protocol)(/|$)',
+  message: 'bots must not reach into the client or protocol packages.',
 };
 // data/ stays allowed: packages.md says sim reads data/arenas, and sim tests
 // import it.
@@ -40,6 +40,31 @@ const relativeIntoSim = {
   regex: '^\\.{1,2}/(.*/)?sim(/|$)',
   message: 'bots imports sim through @claudeline/sim only, never by relative path.',
 };
+
+// protocol imports the sim entry and relative paths only. The segment ban keeps a relative path
+// from reaching the packages it cannot import by name.
+const protocolPatterns = (allowed) => [
+  {
+    regex: nonRelativeExcept(allowed),
+    message: 'protocol imports relative paths and @claudeline/sim only (online design section 3).',
+  },
+  {
+    regex: '(^|/)(bots|client|server)(/|$)',
+    message: 'protocol must not reach into the bots, client or server packages.',
+  },
+  outOfPackage,
+  {
+    regex: '^\\.{1,2}/(.*/)?sim(/|$)',
+    message: 'protocol imports sim through @claudeline/sim only, never by relative path.',
+  },
+];
+
+// The client never imports the server, by name or by a path with a server segment. The selectors
+// below catch import() expressions and import() types, which no-restricted-imports does not see.
+// A file such as ./server-socket stays allowed: the segment must be exactly `server`.
+const SERVER_IMPORT = '^@claudeline/server(/|$)|^\\.{1,2}/(.*/)?server(/|$)';
+const SERVER_IMPORT_IN_SELECTOR = SERVER_IMPORT.replaceAll('/', '\\/');
+const SERVER_IMPORT_MESSAGE = 'The client never imports the server (online design section 3).';
 
 const simPatterns = [
   { regex: NON_RELATIVE, message: 'sim imports nothing outside itself (spec section 3.2).' },
@@ -141,6 +166,25 @@ const botsProperties = [
   { object: 'Date', property: 'now', message: BOTS_CLOCK },
   { object: 'performance', property: 'now', message: BOTS_CLOCK },
 ];
+const PROTOCOL_HOST = 'protocol never touches the clock, timers, the browser or the network (online design section 3).';
+const protocolGlobals = [
+  'error',
+  { name: 'Date', message: PROTOCOL_HOST },
+  { name: 'performance', message: PROTOCOL_HOST },
+  { name: 'setTimeout', message: PROTOCOL_HOST },
+  { name: 'setInterval', message: PROTOCOL_HOST },
+  { name: 'window', message: PROTOCOL_HOST },
+  { name: 'document', message: PROTOCOL_HOST },
+  { name: 'fetch', message: PROTOCOL_HOST },
+];
+// The sim's math ban, its ** ban and noInlineConfig are not copied: floats cross the wire only
+// inside the opaque state, arena and kits, and the codec computes nothing with them.
+const protocolProperties = [
+  'error',
+  { object: 'Math', property: 'random', message: 'protocol has no unseeded randomness (online design section 3).' },
+  { object: 'Date', property: 'now', message: PROTOCOL_HOST },
+  { object: 'performance', property: 'now', message: PROTOCOL_HOST },
+];
 const simSyntax = [
   ...noDynamicImport,
   { selector: "BinaryExpression[operator='**']", message: POW },
@@ -160,6 +204,20 @@ export default defineConfig(
   {
     files: ['packages/client/**/*.ts'],
     languageOptions: { globals: globals.browser },
+    rules: {
+      'no-restricted-imports': boundaryRule([{ regex: SERVER_IMPORT, message: SERVER_IMPORT_MESSAGE }]),
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: `ImportExpression[source.value=/${SERVER_IMPORT_IN_SELECTOR}/]`,
+          message: SERVER_IMPORT_MESSAGE,
+        },
+        {
+          selector: `TSImportType[source.value=/${SERVER_IMPORT_IN_SELECTOR}/]`,
+          message: SERVER_IMPORT_MESSAGE,
+        },
+      ],
+    },
   },
   {
     // The balance tool plays the shipped bots through the two entry points. It reads data/ and
@@ -241,6 +299,21 @@ export default defineConfig(
         ...botsPatterns(['@claudeline/sim', 'vitest']),
         relativeIntoSim,
       ]),
+    },
+  },
+  {
+    files: ['packages/protocol/src/**'],
+    rules: {
+      'no-restricted-imports': boundaryRule(protocolPatterns(['@claudeline/sim'])),
+      'no-restricted-syntax': noDynamicImport,
+      'no-restricted-globals': protocolGlobals,
+      'no-restricted-properties': protocolProperties,
+    },
+  },
+  {
+    files: ['packages/protocol/test/**/*.ts'],
+    rules: {
+      'no-restricted-imports': boundaryRule(protocolPatterns(['@claudeline/sim', 'vitest'])),
     },
   },
 );

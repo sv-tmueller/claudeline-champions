@@ -1,7 +1,7 @@
 # Claudeline Champions: the online design (milestone 6)
 
 Date: 2026-10-17
-Status: approved design (batch #134 decision 1), pre-implementation
+Status: approved design (batch #134 decision 1), in implementation
 Owner: Thomas Mueller (sv-tmueller)
 
 This extends section 7 of the
@@ -11,8 +11,9 @@ cut. The decision it rests on is
 The short record is
 [ADR-006](../../architecture/decisions/ADR-006-online-first-cut.md), and the
 living reference is [online.md](../../architecture/online.md). Nothing here is
-built yet. Where this file and the code disagree after a package lands, fix
-the code or amend this file with a dated line.
+built yet except package P1, `protocol` (section 13). Where this file and the
+code disagree after a package lands, fix the code or amend this file with a
+dated line.
 
 ## 1. Intent and non-goals
 
@@ -65,6 +66,14 @@ types-only `protocol` was rejected: each side would duplicate the decoder, and
 the round-trip test would test nothing real. CLAUDE.md is not edited. Its
 pointer to design spec section 3.2 stays true, because the amendment line sits
 under 3.2.
+
+Amended 2026-10-20 by [batch #147 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6274855460): when
+`protocol` landed, three lines of CLAUDE.md read wrong and were edited, and
+nothing else in it: the workspaces sentence, the typecheck comment and the
+bullet about future packages. The pointer to section 3.2 stays. The segment
+bans of `sim` and `bots` in `eslint.config.js` also name `protocol`, so a
+relative path into it is red, which enforces the rules of section 3 and does
+not change them.
 
 **No pause online.** Escape opens the menu over the running match. The menu
 offers Leave where a local match offers Restart. The lines in
@@ -149,6 +158,12 @@ fixed here.
   `import()` type of `@claudeline/server` fail. The cost, as for bots and
   `sim`: a client file cannot be named `server`, so package P4a names its
   socket file otherwise.
+
+Amended 2026-10-20 by [batch #147 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6274855460), for
+package P1: the `import()` type selector reads `source.value`, as the
+`ImportExpression` selector does, and not `argument.literal.value`, because
+typescript-eslint 8.71 deprecates `argument` on `TSImportType` in favour of
+`source`. Both match today; the trial above holds for it.
 
 ### bots and sim
 
@@ -244,7 +259,7 @@ section 9.
 | Client ping | every 5 s | keepalive and the round trip for the HUD | P4a |
 | Bad messages | the 20th in a row closes | a buggy or hostile client stops costing parse time | P2 |
 | Client message size | 1024 bytes | about ten times the largest `input` (104 characters), set as `ws` `maxPayload` | P1, P3 |
-| Aim range | integers within 100 000 cm | far outside any arena (tens of meters) and the sim does not clamp aim, so the decoder bounds it | P1 |
+| Aim range | integers from -100 000 to 100 000 cm, both included | far outside any arena (tens of meters) and the sim does not clamp aim, so the decoder bounds it | P1 |
 | Input queue | 6, oldest dropped | 6 ticks is 100 ms of input: more adds latency, fewer drops inputs on jitter | P2 |
 | Congestion | 64 KB `bufferedAmount` (about 20 snapshots at the mean of 3222 B, about 8 at the largest of 8065 B), polled every 100 ms, closed after 120 ticks (2 s) of pending batches | skipping snapshots keeps the stream current; a longer backlog means the client cannot keep up | P3 (router), P2 (pending list) |
 | Grace | 600 ticks (10 s) | long enough for a network blip, short enough that allies do not wait on a frozen champion | P5 |
@@ -252,7 +267,7 @@ section 9.
 | Reconnect backoff | 0.5 s doubling to 4 s, given up after 60 s | the same 60 s as the empty-room close, so retrying past it is pointless | P5 |
 | Compression | `permessage-deflate` off | costs CPU on the 60 Hz loop; the mean stream is about 64 KB/s. Revisit when P2 has measured server CPU | P3 |
 | Port and host | 8787, `127.0.0.1` | section 3 | P3 |
-| Name length | 1 to 16 characters after trimming | fits a lobby row, and a message well under the size limit | P1 |
+| Name length | 1 to 16 code points after trimming | fits a lobby row, and a message well under the size limit | P1 |
 | New room | team size 2, the first arena by id with two spawns a team, difficulty `normal` | the smallest match; the host changes it with `settings` | P2 |
 
 ## 5. The lobby and the ready flow
@@ -465,18 +480,18 @@ Further rules:
 - **Limits.** A client message is at most 1024 bytes (a default). An `input` is
   at most about 105 bytes (104 characters for a seven-digit `tick` and six-digit
   aim values), so the limit leaves room for a name and a token. `ws` closes an
-  oversize frame itself with code 1009. `name` is 1 to 16 characters after
-  trimming (a default), without control characters. `roomCode` is five
-  characters of the alphabet in section 5. `token` is a room code, a dot and 22
-  base64url characters.
+  oversize frame itself with code 1009. `name` is 1 to 16 code points after
+  trimming (a default), without control characters (U+0000 to U+001F and
+  U+007F to U+009F). `roomCode` is five characters of the alphabet in section
+  5. `token` is a room code, a dot and 22 base64url characters.
 - **Validation.** The server's decoder checks every field of every client
-  message against its type and range (`aimX` and `aimY` are integers within
-  100 000 cm, a default, and `buttons` an integer from 0 to 255), keeps only the
-  known fields, and builds a fresh object, so an extra field or a `__proto__`
-  key reaches nothing. An invalid message is answered with `error` and ignored,
-  never thrown on. The client's decoder checks the envelope and the scalar
-  fields of each server message, and not the inside of `state`, `arena` and
-  `kits`: the server is the authority on them.
+  message against its type and range (`aimX` and `aimY` are integers from
+  -100 000 to 100 000 cm, both included, a default, and `buttons` an integer
+  from 0 to 255), keeps only the known fields, and builds a fresh object, so an
+  extra field or a `__proto__` key reaches nothing. An invalid message is
+  answered with `error` and ignored, never thrown on. The client's decoder
+  checks the envelope and the scalar fields of each server message, and not the
+  inside of `state`, `arena` and `kits`: the server is the authority on them.
 - **Version.** One integer, `PROTOCOL_VERSION`. A server and a client with
   different versions refuse each other with `version`. Delta snapshots (P7)
   bump it.
@@ -747,7 +762,7 @@ and every row is S or M, or parked.
 
 | # | Package | Size | Blocked by |
 |---|---------|------|------------|
-| P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project | M | this spec |
+| P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project. Lands with PR #157 (#151). | M | this spec |
 | P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test | M | P1 |
 | P3 | Server transport and processes: the `ws` dependency, the router and a fork per room, room codes and tokens, `npm run server`, the socket test | M | P2 |
 | P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests | M | P1 |
