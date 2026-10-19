@@ -138,7 +138,11 @@ function visitKit(kit: KitDef): Visit[] {
   return out;
 }
 
-/** Every number the kit has outside the ranges of rules.md section 4.1 and spec section 10. */
+/**
+ * Every number the kit has outside the ranges of rules.md section 4.1 and spec section 10, and
+ * every lingering area that breaks one of the three rules of roster-v2.md section 0 (the damage or
+ * heal total over its pulses, no stun, root or silence on a pulse, a duration under the slot cooldown).
+ */
 function catalogProblems(kit: KitDef): string[] {
   const problems: string[] = [];
   const within = (value: number, low: number, high: number) => value >= low && value <= high;
