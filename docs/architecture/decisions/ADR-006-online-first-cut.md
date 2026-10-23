@@ -3,8 +3,8 @@
 ## Status
 
 Accepted by [batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441).
-Design only: nothing is built. The full design is the
-[online design spec](../../superpowers/specs/2026-10-17-online-design.md).
+Design only, except P1: `packages/protocol` is built (#151). The full design is
+the [online design spec](../../superpowers/specs/2026-10-17-online-design.md).
 
 ## Context
 

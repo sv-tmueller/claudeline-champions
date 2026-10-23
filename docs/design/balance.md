@@ -209,8 +209,8 @@ Win rate in percent over the cells the champion is in, as X or as Y.
 
 After the tuning passes of #121 and #124 three cells are in the band and 21 are
 outside. Each is in band or accepted with its reason, with its reading. The
-rates are X's, from the report above. A reading names the limits of the bots
-(bots.md, "Not built yet" and "Never pressed") that may account for a cell;
+rates are X's, from the report at 9a9c653. A reading names the limits of the
+bots (bots.md, "Not built yet" and "Never pressed") that may account for a cell;
 none of their shares was measured, so none is stated as the cause. "Within the
 noise" means within the 7 points of section 3 from the band at n = 200, so one
 run cannot tell the cell from the band. "No number moved it" means that every
@@ -266,8 +266,8 @@ arena01 (Hargrim and Quillon against Lumeth and Quillon, seed 1, round 1)
 Lumeth did 138 of the 160 damage Hargrim took, mostly with Mend Bolt from
 range, and Hargrim cast the hook once. Limits that may account: the target is
 the nearest enemy (or the current one within 1 m of it), so the hook may go at
-another champion than Lumeth; nobody dodges, so her bolts may land; Rally Cry
-is never pressed.
+another champion than Lumeth; nobody dodged in the report of 9a9c653 (the bots
+dodge since #137), so her bolts may land; Rally Cry is never pressed.
 
 In 40-seed screens only Mend Bolt's cooldown (36 to 50 and to 70 ticks) and
 its damage on an enemy (10 to 8) moved the cell by more than a few points
@@ -277,15 +277,14 @@ the damage change did not pass the rule (section 6). The Hargrim numbers that
 could close the gap were #124's, and none passed (section 6.2). The hook's
 cooldown, 540 to 360 ticks (aimed at 2v2 arena01), turned the no-stall clause
 of lumeth.test.ts red by 3 ticks (a bot stalled 123 ticks against the 120
-allowed, in the 3v3 on arena02; at the time, see 6.2). The hook's slow
-duration, 60 to 120 ticks
-(aimed at 2v2 arena02), and the hook's speed, 20 to 25 m/s, failed the Hargrim
-fixture coverage. Maul Swing's damage, 12 to 16
+allowed, in the 3v3 on arena02; gone since #137, see 6.2). The hook's slow
+duration, 60 to 120 ticks (aimed at 2v2 arena02), and the hook's speed, 20 to
+25 m/s, failed the Hargrim fixture coverage. Maul Swing's damage, 12 to 16
 (aimed at 3v3 arena01), left a Quillon stalled for 6003 ticks in the 2v2 of
-lumeth.test.ts on arena02 (at the time, see 6.2). The one that got a full run,
-the hook's damage, 14 to 20 (run H2, aimed at 3v3 arena02), left the target at
-1.0 and the sum at 675.5, with 14 cells moved by at most 3.5 points. So no
-Hargrim number moved the cells within the rule, and the limits above may
+lumeth.test.ts on arena02 (gone since #137, see 6.2). The one that got a full
+run, the hook's damage, 14 to 20 (run H2, aimed at 3v3 arena02), left the
+target at 1.0 and the sum at 675.5, with 14 cells moved by at most 3.5 points.
+So no Hargrim number moved the cells within the rule, and the limits above may
 account.
 
 ### 5.3 Hargrim v Quillon (four cells, accepted)
@@ -305,8 +304,8 @@ the band. Rush's cooldown, 420 to 300 ticks (aimed at 2v2 arena01), failed the
 Hargrim fixture coverage, and Bind Shot's slow (40 to 30 percent, and 90 to 60
 ticks) and Snare Orb's cooldown (720 to 960 ticks), the other candidates aimed
 at these cells, failed the Quillon fixture coverage. Limits that may account:
-nobody dodges, so Hargrim may walk into bolts, and Rally Cry, his haste, is
-never pressed.
+nobody dodged in the report of 9a9c653, so Hargrim may walk into bolts, and
+Rally Cry, his haste, is never pressed.
 
 ### 5.4 Lumeth v Skerrow (four cells, accepted)
 
@@ -325,7 +324,7 @@ Limits that may account: Skerrow's Lunge opener waits at 6 to 8 m for its
 opening and she has no Lunge away; Lumeth's Lantern Burst is pressed as an
 escape when an acted enemy is within 3 m, which may push a diving Skerrow 2 m
 back each time it is ready; the bot presses Quiet Dart only at a target with an
-escape ready; nobody dodges.
+escape ready; nobody dodged in the report of 9a9c653.
 
 ### 5.5 Quillon v Skerrow (four cells, accepted)
 
@@ -339,14 +338,15 @@ cooldown, Bind Shot's slow and its duration, Snare Orb's cooldown, Rod Bolt's
 cooldown and Lance's windup; the committed Quillon fixture is attempt 23 of its
 search, and the search is not in the repository (at the time; #128 added the
 tool)) and two on the no-stall clause of lumeth.test.ts (Rod Bolt's reach and
-its damage; at the time, see 6.2). Limits that may account:
+its damage; gone since #137, see 6.2). Limits that may account:
 the target is the nearest enemy (or the current one within 1 m of it), so in a
 replayed Quillon and Hargrim against Skerrow and Hargrim match (2v2, arena01,
 seed 1, round 1) Skerrow hit the other Hargrim while Quillon's bolts hit her
 Hargrim nine times (eight Rod Bolts, six of them for the full 11 damage and two
 absorbed by Iron Hide, and one Snare Orb) and Skerrow three times; Skerrow's
 Lunge opener waits at 6 to 8 m and she has no Lunge away; the bot presses Quiet
-Dart only at a target with an escape ready; nobody dodges.
+Dart only at a target with an escape ready; nobody dodged in the report of
+9a9c653.
 
 ### 5.6 Hargrim v Skerrow (two in band, two accepted within the noise)
 
@@ -359,8 +359,9 @@ noise, on opposite sides of the band (Throwing Knife's cooldown, 180 to 300
 ticks, took 2v2 on arena02 into the band and raised the summed distance, and it
 fails the Skerrow fixture coverage). Limits that may account: Iron Hide is an
 escape slot for the bot, so it is not pressed against an opener as the roster
-has it; Skerrow waits at 6 to 8 m and has no Lunge away; nobody dodges. The 3v3
-cells pool two fill orders that differ widely (26.0 and 63.0 on arena02).
+has it; Skerrow waits at 6 to 8 m and has no Lunge away; nobody dodged in the
+report of 9a9c653. The 3v3 cells pool two fill orders that differ widely
+(26.0 and 63.0 on arena02).
 #124's runs moved these cells too, on the way to other targets. Iron Hide's
 absorb, 40 to 60 (run H1), took the two cells in band to 53.5 and 59.5, Hargrim
 ahead as the roster has it, but took 3v3 arena01 from 63.5 to 70.0 and raised
@@ -379,7 +380,7 @@ points. #124 tried the Quillon numbers aimed at arena02: Rod Bolt's reach, 13.93
 to 12.1 m (aimed at 2v2), which the bot kites to, and its cooldown, 30 to 36
 ticks (aimed at 3v3). Neither got a full run: the reach turned the no-stall
 clause of lumeth.test.ts red (a bot stalled 3392 ticks in engage in the 3v3 on
-arena01; at the time, see 6.2), and the cooldown failed the fixture coverage
+arena01; gone since #137, see 6.2), and the cooldown failed the fixture coverage
 and the pinned 3v3 ultimate run. The Quillon numbers that did get a full run
 moved both arenas.
 Hush Ward's absorb (Q1) took 3v3 arena01 from 58.5 to 61.5, out of the band, and
@@ -437,7 +438,7 @@ distance is the sum over the 24 cells of the distance to the 40 to 60 band.
   a measured gain. Two side effects went the wrong way: Hargrim v Skerrow 2v2
   arena01, in band, fell from 45.0 to 41.0, and Lumeth v Quillon 2v2 arena01
   rose from 63.5 to 65.5, further out of the band.
-- The report above is the result: 3 cells in band of 24, and the summed
+- The report at 9a9c653 is the result: 3 cells in band of 24, and the summed
   distance 675.5. By champion over its cells: Hargrim 16.4 (14.2 before),
   Lumeth 79.1 (77.9), Quillon 85.3 (86.4) and Skerrow 19.2 (21.5).
 - #124 kept none of its 20 candidates (section 6.2), so that report is also its
@@ -496,8 +497,8 @@ coverage or allocation.test.ts red is dropped with no full run. The lists are
 the architect's, Quillon's ten and then Hargrim's ten, one number each (with
 any field its EX shares); a 40-seed screen could only have ordered them and
 none was run. Nothing was kept, so every full run (100 seeds on 24 configs)
-is measured against the report above, the sum 675.5. The cap is 4 kept changes
-and 10 full runs per champion: Quillon used 2 runs and Hargrim 5, and neither
+is measured against the report at 9a9c653, the sum 675.5. The cap is 4 kept
+changes and 10 full runs per champion: Quillon used 2 runs and Hargrim 5, and neither
 kept one.
 
 Before a full run each candidate met these pre-checks: the fixture coverage

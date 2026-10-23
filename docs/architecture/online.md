@@ -80,7 +80,8 @@ listed in
   Node's type stripping, with no build step.
 - `client` imports `sim`, `bots` and `protocol`, never `server`. A lint deny
   rule covers static and dynamic imports, and is built.
-- `sim` and `bots` are unchanged.
+- `sim` and `bots` are unchanged, except that their lint segment bans now name
+  `protocol`.
 
 The rules and the lint blocks are in
 [packages.md](packages.md#dependency-rules) and
