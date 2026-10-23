@@ -1238,7 +1238,10 @@ tolerance every row is red, both sides included; with the rect limit of
 walk) and the circle row is green; with the rect branch of `overlapsObstacle`
 without it only the `pointBlocked` asserts of the three rect rows are red and
 the walks stay green. The architect of #129 replayed 600 ticks from a snapshot
-of each: the bots before the dodge and the tolerance stalled for the 600 ticks
+of each, in scratch scripts that are not in the repository (the figures below
+are that architect's scratch evidence, in
+[the #129 comment](https://github.com/sv-tmueller/claudeline-champions/issues/129#issuecomment-6273751736)):
+the bots before the dodge and the tolerance stalled for the 600 ticks
 (142 on the circle), those with the tolerance and no dodge and those of today
 for 15, which is a fresh bot's delay ring starting on idle and no stall, and
 those with the dodge and no tolerance for 600 (300 on the circle). So the

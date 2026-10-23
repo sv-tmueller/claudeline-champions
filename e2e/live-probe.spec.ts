@@ -16,13 +16,12 @@ import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 // bare `/` opens the select) at time scale 1, where the hooks and the HUD change
 // in every window (the position and facing of the human on every tick,
 // projectiles, hits and bars as the bots fight). The first scene, combat.spec.ts,
-// is a steady state. This one counts the table-driven
-// change writes with real changes, and the bots' fight through the glue. The
-// bots package itself is logged as the sixth figure of the probe line and bounded
-// apart from the counted code, on the median of the five windows (see heap-probe.ts).
-// Every frame runs through the client's dev-only hook, starting in the warmup phase;
-// the fake clock is paused before the page loads and never runs a frame, so the ticks
-// are the hook's alone.
+// is a steady state. This one counts the table-driven change writes with real
+// changes, and the bots' fight through the glue. The bots package itself is logged
+// as the sixth figure of the probe line and bounded apart from the counted code, on
+// the median of the five windows (see heap-probe.ts). Every frame runs through the
+// client's dev-only hook, starting in the warmup phase; the fake clock is paused
+// before the page loads and never runs a frame, so the ticks are the hook's alone.
 //
 // The scene is measured late, in the first round that begins after
 // WARM_UP_TICKS, with no profiler before it. A live match does not give the
