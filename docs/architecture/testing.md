@@ -227,9 +227,8 @@ A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
 
 ## Playwright e2e
 
-The specs are in `e2e/*.spec.ts`. They run against the Vite dev server on
-port 5173, or on `CLAUDELINE_PORT` when it is set, which Playwright starts
-itself.
+The specs are in `e2e/*.spec.ts`. They run against the Vite dev server, which
+Playwright starts itself, on port 5173 or on `CLAUDELINE_PORT` when it is set.
 
 A bare `/` opens the pre-match select, not a match (see
 [client](client.md#pre-match-select)). A spec that wants the default match
@@ -401,9 +400,13 @@ other spec.
   Two checkouts on two ports run the suite at once. CI never sets the variable,
   so it runs on 5173. The heap probe keys scripts by path, not by origin, so its
   figures do not depend on the port.
-- A port already in use fails at once ("already used" from Playwright, or
-  Vite's strictPort error), and that says nothing about the code.
-  `lsof -nP -iTCP:<port> -sTCP:LISTEN` names the holder; pick another port.
+- A port already in use says nothing about the code. When the holder serves
+  the page, Playwright fails at once with "already used". When a holder on
+  127.0.0.1 answers anything else or drops the connection, Vite's strictPort
+  error ("Port <port> is already in use") fails the run at once. A holder that
+  accepts the connection and never answers stalls the run before any spec
+  starts, with no error. In each case `lsof -nP -iTCP:<port> -sTCP:LISTEN`
+  names the holder; pick another port.
 - Assertions are tick-based only. A spec paces itself by the canvas hook
   `data-tick` and by the other hooks and HUD attributes, and never by a
   wall-clock wait, so a slow machine cannot change what it sees. The combat
