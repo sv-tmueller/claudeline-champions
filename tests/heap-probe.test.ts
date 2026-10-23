@@ -9,6 +9,7 @@ import {
   type Allocations,
   type ProfileNode,
 } from '../e2e/heap-probe';
+import { originOf, readPort } from '../e2e/port';
 
 // The pure part of the heap probe's shared module (e2e/heap-probe.ts), which the
 // two probe specs run in a browser: how a profile is sorted into counted code,
@@ -18,9 +19,10 @@ function node(url: string, functionName: string, selfSize: number, children: Pro
   return { callFrame: { functionName, url }, selfSize, children };
 }
 
-const CLIENT = 'http://127.0.0.1:5173/packages/client/src/';
-const SIM = 'http://127.0.0.1:5173/packages/sim/src/';
-const BOTS = 'http://127.0.0.1:5173/packages/bots/src/';
+const ORIGIN = originOf(readPort());
+const CLIENT = `${ORIGIN}/packages/client/src/`;
+const SIM = `${ORIGIN}/packages/sim/src/`;
+const BOTS = `${ORIGIN}/packages/bots/src/`;
 
 describe('summarise', () => {
   it('counts the client modules of the frame path, and nothing from the sim or the bots', () => {
@@ -119,13 +121,26 @@ describe('summarise', () => {
 
   it("keeps three's animation callback and the fake clock apart from the counted code", () => {
     const root = node('', '(root)', 0, [
-      node('http://127.0.0.1:5173/node_modules/three/build/three.module.js', 'onAnimationFrame', 36),
+      node(`${ORIGIN}/node_modules/three/build/three.module.js`, 'onAnimationFrame', 36),
       node('', 'requestAnimationFrame', 24),
     ]);
     const result = summarise(root);
     expect(result.onAnimationFrame).toBe(36);
     expect(result.fakeRequestAnimationFrame).toBe(24);
     expect(result.combat).toBe(0);
+  });
+
+  it('gives the same figures for the same tree on any origin, so the probe does not depend on CLAUDELINE_PORT', () => {
+    const tree = (origin: string): ProfileNode =>
+      node('', '(root)', 0, [
+        node(`${origin}/packages/client/src/main.ts`, 'frameMany', 300),
+        node(`${origin}/packages/sim/src/input.ts`, 'resolveInput', 70),
+        node(`${origin}/packages/bots/src/bot.ts`, 'think', 900),
+        node(`${origin}/node_modules/three/build/three.module.js`, 'onAnimationFrame', 36),
+      ]);
+    const onDefault = summarise(tree('http://127.0.0.1:5173'));
+    expect(onDefault.combat).toBe(300);
+    expect(summarise(tree('http://127.0.0.1:6172'))).toEqual(onDefault);
   });
 });
 
@@ -193,8 +208,8 @@ describe('conclude', () => {
 describe('measureWindows', () => {
   it('profiles each window in turn, counting every function of the pattern, and concludes on them', async () => {
     const calls: string[] = [];
-    const draw = node('http://127.0.0.1:5173/packages/client/src/entity-views.ts', 'draw', 700);
-    const frameMany = node('http://127.0.0.1:5173/packages/client/src/main.ts', 'frameMany', 360);
+    const draw = node(`${CLIENT}entity-views.ts`, 'draw', 700);
+    const frameMany = node(`${CLIENT}main.ts`, 'frameMany', 360);
     const page = {
       evaluate: async () => void calls.push('window'),
     };
@@ -218,8 +233,8 @@ describe('measureWindows', () => {
 
 describe('allocationsOverAWindow', () => {
   it('counts the entity views draw in the window it runs, on either scene', async () => {
-    const draw = node('http://127.0.0.1:5173/packages/client/src/entity-views.ts', 'draw', 700);
-    const frameMany = node('http://127.0.0.1:5173/packages/client/src/main.ts', 'frameMany', 360);
+    const draw = node(`${CLIENT}entity-views.ts`, 'draw', 700);
+    const frameMany = node(`${CLIENT}main.ts`, 'frameMany', 360);
     const page = { evaluate: async () => undefined };
     const cdp = {
       send: async (method: string) =>

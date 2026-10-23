@@ -227,8 +227,8 @@ A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
 
 ## Playwright e2e
 
-The specs are in `e2e/*.spec.ts`. They run against the Vite dev server on
-port 5173, which Playwright starts itself.
+The specs are in `e2e/*.spec.ts`. They run against the Vite dev server, which
+Playwright starts itself, on port 5173 or on `CLAUDELINE_PORT` when it is set.
 
 A bare `/` opens the pre-match select, not a match (see
 [client](client.md#pre-match-select)). A spec that wants the default match
@@ -385,16 +385,28 @@ other spec.
   version 2 and a true `muted`, the button reads muted and the round start is
   silent; unmuting plays the next round start once and the round end before it.
 
-- Run them with `CI=1`. Without it Playwright reuses whatever listens on 5173,
-  which can be a sibling session's dev server serving other code. With `CI=1`
-  it always starts its own, and fails with "already used" when something holds
-  the port. `npm run check` does not set it (its last step is `npm run e2e`,
-  which is plain `playwright test`), so run `CI=1 npm run check`. CI sets it
-  itself.
-- Check the port before every e2e command, for example
-  `lsof -nP -iTCP:5173 -sTCP:LISTEN`, which must print nothing. When a parallel
-  session takes the port, wait until it is free and run again. That failure says
-  nothing about the code.
+- Run them with `CI=1`. Without it Playwright reuses whatever listens on the
+  port, which can be a sibling session's dev server serving other code. With
+  `CI=1` it always starts its own, and fails with "already used" when something
+  holds the port. `npm run check` does not set it (its last step is
+  `npm run e2e`, which is plain `playwright test`), so run `CI=1 npm run check`.
+  CI sets it itself.
+- The port is `CLAUDELINE_PORT`, default 5173. It sets Vite's port, `baseURL`
+  and `webServer.url` together, read and validated by `e2e/port.ts`: a plain
+  decimal from 1024 to 65535, and any other value, an empty one included, stops
+  with an error that names it. A session that runs beside others picks a port
+  no other session uses. The lanes plan's convention is 6 followed by the issue
+  number, so 6172 for #172, and it runs `CLAUDELINE_PORT=6172 CI=1 npm run check`.
+  Two checkouts on two ports run the suite at once. CI never sets the variable,
+  so it runs on 5173. The heap probe keys scripts by path, not by origin, so its
+  figures do not depend on the port.
+- A port already in use says nothing about the code. When the holder serves
+  the page, Playwright fails at once with "already used". When a holder on
+  127.0.0.1 answers anything else or drops the connection, Vite's strictPort
+  error ("Port <port> is already in use") fails the run at once. A holder that
+  accepts the connection and never answers stalls the run before any spec
+  starts, with no error. In each case `lsof -nP -iTCP:<port> -sTCP:LISTEN`
+  names the holder; pick another port.
 - Assertions are tick-based only. A spec paces itself by the canvas hook
   `data-tick` and by the other hooks and HUD attributes, and never by a
   wall-clock wait, so a slow machine cannot change what it sees. The combat

@@ -13,7 +13,8 @@ The repo is an npm workspaces monorepo: `packages/sim`, `packages/bots`,
 ```bash
 npm ci                           # install from the lockfile
 npx playwright install chromium  # one-time per machine; check and e2e fail without it
-npm run dev                      # dev server at http://127.0.0.1:5173
+npm run dev                      # dev server at http://127.0.0.1:5173; CLAUDELINE_PORT=<port>
+                                 # picks another port, and e2e follows it
 npm run check                    # lint, typecheck, unit tests, asset checks, Playwright e2e: the check suite
 npm run test                     # Vitest unit tests (all projects)
 npm run lint                     # ESLint, includes the package boundary rules
