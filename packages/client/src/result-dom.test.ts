@@ -23,9 +23,9 @@ describe('champion select entries', () => {
     ]);
   });
 
-  it('gives six available entries when the kit files are six, since the client now registers all six', () => {
+  it('gives six available entries when the kit files are six, and leaves out a kit file the client has not registered', () => {
     const six = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick'];
-    const entries = selectEntries(six, 'normal', 'arena01', 2);
+    const entries = selectEntries([...six, 'unregistered'], 'normal', 'arena01', 2);
     expect(entries.map((entry) => entry.id)).toEqual(six);
     expect(entries.every((entry) => entry.available)).toBe(true);
   });

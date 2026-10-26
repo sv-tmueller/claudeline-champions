@@ -6,7 +6,7 @@ import { createAreaViews, createProjectileViews, type EntityViews } from './enti
 import { BRIMWICK_KIT, HARGRIM_KIT, ONDREL_KIT, QUILLON_KIT } from './test-kits';
 
 // The area views draw lingering areas in a match for the first time: every v1 area and every
-// area of Brimwick lasts one tick, so it is made in step 3 and gone in step 6 of the same step and
+// area of Brimwick lasts one tick, so it is made in step 3 and gone in step 6 of the same tick and
 // never reaches `sync`. Ondrel's Mire, Reed Step, Reed Fence, Reed Screen and Drowned Ground last
 // 120 to 300 ticks. This plays each one with the real sim and the real kits, capture, step and
 // sync in main.ts order, and reads the views (entity-views-sim.test.ts uses toolkit spawns).
@@ -61,13 +61,16 @@ interface Played {
   counts: number[];
   /** The disc as drawn in the first frame an area view was shown, or null if none was. */
   disc: { x: number; z: number; scale: number; visible: number } | null;
+  /** The areas the sim made, from each step's areaSpawned events. */
+  spawned: number;
 }
 
 /** Presses `buttons` for the first frame, then idles `frames` frames in all, reading the area views after each. */
 function play(s: Scene, buttons: number, aimX: number, aimY: number, frames = 360): Played {
-  const played: Played = { counts: [], disc: null };
+  const played: Played = { counts: [], disc: null, spawned: 0 };
   for (let i = 0; i < frames; i++) {
     s.frame(i === 0 ? buttons : 0, aimX, aimY);
+    played.spawned += s.state.events.filter((event) => event.type === 'areaSpawned').length;
     // The views follow the sim list in every frame.
     expect(s.areas.count).toBe(s.state.areas.length);
     played.counts.push(s.areas.count);
@@ -91,7 +94,7 @@ function run(counts: readonly number[]): { first: number; length: number } {
 }
 
 describe('the area views draw the lingering areas of Ondrel', () => {
-  // An area of `durationTicks` is made in step 3 and counted down in step 6 of the step that makes
+  // An area of `durationTicks` is made in step 3 and counted down in step 6 of the tick that makes
   // it, so a sync sees it for durationTicks - 1 frames: the 1 tick areas of v1 and Brimwick for none.
   // [label, buttons, aim in cm, radius, duration, expected disc x and y in metres]. The owner stands at (-12, 2).
   const CASES: [string, number, [number, number], number, number, [number, number]][] = [
@@ -149,7 +152,7 @@ describe('the area views draw the lingering areas of Ondrel', () => {
     s.frame(Button.F, -600, 200);
     for (let i = 0; i < 80 && s.areas.count === 0; i++) s.frame(0, -600, 200);
     expect(s.areas.count).toBe(1);
-    // Both champions of team B die in the next step, to a one-tick area of the dev tool at each of them:
+    // Both champions of team B die in the next step, to a two-tick area of the dev tool at each of them:
     // the round is decided with the Drowned Ground still alive.
     for (const champion of s.state.champions) {
       if (champion.team !== 'B') continue;
@@ -181,6 +184,7 @@ describe('the area views never show the one-tick areas', () => {
   ] as const)('shows no view for %s', (_label, buttons) => {
     const s = scene('brimwick');
     const played = play(s, buttons, -600, 200, 120);
+    expect(played.spawned, 'the one-tick area was made').toBe(1);
     expect(played.disc).toBeNull();
     expect(Math.max(...played.counts)).toBe(0);
   });
