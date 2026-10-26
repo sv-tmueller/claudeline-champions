@@ -13,7 +13,7 @@ import type { TestClient } from './loopback';
 
 const data = roomData();
 // Two rounds to win, not the default three: the match still crosses a round boundary, and the file
-// runs in about a third of the time (the runner took 29 s of this file at three rounds).
+// runs in under half the time (14 s to 5.5 s locally; the runner took 29 s at three rounds).
 const ROUNDS_TO_WIN = 2;
 
 interface Spec {
@@ -98,6 +98,13 @@ function firstDivergence(played: Played, arenaId: string, difficulty: Difficulty
   return null;
 }
 
+// Runner (ubuntu-latest, Node 22) at three rounds, 779e504 (job 121633905207): the two matches of
+// a beforeAll took about 11 s, the two local-reference rows 3.9 s and 2.6 s, the file 28.7 s. At
+// two rounds the local times are 4.7 s for the beforeAll (8.2 s at three) and 0.7 s and 0.5 s for
+// the rows (1.4 s and 1.5 s), on an Apple M5 Pro with Node 22.23.2; the runner has not timed the
+// two-round file yet. Timeouts (testing.md, Check suite): 10 s for the rows, twice 3.9 s is 7.8 s;
+// 20 s for the beforeAll, which the rule allows for a runner time up to 10 s, and the shorter match
+// should take about half of the 11 s. Rescan when a runner has timed this file.
 describe.each(SPECS)('loopback: $name', { timeout: 10_000 }, (spec) => {
   let first: Played;
   let second: Played;

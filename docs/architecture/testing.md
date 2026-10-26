@@ -131,7 +131,9 @@ the test sits at 42 percent of its timeout.
   same seed and inputs that reaches the server's checksum at every tick (and a
   run at another tier that does not), and a sha256 over every text in both
   directions that is the same across two runs. It pins no end tick, winner or
-  champion list. It takes about 14 s. See [online](online.md).
+  champion list. It plays to two rounds won, not three, and takes about 5.5 s
+  locally; at three rounds it took 14 s locally and 29 s on the runner (job
+  121633905207). See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
