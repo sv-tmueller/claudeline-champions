@@ -26,6 +26,8 @@ const botsCtsFile = 'packages/bots/src/virtual.cts';
 const botsTestFile = 'packages/bots/test/virtual.test.ts';
 const protocolFile = 'packages/protocol/src/virtual.ts';
 const protocolTestFile = 'packages/protocol/test/virtual.test.ts';
+const serverFile = 'packages/server/src/virtual.ts';
+const serverTestFile = 'packages/server/test/virtual.test.ts';
 const clientFile = 'packages/client/src/virtual.ts';
 const balanceFile = 'tools/balance/virtual.ts';
 const fixturesFile = 'tools/fixtures/virtual.ts';
@@ -81,6 +83,25 @@ const protocolBannedImports: [string, string][] = [
   ['tests by relative path', "import '../../../tests/x';"],
   ['node_modules by relative path', "import '../../../node_modules/three';"],
   ['another package through packages by relative path', "import '../../../packages/sim/src/index';"],
+];
+
+// The server source imports relative paths, node: builtins and the three entry points (P2: no ws).
+const serverBannedImports: [string, string][] = [
+  ['@claudeline/client', "import '@claudeline/client';"],
+  ['a deep path of @claudeline/sim', "import '@claudeline/sim/src/kit';"],
+  ['a deep path of @claudeline/protocol', "import '@claudeline/protocol/src/codec';"],
+  ['a deep path of @claudeline/bots', "import '@claudeline/bots/src/bot';"],
+  ['ws', "import 'ws';"],
+  ['three', "import 'three';"],
+  ['a node builtin without the prefix', "import 'fs';"],
+  ['client by relative path', "import '../../client/src/main';"],
+  ['sim by relative path', "import '../../sim/src/input';"],
+  ['bots by relative path', "import '../../bots/src/index';"],
+  ['protocol by relative path', "import '../../protocol/src/index';"],
+  ['another package through packages', "import '../../../packages/sim/src/index';"],
+  ['node_modules by relative path', "import '../../../node_modules/three';"],
+  ['tests by relative path', "import '../../../tests/x';"],
+  ['e2e by relative path', "import '../../../e2e/scene.spec';"],
 ];
 
 const cases: Case[] = [
@@ -544,6 +565,94 @@ const cases: Case[] = [
     code: "import '../../protocol/src/index';",
     rule: IMPORTS,
   },
+  // The server source (P2): the three entry points, node: builtins and relative paths.
+  ...serverBannedImports.map(([what, code]) => ({
+    name: `server imports ${what}`,
+    file: serverFile,
+    code,
+    rule: IMPORTS,
+  })),
+  {
+    name: 'server uses a dynamic import of a sibling file',
+    file: serverFile,
+    code: "export const p = import('./room');",
+    rule: SYNTAX,
+  },
+  {
+    name: 'server uses an import type of the sim',
+    file: serverFile,
+    code: "export type T = import('@claudeline/sim').PlayerInput;",
+    rule: SYNTAX,
+  },
+  { name: 'server imports sim', file: serverFile, code: "import '@claudeline/sim';", rule: null },
+  { name: 'server imports bots', file: serverFile, code: "import '@claudeline/bots';", rule: null },
+  { name: 'server imports protocol', file: serverFile, code: "import '@claudeline/protocol';", rule: null },
+  { name: 'server imports node:crypto', file: serverFile, code: "import 'node:crypto';", rule: null },
+  { name: 'server imports a sibling file', file: serverFile, code: "import './room';", rule: null },
+  {
+    name: 'server imports a sibling file with sim in its name',
+    file: serverFile,
+    code: "import './simple';",
+    rule: null,
+  },
+  {
+    // The wall clock, timers, Math.random and the sim's math are the server's to use (spec section 3).
+    name: 'server uses the clock, timers, Math.random, Math.sin and **',
+    file: serverFile,
+    code: 'export const v = Date.now() + Math.random() + Math.sin(1) + 2 ** 3; setTimeout(() => 0, 1); setInterval(() => 0, 1); export const p = performance.now();',
+    rule: null,
+  },
+  { name: 'server test imports vitest', file: serverTestFile, code: "import 'vitest';", rule: null },
+  { name: 'server test imports node:fs', file: serverTestFile, code: "import 'node:fs';", rule: null },
+  { name: 'server test imports node:crypto', file: serverTestFile, code: "import 'node:crypto';", rule: null },
+  { name: 'server test imports server source', file: serverTestFile, code: "import '../src/room';", rule: null },
+  { name: 'server test imports protocol', file: serverTestFile, code: "import '@claudeline/protocol';", rule: null },
+  { name: 'server test imports client', file: serverTestFile, code: "import '@claudeline/client';", rule: IMPORTS },
+  { name: 'server test imports ws', file: serverTestFile, code: "import 'ws';", rule: IMPORTS },
+  {
+    name: 'server test imports sim source by relative path',
+    file: serverTestFile,
+    code: "import '../../sim/src/step';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'server test imports protocol source by relative path',
+    file: serverTestFile,
+    code: "import '../../protocol/src/codec';",
+    rule: IMPORTS,
+  },
+  {
+    name: 'server test imports client by relative path',
+    file: serverTestFile,
+    code: "import '../../client/src/main';",
+    rule: IMPORTS,
+  },
+  // The segment bans of sim and bots name server too (P2): the unchanged rules, enforced for it.
+  { name: 'sim imports server', file: simFile, code: "import '@claudeline/server';", rule: IMPORTS },
+  { name: 'sim imports server by relative path', file: simFile, code: "import '../../server/src/room';", rule: IMPORTS },
+  {
+    name: 'sim test imports server by relative path',
+    file: simTestFile,
+    code: "import '../../server/src/room';",
+    rule: IMPORTS,
+  },
+  { name: 'sim test imports server', file: simTestFile, code: "import '@claudeline/server';", rule: IMPORTS },
+  { name: 'sim imports a sibling file with server in its name', file: simFile, code: "import './serverless';", rule: null },
+  { name: 'bots imports server', file: botsFile, code: "import '@claudeline/server';", rule: IMPORTS },
+  {
+    name: 'bots imports server by relative path',
+    file: botsFile,
+    code: "import '../../server/src/room';",
+    rule: IMPORTS,
+  },
+  { name: 'bots test imports server', file: botsTestFile, code: "import '@claudeline/server';", rule: IMPORTS },
+  {
+    name: 'bots test imports server by relative path',
+    file: botsTestFile,
+    code: "import '../../server/src/room';",
+    rule: IMPORTS,
+  },
+  { name: 'bots imports a sibling file with server in its name', file: botsFile, code: "import './serverless';", rule: null },
 ];
 
 // The first row has hit Vitest's 5 s default timeout while the machine ran several e2e suites at

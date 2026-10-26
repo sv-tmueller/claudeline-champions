@@ -11,7 +11,7 @@ package.json                npm workspaces root and the npm scripts
 packages/sim/               pure TypeScript, zero runtime deps, no DOM types
 packages/bots/              depends on sim only
 packages/client/            Vite + Three.js, depends on sim, bots and (milestone 6) protocol
-packages/server/            Node authoritative match server (milestone 6)
+packages/server/            Node authoritative match room: lobby, loop, bots, snapshots (milestone 6; the transport comes with P3)
 packages/protocol/          shared network message types and pure codec, depends on sim (types only)
 packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
@@ -53,11 +53,19 @@ docs/superpowers/specs/     approved designs (the design spec)
   `JSON.parse` and computes nothing with. Its tsconfig has `lib: ["ES2023"]`,
   `types: []` and `erasableSyntaxOnly`. Lint has a source block and a test
   block (relative paths, `@claudeline/sim` and `vitest`).
-- Designed for milestone 6 and not built yet (the amendment under spec section
-  3.2, [online design section 3](../superpowers/specs/2026-10-17-online-design.md#3-package-layout-and-rules)):
-  - `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, with
-    Node globals. It never imports `client`, and it may read the wall clock.
-    Its lint block comes with the server package.
+- `server` (built as the P2 skeleton, #167; the amendment under spec section
+  3.2, [online design section 3](../superpowers/specs/2026-10-17-online-design.md#3-package-layout-and-rules))
+  imports relative paths, `node:` built-ins and exactly the entry points of
+  `@claudeline/sim`, `@claudeline/bots` and `@claudeline/protocol` (a deep path
+  such as `@claudeline/sim/src/kit` is red). It never imports `client`, has the
+  Node globals and may read the wall clock, so the clock, timer and math bans of
+  `sim` are not applied; dynamic `import()` and `import()` types are banned.
+  `ws` joins the list with P3, which adds the dependency: the lint row "server
+  imports ws" is red until then. Its relative-path bans name `sim`, `bots`,
+  `protocol` and `client`. Its tsconfig has `lib: ["ES2023"]`, `types: ["node"]`
+  and `erasableSyntaxOnly`, since P3 runs the source through Node's type
+  stripping. The test block allows `vitest` too. `src/difficulty.ts` pins the
+  bots and wire `Difficulty` unions together in both directions.
 - `tools/balance` imports relative paths, `node:` builtins, `vitest` and the
   entry points of `@claudeline/sim` and `@claudeline/bots`. It reads `data/`
   and never a package's own files.
@@ -71,12 +79,11 @@ docs/superpowers/specs/     approved designs (the design spec)
   `e2e`. It reads `data/` and writes `packages/sim/test/fixtures/` by file path.
   The sim test lint is unchanged: the sim suite does not import the tool.
 - Lint enforces these boundaries. A violation fails `npm run check`. Today
-  that holds for `sim`, `bots`, `protocol`, `tools/balance` and
-  `tools/fixtures`, and for the client's deny of `server`; the `server` block
-  comes with the server package. The segment bans of `sim` and `bots` name
-  `protocol` too, so a relative path such as `../../protocol/src/index` is red
-  there as the package name already was (batch #147 decision 4); the server
-  package does the same for `server`.
+  that holds for `sim`, `bots`, `protocol`, `server`, `tools/balance` and
+  `tools/fixtures`, and for the client's deny of `server`. The segment bans of
+  `sim` and `bots` name `protocol` and `server` too, so a relative path such as
+  `../../protocol/src/index` or `../../server/src/room` is red there as the
+  package name already was (batch #147 decision 4, and #167 for `server`).
 
 ## Data flow
 

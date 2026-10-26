@@ -20,9 +20,10 @@ first.
   the result with Three.js and an HTML HUD.
 - Online (milestone 6, designed in the
   [online design](../superpowers/specs/2026-10-17-online-design.md); only
-  `protocol` is built so far), the same sim runs on the server (`server`):
-  clients send their input stream, the server stays authoritative, and both
-  sides read and write the messages through the `protocol` codec.
+  `protocol`, the client's net core and the `server` skeleton are built so
+  far), the same sim runs on the server (`server`): clients send their input
+  stream, the server stays authoritative, and both sides read and write the
+  messages through the `protocol` codec.
 - Arenas are JSON. The sim reads them for collision and Blender scripts read
   them to generate the committed `.glb` models.
 - Roster kits are JSON too, under `data/kits/<id>.json`: plain data that the
@@ -101,8 +102,15 @@ first.
   total decoders (first message, session message, server message), the
   encoders in the spec's key order and the snapshot splice, with the lint
   blocks that keep it to `@claudeline/sim` and relative paths (see
-  [Online](online.md)). The client's net core imports it (#168); `main.ts` does not yet.
-- `server`, `desktop`: not started (milestones 6 and 8).
+  [Online](online.md)). The client's net core imports it (#168); `main.ts` does
+  not yet. The `server` imports it.
+- `server`: the P2 skeleton (#167): `Room` with the lobby and ready flow, bot
+  fill, a 60 Hz accumulator loop on an injected clock, the input queue, the
+  snapshot cadence and event batches, the 20-bad-messages close, the two-way
+  `Difficulty` check, and a loopback test that plays a 2v2 and a 3v3 to a
+  result through the codec. No transport, no process and no timer yet, and no
+  `ws` dependency: they come with P3 (see [Online](online.md)).
+- `desktop`: not started (milestone 8).
 
 ## Index
 
