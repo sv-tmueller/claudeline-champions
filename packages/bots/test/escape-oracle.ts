@@ -218,10 +218,11 @@ export interface TurnOrderTeleport {
  * Where the sim puts champion `caster` when it casts in the real turn order: `before` is a clone of
  * the state the bots thought on (taken before the real step) and `inputs` are the real inputs of
  * that tick. It is stepped with a copy of the input of every champion with an id up to the caster's
- * (the lower ids take their turn first, so they walk or die before the cast, and the caster's input
- * is its real press, whose aim the caller has checked against the landing) and none for the rest,
- * which act after the caster's cast and so cannot move it. The champions ahead are not read by the
- * bot, which only the oracle models. Null when the sim does not move the caster or blocks it.
+ * (the lower ids take their turn first, so they may walk or die before the cast, and the caster's
+ * input is its real press, whose aim the caller has checked against the landing) and none for the
+ * rest, which act after the caster's cast and so cannot move it. The bot cannot see the inputs of
+ * the champions ahead; only the oracle models their turns. Null when the sim does not move the
+ * caster or blocks it.
  */
 export function teleportAfterWalksAhead(
   before: GameState,
