@@ -871,92 +871,131 @@ above 2^30 boxes only in the browser. The live probe stays the authority.
 
 ### The default tiers on the runner
 
-On the first attempt of PR #132 (run 39014736086, job 117344361894: the checks job,
-Node 22.23.3 on ubuntu-latest, the merge of 20d003c into 5820f16) the scene check read the
-kite, no clear shot scene at 5440, 5440 and 5440 B a think, the retreat scene at 96, 96 and
-96 B, the press scene at 0, 256 and 0 B and every other scene at 0 B. The rerun (job
-117344842670) read 0 B everywhere but the press scene's 256 B in round 2, which both
-attempts share. The failing attempt was the faster one: the scene check took 3688 ms
-against 4896 ms, the tools harness beside it 33.7 s against 63.0 s. Node 22's V8 12.4 runs
-without Maglev unless asked, so its default tiers are Ignition, Sparkplug and Turbofan, and
-5440 B is 340 heap numbers of 16 B, about one per cell of the sight scan's 17 by 17 window.
+On the first attempt of PR #132 (run 39014736086, job 117344361894: the checks
+job, Node 22.23.3 on ubuntu-latest, the merge of 20d003c into 5820f16) the
+scene check read the kite, no clear shot scene at 5440, 5440 and 5440 B a
+think, the retreat scene at 96, 96 and 96 B, the press scene at 0, 256 and 0 B
+and every other scene at 0 B. The rerun (job 117344842670) read 0 B everywhere
+but the press scene's 256 B in round 2, which both attempts share. The failing
+attempt was the faster one: the scene check took 3688 ms against 4896 ms, the
+tools harness beside it 33.7 s against 63.0 s. Node 22's V8 12.4 runs without
+Maglev unless asked, so its default tiers are Ignition, Sparkplug and Turbofan,
+and 5440 B is 340 heap numbers of 16 B, about one per cell of the sight scan's
+17 by 17 window.
 
-Nothing reproduced that state locally (Apple silicon, Node 22.23.2, the scene check on the
-unchanged test, 1 to 10 runs in each configuration below). Whole-worker tiers read what the header says: with
-`--no-turbofan` (and the same with `--no-sparkplug` added, or `--maglev --no-turbofan`) every
-scene reads 23 to 323 KB a think in all three rounds, the kite scene 322544 B. A delay of the
-background compile, `--concurrent-recompilation-delay=<ms>` (a job is installed no sooner than
-that after it was queued), shows the mechanism but not the runner's figures:
+Nothing reproduced that state locally (Apple silicon, Node 22.23.2, the scene
+check on the unchanged test, 1 to 20 runs in each configuration below). V8
+flags reach the workers only through `execArgv` in a project of the config
+(Vitest 5.0.3 ignores `--execArgv` on the command line when the config has
+projects), so each run used a scratch config of one forks project whose
+`execArgv` is the flags, started as `G133_FLAGS='<flags>' npx vitest run
+--config <scratch config> --project bots packages/bots/test/allocation.test.ts
+-t 'every scene'`; PR #184 has the config. Whole-worker tiers read what the
+header says: with `--no-turbofan` (and the same with `--no-sparkplug` added, or
+`--maglev --no-turbofan`) every scene reads 23 to 323 KB a think in all three
+rounds, the kite scene 322544 B. A delay of the background compile,
+`--concurrent-recompilation-delay=<ms>` (a job is installed no sooner than that
+after it was queued), shows the mechanism but not the runner's figures. On the
+unchanged test:
 
-- 0 ms: every scene 0 B in 3 of 3 runs; 5 ms: the same but the press scene at 32 to 48 B
-  (under the bound) in 3 of 3.
-- 10 ms: the press scene reads 900 to 1300 B through the three rounds and the engage stand
-  scene 32 B, so the check without a settle was red in 8 of 10 runs; every other scene 0 B.
-- 15 and 25 ms: the press and the engage stand scenes at 300 to 1700 B, the kite step, the
-  deadlock stand and the skerrow wait scenes at 32 to 464 B, a dozen scenes clean; red in
-  every run.
-- 50 to 200 ms: most scenes at 16 B to 4 KB; 400 and 800 ms: the press and engage stand
-  scenes at 44 and 36 KB, the kite scene at 64 and 127 KB.
-- Controls at 25 ms: `--no-concurrent-recompilation` read 0 B in every scene in 3 of 3 runs,
-  `--no-use-osr` stayed red in 3 of 3 (the OSR is not the cause), `--v8-pool-size=1` alone read
-  0 B in 3 of 3.
+- 0 ms: every scene 0 B in 3 of 3 runs; 5 ms: the same but the press scene at
+  32 to 48 B (under the bound) in 3 of 3.
+- 10 ms: red in 20 of 20 runs (load average 25 to 35 on a shared machine): the
+  press scene at 1040 to 1696 B, the engage stand scene at 368 to 2576 B, the
+  kite step and deadlock stand scenes at 32 to 128 B. An earlier set of ten
+  runs at lower load read red in 8.
+- 15 and 25 ms: the press and engage stand scenes at 300 to 1700 B, the kite
+  step, deadlock stand and skerrow wait scenes at 32 to 464 B, a dozen scenes
+  clean; red in 3 of 3 runs each.
+- 50 to 200 ms: most scenes at 16 B to 4 KB; 400 and 800 ms: the press and
+  engage stand scenes at 44 and 36 KB, the kite scene at 64 and 127 KB.
+- Controls at 25 ms: `--no-concurrent-recompilation` read 0 B in every scene in
+  3 of 3 runs, `--no-use-osr` stayed red in 3 of 3, `--v8-pool-size=1` alone
+  read 0 B in 3 of 3.
 
-`--trace-opt --trace-deopt` at 25 ms shows why a delay hurts a whole scene: each scene's frozen
-state deoptimises functions that an earlier scene's feedback had optimised ("Insufficient type
-feedback", `updateRuns`, `move`, `think`, `kiteStepInto`, `kiteDirectionInto`, `waitsFor`), 37
-deopts in the run, and every reoptimisation waits the delay again. The code a window
-measures is then still a lower tier's until the job lands.
+`--trace-opt --trace-deopt` at 25 ms shows why a delay hurts a whole scene:
+each scene's frozen state deoptimises functions that an earlier scene's
+feedback had optimised ("Insufficient type feedback", `updateRuns`, `move`,
+`think`, `kiteStepInto`, `kiteDirectionInto`, `waitsFor`), 37 deopts in the
+run, and every reoptimisation waits the delay again. The code a window measures
+is then still a lower tier's until the job lands.
 
-Pinning one function out of Turbofan (`--turbo-filter=-<fn>`, one run each) gives no kite-only
-state. `nearestSightCellIn`: the kite scene at 62224 B, the retreat at 29232, the deadlock
-advance at 35616; `lineOfSight`: 6 to 175 KB in 15 scenes; `distanceInto`: 48 to 272 B in all
-17; `steerTowardInto`: 176 B in the path follow, kite and deadlock flee scenes; `seekShot`: 32
-to 64 B in four scenes; `clearShotWith`: 672 B in the two Lumeth ally scenes; `cellIndexAt`:
-224 B in the two escape scenes; `move`: 16 to 32 B in all 17; `hypot2`, `cellCenterInto` and
-`followPathInto`: 0 B (not on these paths, or inlined into a caller that is still optimised).
-`--max-lazy` is no tier flag (it ignores eager compilation hints at parse time) and was not
-run; `--no-opt` is `--no-turbofan`.
+Pinning one function out of Turbofan (`--turbo-filter=-<fn>`, one run each)
+gives no kite-only state. `nearestSightCellIn`: the kite scene at 62224 B, the
+retreat at 29232, the deadlock advance at 35616; `lineOfSight`: 6 to 175 KB in
+15 scenes; `distanceInto`: 48 to 272 B in all 17; `steerTowardInto`: 176 B in
+the path follow, kite and deadlock flee scenes; `seekShot`: 32 to 64 B in four
+scenes; `clearShotWith`: 672 B in the two Lumeth ally scenes; `cellIndexAt`:
+224 B in the two escape scenes; `move`: 16 to 32 B in all 17; `hypot2`,
+`cellCenterInto` and `followPathInto`: 0 B (not on these paths, or inlined into
+a caller that is still optimised). `--max-lazy` is no tier flag (it ignores
+eager compilation hints at parse time) and was not run; `--no-opt` is
+`--no-turbofan`.
 
-The reading, likely and not proven: one function on the kite scene's scan path (the 5440 B is
-one boxed double per cell, which `nearestSightCellIn` in a lower tier, or one of its callees
-not inlined, would give) ran in Ignition or Sparkplug through all three rounds because its
-Turbofan job, compiled on a background thread, landed after them. The warm-up counts thinks;
-the job takes wall time; the runner had three Vitest workers on four vCPUs, a fast main
-thread next to a starved compile thread, and the lowest-round rule cannot absorb a state that
-lasts all three rounds. No delay reproduced the runner's figures (the delay stretches every
-job alike; the runner's state was one scene), and no survey of other attempts was run.
+The reading, likely and not proven: one function on the kite scene's scan path
+(the 5440 B is one boxed double per cell, which `nearestSightCellIn` in a lower
+tier, or one of its callees not inlined, would give) ran in Ignition or
+Sparkplug through all three rounds because its Turbofan job, compiled on a
+background thread, landed after them. The warm-up counts thinks; the job takes
+wall time; the runner had three Vitest workers on four vCPUs, a fast main
+thread next to a starved compile thread, and the lowest-round rule cannot
+absorb a state that lasts all three rounds. No delay reproduced the runner's
+figures (the delay stretches every job alike; the runner's state was one
+scene), and no survey of other attempts was run.
 
-Since #133 the check settles in the default tiers: after the warm-up it reads windows of 600
-thinks, measured as a round is, until one reads under the bound, at most 20, then the three
-rounds. The settle decides nothing: the verdict is still the lowest of the three rounds, and
-Maglev alone does not settle, since its flags pin the compile timing. With the compile delayed
-10 ms the settle took 3 to 14 windows (the press scene) in 10 of 10 runs, and the check was
-green in all 10 against 2 of 10 without it; at 15 ms 3 of 4 runs were green, the red one flat
-through 20 windows, and at 25 ms the press scene stayed flat through 20 windows in 3 of 3. A
-mutation that allocates on every think settles to the cap and stays red, in 3 of 3 runs each,
-on Node 22 in the default tiers: a six-double object kept in `waitsFor` (168 B in the skerrow
-engage and wait scenes), a `{ slot, ex }` object per slot in `updateRuns` (all 17 scenes red,
-280 B in twelve and 200 B in five, the whole red run 3.9 s against the 15 s timeout), and a two-double cell centre
-object in the sight scan (14328 to 17784 B in the kite, retreat and deadlock advance scenes).
-The clean tree reads 0 B in all 17 scenes with one settle window each, in every run, and on
-Node 26.7 the Maglev project reads 0 B in all 17 and its kite scene reads 16 B against 8 B with
-`bestDistance` of the sight scan made a local. The measured loop is written out twice,
-word for word (the settle's and the rounds'), because one copy in a loop over both read 80 B
-a think in 3 to 12 of 17 scenes of the clean tree: the loop sat in another tier, as in the 144 B
-case of Testing.
+Since #133 the check settles in the default tiers: after the warm-up it reads
+windows of 600 thinks, measured as a round is, until one reads under the bound,
+at most 20, then the three rounds. The settle decides nothing: the verdict is
+still the lowest of the three rounds, and Maglev alone does not settle, since
+its flags pin the compile timing. What the settle absorbs is a series that
+falls, a tier-up that came late. It does not cure a series that stays flat
+through the cap, which is a function that stays in a lower tier (or deoptimises
+and waits its reoptimisation again and again); the check is then red, as
+before, and the log line says which it was. The measure, at a 10 ms delay with
+the settle (20 runs, load average 20 to 50 on a shared machine, the command
+above with `--concurrent-recompilation-delay=10`): the press scene's series
+fell to under the bound in 8 to 18 windows in 6 runs, all green, and stayed
+flat through the 20 windows at 320 to 1312 B in 14 runs, of which 3 were green
+only because one of the three rounds read low (32, 0, 0 B; 1040, 1040, 48 B;
+48, 48, 48 B) and 11 were red. So the check was green in 9 of 20 against 0 of
+20 on the unchanged test, not in all of them. At 15 ms (4 runs) 3 were green,
+the red one flat through 20 windows, and at 25 ms (3 runs) the press scene
+stayed flat through 20 windows in 3 of 3. For the record, at 10 ms with the
+settle: `--no-concurrent-recompilation` was green in 10 of 10 runs (every scene
+one window at 0 B, since nothing is delayed), `--no-use-osr` green in 3 of 10
+(7 flat through the cap at 864 to 1248 B). A flag-pinned project was not taken:
+the delay is a stress the runner does not show, and a pin would hide the tier
+the users run.
 
-On the runner (the three attempts of run 40339535608 of PR #184, the checks job and both heap
-jobs, nine jobs) every scene settled in one window of 10 to 58 ms and read 0 B, and the scene
-check took 4.8 to 6.9 s in the checks job.
+A mutation that allocates on every think settles to the cap and stays red, in 3
+of 3 runs each, on Node 22 in the default tiers: a six-double object kept in
+`waitsFor` (168 B in the skerrow engage and wait scenes), a `{ slot, ex }`
+object per slot in `updateRuns` (all 17 scenes red, 280 B in twelve and 200 B
+in five, the whole red run 3.9 s against the 15 s timeout), and a two-double
+cell centre object in the sight scan (14328 to 17784 B in the kite, retreat and
+deadlock advance scenes). The clean tree reads 0 B in all 17 scenes with one
+settle window each, in every run without a delay, and on Node 26.7 the Maglev
+project reads 0 B in all 17 and its kite scene reads 16 B against 8 B with
+`bestDistance` of the sight scan made a local. The measured loop is written out
+twice, word for word (the settle's and the rounds'), because one copy in a loop
+over both read 80 B a think in 3 to 12 of 17 scenes of the clean tree: the loop
+sat in another tier, as in the 144 B case of Testing.
 
-Each scene's log line prints the settle windows and their wall time, then the rounds:
-`kite, no clear shot: settle 5440, 5440, 0 (3 windows, 41 ms); 0, 0, 0 B per think`. A series
-that falls and then fails came late (raise the cap by its rule: the smallest of 10 and 20 that
-is at least twice the largest clean series; more than 10 windows in a clean tree is reported,
-not absorbed). A series flat through the cap did not tier up (a deopt loop, or a function V8
-did not optimise), and its bytes name the function by the fingerprint above. The test cannot
-name a tier itself: `%GetOptimizationStatus` needs `--allow-natives-syntax`, and V8's code
-statistics are in `node:v8`, which the bots tests do not import.
+On the runner (the three attempts of run 40339535608 of PR #184, the checks job
+and both heap jobs, nine jobs) every scene settled in one window of 10 to 58 ms
+and read 0 B, and the scene check took 4.8 to 6.9 s in the checks job.
+
+Each scene's log line prints the settle windows and their wall time, then the
+rounds: `kite, no clear shot: settle 5440, 5440, 0 (3 windows, 41 ms); 0, 0, 0
+B per think`. That line is how a future failure says which state it was. A
+series that falls and then fails came late (raise the cap by its rule: the
+smallest of 10 and 20 that is at least twice the largest clean series; more
+than 10 windows in a clean tree is reported, not absorbed). A series flat
+through the cap did not tier up (a deopt loop, or a function V8 did not
+optimise), and its bytes name the function by the pin figures above. The test
+cannot name a tier itself: `%GetOptimizationStatus` needs
+`--allow-natives-syntax`, and V8's code statistics are in `node:v8`, which the
+bots tests do not import.
 
 ## Aim
 
@@ -1368,13 +1407,15 @@ the Quiet Dart cue on every think, and a Lumeth escape: the 3 m trigger, the
 near-ally scan, the dash landing and the aim override on every think, a Lumeth
 heal: the ally scan of her four ally slots and the aim at the ally on every
 think with Soothing Surge pressed on each, and a Lumeth windup: the same with
-its cast in progress, so the ally is held through the windup on every think, and
-a dodge: a Quillon standing with two bolts at her, one along an axis and one on
-a diagonal, so the threat scan of both and the sidestep run on every think),
-warms each bot up with 20000 thinks, settles it in the default tiers (windows read like a
-round until one is under the bound, at most 20, which decide nothing; see The default tiers
-on the runner) and reads `process.memoryUsage().heapUsed` around one `think`, 600 samples
-per round. The figure of a round is the median
+its cast in progress, so the ally is held through the windup on every think,
+and a dodge: a Quillon standing with two bolts at her, one along an axis and
+one on a diagonal, so the threat scan of both and the sidestep run on every
+think), warms each bot up with 20000 thinks, settles it in the default tiers
+(windows read like a round until one is under the bound, at most 20, which
+decide nothing: a series that falls is a late tier-up the settle absorbs, a
+series flat through the cap is a state it does not cure and the log line names;
+see The default tiers on the runner) and reads `process.memoryUsage().heapUsed`
+around one `think`, 600 samples per round. The figure of a round is the median
 delta minus the median delta of an empty pair of reads taken in the same loop,
 just before each think (a call of `process.memoryUsage()` allocates its result
 object, 144 B in a tier that does not optimise it away, and a pair read in

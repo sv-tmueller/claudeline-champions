@@ -259,13 +259,16 @@ const WARM_UP = 20000;
  * bots.md, Allocation, The default tiers on the runner). The settle gives that job wall time
  * without changing what is measured. The verdict is still the lowest of the three rounds against
  * the limit: a mutation that allocates on every think reads its bytes in every settle window too,
- * settles to this cap and stays red. The cap is 20, the most the rule allows (the smallest of 10 and 20
- * that is at least twice the largest series seen): with the compile of every job delayed by 10 ms
- * (`--concurrent-recompilation-delay=10`, the delay at which the press scene read 900 to 1300 B in
- * 8 of 10 runs of the check without a settle) a clean tree settled in at most 14 windows in 10 runs,
- * and no delay reproduced the runner's own figures. A clean tree that needs more than 10 windows is
- * reported, not absorbed by raising this. Maglev alone does not settle: its flags pin the compile
- * timing.
+ * settles to this cap and stays red. The cap is 20, the most the rule allows (the smallest of 10 and
+ * 20 that is at least twice the largest series seen). The settle absorbs a series that falls, a
+ * tier-up that came late; it does not cure a series that stays flat through the cap, which is a
+ * function that stays in a lower tier, and the log line names it. With the compile of every job
+ * delayed by 10 ms (`--concurrent-recompilation-delay=10`, a delay the runner does not show) the
+ * press scene's series fell to under the bound in 8 to 18 windows in 6 of 20 runs and stayed flat
+ * through the cap in 14 (bots.md, The default tiers on the runner, has the command and the other
+ * delays); no delay reproduced the runner's own figures. A clean tree that needs more than 10
+ * windows is reported, not absorbed by raising this. Maglev alone does not settle: its flags pin
+ * the compile timing.
  */
 const SETTLE_WINDOWS = 20;
 
