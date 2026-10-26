@@ -188,6 +188,22 @@ export function configBrimwick(): MatchConfig {
 }
 
 /**
+ * Ondrel and Brimwick against Hargrim and Quillon: both new kits on team A, so champions 0 and 1,
+ * or 1 and 0 with `swapped`.
+ */
+export function configSix(swapped = false): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: swapped ? 'brimwick' : 'ondrel', team: 'A' },
+      { championId: swapped ? 'ondrel' : 'brimwick', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
+/**
  * Hargrim, Quillon and Lumeth on each team, in that order: the 3v3 roster the client plays (team B
  * of the 3v3 row, with the pick of the Hargrim launch in place of its Hargrim on team A).
  */

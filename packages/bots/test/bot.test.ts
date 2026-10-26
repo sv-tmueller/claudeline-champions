@@ -13,7 +13,7 @@ import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
 import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, clearShotOracle, config2v2, configMirror, jsonKits } from './helpers';
+import { arena01, clearShotOracle, config2v2, configMirror, configSix, jsonKits, sixKits } from './helpers';
 import { hargrimKit, quillonFastExKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -709,15 +709,23 @@ describe('aim lead', () => {
   // runner time (testing.md, Check suite).
   it('matches the reference chain on random frozen states, to the centimetre', { timeout: 10_000 }, () => {
     const rng = createRng(20241005);
-    // Half the states use the shipped kits, half a fixture whose M2 EX bolt (18 m/s) is faster than
-    // its base bolt (15 m/s): the shipped kits give both the same speed on every slot.
-    const kitSets = [jsonKits, () => [hargrimKit(), quillonFastExKit()]];
+    // A third of the states use the shipped Hargrim and Quillon, a third a fixture whose M2 EX bolt
+    // (18 m/s) is faster than its base bolt (15 m/s): the shipped kits give both the same speed on
+    // every slot. The last third is Ondrel and Brimwick, whose areas (the Mire, Drowned Ground and
+    // Firecracker) have no projectile and so lead at the nominal speed, and whose bolts fly at 16
+    // and 24 m/s; they swap places every other round of blocks, so each is the bot of a cast.
+    const kitSets = [
+      { kits: jsonKits, config: () => configMirror() },
+      { kits: () => [hargrimKit(), quillonFastExKit()], config: () => configMirror() },
+      { kits: sixKits, config: (i: number) => configSix(Math.floor(i / 12) % 2 === 1) },
+    ];
     const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
     const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, speeds: new Set<number>() };
     let checked = 0;
     for (let i = 0; i < 4000; i++) {
-      const kits = (kitSets[Math.floor(i / 4) % 2] as () => KitDef[])();
-      const state = createMatch(configMirror(), open, 1, kits);
+      const set = kitSets[Math.floor(i / 4) % kitSets.length] as (typeof kitSets)[number];
+      const kits = set.kits();
+      const state = createMatch(set.config(i), open, 1, kits);
       const botId = i % 2;
       const enemyId = 2 + (Math.floor(i / 2) % 2);
       for (const id of [0, 1, 2, 3]) if (id !== botId && id !== enemyId) kill(state, id);
@@ -784,8 +792,9 @@ describe('aim lead', () => {
     expect(seen.fast).toBeGreaterThan(300);
     expect(seen.zero).toBeGreaterThan(100);
     // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25,
-    // and the fixture's: 15 for its base M2 and 18 for its EX.
-    for (const speed of [12, 14, 15, 18, 20, 22, 25]) {
+    // the fixture's: 15 for its base M2 and 18 for its EX, and the 16 of Undertow and the 24 of
+    // Flash Powder.
+    for (const speed of [12, 14, 15, 16, 18, 20, 22, 24, 25]) {
       expect([...seen.speeds], `speed ${speed}`).toContain(speed);
     }
   });
