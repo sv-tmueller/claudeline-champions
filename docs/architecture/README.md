@@ -41,7 +41,7 @@ first.
   `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot
-  test; casting from kit data with range profiles for all four roster ids; the
+  test; casting from kit data with range profiles for all six roster ids; the
   energy reserve; openers and escapes for Hargrim, Quillon and Skerrow (#81),
   Skerrow's wait at 6 to 8 m and her Quiet Dart opener, and no dash pressed on
   an escape think for any kit (#98); aim leading and three tiers. A think
@@ -50,7 +50,13 @@ first.
   ally, the 3 m escape trigger with Lantern Burst and Glide, and her ally
   slots: Mend Bolt, Soothing Surge, Aegis Veil and Dawnbloom pressed at the
   ally that needs them, with the bolts aimed at it through their windup. Her
-  leash to an ally and the EX variants of M2 and R are not built.
+  leash to an ally and the EX variants of M2 and R are not built. Ondrel has
+  Undertow on a target walking away, Reed Step and Reed Screen as escapes and
+  rangeMin 5; Brimwick Flash Powder on a target walking toward her, Flare Step
+  and Smoke Pot as escapes, rangeMin 7 and Grand Finale held for a target at 55
+  health or less or a cornered one (#165). One escape streak gates the whole
+  escape order, and the areas lead at the nominal 20 m/s (measured, see
+  [bots](bots.md), Aim).
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
   any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
@@ -76,8 +82,8 @@ first.
   key plays a match as before. Not built: music, the other three `Platform`
   methods (`identity`, `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
-  Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (no bot
-  profile yet); models for the six roster ids and the placeholder, each rigged,
+  Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
+  profiles since #165); models for the six roster ids and the placeholder, each rigged,
   with six clips (the client registers and plays all six roster ids). The v1 kits carry the
   first tuning pass's two numbers, Skerrow's Rend damage and Lumeth's Binding
   Sigil radius (see [balance.md](../design/balance.md)).
