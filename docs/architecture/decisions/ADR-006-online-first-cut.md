@@ -5,7 +5,8 @@
 Accepted by [batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441).
 Design only, except P1 and P2: `packages/protocol` is built (#151), and so is
 the `packages/server` skeleton, with no transport yet (#167). The full design
-is the [online design spec](../../superpowers/specs/2026-10-17-online-design.md).
+is the
+[online design spec](../../superpowers/specs/2026-10-17-online-design.md).
 
 ## Context
 

@@ -77,12 +77,12 @@ not change them.
 
 Amended 2026-10-26 by
 [batch #177 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/177#issuecomment-6417634639),
-for package P2 (#167): when `server` landed, the same three lines of CLAUDE.md read wrong again and were
-edited, and nothing else in it: the workspaces sentence, the typecheck comment
-and the bullet about the future `server`. The pointer to section 3.2 stays. The
-segment bans of `sim` and `bots` in `eslint.config.js` also name `server`, so a
-relative path into it is red, which enforces the rules of section 3 and does
-not change them.
+for package P2 (#167): when `server` landed, the same three lines of
+CLAUDE.md read wrong again and were edited, and nothing else in it: the
+workspaces sentence, the typecheck comment and the bullet about the future
+`server`. The pointer to section 3.2 stays. The segment bans of `sim` and `bots`
+in `eslint.config.js` also name `server`, so a relative path into it is red,
+which enforces the rules of section 3 and does not change them.
 
 **No pause online.** Escape opens the menu over the running match. The menu
 offers Leave where a local match offers Restart. The lines in
