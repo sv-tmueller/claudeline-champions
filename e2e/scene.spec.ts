@@ -167,6 +167,8 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
       { champion: 'quillon', available: 'true', href: '?champion=quillon&difficulty=normal&arena=arena01&teamsize=2', text: 'Quillon' },
       { champion: 'lumeth', available: 'true', href: '?champion=lumeth&difficulty=normal&arena=arena01&teamsize=2', text: 'Lumeth' },
       { champion: 'skerrow', available: 'true', href: '?champion=skerrow&difficulty=normal&arena=arena01&teamsize=2', text: 'Skerrow' },
+      { champion: 'ondrel', available: 'true', href: '?champion=ondrel&difficulty=normal&arena=arena01&teamsize=2', text: 'Ondrel' },
+      { champion: 'brimwick', available: 'true', href: '?champion=brimwick&difficulty=normal&arena=arena01&teamsize=2', text: 'Brimwick' },
     ]);
     expect(hud.result.arenas).toEqual([
       { id: 'arena01', current: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: 'Arena 1' },
@@ -222,6 +224,34 @@ test('starts as Quillon from the launch address', async ({ page }) => {
   }
 });
 
+// A launch with Ondrel or Brimwick plays the champion's own model (the placeholder was the fallback
+// for an id the client did not register), its health and its name on the scoreboard, which is built
+// hidden at startup and readable without Tab. A missing clip on either model is a page error at load,
+// which watchProblems reports. The glbs the page asks for are the human's, the ally's and the enemy
+// champion's of the default roster: the model of each id is loaded once.
+for (const [id, health, name] of [
+  ['ondrel', '130 / 130', 'Ondrel'],
+  ['brimwick', '120 / 120', 'Brimwick'],
+] as const) {
+  test(`starts as ${name} from the launch address, on its own model`, async ({ page }) => {
+    const { problems, failed } = watchProblems(page);
+    const models = new Set<string>();
+    page.on('request', (request) => {
+      const match = /models\/champions\/([a-z]+)\.glb/.exec(request.url());
+      if (match) models.add(match[1] as string);
+    });
+    try {
+      await page.goto(`/?champion=${id}`);
+      await orFail(page.waitForSelector('canvas[data-arena="arena01"]'), failed);
+      expect((await readHud(page)).healthText).toBe(health);
+      expect(await page.locator('[data-hud="scoreboard"] [data-row="0"] [data-part="name"]').textContent()).toBe(name);
+      expect([...models].sort()).toEqual([id, 'quillon', 'hargrim'].sort());
+    } finally {
+      expect(problems).toEqual([]);
+    }
+  });
+}
+
 test('starts on arena02 from the launch address', async ({ page }, testInfo) => {
   const { problems, failed } = watchProblems(page);
   try {
@@ -238,6 +268,8 @@ test('starts on arena02 from the launch address', async ({ page }, testInfo) => 
       '?champion=quillon&difficulty=normal&arena=arena02&teamsize=2',
       '?champion=lumeth&difficulty=normal&arena=arena02&teamsize=2',
       '?champion=skerrow&difficulty=normal&arena=arena02&teamsize=2',
+      '?champion=ondrel&difficulty=normal&arena=arena02&teamsize=2',
+      '?champion=brimwick&difficulty=normal&arena=arena02&teamsize=2',
     ]);
     expect(hud.result.arenas.map((entry) => [entry.id, entry.current])).toEqual([
       ['arena01', 'false'],
@@ -274,6 +306,8 @@ test('starts a 3v3 from the launch address', async ({ page }) => {
       '?champion=quillon&difficulty=normal&arena=arena01&teamsize=3',
       '?champion=lumeth&difficulty=normal&arena=arena01&teamsize=3',
       '?champion=skerrow&difficulty=normal&arena=arena01&teamsize=3',
+      '?champion=ondrel&difficulty=normal&arena=arena01&teamsize=3',
+      '?champion=brimwick&difficulty=normal&arena=arena01&teamsize=3',
     ]);
     expect(hud.result.arenas.map((entry) => entry.href)).toEqual([
       '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3',
@@ -302,7 +336,7 @@ test('starts on the hard tier from the launch address, and reads an unknown tier
       ['hard', 'true'],
     ]);
     const outside = [...hud.result.entries, ...hud.result.arenas, ...hud.result.teams].map((entry) => entry.href);
-    expect(outside).toHaveLength(8);
+    expect(outside).toHaveLength(10);
     for (const href of outside) expect(href, 'a link keeps the tier').toContain('difficulty=hard');
     // The difficulty row's own links write each tier, with the champion, the arena and the size kept.
     expect(hud.result.difficulties.map((entry) => entry.href)).toEqual([

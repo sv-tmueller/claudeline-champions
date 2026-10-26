@@ -12,7 +12,7 @@
     "dev": "npm run dev -w @claudeline/client",
     "build": "npm run build -w @claudeline/client",
     "lint": "eslint .",
-    "typecheck": "tsc -p packages/sim && tsc -p packages/bots && tsc -p packages/protocol && tsc -p packages/client && tsc -p tools/balance && tsc -p tools/fixtures && tsc -p tsconfig.tools.json",
+    "typecheck": "tsc -p packages/sim && tsc -p packages/bots && tsc -p packages/protocol && tsc -p packages/client && tsc -p packages/client/tsconfig.net.json && tsc -p tools/balance && tsc -p tools/fixtures && tsc -p tsconfig.tools.json",
     "balance": "node --experimental-strip-types --import ./tools/balance/register.ts tools/balance/run.ts",
     "fixtures:search": "node --experimental-strip-types --import ./tools/fixtures/register.ts tools/fixtures/run.ts",
     "test": "vitest run",

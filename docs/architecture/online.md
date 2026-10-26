@@ -1,7 +1,8 @@
 # Online and ladder
 
-Milestone 6 design. P1 is built: `packages/protocol` (#151). The rest is not:
-`packages/server` and the client's online path do not exist. The approved
+Milestone 6 design. P1 is built: `packages/protocol` (#151), and so is the
+client's net core, P4a (#168, no DOM, in `packages/client/src/net/`). The rest is
+not: `packages/server` and the client's online match path do not exist. The approved
 source is the [online design](../superpowers/specs/2026-10-17-online-design.md)
 (batch #134 decision 1), recorded in
 [ADR-006](decisions/ADR-006-online-first-cut.md), and it extends section 7 of

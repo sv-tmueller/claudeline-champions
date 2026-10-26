@@ -7,6 +7,7 @@ import {
   D_DEATH_T,
   D_DEATH_W,
   D_IDLE_T,
+  D_NOW,
   D_OV_T,
   D_OV_W,
   D_RUN_SCALE,
@@ -23,10 +24,15 @@ import {
   triggerInterrupt,
   triggerSnap,
   updateAnims,
+  updateAnimsAt,
   type AnimChampion,
   type AnimState,
   type ChampionAnim,
+  type DrawnTime,
 } from './champion-anim';
+import { createRenderClock, type RenderClock } from './net/render-clock';
+import { createSnapshotBuffer, type BufferView } from './net/snapshot-buffer';
+import { buildStream, type StreamEntry } from './net/test-stream';
 
 // The state machine of a champion's clips, in ticks at 60 Hz. The tests drive it as the
 // client does: the sim tick and the loop clock's alpha are read inside updateAnims, and
@@ -630,5 +636,141 @@ describe('the priming script', () => {
 describe('the clip lengths', () => {
   it('are the seconds of the six clips, in the order Idle, Run, Attack, Cast, Hit, Death', () => {
     expect(Array.from(CLIP_SECONDS)).toEqual([2, 20 / 30, 12 / 30, 15 / 30, 9 / 30, 1]);
+  });
+});
+
+// The time base of an online match: the drawn time comes from the render clock, not from a state's
+// tick and an alpha, because the two states a draw interpolates are a snapshot gap apart.
+
+describe('updateAnimsAt', () => {
+  // One champion through a script of walks, stops, casts, a hit, a dash, a death and a new round,
+  // each row [ticks, vx, event]. `drive` calls `step(tick, alpha)` once per frame.
+  const ROWS: readonly (readonly [number, number, string])[] = [
+    [20, 0, ''],
+    [25, 5.5, ''],
+    [30, 0, ''],
+    [6, 5.5, 'attack'],
+    [10, 5.5, 'cast'],
+    [12, 0, 'hit'],
+    [15, 0, 'interrupt'],
+    [12, 5.5, 'dashOn'],
+    [12, 0, 'dashOff'],
+    [10, 0, 'death'],
+    [40, 0, ''],
+    [6, 0, 'snap'],
+  ];
+
+  function trigger(anim: ChampionAnim, event: string): void {
+    if (event === 'attack') triggerCast(anim, CAST_ATTACK);
+    else if (event === 'cast') triggerCast(anim, CAST_OTHER);
+    else if (event === 'hit') triggerHit(anim);
+    else if (event === 'interrupt') triggerInterrupt(anim);
+    else if (event === 'dashOn') triggerDash(anim, 1);
+    else if (event === 'dashOff') triggerDash(anim, 0);
+    else if (event === 'death') triggerDeath(anim);
+    else if (event === 'snap') triggerSnap(anim);
+  }
+
+  /** Every field but the doubles. */
+  function integersOf(anim: ChampionAnim): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [key, value] of Object.entries(anim)) if (key !== 'd') out[key] = value as number;
+    return out;
+  }
+
+  function play(frame: (anim: ChampionAnim, champion: AnimChampion, tick: number, alpha: number) => void): ChampionAnim[] {
+    const anim = createAnim();
+    const champion: AnimChampion = { x: 0, y: 0, vx: 0, vy: 0, aimX: 1000, aimY: 0 };
+    const frames: ChampionAnim[] = [];
+    let tick = 100;
+    for (const [ticks, vx, event] of ROWS) {
+      champion.vx = vx;
+      for (let i = 0; i < ticks; i++) {
+        if (i === 0) trigger(anim, event);
+        tick += 1;
+        champion.x += vx / 60;
+        frame(anim, champion, tick, (i % 4) / 4);
+        frames.push({ ...anim, d: Float64Array.from(anim.d) });
+      }
+    }
+    return frames;
+  }
+
+  it('gives the same record as updateAnims at every frame of the state machine script, with drawn = tick + alpha', () => {
+    const old = play((anim, champion, tick, alpha) => {
+      updateAnims([anim], { tick, champions: [champion] }, { alpha });
+    });
+    const drawn: { ticks: number } = { ticks: 0 };
+    const next = play((anim, champion, tick, alpha) => {
+      drawn.ticks = tick + alpha;
+      updateAnimsAt([anim], [champion], drawn);
+    });
+    expect(next).toHaveLength(old.length);
+    expect(old.length).toBeGreaterThan(150);
+    expect(new Set(old.map((frame) => frame.code)).size).toBeGreaterThanOrEqual(6);
+    for (let i = 0; i < old.length; i++) {
+      const a = old[i] as ChampionAnim;
+      const b = next[i] as ChampionAnim;
+      for (let k = 0; k < a.d.length; k++) expect(Object.is(b.d[k], a.d[k])).toBe(true);
+      const integersA = integersOf(a);
+      const integersB = integersOf(b);
+      expect(integersB).toEqual(integersA);
+    }
+  });
+
+  it('skips a champion with no anim, as updateAnims does', () => {
+    const drawn: DrawnTime = { ticks: 12.5 };
+    const champion: AnimChampion = { x: 0, y: 0, vx: 0, vy: 0, aimX: 0, aimY: 0 };
+    expect(() => updateAnimsAt([], [champion], drawn)).not.toThrow();
+    const anim = createAnim();
+    expect(() => updateAnimsAt([anim], [], drawn)).not.toThrow();
+    expect(anim.d[D_NOW]).toBe(0);
+  });
+
+  // The render clock over the scripted stream: the drawn time is the render tick, so it moves about
+  // a frame a frame. Drawn from the tick of snapshot B and the buffer's alpha it would jump a
+  // snapshot gap at once.
+  function frames(source: (clock: RenderClock, view: BufferView) => number): number[] {
+    const clock = createRenderClock(6);
+    const buffer = createSnapshotBuffer();
+    const stream = buildStream();
+    const anim = createAnim();
+    const champion: AnimChampion = { x: 0, y: 0, vx: 0, vy: 0, aimX: 0, aimY: 0 };
+    const drawn: { ticks: number } = { ticks: 0 };
+    const times: number[] = [];
+    let next = 0;
+    for (let now = 0; now <= 1000; now += 1000 / 60) {
+      while (next < stream.length && (stream[next] as StreamEntry).atMs <= now) {
+        const entry = stream[next] as StreamEntry;
+        clock.onSnapshot(entry.snapshot.tick, entry.atMs);
+        buffer.add(entry.snapshot);
+        next++;
+      }
+      clock.update(now);
+      const view = buffer.select(clock.renderTick);
+      if (view === null) continue;
+      drawn.ticks = source(clock, view);
+      updateAnimsAt([anim], [champion], drawn);
+      times.push(anim.d[D_NOW] as number);
+    }
+    return times;
+  }
+
+  it('moves about one frame a frame when driven by the render clock over the stream', () => {
+    const times = frames((clock) => clock.renderTick);
+    expect(times.length).toBeGreaterThan(40);
+    for (let i = 1; i < times.length; i++) {
+      const step = (times[i] as number) - (times[i - 1] as number);
+      expect(step).toBeGreaterThanOrEqual(0);
+      // A frame is 1/60 s; the catch-up allows 2 frames; a snapshot gap is 3.
+      expect(step).toBeLessThanOrEqual(2 / 60 + 1e-9);
+    }
+  });
+
+  it('would jump a snapshot gap when driven by the tick of B and the buffer alpha', () => {
+    const times = frames((_clock, view) => (view.b as { tick: number }).tick + view.alpha);
+    let biggest = 0;
+    for (let i = 1; i < times.length; i++) biggest = Math.max(biggest, Math.abs((times[i] as number) - (times[i - 1] as number)));
+    expect(biggest).toBeGreaterThan(2 / 60 + 1e-9);
   });
 });

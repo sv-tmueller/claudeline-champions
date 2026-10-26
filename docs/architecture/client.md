@@ -159,19 +159,24 @@ must not reach a production file (the dist grep).
 
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`. A later kit file joins the match without a client change, reached
-by `?champion=<id>` on the placeholder model. The select shows the roster ids
-the client registers with a name and a model (`ROSTER_IDS`), each available once
-its kit file exists, so a kit without a roster entry is not on it until the
-client registers it (batch #147 decision 3, part 3). `createMatch` validates the
-kits, and a bad kit file shows up as a page error. The arenas work the same way:
-every file under `data/arenas/` goes through `parseArenaDef` (a bad file is a
-page error too), sorted by id, and `arenaById` in `arenas.ts` hands the chosen
-one to `createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the
-id, so `arena02.glb` loads with no change in `models.ts`. Of the pure modules,
-`launch` takes the kit ids and the arena ids, `match-setup` takes the kit list
-and the arena, and `result-dom` and `menu-dom` take ids and
-`{ id, name, spawns }` records (`bot-driver`, `models` and `roster` take none of
-them), so the unit tests load the files statically instead:
+by `?champion=<id>` on the placeholder model, if it has no roster entry. The
+client registers six champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
+Lumeth and Skerrow in the order of roster-v1.md, then Ondrel and Brimwick of
+roster-v2.md, each with a name and a model, so `?champion=ondrel` and
+`?champion=brimwick` play their own model, health and name (batch #177, package
+C). The select shows those six, each available once its kit file exists, so a
+kit without a roster entry is not on it until the client registers it (batch
+#147 decision 3, part 3). `ENEMY_ROSTER` and the sandbox roster hold neither, so
+no bot team and no probe scene plays an Ondrel or a Brimwick. `createMatch`
+validates the kits, and a bad kit file shows up as a page error. The arenas work
+the same way: every file under `data/arenas/` goes through `parseArenaDef` (a
+bad file is a page error too), sorted by id, and `arenaById` in `arenas.ts`
+hands the chosen one to `createLocalMatch`. `arenaModelUrl(arena.id)` and
+`data-arena` follow the id, so `arena02.glb` loads with no change in
+`models.ts`. Of the pure modules, `launch` takes the kit ids and the arena ids,
+`match-setup` takes the kit list and the arena, and `result-dom` and `menu-dom`
+take ids and `{ id, name, spawns }` records (`bot-driver`, `models` and `roster`
+take none of them), so the unit tests load the files statically instead:
 `tsconfig.tools.json` has `types: ["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
@@ -238,7 +243,22 @@ The combat view is made of small modules that `main.ts` wires together. The
 sim steps first and the views read its state afterwards.
 
 - `entity-views.ts`: pooled meshes for projectiles and areas, matched to sim
-  entities by id and interpolated between ticks.
+  entities by id and interpolated between ticks. Lingering areas are the first
+  areas a match draws: every area of v1 and of Brimwick lasts one tick
+  (`durationTicks` 1), so it is made in step 3 and removed in step 6 of the same
+  tick ([simulation.md, Tick order](simulation.md#tick-order)) and never reaches
+  `sync`, while Ondrel's lingering areas last 120 to 300 ticks and a sync sees
+  each for one tick fewer. A one-hit area never gets a view, so Reed Fence (Q),
+  a one-hit circle and a 120 tick one, shows one disc and not two. The disc is
+  the translucent team colour of the area for its whole life and is static
+  between pulses: there is no pulse cue, and the pulses are the sim's (batch
+  #177 decision 2). It is released at its expiry, or in the frame of a round
+  decision, which clears the areas. The pool of 16 covers the most Ondrel has
+  alive, five, since each lingering duration is shorter than its slot's cooldown
+  (roster-v2.md section 0), so a slot never has two of its own areas alive.
+  `entity-views-lingering.test.ts` plays each path of Ondrel on the real sim and
+  kits and reads the radius, the placement and the release;
+  `e2e/lingering.spec.ts` reads `data-areas` in the browser.
 - `health-bars.ts`: a world-space bar above each champion, green for allies
   and red for enemies.
 - `impact-rings.ts`: a fixed pool of rings that grow and fade where a
@@ -324,7 +344,7 @@ averages the clips that play where an upper-body strike must replace the arms
 and leave the legs alone
 ([batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811)).
 The mixer is the test oracle: `clip-sampler.test.ts` compares the sampler to it
-with `Object.is` per component, for every clip of all five models at 60 times
+with `Object.is` per component, for every clip of all seven models at 60 times
 per clip, with `action.time` and `update(0)`. Two counted modules, both on the
 frame path rules above:
 
@@ -404,9 +424,10 @@ to its next passing key, holds there while the weight fades, and the feet stay
 at or above the floor. `clip-sampler.test.ts` samples every transition (every
 stop phase of Run at four speeds and both directions, every overlay at every
 offset over Idle and Run, interrupts, Death from every state, a dash, the snap)
-for all five models, and the lowest skinned vertex stays at or above -1e-4 m
+for all seven models, and the lowest skinned vertex stays at or above -1e-4 m
 (the lowest figure is -9e-15 m). The highest stays under 1.91 m: every
-transition reaches 1.735 m on the three plain models and 1.8695 m on Lumeth,
+transition reaches 1.735 m on the three plain models, 1.8695 m on Lumeth,
+1.8758 m on Ondrel and 1.8641 m on Brimwick,
 but an overlay over Run adds the bounce of Run's Hips (up to 35 mm) to
 Quillon's staff at the strike, 1.9051 m in the sweep and 1.9078 m at the worst
 phase, 6 cm under the health bar at 1.97 m. Entering Run at its split, leaving
@@ -559,7 +580,7 @@ third copy of the rows, with the label "Play as") and a Start link
 (`data-action="start"`). The first choice is `parseLaunch('', ...)`: Hargrim,
 normal, arena01, 2v2. The champion row is `selectEntries`, that is the roster
 ids in roster order, each available once its kit file loads; with six kit files
-it still lists four.
+it lists all six, and a kit file the client has not registered is not on it.
 
 A pick is a plain click on a row entry, handled by one listener on the panel. An
 entry's href already is the next whole setup, so the click reads it back with
@@ -827,6 +848,77 @@ noise. The master gain is 0.2 and a voice peaks at 0.6.
   throws. The fake lives in the spec, so a build contains no `__fakeAudio`;
   `grep -r __fakeAudio packages/client/dist` must print nothing, next to the
   dist grep above.
+
+## Online
+
+The client's net core, built in #168 (P4a of the [online design](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering),
+see [online](online.md)). It lives in `packages/client/src/net/` and has no
+DOM: it takes time as a `nowMs` parameter, and
+`packages/client/tsconfig.net.json` (`lib: ["ES2023"]`, `types: []`, on the
+`npm run typecheck` line) makes `window`, `document`, `WebSocket`,
+`performance`, `setTimeout`, `setInterval`, `requestAnimationFrame` and
+`console` type errors in it and in anything it imports. `Date` is in ES2023, so
+"time comes in as a parameter" is a review rule. Net files import only
+`@claudeline/protocol`, `@claudeline/sim` (types) and each other, never a client
+file outside `net/`: `AlphaClock` and `DrawnTime` are met by shape. No file of
+`net/` shares a basename with another client file or with an entry of the heap
+probe's `COMBAT_CODE` (the probe keys files by basename), and none is named
+`server`. Nothing in `main.ts` uses the net core yet: the local path is
+unchanged and the production bundle is byte-identical (P4b wires it in).
+
+- **`transport.ts`.** The seam to a socket, in strings only: `send(text)`,
+  `close()` and `setHandlers({ open, message, closed })`. No WebSocket adapter
+  yet (P4b or P4c). `fake-transport.ts` is the test-only fake: it records the
+  sent texts and `deliver(text)` pushes a server text in synchronously.
+- **`snapshot-buffer.ts`.** Up to `BUFFER_CAPACITY` (8) snapshots, sorted by
+  tick. `add` ignores a duplicate tick and a tick at or below the A of the
+  last `select` (the render tick never goes back). `select(renderTick)` writes
+  A, B and `alpha = (render - A) / (B - A)` into one reused record, whose
+  `alpha` is what the interpolation's `AlphaClock` reads, and drops what is
+  below A. Past the newest it holds it (A = B = newest, `alpha` 1, no
+  extrapolation); before the oldest it holds the oldest (`alpha` 0). A snapshot
+  off the cadence gives an uneven gap and the right alpha.
+- **`render-clock.ts`.** `onSnapshot(tick, nowMs)` and `update(nowMs)`; no
+  `renderTick` before the first snapshot (`started` is false). The estimate is
+  the newest tick plus the elapsed time at 60 ticks a second. A newer snapshot
+  corrects it by `CORRECTION_UP` (0.1) of the error when it is ahead of the
+  estimate and by `CORRECTION_DOWN` (0.02) when it is behind (late snapshots
+  and bursts must not drag it down). A late, duplicate or out-of-order tick
+  changes nothing. The render tick is the estimate minus the render delay of
+  `matchStart` (6), capped at the newest tick held (a stall holds, it does not
+  extrapolate), never backward, and after the first frame it rises at most
+  `MAX_CATCH_UP_RATE` (2) times real time, so a jump of the target is a run of
+  bounded steps. The three constants are module constants, not rows of the
+  defaults table of the design.
+- **`event-release.ts`.** `add(batches)` for every snapshot and
+  `release(renderTick)` each frame, which hands out the batches whose tick the
+  render tick has reached (`tick <= renderTick`), once each and in tick order,
+  in one array it reuses. A batch already pending, or at or below the last
+  released tick (the high-water mark), is dropped: over an ordered transport it
+  can only be a duplicate. A batch that arrives out of order and is above the
+  mark still releases in tick order. P4b writes each released batch into the
+  state that `routeEvents` and `routeSounds` read.
+- **`input-sender.ts`.** One `input` message per sampled tick through
+  `transport.send`, with `encodeClientMessage`, counted 0, 1, 2 ... A sender is
+  one per `matchStart`, with no reset: a reconnect's match start makes a new
+  one. Each aim is clamped to `MAX_AIM_CM` of the protocol on the sender's own
+  scratch record, so the input core's shared record is not changed.
+- **`updateAnimsAt`.** In `champion-anim.ts`, next to `updateAnims`, which is
+  unchanged (see Animation): `updateAnimsAt(anims, champions, drawn)` takes a
+  `DrawnTime` record, `{ ticks }`, and moves the clips to `drawn.ticks / 60`.
+  Online the two states a draw interpolates are a snapshot gap apart, so
+  `(state.tick + alpha) / 60` would jump the gap; the drawn time is the render
+  tick. Driven by the render clock over the scripted stream it moves at most two
+  frames a frame, and from the tick of B plus the buffer's alpha it would jump
+  more than that (the unit tests pin both). The local path keeps `updateAnims`
+  until P4b, which also primes `updateAnimsAt` in `scriptAnims` if it goes on
+  the frame path. The online receive path is outside the heap probe in this cut.
+- **The tests.** Each unit has a test next to it. They are driven by
+  `test-stream.ts`, a test-only module that copies the `matchStart` and
+  `snapshot` goldens of `packages/protocol/test/samples.ts` (a test folder, not
+  an export, so not imported) and pins each by a round trip through the
+  protocol's codec, then builds a stream with `encodeSnapshot` and a fixed
+  jitter table, and sends every text through `decodeServerMessage`.
 
 ## Steam readiness rules
 
