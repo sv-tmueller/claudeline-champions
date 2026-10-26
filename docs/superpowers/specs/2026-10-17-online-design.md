@@ -75,8 +75,9 @@ bans of `sim` and `bots` in `eslint.config.js` also name `protocol`, so a
 relative path into it is red, which enforces the rules of section 3 and does
 not change them.
 
-Amended 2026-10-26 by [batch #177 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/177), for package P2 (#167): when
-`server` landed, the same three lines of CLAUDE.md read wrong again and were
+Amended 2026-10-26 by
+[batch #177 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/177#issuecomment-6417634639),
+for package P2 (#167): when `server` landed, the same three lines of CLAUDE.md read wrong again and were
 edited, and nothing else in it: the workspaces sentence, the typecheck comment
 and the bullet about the future `server`. The pointer to section 3.2 stays. The
 segment bans of `sim` and `bots` in `eslint.config.js` also name `server`, so a
@@ -612,7 +613,7 @@ all six), `roundsToWin` 3, hard difficulty. Sizes are of the snapshot message of
 section 6, in UTF-8 bytes, as the three runs above measured them. Run 4:
 arena01, 12 137 ticks, 4046 snapshots. Run 5: arena02, 23 772 ticks, 7924
 snapshots. The humans are scripts that walk at an enemy and press slots, not
-bots, so the runs are a sample of the same kind as the first three.
+bots, so these runs are a sample, as the first three are, and not a bound.
 
 | What | Run 4 mean / max | Run 5 mean / max |
 |------|------------------|------------------|
@@ -801,9 +802,9 @@ Each layer, and what it asserts:
   - The server's recorded input stream replays through the sim to the same
     final `checksum`.
   - Reconnect: the grace period, the bot takeover, the return, and that the
-    returning client's inputs from tick 0 apply (the counter reset). These
-    rows are package P5's; P2's test has none (a `reconnect` first message is
-    a fatal `badToken` until then).
+    returning client's inputs from tick 0 apply (the counter reset). Amended
+    2026-10-26 for package P2 (#167): these rows are package P5's; P2's test
+    has none (a `reconnect` first message is a fatal `badToken` until then).
 - **Socket test** (`packages/server/test`): a real `ws` server on a free port
   and Node's built-in `WebSocket` client (typed by `@types/node`): a client
   creates a room, a second joins by its code, they ready up and the first

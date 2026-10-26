@@ -139,12 +139,12 @@ picked where the spec leaves them open:
 - **Host.** One rule, `moveHost` in `lobby.ts`, for every way a host goes: when
   the host's seat stops being a human's, the human in the lowest seat becomes
   host, or no one (`hostSeat` -1) when none is left. The paths are `leave` in the
-  lobby, a closed socket in the lobby, the 20th bad message, `leave` during a
-  match (the bot takes the seat and the host moves at once) and the end of a
-  match that frees a disconnected seat. A host whose socket closes during a
-  match stays host until the match ends (nobody can send `settings` then). If
-  the only human leaves a running match there is no host, the match plays on and
-  `empty()` is called at its end.
+  lobby, a closed socket in the lobby, the 20th bad message in the lobby,
+  `leave` during a match (the bot takes the seat and the host moves at once) and
+  the end of a match that frees a disconnected seat. A host whose socket closes
+  during a match stays host until the match ends (nobody can send `settings`
+  then). If the only human leaves a running match there is no host, the match
+  plays on and `empty()` is called at its end.
 - **Bad messages.** The counter counts every `badMessage` answer after
   `welcome`: a codec failure, a `championId` or `arenaId` outside the lists, and
   an arena whose `maxTeamSize` is below the team size. Answers 1 to 19 are
