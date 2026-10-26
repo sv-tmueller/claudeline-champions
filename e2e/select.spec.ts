@@ -4,7 +4,7 @@ import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 // The pre-match select: the page opens on it at a bare address, the picks update the rows and
 // the Start link without leaving the page, Start plays the setup, and an address that names a
 // key skips it. The match itself is covered by the other specs, which enter with a key.
-const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
+const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick'];
 const PICKED = '?champion=quillon&difficulty=hard&arena=arena02&teamsize=3';
 const PANEL = '[data-select="panel"]';
 // The bare address, the one that opens the select; every spec that wants the default match
