@@ -11,20 +11,22 @@ const THREE_SPAWNS = { teamA: [[-12, 2], [-12, -2], [-12, 0]], teamB: [[12, 2], 
 const TWO_SPAWNS = { teamA: THREE_SPAWNS.teamA.slice(0, 2), teamB: THREE_SPAWNS.teamB.slice(0, 2) } as ArenaDef['spawns'];
 
 describe('champion select entries', () => {
-  it('lists the four roster ids in order, with their names', () => {
+  it('lists the six roster ids in order, with their names', () => {
     const entries = selectEntries(['hargrim', 'quillon'], 'normal', 'arena01', 2);
     expect(entries.map((entry) => [entry.id, entry.name])).toEqual([
       ['hargrim', 'Hargrim'],
       ['quillon', 'Quillon'],
       ['lumeth', 'Lumeth'],
       ['skerrow', 'Skerrow'],
+      ['ondrel', 'Ondrel'],
+      ['brimwick', 'Brimwick'],
     ]);
   });
 
-  it('lists the four roster ids when the kit files are six, since an id the client has no name or model for is not on the select', () => {
+  it('gives six available entries when the kit files are six, since the client now registers all six', () => {
     const six = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick'];
     const entries = selectEntries(six, 'normal', 'arena01', 2);
-    expect(entries.map((entry) => entry.id)).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow']);
+    expect(entries.map((entry) => entry.id)).toEqual(six);
     expect(entries.every((entry) => entry.available)).toBe(true);
   });
 
@@ -44,6 +46,8 @@ describe('champion select entries', () => {
     const entries = selectEntries(['hargrim', 'quillon'], 'normal', 'arena01', 2);
     expect(entries[2]).toMatchObject({ available: false, href: null });
     expect(entries[3]).toMatchObject({ available: false, href: null });
+    expect(entries[4]).toMatchObject({ available: false, href: null });
+    expect(entries[5]).toMatchObject({ available: false, href: null });
   });
 
   it('picks up a later kit file without a change', () => {
