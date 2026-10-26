@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@claudeline/bots": "*",
+    "@claudeline/protocol": "*",
     "@claudeline/sim": "*",
     "three": "~0.186.1"
   },

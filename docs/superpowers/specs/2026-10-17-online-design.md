@@ -256,7 +256,7 @@ section 9.
 | Rooms per server | 16 | each room is one Node process, so the cap bounds processes and memory until a deployment measures them | P3 |
 | First message | within 5 s | a socket that never speaks would hold a slot | P3 |
 | Idle close | 30 s without a message | frees a dead socket; the 5 s ping keeps a lobby socket alive with margin | P3 |
-| Client ping | every 5 s | keepalive and the round trip for the HUD | P4a |
+| Client ping | every 5 s | keepalive and the round trip for the HUD | P4c |
 | Bad messages | the 20th in a row closes | a buggy or hostile client stops costing parse time | P2 |
 | Client message size | 1024 bytes | about ten times the largest `input` (104 characters), set as `ws` `maxPayload` | P1, P3 |
 | Aim range | integers from -100 000 to 100 000 cm, both included | far outside any arena (tens of meters) and the sim does not clamp aim, so the decoder bounds it | P1 |
@@ -269,6 +269,8 @@ section 9.
 | Port and host | 8787, `127.0.0.1` | section 3 | P3 |
 | Name length | 1 to 16 code points after trimming | fits a lobby row, and a message well under the size limit | P1 |
 | New room | team size 2, the first arena by id with two spawns a team, difficulty `normal` | the smallest match; the host changes it with `settings` | P2 |
+
+Amended 2026-10-26 by [batch #177 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/177), for package P4a: the owner of the client ping moves from P4a to P4c. The P4a row of section 13 never listed the ping, and its first user is the lobby keepalive of P4c, since inputs keep a match connection busy. The value and the reason are unchanged.
 
 ## 5. The lobby and the ready flow
 
@@ -765,7 +767,7 @@ and every row is S or M, or parked.
 | P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project. Lands with PR #157 (#151). | M | this spec |
 | P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test | M | P1 |
 | P3 | Server transport and processes: the `ws` dependency, the router and a fork per room, room codes and tokens, `npm run server`, the socket test | M | P2 |
-| P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests | M | P1 |
+| P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests. Lands with PR #181 (#168): the transport is an interface and a test fake, and the browser `WebSocket` adapter comes with P4b or P4c; the anims time base is `updateAnimsAt` and `DrawnTime` next to an unchanged `updateAnims`, which the local path keeps until P4b. | M | P1 |
 | P4b | Client online match path: `main.ts` split into a local and an online start (no sim in the online loop), any local id and team, the `data-p0*` hooks and the HUD score for the local team, the views fed from the buffer, the menu without pause and its Leave; its check is a client unit driving the online start through a fake transport | M | P4a |
 | P4c | Client lobby: the address parameters and the lobby screen, the Playwright e2e and the CI server start | M | P3, P4b |
 | P5 | Reconnect: the grace period, the bot takeover, the seat's input-counter reset, client backoff, loopback and e2e rows | M | P3, P4c |

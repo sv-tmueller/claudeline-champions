@@ -34,8 +34,8 @@ docs/superpowers/specs/     approved designs (the design spec)
   reads the wall clock, never calls `Math.random`, never touches `window`,
   `document`, `fetch` or Node built-ins.
 - `bots` imports `sim` only.
-- `client` imports `sim` and `bots`, and will import `protocol` (its dependency
-  is added with the first client package that uses it). It owns all rendering,
+- `client` imports `sim`, `bots` and `protocol` (the net core in `src/net/` does,
+  #168; `main.ts` does not yet). It owns all rendering,
   input, audio and UI. It never imports `server`: a lint block denies that
   today, for static imports, for `import()` expressions and for `import()`
   types, for `@claudeline/server` and any relative path with a `server`
