@@ -98,8 +98,7 @@ The commands and file list are in `tools/blender/README.md`.
 - Each of the six roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
   in body colour and one silhouette cue that stays below 1.9 m. The client
-  loads four of them until batch 13 (Ondrel and Brimwick are committed and
-  checked, and nothing requests them yet).
+  registers and loads all six (batch #177, package C).
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours and cues are in
   [`tools/blender/README.md`](../../tools/blender/README.md).

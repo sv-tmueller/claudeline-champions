@@ -85,8 +85,8 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
   one decision 2 of batch #134 reserved. Brimwick's moved, by decision 1 of
   batch #147, and her model paragraph says why. The committed
   `test_champion_models.py` checks both files, and the figures in the model
-  subsections come from its functions. The client loads neither before
-  batch 13.
+  subsections come from its functions. The client registers and loads both
+  (batch #177, package C).
 - The names were checked by hand against the Bloodline Champions and
   Battlerite rosters. They are original (ADR-005).
 
