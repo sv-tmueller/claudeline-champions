@@ -58,14 +58,16 @@ The tests with their own timeout for this reason. Local times are from one
 full `npm run test` on an Apple M5 Pro with Node 22.23.2; runner times are
 ubuntu-latest, Node 22, over the five logs of 5e0bf3d, #127 and 5820f16 (two
 green, three red attempts of identical code); green is the first range, red
-the second.
+the second. The three clip-sampler green ranges are over the seven-model unit
+jobs of the three green runs of PR #179 (40334583804, 40336071398,
+40336850393); their red ranges are still from 5820f16.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
   timeout 15 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
-  every phase" (seven models, lumeth slowest): 1.1 to 1.8 s locally, 2.3 to
-  4.1 s green, 3.3 to 8.0 s red, timeout 20 s.
+  every phase" (seven models, lumeth slowest): 1.1 to 1.8 s locally, 3.6 to
+  8.3 s green, 3.3 to 8.0 s red, timeout 20 s.
 - `packages/sim/test/toolkit-stress.test.ts`, "gives the same checksum when
   run twice": 1.05 s locally, 2.0 to 2.5 s green, 3.6 to 3.8 s red, timeout
   10 s.
@@ -79,10 +81,10 @@ the second.
   across arena01: the follower's whole plan step": 0.75 s locally, 1.6 to
   1.7 s green, 2.3 to 2.7 s red, timeout 10 s.
 - `packages/client/src/clip-sampler.test.ts`, "with Attack, Cast and Hit over
-  Idle and over Run" (seven models): 0.34 to 0.47 s locally, up to 1.3 s
+  Idle and over Run" (seven models): 0.34 to 0.47 s locally, 1.0 to 2.4 s
   green, 1.1 to 2.6 s red, timeout 10 s.
 - `packages/client/src/clip-sampler.test.ts`, "through Death from every
-  state, and the snap back" (seven models): 0.41 to 0.54 s locally, up to 1.5
+  state, and the snap back" (seven models): 0.41 to 0.54 s locally, 1.2 to 2.5
   s green, 1.1 to 3.0 s red, timeout 10 s.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" has a
