@@ -945,6 +945,10 @@ word for word (the settle's and the rounds'), because one copy in a loop over bo
 a think in 3 to 12 of 17 scenes of the clean tree: the loop sat in another tier, as in the 144 B
 case of Testing.
 
+On the runner (the three attempts of run 40339535608 of PR #184, the checks job and both heap
+jobs, nine jobs) every scene settled in one window of 10 to 58 ms and read 0 B, and the scene
+check took 4.8 to 6.9 s in the checks job.
+
 Each scene's log line prints the settle windows and their wall time, then the rounds:
 `kite, no clear shot: settle 5440, 5440, 0 (3 windows, 41 ms); 0, 0, 0 B per think`. A series
 that falls and then fails came late (raise the cap by its rule: the smallest of 10 and 20 that

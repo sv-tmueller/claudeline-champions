@@ -623,10 +623,13 @@ describe('think allocation', () => {
   });
 
   // Runner (ubuntu-latest, Node 22): 2.9 and 3.9 s green, 5.9, 5.9 and 5.7 s red on 5820f16
-  // (runs 39001711657, 39008413462, 39009180211 x3); 1.6 s locally (Apple M5 Pro, Node 22.23.2,
-  // full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
-  // runner time (testing.md, Check suite). The heap jobs of #108 (Node 24 and 26, both tiers) read
-  // 3.3 to 5.2 s.
+  // (runs 39001711657, 39008413462, 39009180211 x3), then 6.9, 5.0 and 4.8 s on the settled check
+  // (the three attempts of run 40339535608 of PR #184, one settle window of 10 to 58 ms a scene
+  // each); 1.6 s locally (Apple M5 Pro, Node 22.23.2, full npm run test). Timeout: the smallest of
+  // 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite): 13.8 s, so
+  // 15. A red run to the cap of the settle takes about 4 s locally (the `{ slot, ex }` mutation of
+  // bots.md, all 17 scenes at the cap), inside it. The heap jobs (Node 24 and 26, both tiers)
+  // read 3.6 to 5.3 s.
   it('allocates under the limit per think in every scene', { timeout: 15_000 }, () => {
     const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
     const scenes = buildScenes();
