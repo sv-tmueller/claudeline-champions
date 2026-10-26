@@ -274,12 +274,11 @@ other spec.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard`, and
-  `/?difficulty=brutal` reads normal as current (ten links outside the
-  difficulty row now: six champions, two arenas, two team sizes). The default
-  test lists eight
-  `data-hud` elements (the eighth is `scoreboard`, hidden and not displayed) and
-  reads `data-silenced="false"` on all seven slots, while only F reads
+  and every link of the other three rows carrying `difficulty=hard` (ten links:
+  six champions, two arenas, two team sizes), and `/?difficulty=brutal` reads
+  normal as current. The default test lists eight `data-hud` elements (the
+  eighth is `scoreboard`, hidden and not displayed) and reads
+  `data-silenced="false"` on all seven slots, while only F reads
   `data-blocked="true"`: the silence flag is not the energy gate.
 - `hud.spec.ts`: the shield, the scoreboard and the silence flag, on the
   sandbox (`/?scene=sandbox`) with a paused clock and tick budgets, like

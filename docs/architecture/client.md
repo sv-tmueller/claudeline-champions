@@ -166,17 +166,17 @@ roster-v2.md, each with a name and a model, so `?champion=ondrel` and
 `?champion=brimwick` play their own model, health and name (batch #177, package
 C). The select shows those six, each available once its kit file exists, so a
 kit without a roster entry is not on it until the client registers it (batch
-#147 decision 3, part 3). `ENEMY_ROSTER` and the sandbox roster do not change:
-no bot team and no probe scene plays an Ondrel or a Brimwick. `createMatch` validates the
-kits, and a bad kit file shows up as a page error. The arenas work the same way:
-every file under `data/arenas/` goes through `parseArenaDef` (a bad file is a
-page error too), sorted by id, and `arenaById` in `arenas.ts` hands the chosen
-one to `createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the
-id, so `arena02.glb` loads with no change in `models.ts`. Of the pure modules,
-`launch` takes the kit ids and the arena ids, `match-setup` takes the kit list
-and the arena, and `result-dom` and `menu-dom` take ids and
-`{ id, name, spawns }` records (`bot-driver`, `models` and `roster` take none of
-them), so the unit tests load the files statically instead:
+#147 decision 3, part 3). `ENEMY_ROSTER` and the sandbox roster hold neither, so
+no bot team and no probe scene plays an Ondrel or a Brimwick. `createMatch`
+validates the kits, and a bad kit file shows up as a page error. The arenas work
+the same way: every file under `data/arenas/` goes through `parseArenaDef` (a
+bad file is a page error too), sorted by id, and `arenaById` in `arenas.ts`
+hands the chosen one to `createLocalMatch`. `arenaModelUrl(arena.id)` and
+`data-arena` follow the id, so `arena02.glb` loads with no change in
+`models.ts`. Of the pure modules, `launch` takes the kit ids and the arena ids,
+`match-setup` takes the kit list and the arena, and `result-dom` and `menu-dom`
+take ids and `{ id, name, spawns }` records (`bot-driver`, `models` and `roster`
+take none of them), so the unit tests load the files statically instead:
 `tsconfig.tools.json` has `types: ["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
@@ -244,20 +244,21 @@ sim steps first and the views read its state afterwards.
 
 - `entity-views.ts`: pooled meshes for projectiles and areas, matched to sim
   entities by id and interpolated between ticks. Lingering areas are the first
-  areas a match draws: every area of v1 and of Brimwick lasts one tick (`durationTicks`
-  1), so it is made in step 3 and counted down in step 6 of the same step and never
-  reaches `sync`, while Ondrel's last 120 to 300 ticks (a sync sees each for one
-  tick fewer). A one-hit area never gets a view, so Reed Fence (Q), a one-hit
-  circle and a 120 tick one, shows one disc and not two. The disc is the
-  translucent team colour of the area for its whole life and is static between
-  pulses: there is no pulse cue, and the pulses are the sim's (batch #177
-  decision 2). It is released at its expiry, or in the frame of a round decision,
-  which clears the areas. The pool of 16 covers the most Ondrel has alive, five,
-  since each lingering duration is shorter than its slot's cooldown (roster-v2.md
-  section 0), so a slot never has two of its own areas alive.
+  areas a match draws: every area of v1 and of Brimwick lasts one tick
+  (`durationTicks` 1), so it is made in step 3 and removed in step 6 of the same
+  tick ([simulation.md, Tick order](simulation.md#tick-order)) and never reaches
+  `sync`, while Ondrel's lingering areas last 120 to 300 ticks and a sync sees
+  each for one tick fewer. A one-hit area never gets a view, so Reed Fence (Q),
+  a one-hit circle and a 120 tick one, shows one disc and not two. The disc is
+  the translucent team colour of the area for its whole life and is static
+  between pulses: there is no pulse cue, and the pulses are the sim's (batch
+  #177 decision 2). It is released at its expiry, or in the frame of a round
+  decision, which clears the areas. The pool of 16 covers the most Ondrel has
+  alive, five, since each lingering duration is shorter than its slot's cooldown
+  (roster-v2.md section 0), so a slot never has two of its own areas alive.
   `entity-views-lingering.test.ts` plays each path of Ondrel on the real sim and
-  kits and reads the radius, the placement and the release; `e2e/lingering.spec.ts`
-  reads `data-areas` in the browser.
+  kits and reads the radius, the placement and the release;
+  `e2e/lingering.spec.ts` reads `data-areas` in the browser.
 - `health-bars.ts`: a world-space bar above each champion, green for allies
   and red for enemies.
 - `impact-rings.ts`: a fixed pool of rings that grow and fade where a
