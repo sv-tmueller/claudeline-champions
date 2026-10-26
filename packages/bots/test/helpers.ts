@@ -161,7 +161,7 @@ export function configLumeth(): MatchConfig {
   };
 }
 
-/** Hargrim and Ondrel against Hargrim and Quillon: the mage on team A, so champion 1. */
+/** Hargrim and Ondrel against Hargrim and Quillon: the zone controller on team A, so champion 1. */
 export function configOndrel(): MatchConfig {
   return {
     teamSize: 2,
@@ -174,7 +174,7 @@ export function configOndrel(): MatchConfig {
   };
 }
 
-/** Hargrim and Brimwick against Hargrim and Quillon: the pyromancer on team A, so champion 1. */
+/** Hargrim and Brimwick against Hargrim and Quillon: the burst caster on team A, so champion 1. */
 export function configBrimwick(): MatchConfig {
   return {
     teamSize: 2,
