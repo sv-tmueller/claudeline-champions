@@ -58,14 +58,16 @@ The tests with their own timeout for this reason. Local times are from one
 full `npm run test` on an Apple M5 Pro with Node 22.23.2; runner times are
 ubuntu-latest, Node 22, over the five logs of 5e0bf3d, #127 and 5820f16 (two
 green, three red attempts of identical code); green is the first range, red
-the second.
+the second. The three clip-sampler green ranges are over the seven-model unit
+jobs of the three green runs of PR #179 (40334583804, 40336071398,
+40336850393); their red ranges are still from 5820f16.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
   timeout 15 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
-  every phase" (five models, lumeth slowest): 1.1 to 1.8 s locally, 2.3 to
-  4.1 s green, 3.3 to 8.0 s red, timeout 20 s.
+  every phase" (seven models, lumeth slowest): 1.1 to 1.8 s locally, 3.6 to
+  8.3 s green, 3.3 to 8.0 s red, timeout 20 s.
 - `packages/sim/test/toolkit-stress.test.ts`, "gives the same checksum when
   run twice": 1.05 s locally, 2.0 to 2.5 s green, 3.6 to 3.8 s red, timeout
   10 s.
@@ -79,10 +81,10 @@ the second.
   across arena01: the follower's whole plan step": 0.75 s locally, 1.6 to
   1.7 s green, 2.3 to 2.7 s red, timeout 10 s.
 - `packages/client/src/clip-sampler.test.ts`, "with Attack, Cast and Hit over
-  Idle and over Run" (five models): 0.34 to 0.47 s locally, up to 1.3 s
+  Idle and over Run" (seven models): 0.34 to 0.47 s locally, 1.0 to 2.4 s
   green, 1.1 to 2.6 s red, timeout 10 s.
 - `packages/client/src/clip-sampler.test.ts`, "through Death from every
-  state, and the snap back" (five models): 0.41 to 0.54 s locally, up to 1.5
+  state, and the snap back" (seven models): 0.41 to 0.54 s locally, 1.2 to 2.5
   s green, 1.1 to 3.0 s red, timeout 10 s.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" has a
@@ -242,7 +244,7 @@ enters on a bare `/`, through a constant, so a grep for `goto('/')` finds no
 other spec.
 
 - `select.spec.ts`: the pre-match select (`select.png`, at 1280x720). On `/` the
-  panel shows and no canvas exists; the champion row is the four roster ids in
+  panel shows and no canvas exists; the champion row is the six roster ids in
   order, all available, with Hargrim, arena01, 2v2 and normal current and the
   Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
   each `data-current`, leaves the address search empty and makes the Start href
@@ -260,7 +262,13 @@ other spec.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
   timer against the tick, the hidden result panel with its champion, arena and
   team select (every href writes `teamsize`, with 2v2 current), and the launch
-  address `?champion=quillon`. A row on `/?arena=arena02` (`scene-arena02.png`)
+  address `?champion=quillon`. Two rows next to it, `?champion=ondrel` and
+  `?champion=brimwick`, read health 130 / 130 and 120 / 120, the scoreboard's
+  row 0 name (built hidden at startup, so readable without Tab) as Ondrel and
+  Brimwick, and the champion glbs the page requests (collected with
+  `page.on('request')` before `goto`) as the pick's own, Quillon's and
+  Hargrim's, with no `placeholder.glb`; they are red when the roster has no
+  such id, and a missing clip is a page error at load. A row on `/?arena=arena02` (`scene-arena02.png`)
   checks `data-arena` and the human's position, (-1100, 200), which proves the
   sim got arena02 and not only the hook, and the arena links. A row on
   `/?teamsize=3` reads `data-bar0` to `data-bar5` at 100 and no `data-bar6`, the
@@ -268,10 +276,11 @@ other spec.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard`, and
-  `/?difficulty=brutal` reads normal as current. The default test lists eight
-  `data-hud` elements (the eighth is `scoreboard`, hidden and not displayed) and
-  reads `data-silenced="false"` on all seven slots, while only F reads
+  and every link of the other three rows carrying `difficulty=hard` (ten links:
+  six champions, two arenas, two team sizes), and `/?difficulty=brutal` reads
+  normal as current. The default test lists eight `data-hud` elements (the
+  eighth is `scoreboard`, hidden and not displayed) and reads
+  `data-silenced="false"` on all seven slots, while only F reads
   `data-blocked="true"`: the silence flag is not the energy gate.
 - `hud.spec.ts`: the shield, the scoreboard and the silence flag, on the
   sandbox (`/?scene=sandbox`) with a paused clock and tick budgets, like
@@ -298,6 +307,20 @@ other spec.
   read one by one) and 105 to 210 ms at 1280x720 (about 6), and a read costs 32
   to 75 ms, so the body takes about 17 s and the page load and the screenshot
   make it about 22 s. The timeout is more than twice that, as the rule asks.
+- `lingering.spec.ts`: the first lingering area a match draws
+  (`lingering.png`, at 1280x720), on `?champion=ondrel&difficulty=normal&arena=arena01&teamsize=2`
+  with a paused clock and tick budgets, like `hud.spec.ts`. After the warmup,
+  KeyQ (Reed Fence, an 18 tick windup, a keyboard cast so no pointer is
+  derived) reads `data-anim0` Idle+Cast within 3 ticks of the press and
+  `data-areas` 1, not 2 (the one-hit circle of the same cast lasts a tick and
+  never reaches a view), at a read inside the 120 ticks and ten ticks before
+  their end, and 0 within 20 ticks of it. The picture is one frame at 1280x720
+  while the fence is down; no pixel counts. The units behind it are
+  `entity-views-lingering.test.ts`, which plays each of Ondrel's lingering
+  paths on the real sim. The test runs about 360 frames at 17 to 24 ms
+  (320x180) and 2 at 105 to 210 ms, about 50 reads at 32 to 75 ms, so the body
+  takes about 9 to 13 s and the test about 15 s with the load; the 45 s
+  timeout is more than twice that. It does not use `__runProbeFrames`.
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.
@@ -892,6 +915,21 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   limit 1 when it was first measured, and 3 of 10 attempts on a rerun (128, 80
   and 32 B in the worst window, 0 B in the other 7). `setAttribute` read 0 B in
   every attempt of every clean run.
+- The lingering-area path runs in neither scene: the sandbox is Hargrim and
+  Quillon against Lumeth and Skerrow with only the Hargrim and Quillon kits,
+  and the live probe is `DEFAULT_MATCH` on `ENEMY_ROSTER`, so neither plays an
+  Ondrel and no area outlives its tick in a measured window. Neither scene
+  changed with the roster at six (batch #177, package C): the live round 3 still
+  begins by tick 4289 and the windows stay at 4349 to 4499. A live area slot
+  runs the capture, sync, find and draw code the projectile views run in both
+  scenes (`entity-views.ts:draw` and `find` read 0 B there), and the pool grows
+  only past 16 slots, which Ondrel's at most five areas never reach. `roster.ts`
+  runs only when the HUD and the scoreboard are built. Scratch check, nothing
+  committed, `combat.spec.ts` and `live-probe.spec.ts` with `--repeat-each=3`
+  in three separate runs: the counted medians are 360 to 432 B on the sandbox
+  (limit 600) and 408 to 552 B on the live scene (limit 780), the live bots
+  8984 to 11 788 B (limit 18 000), and neither `roster.ts` nor
+  `entity-views.ts:draw` or `find` appears among the per-window functions.
 - The shield branch and the silence branch run in neither scene (the human of
   both casts no R, and no champion there silences it), and neither is added to
   `combat.spec` or `live-probe.spec`, which would move the documented scenes.

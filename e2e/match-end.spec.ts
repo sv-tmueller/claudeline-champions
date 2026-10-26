@@ -40,7 +40,7 @@ const RING_BUDGET_TICKS = 8000;
 const RING_BUDGET_FRAMES = 100;
 // The human stands at (-12, 2): the ring passes it when its radius falls below sqrt(148) m.
 const HUMAN_DISTANCE_M = Math.sqrt(12 * 12 + 2 * 2);
-const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow'];
+const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick'];
 // Red pixels: the red edge is #ff4d4f at about 70 % over the dark background at its
 // rim and fainter inwards. The box keeps green and blue under 100, which an orange
 // edge (the energy colour) at that strength would pass. Anything else red in the

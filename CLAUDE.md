@@ -25,7 +25,8 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # ring.png, scene-arena02.png,
                                  # match-arena02.png, match-3v3.png,
                                  # match-3v3-arena02.png, menu.png,
-                                 # scoreboard.png, select.png in test-results/*/
+                                 # scoreboard.png, select.png, lingering.png
+                                 # in test-results/*/
 npm run balance                  # bot-versus-bot win-rate report: plays 4800
                                  # matches and writes the block of
                                  # docs/design/balance.md, about 5.5 minutes on
@@ -53,7 +54,7 @@ ready pull requests and on main.
   wall clock, never calls `Math.random`, and never touches `window`,
   `document`, `fetch` or Node built-ins.
 - `bots` imports `sim` only.
-- `client` imports `sim` and `bots`. It owns rendering, input, audio and UI.
+- `client` imports `sim`, `bots` and `protocol`. It owns rendering, input, audio and UI.
 - Lint (`eslint.config.js`) enforces the import rules, including relative
   paths into `node_modules`, `packages`, `tests` or `e2e`, and relative paths
   from bots source and bots tests into sim. In sim and bots source it also bans

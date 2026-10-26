@@ -264,6 +264,34 @@ export function updateAnims(anims: readonly ChampionAnim[], state: AnimState, cl
   }
 }
 
+/**
+ * The drawn time of an online match, in ticks: the render clock's tick (`net/render-clock.ts`),
+ * which fits by shape and is read inside `updateAnimsAt` like `alpha` is in `updateAnims`.
+ */
+export interface DrawnTime {
+  readonly ticks: number;
+}
+
+/**
+ * `updateAnims` for an online match. There the two states a draw interpolates are a snapshot gap
+ * apart, so `(state.tick + alpha) / 60` would jump the gap; the drawn time is the render tick,
+ * `drawn.ticks / 60`. Same steps, same triggers. The local path keeps `updateAnims`.
+ */
+export function updateAnimsAt(
+  anims: readonly ChampionAnim[],
+  champions: readonly AnimChampion[],
+  drawn: DrawnTime,
+): void {
+  const now = drawn.ticks / TICKS_PER_SECOND;
+  for (let i = 0; i < anims.length; i++) {
+    const anim = anims[i];
+    const champion = champions[i];
+    if (anim === undefined || champion === undefined) continue;
+    anim.d[D_NOW] = now;
+    updateAnim(anim, champion);
+  }
+}
+
 function updateAnim(anim: ChampionAnim, champion: AnimChampion): void {
   const d = anim.d;
   const last = d[D_LAST] as number;
