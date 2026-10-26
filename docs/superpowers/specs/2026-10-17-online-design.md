@@ -78,10 +78,13 @@ not change them.
 Amended 2026-10-26 by
 [batch #177 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/177#issuecomment-6417634639),
 for package P2 (#167): when `server` landed, the same three lines of
-CLAUDE.md read wrong again and were edited, and nothing else in it: the
-workspaces sentence, the typecheck comment and the bullet about the future
-`server`. The pointer to section 3.2 stays. The segment bans of `sim` and `bots`
-in `eslint.config.js` also name `server`, so a relative path into it is red,
+CLAUDE.md read wrong again and were edited: the workspaces sentence, the
+typecheck comment and the bullet about the future `server`. By
+[batch #177 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/177#issuecomment-6417677008),
+package P4a (#168) edited one line more, the bullet that says what `client`
+imports, to name `protocol`. Nothing else in CLAUDE.md changed, and the
+pointer to section 3.2 stays. The segment bans of `sim` and `bots` in
+`eslint.config.js` also name `server`, so a relative path into it is red,
 which enforces the rules of section 3 and does not change them.
 
 **No pause online.** Escape opens the menu over the running match. The menu

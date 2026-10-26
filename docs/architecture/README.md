@@ -20,10 +20,10 @@ first.
   the result with Three.js and an HTML HUD.
 - Online (milestone 6, designed in the
   [online design](../superpowers/specs/2026-10-17-online-design.md); only
-  `protocol` and the `server` skeleton are built so far), the same sim runs on
-  the server (`server`):
-  clients send their input stream, the server stays authoritative, and both
-  sides read and write the messages through the `protocol` codec.
+  `protocol`, the client's net core and the `server` skeleton are built so
+  far), the same sim runs on the server (`server`): clients send their input
+  stream, the server stays authoritative, and both sides read and write the
+  messages through the `protocol` codec.
 - Arenas are JSON. The sim reads them for collision and Blender scripts read
   them to generate the committed `.glb` models.
 - Roster kits are JSON too, under `data/kits/<id>.json`: plain data that the
