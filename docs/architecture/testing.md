@@ -103,7 +103,9 @@ the test sits at 42 percent of its timeout.
   the pairings, fills and seeds, `playMatch` against a reference loop, the
   aggregation and the report text, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report. The same project holds the fixture search's tests
+  report. One `playMatch` row plays the match of #123 (Quillon v Skerrow, 3v3,
+  arena01, seed 6) and asserts that it ends in a decision, with no end tick.
+  The same project holds the fixture search's tests
   (`tools/fixtures/*.test.ts`): the format against the committed bytes, the
   pure search cases, the reproduction of the six roster fixtures and the CLI
   (see [Fixture search](#fixture-search)).

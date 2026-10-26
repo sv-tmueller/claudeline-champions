@@ -1260,6 +1260,56 @@ those with the dodge and no tolerance for 600 (300 on the circle). So the
 tolerance of #137 resolved the four and the dodge did not; no rule was missing
 in the bots.
 
+The same file pins the stand of #123, the match of seed 6 (Quillon against
+Skerrow, 3v3, arena 1, Lumeth and Hargrim as fill) that ran to the tick budget
+and the eight H3 seeds of section 5.8 of balance.md that did the same. On the
+bots of 9a9c653 all nine are one state, not the end ring's: a Hargrim rests one
+ulp inside the inflated circle of the centre pillar, (0, 0) with radius 1.5 and
+the champion radius 0.5 (|p| = 1.9999999999999998 in seed 6, 1.9999999999999996
+in seed 98), so `nearestFreeCell` reached no cell from it, the follower of the
+Hargrim at the pillar and that of the enemy Hargrim both got no points, and the
+two stood. In seed 6 the pair stood from tick 480, before the ring of the round
+clock closed around it; the ring was incidental. Nothing was wrong with any
+press: at 2.139 m an M1 is out of reach (the band top of 3 m less the margin of
+1 leaves `rangeMax` 2), so the engage case walks in, and that walk is what
+failed. Two rows of `RECORDED` hold the states at tick 20000 (seed 6: A at
+(0.0855, -1.9982), B at (2.0015, -1.0464); seed 98: A at (0.2539, -1.9838), B at
+(1.2433, -1.8387), 1.0 m apart, touching) and take the same four asserts as the
+rows of #129. A stepped scene, "the end-ring stand of #123, stepped", puts the
+two Hargrims of each row on free play with a normal, hard or easy bot each (bot
+seeds 601 and 603) and steps the sim: the first move comes within the reaction
+delay plus one think, a Hargrim presses, a damage event between the two
+follows, and one of them dies within 1400 ticks (twice the slowest death
+measured, 697 ticks on easy in seed 6 with the bot seeds 602 and 605, rounded
+up to 100; the seeds of the test give 618 on normal). Without the tolerance
+(`TOUCH = 0`) every new assert that reads the bots' geometry is red: `pointBlocked`,
+the walks on both sides, the stepped scene and the stall tracker's row below
+(the clearance asserts read only the test's own oracle and stay green); with
+the circle limit of `obstacleShapes` without it the walks, the stepped scene
+and the tracker row are red and `pointBlocked` is green; with the circle branch
+of `overlapsObstacle` without it only the `pointBlocked` asserts of the two
+rows are red (as in #129 with the rect branch, the segment test decides the
+walks). The figures that follow are the scratch evidence of the architect of
+#123, in scripts that are not in the repository (in [the #123
+sub-plan](https://github.com/sv-tmueller/claudeline-champions/issues/123#issuecomment-6417700905)):
+main's bots (normal tier) taken over each of the nine frozen states move on the
+first acting think (+15 ticks), press within +24 to +27 and end round 1 within
++321 to +843 ticks; a copy of main's bots with `TOUCH = 0` (the dodge still on)
+stands for 6000 ticks in all nine, so, as in #129, the tolerance resolves the
+stand and the dodge does not; and the whole H3 cell on main, seeds 1 to 100 in
+both fills (200 matches), has no budget hit.
+No rule was missing in the bots; one case is out of scope: the bots test a
+Hargrim M1 for a clear shot of 0.5 m, while the sim's melee arc ignores
+obstacles (`melee.ts`), so the touching pair of seed 98 (1.0 m, the pillar
+clips a shifted line) presses no M1 and walks on, which is no stall on main
+(the scene ends in 446 ticks). The harness row of `tools/balance/harness.test.ts`
+plays the match of seed 6 through `playMatch` and asserts that it ends in a
+decision (no end tick is pinned). It is green on main and red on the bots of
+9a9c653 (budget hit, 60000 ticks), which a scratch copy of that commit shows,
+but not under a mutation of the tolerance: without it the full match takes
+another course (it ends at tick 5769, not 5096) and never reaches the stand, so
+the frozen, stepped and tracker rows carry the mutation reading.
+
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
 `configLumeth3v3`), to matchEnd with 3 rounds to win on arena01 and arena02:
@@ -1457,7 +1507,15 @@ kiting closer than `rangeMin` in sight 10, engaging in range 0, no alive enemy
 both counts, and a run that ended leaves none in the next. The wait of
 Skerrow reads 0 from 6 to 8 m at a SPACE cooldown of 2 to 90, and 10 at 5.95
 and 8.05 m, at a cooldown of 0, 1 and 91, with no clear shot, for a Skerrow
-with no kit and for a Hargrim.
+with no kit and for a Hargrim. A row on the recorded stand of #123 (seed 6: two
+Hargrims 2.139 m apart on arena 1, one ulp inside the inflated centre pillar,
+kitted, so `rangeMax` is 2 and neither holds) reads 10 of 10 with the stubs
+`engage` at both champions and zero inputs. Its reachability test goes through
+the bots' own `nearestFreeCell`, so without the tolerance of `geometry.ts` it
+reads 0: the search finds no free cell, the enemy reads unreachable and the
+tracker counts nothing. That is why the tracker could not see the stand on the
+bots of 9a9c653, where the stall ran to the tick budget, and why the row is red
+without the tolerance.
 
 `packages/bots/test/deadlock.test.ts` pins the rule. Unit scenes on frozen states cover
 the advance, the stay of a team that is ahead, the tie (a mirror where all four advance),
