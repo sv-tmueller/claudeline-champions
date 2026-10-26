@@ -1,7 +1,9 @@
 import arena01Json from '../../../data/arenas/arena01.json';
 import arena02Json from '../../../data/arenas/arena02.json';
+import brimwickJson from '../../../data/kits/brimwick.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import lumethJson from '../../../data/kits/lumeth.json';
+import ondrelJson from '../../../data/kits/ondrel.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
 import {
@@ -51,6 +53,19 @@ export function jsonKits(): KitDef[] {
  */
 export function rosterKits(): KitDef[] {
   return [...jsonKits(), structuredClone(lumethJson) as unknown as KitDef];
+}
+
+/**
+ * The six shipped kits: `rosterKits()` and the shipped Ondrel and Brimwick. `rosterKits()` keeps its
+ * four, so the pins that read a champion with no kit (an Ondrel or a Brimwick at a kitless id)
+ * stay as they are, and `createMatch` keeps only the kits in use.
+ */
+export function sixKits(): KitDef[] {
+  return [
+    ...rosterKits(),
+    structuredClone(ondrelJson) as unknown as KitDef,
+    structuredClone(brimwickJson) as unknown as KitDef,
+  ];
 }
 
 function validAxis(v: number): boolean {
@@ -140,6 +155,32 @@ export function configLumeth(): MatchConfig {
     players: [
       { championId: 'hargrim', team: 'A' },
       { championId: 'lumeth', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
+/** Hargrim and Ondrel against Hargrim and Quillon: the mage on team A, so champion 1. */
+export function configOndrel(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'ondrel', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
+/** Hargrim and Brimwick against Hargrim and Quillon: the pyromancer on team A, so champion 1. */
+export function configBrimwick(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'brimwick', team: 'A' },
       { championId: 'hargrim', team: 'B' },
       { championId: 'quillon', team: 'B' },
     ],
