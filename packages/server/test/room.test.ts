@@ -384,7 +384,10 @@ describe('the end of a match', () => {
     expect(host.of('matchEnd')).toHaveLength(1);
   });
 
-  it('keeps the settings and the choices, and lets the room play again', () => {
+  // Runner (ubuntu-latest, Node 22): 3.7 s on 779e504 (job 121633905207); 1.8 s locally (Apple M5
+  // Pro, full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it('keeps the settings and the choices, and lets the room play again', { timeout: 10_000 }, () => {
     const harness = new Harness({ roundsToWin: 1 });
     const host = create(harness);
     host.send({ t: 'settings', settings: { teamSize: 2, arenaId: data.listings[0]?.id ?? '', difficulty: 'easy' } });
@@ -442,7 +445,10 @@ describe('the end of a match', () => {
     expect(late.of('error')).toEqual([{ t: 'error', code: 'matchRunning', fatal: true }]);
   });
 
-  it('frees the seats of humans who were disconnected, moves the host, and calls empty() at the end', () => {
+  // Runner (ubuntu-latest, Node 22): 3.7 s on 779e504 (job 121633905207); 1.6 s locally (Apple M5
+  // Pro, full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest
+  // runner time (testing.md, Check suite).
+  it('frees the seats of humans who were disconnected, moves the host, and calls empty() at the end', { timeout: 10_000 }, () => {
     const harness = new Harness({ roundsToWin: 1 });
     const host = create(harness);
     const guest = join(harness, 'Bo');

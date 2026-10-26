@@ -86,6 +86,12 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
 - `packages/client/src/clip-sampler.test.ts`, "through Death from every
   state, and the snap back" (seven models): 0.41 to 0.54 s locally, 1.2 to 2.5
   s green, 1.1 to 3.0 s red, timeout 10 s.
+- `packages/server/test/room.test.ts`, "keeps the settings and the choices,
+  and lets the room play again": 1.8 s locally, 3.7 s on the runner (job
+  121633905207, 779e504), timeout 10 s.
+- `packages/server/test/room.test.ts`, "frees the seats of humans who were
+  disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
+  3.7 s on the runner (job 121633905207, 779e504), timeout 10 s.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" has a
 150 s timeout (120 s before the dodge of #137), and it is the thinnest margin in
