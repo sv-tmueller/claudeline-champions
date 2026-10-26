@@ -92,6 +92,7 @@ describe('a headless 3v3 free play on the shipped kits, seeds 648 to 653', () =>
     const played = play(set, run);
     expect(played.state.tick).toBe(TICKS);
     expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.displaced, played.summary).toBeGreaterThanOrEqual(1);
     expectNoStall(played);
   }, 30_000);
 });
