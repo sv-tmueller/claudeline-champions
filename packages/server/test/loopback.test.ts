@@ -98,13 +98,15 @@ function firstDivergence(played: Played, arenaId: string, difficulty: Difficulty
   return null;
 }
 
-// Runner (ubuntu-latest, Node 22) at three rounds, 779e504 (job 121633905207): the two matches of
-// a beforeAll took about 11 s, the two local-reference rows 3.9 s and 2.6 s, the file 28.7 s. At
-// two rounds the local times are 4.7 s for the beforeAll (8.2 s at three) and 0.7 s and 0.5 s for
-// the rows (1.4 s and 1.5 s), on an Apple M5 Pro with Node 22.23.2; the runner has not timed the
-// two-round file yet. Timeouts (testing.md, Check suite): 10 s for the rows, twice 3.9 s is 7.8 s;
-// 20 s for the beforeAll, which the rule allows for a runner time up to 10 s, and the shorter match
-// should take about half of the 11 s. Rescan when a runner has timed this file.
+// Runner (ubuntu-latest, Node 22) at two rounds, de0ef18 (job 121656797139): the file took 11.5 s,
+// the two local-reference rows 1.5 s (2v2) and 1.0 s (3v3). The log has no time for a beforeAll, so
+// the two of them together took at most 11.5 - 2.5 = 9.0 s, and about 4.5 s each, as the local
+// times split evenly (2.9 s and 2.7 s for a describe with its rows). Locally, on an Apple M5 Pro
+// with Node 22.23.2, the file takes 5.5 s: 4.7 s for the beforeAlls, 0.7 s and 0.5 s for the rows.
+// At three rounds, on 779e504 (job 121633905207), the runner took 28.7 s for the file. Timeouts
+// (testing.md, Check suite): 10 s for the rows, the smallest the rule allows; 15 s for the
+// beforeAll, which the rule allows for a runner time up to 7.5 s, 3 s over the 4.5 s estimate.
+// Rescan when a runner log times a beforeAll.
 describe.each(SPECS)('loopback: $name', { timeout: 10_000 }, (spec) => {
   let first: Played;
   let second: Played;
@@ -112,7 +114,7 @@ describe.each(SPECS)('loopback: $name', { timeout: 10_000 }, (spec) => {
   beforeAll(() => {
     first = play(spec, 1);
     second = play(spec, 1);
-  }, 20_000);
+  }, 15_000);
 
   it('plays to a result: a final snapshot, matchEnd, then the lobby', () => {
     const { harness, players } = first;
