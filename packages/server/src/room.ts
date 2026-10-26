@@ -22,6 +22,7 @@ import type { GameState, MatchConfig, PlayerInput } from '@claudeline/sim';
 import type { RoomData } from './data';
 import { InputQueue } from './input-queue';
 import {
+  BOT_NAME,
   clearBots,
   configure,
   createLobby,
@@ -196,8 +197,9 @@ export class Room {
         else this.seat(conn, st, m.name);
         return;
       case 'joinRoom':
-        if (m.roomCode !== this.o.roomCode || this.lobby.hostSeat === -1) this.fatal(conn, 'roomNotFound');
+        if (m.roomCode !== this.o.roomCode) this.fatal(conn, 'roomNotFound');
         else if (this.run !== null) this.fatal(conn, 'matchRunning');
+        else if (this.lobby.hostSeat === -1) this.fatal(conn, 'roomNotFound');
         else this.seat(conn, st, m.name);
         return;
       case 'reconnect':
@@ -369,7 +371,7 @@ export class Room {
     this.conns.delete(conn);
     if (seat === undefined || id === -1) return;
     seat.kind = 'bot';
-    seat.name = 'Bot';
+    seat.name = BOT_NAME;
     seat.ready = false;
     seat.conn = null;
     seat.token = null;

@@ -432,6 +432,16 @@ describe('the end of a match', () => {
     expect(harness.emptied).toBe(1);
   });
 
+  it('refuses a joiner with matchRunning when the only human left mid-match, as a socket close does', () => {
+    const harness = new Harness({ roundsToWin: 1 });
+    const host = create(harness);
+    ready(harness, host);
+    host.send({ t: 'leave' });
+    harness.flush();
+    const late = join(harness, 'Bo');
+    expect(late.of('error')).toEqual([{ t: 'error', code: 'matchRunning', fatal: true }]);
+  });
+
   it('frees the seats of humans who were disconnected, moves the host, and calls empty() at the end', () => {
     const harness = new Harness({ roundsToWin: 1 });
     const host = create(harness);
