@@ -1,8 +1,9 @@
 # Online and ladder
 
-Milestone 6 design. P1 is built: `packages/protocol` (#151), and so is the
-client's net core, P4a (#168, no DOM, in `packages/client/src/net/`). The rest is
-not: `packages/server` and the client's online match path do not exist. The approved
+Milestone 6 design. P1, P2 and P4a are built: `packages/protocol` (#151), the
+`packages/server` skeleton (#167) and the client's net core (#168, no DOM, in
+`packages/client/src/net/`). The rest is not: the server's transport and
+processes (P3) and the client's online match path do not exist. The approved
 source is the [online design](../superpowers/specs/2026-10-17-online-design.md)
 (batch #134 decision 1), recorded in
 [ADR-006](decisions/ADR-006-online-first-cut.md), and it extends section 7 of
@@ -40,7 +41,10 @@ listed in
   start and in per-tick batches. In three measured 3v3 runs a snapshot
   averaged 2.7 to 2.8 KB of state and 3.0 to 3.2 KB with its events, and the
   largest message was 8.1 KB (about 61 to 64 KB/s a client on average, 161 KB/s
-  at the largest message)
+  at the largest message). With the roster at six champions (P2) the mean is
+  3.1 to 3.3 KB, the largest 7.4 KB, and `arena` and `kits` are 16 KB once per
+  match. A tick at six seats takes 0.05 to 0.09 ms on average and under 1 ms at
+  the 99th percentile on an Apple M5 Pro, against the 16.7 ms it has
   ([section 8](../superpowers/specs/2026-10-17-online-design.md#8-snapshots)).
 - **Rendering.** The client draws 6 ticks (100 ms) behind the estimated server
   tick, through the existing interpolation, and releases events when the render
@@ -76,18 +80,87 @@ listed in
   `{ ok: false, code, reason }` and never throw, two encoders that write the
   keys in the spec's order, and `snapshotStateJson` with `encodeSnapshot`, the
   splice of section 8, byte-equal to the full encoder.
-- `server` imports `sim`, `bots`, `protocol`, `ws` and `node:` built-ins, never
-  `client`, and may read the wall clock. It runs from TypeScript source through
-  Node's type stripping, with no build step.
+- `server` (built as the P2 skeleton, #167) imports `sim`, `bots`, `protocol`
+  and `node:` built-ins, never `client`, and may read the wall clock. `ws`
+  joins with P3, which adds the dependency, and the lint row "server imports
+  ws" is red until then. It runs from TypeScript source through Node's type
+  stripping, with no build step: its tsconfig has `erasableSyntaxOnly`, so no
+  parameter properties, `enum` or `namespace`, and its relative imports have no
+  extension (P3's resolve hook completes them). What P2 has is below.
 - `client` imports `sim`, `bots` and `protocol`, never `server`. A lint deny
   rule covers static and dynamic imports, and is built.
 - `sim` and `bots` are unchanged, except that their lint segment bans now name
-  `protocol`.
+  `protocol` and `server`.
 
 The rules and the lint blocks are in
 [packages.md](packages.md#dependency-rules) and
 [section 3](../superpowers/specs/2026-10-17-online-design.md#3-package-layout-and-rules)
 of the design.
+
+## The server skeleton (P2)
+
+`packages/server` holds `Room`, the lobby and ready flow, bot fill, the loop,
+the input queue, the snapshot cadence and batches, and a loopback test. It has
+no transport, no process and no timer. The pieces and the rules the package
+picked where the spec leaves them open:
+
+- **`Room`.** It takes its transport, clock and entropy as options
+  (`send(conn, text)`, `close(conn)`, `now()`, `randomBytes(n)`), an `empty()`
+  callback and the room code, and is driven by `open`, `message` and `closed`
+  per connection id and by `wake()`. It never throws on input: the decoders are
+  total and every branch is total over decoded messages. The room code is
+  passed in (the router draws it in P3). The token is the code, a dot and the
+  base64url of 16 injected bytes, so `welcome` carries one that decodes. An
+  optional observer (`matchStarted`, `stepped`) is the test's hook and is empty
+  in production.
+- **The loop.** `wake()` reads `now()` into a fixed-step accumulator with the
+  client's epsilon: at most 5 steps per wake, a longer stall drops the backlog,
+  and none while no match runs, so `now += 1000 / 60` gives exactly one step.
+  Nothing in P2 calls a timer. The timer that calls `wake()` lands with the
+  child process in P3.
+- **Data.** `loadRoomData` reads `data/kits` (all of them, sorted by id, which
+  is the roster order) and `data/arenas` through `parseArenaDef`, sorted by id.
+  An arena's `maxTeamSize` is the smaller spawn count capped at 3, and an
+  arena under 2 is left out.
+- **Bot driver.** It stays in `server`, as the client's rule: the bot of
+  champion `id` is `createBot(id, difficulty, matchSeed * 100 + id)`, and its
+  record goes straight into the inputs array. The match seed is a uint32 from 4
+  injected bytes, so `seed * 100 + id` is a safe integer.
+- **Bot fill.** The open seats, in seat order, fill team A's missing places
+  first and then team B's. Champion ids follow: team A's seats in seat order,
+  then team B's. The n-th bot by id takes `roster[n % roster.length]`. A bot
+  seat is named `Bot` in the `room` message.
+- **Inputs.** The queue is 6 deep with the oldest dropped. A message with a
+  `tick` at or below the last received is dropped. An empty queue repeats the
+  last move and aim with the buttons cleared, and a seat that has not sent an
+  input yet gets the sim's missing input (undefined, not a zeroed record). An
+  `input` outside a match (the race after `matchEnd`) is dropped silently and
+  counts as valid.
+- **Bad messages.** The counter counts every `badMessage` answer after
+  `welcome`: a codec failure, a `championId` or `arenaId` outside the lists, and
+  an arena whose `maxTeamSize` is below the team size. Answers 1 to 19 are
+  `fatal: false`, the 20th is `fatal: true` and then the seat closes (in the
+  lobby that frees the seat, sends `room` and moves the host). Any other
+  message resets the count to 0, including those refused with `notHost`,
+  `notInLobby` or `teamFull`. Before `welcome`, any failure is fatal.
+- **Snapshots.** `snapshotStateJson` once per snapshot, then `encodeSnapshot`
+  per client with that client's `ack` and its pending batches. A pending batch
+  holds a copy of the events, because `step` clears `state.events` in place.
+  P2 has one pending list a client: the `congested` flag and the 120-tick close
+  come with the router in P3.
+- **What P2 does in place of P3 and P5.** `reconnect` as a first message is a
+  fatal `badToken`. A socket closed during a match leaves the seat with the
+  sim's missing input until the match ends, and the seat is freed then (no
+  grace period and no takeover). `leave` during a match gives the seat to a
+  bot for good. A second `createRoom` into a room that has a host is a fatal
+  `badMessage` (the router never sends one). An empty lobby calls `empty()`; the
+  IPC message that carries it is P3, and the close of a match nobody watches
+  after 3600 ticks is P5, so until then a match whose humans are all gone plays
+  on to its end.
+- **Not built.** The energy orb: roster v3 says the online server sets
+  `MatchConfig.energyOrb`, which does not exist yet, and the protocol's
+  `matchStart` encoder copies only `teamSize`, `players` and `roundsToWin`. The
+  orb package owns both.
 
 ## Tests
 
@@ -99,9 +172,9 @@ One line a layer
   the server's `checksum` at every snapshot, and a table rejects each bound
   with its edge pair (size in UTF-8 bytes, aim, buttons, names in code points,
   room codes, tokens, the version and every server field).
-- Server headless test: `Room` on a loopback transport and a manual clock, from
-  create and ready to `matchEnd`, with a checksum match at every snapshot and
-  the reconnect rows.
+- Server headless test (the `server` Vitest project, built in P2): `Room` on a
+  loopback transport and a manual clock, from create and ready to `matchEnd`,
+  with a checksum match at every snapshot. The reconnect rows are P5's.
 - Socket test: a real `ws` server and Node's `WebSocket` client on a free port.
 - Client units: the snapshot buffer, the render clock, event release, input
   ticks.

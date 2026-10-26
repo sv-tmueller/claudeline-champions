@@ -10,8 +10,8 @@ cut. The decision it rests on is
 [batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441).
 The short record is
 [ADR-006](../../architecture/decisions/ADR-006-online-first-cut.md), and the
-living reference is [online.md](../../architecture/online.md). Nothing here is
-built yet except package P1, `protocol` (section 13). Where this file and the
+living reference is [online.md](../../architecture/online.md). Built so far:
+packages P1, `protocol`, and P2, `server` (section 13). Where this file and the
 code disagree after a package lands, fix the code or amend this file with a
 dated line.
 
@@ -72,6 +72,14 @@ Amended 2026-10-20 by [batch #147 decision 4](https://github.com/sv-tmueller/cla
 nothing else in it: the workspaces sentence, the typecheck comment and the
 bullet about future packages. The pointer to section 3.2 stays. The segment
 bans of `sim` and `bots` in `eslint.config.js` also name `protocol`, so a
+relative path into it is red, which enforces the rules of section 3 and does
+not change them.
+
+Amended 2026-10-26 by [batch #177 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/177), for package P2 (#167): when
+`server` landed, the same three lines of CLAUDE.md read wrong again and were
+edited, and nothing else in it: the workspaces sentence, the typecheck comment
+and the bullet about the future `server`. The pointer to section 3.2 stays. The
+segment bans of `sim` and `bots` in `eslint.config.js` also name `server`, so a
 relative path into it is red, which enforces the rules of section 3 and does
 not change them.
 
@@ -138,6 +146,14 @@ fixed here.
   list when the server first runs (package P3), or the hook moves to a shared
   path. Workspace packages resolve to their real path under `packages/`, not
   under `node_modules`, which is why type stripping accepts them today.
+
+Amended 2026-10-26 for package P2 (#167): the server source block allows
+relative paths, `node:` built-ins and exactly the entry points of
+`@claudeline/sim`, `@claudeline/bots` and `@claudeline/protocol`, and the
+segment ban on relative paths names `sim`, `bots`, `protocol` and `client`.
+`ws` is not in the list: it joins with package P3, which adds the dependency,
+and the lint row "server imports ws" is red until then. The source and test
+blocks have the Node globals, and the test block adds `vitest`.
 
 ### client
 
@@ -237,6 +253,11 @@ match runs. In the lobby the child only reacts to messages.
 5. On every third tick (`state.tick % 3 === 0`), and on the tick that produced
    `matchEnded`, send each client one snapshot with its pending batches
    (section 8).
+
+Amended 2026-10-26 for package P2 (#167): the loop is the `wake()` method of
+`Room`, which reads an injected `now()` into the accumulator and runs the
+steps owed. Nothing in P2 calls a timer. The timer that calls `wake()` lands
+with the child process in package P3.
 
 The match ends when the step emits `matchEnded`. The room then sends
 `matchEnd` after that final snapshot and returns to the lobby (section 5).
@@ -581,7 +602,45 @@ the entities in play, so package P2 measures again with the roster to six
 champions and the later kits. A client sends at most 60 `input` messages a
 second at about 105 B, 6.3 KB/s. `permessage-deflate` is off in this cut (a
 default, section 4), since it costs CPU on a 60 Hz loop. Server CPU is not
-measured here: package P2 measures a tick with six seats.
+measured in these three runs: package P2 measured a tick with six seats, below.
+
+Measured 2026-10-26 by package P2 (#167), with the roster at six champions, on
+the shipped `Room`. Method: a scratch Vitest file, not committed, drives `Room`
+on the loopback transport with the manual clock. Six scripted humans, three a
+team, each pick a different champion of the six kits (`matchStart` then holds
+all six), `roundsToWin` 3, hard difficulty. Sizes are of the snapshot message of
+section 6, in UTF-8 bytes, as the three runs above measured them. Run 4:
+arena01, 12 137 ticks, 4046 snapshots. Run 5: arena02, 23 772 ticks, 7924
+snapshots. The humans are scripts that walk at an enemy and press slots, not
+bots, so the runs are a sample of the same kind as the first three.
+
+| What | Run 4 mean / max | Run 5 mean / max |
+|------|------------------|------------------|
+| `state` | 2767 / 5440 B | 2817 / 6029 B |
+| Event batches | 253 / 2661 B | 442 / 3102 B |
+| Whole `snapshot` message | 3078 / 6590 B | 3318 / 7384 B |
+| `arena` and `kits`, sent once | 15 772 B | 16 006 B |
+
+Six kits do not grow the snapshot: the mean is 3.1 to 3.3 KB (3.0 to 3.2 KB
+with three kits) and the largest message 7384 B, below the 8065 B of run 3.
+The per-client stream is about 62 to 66 KB/s on average, and 148 KB/s if every
+snapshot were the largest. `arena` and `kits` roughly double with the six kits,
+from 8.1 to 8.5 KB to 15.8 to 16.0 KB, once per match and once per reconnect.
+
+Server CPU, in the same runs: the time of one `wake()` that runs one step, that
+is think, `step`, the copy of the events and, on every third tick, the snapshot
+encoding for each client; the transport is not in it. Apple M5 Pro, Node 22.23.
+With six humans (no bot think, six encodings a snapshot): a mean of 0.049 ms
+(run 4) and 0.059 ms (run 5) a tick and a 99th percentile of 0.19 and 0.24 ms.
+With one human and five hard bots on the same arenas (3147 and 3347 ticks): a
+mean of 0.093 and 0.078 ms and a 99th percentile of 0.75 and 0.81 ms. The
+largest single tick in the four runs was 50 ms, an isolated outlier (the 99th
+percentile of the same run is 0.24 ms), not a steady cost. A tick has 16.7 ms, so the
+99th percentile of the worst case is under 5 percent of it, and one core holds
+several rooms. The loop is far from busy, so CPU is no reason to turn
+`permessage-deflate` on. The default stays off: the cost of deflate itself was
+not measured here, and the stream of about 66 KB/s a client is the number a
+deployment weighs (package P3).
 
 Round trip. A second script plays a 3v3 with a different roster (Skerrow,
 Quillon and Lumeth each side), builds the snapshot message at every third tick,
@@ -742,7 +801,9 @@ Each layer, and what it asserts:
   - The server's recorded input stream replays through the sim to the same
     final `checksum`.
   - Reconnect: the grace period, the bot takeover, the return, and that the
-    returning client's inputs from tick 0 apply (the counter reset).
+    returning client's inputs from tick 0 apply (the counter reset). These
+    rows are package P5's; P2's test has none (a `reconnect` first message is
+    a fatal `badToken` until then).
 - **Socket test** (`packages/server/test`): a real `ws` server on a free port
   and Node's built-in `WebSocket` client (typed by `@types/node`): a client
   creates a room, a second joins by its code, they ready up and the first
@@ -765,7 +826,7 @@ and every row is S or M, or parked.
 | # | Package | Size | Blocked by |
 |---|---------|------|------------|
 | P1 | `protocol`: workspace, types, version, codec, round-trip tests, the protocol and client lint blocks with their rule rows, tsconfig, the typecheck line and the Vitest project. Lands with PR #157 (#151). | M | this spec |
-| P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test | M | P1 |
+| P2 | Server skeleton: `Room`, the lobby and ready flow, bot fill, the 60 Hz loop, the input queue, the snapshot cadence and batches, the server lint block, the loopback headless test. Lands with PR #180 (#167). | M | P1 |
 | P3 | Server transport and processes: the `ws` dependency, the router and a fork per room, room codes and tokens, `npm run server`, the socket test | M | P2 |
 | P4a | Client net core, no DOM: the socket transport, the snapshot buffer, the render clock, event release, the input sender, the anims time base, unit tests. Lands with PR #181 (#168): the transport is an interface and a test fake, and the browser `WebSocket` adapter comes with P4b or P4c; the anims time base is `updateAnimsAt` and `DrawnTime` next to an unchanged `updateAnims`, which the local path keeps until P4b. | M | P1 |
 | P4b | Client online match path: `main.ts` split into a local and an online start (no sim in the online loop), any local id and team, the `data-p0*` hooks and the HUD score for the local team, the views fed from the buffer, the menu without pause and its Leave; its check is a client unit driving the online start through a fake transport | M | P4a |

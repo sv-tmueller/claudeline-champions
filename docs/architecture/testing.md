@@ -115,6 +115,17 @@ the test sits at 42 percent of its timeout.
   3v3 on arena02 whose snapshots, spliced and decoded, rebuild to the live
   `checksum` (with checks that it saw a projectile, an area, a status, and
   snapshot ticks with and without events). See [online](online.md).
+- Server tests (the `server` Vitest project, `packages/server/test`): the
+  input queue, the step clock and the data loader, the lobby rules as pure
+  functions, the Room's lobby and loop rows, the bad-message counter, the
+  two-way `Difficulty` check (its compile-time rows are checked by
+  `tsc -p tsconfig.tools.json`, since Vitest does not typecheck) and the
+  loopback test: a 2v2 on arena01 and a 3v3 on arena02 through the codec, with a
+  checksum match at every snapshot, complete event batches, a local run of the
+  same seed and inputs that reaches the server's checksum at every tick (and a
+  run at another tier that does not), and a sha256 over every text in both
+  directions that is the same across two runs. It pins no end tick, winner or
+  champion list. It takes about 14 s. See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
