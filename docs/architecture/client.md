@@ -159,19 +159,24 @@ must not reach a production file (the dist grep).
 
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`. A later kit file joins the match without a client change, reached
-by `?champion=<id>` on the placeholder model. The select shows the roster ids
-the client registers with a name and a model (`ROSTER_IDS`), each available once
-its kit file exists, so a kit without a roster entry is not on it until the
-client registers it (batch #147 decision 3, part 3). `createMatch` validates the
-kits, and a bad kit file shows up as a page error. The arenas work the same way:
-every file under `data/arenas/` goes through `parseArenaDef` (a bad file is a
-page error too), sorted by id, and `arenaById` in `arenas.ts` hands the chosen
-one to `createLocalMatch`. `arenaModelUrl(arena.id)` and `data-arena` follow the
-id, so `arena02.glb` loads with no change in `models.ts`. Of the pure modules,
-`launch` takes the kit ids and the arena ids, `match-setup` takes the kit list
-and the arena, and `result-dom` and `menu-dom` take ids and
-`{ id, name, spawns }` records (`bot-driver`, `models` and `roster` take none of
-them), so the unit tests load the files statically instead:
+by `?champion=<id>` on the placeholder model, if it has no roster entry. The
+client registers six champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
+Lumeth and Skerrow in the order of roster-v1.md, then Ondrel and Brimwick of
+roster-v2.md, each with a name and a model, so `?champion=ondrel` and
+`?champion=brimwick` play their own model, health and name (batch #177, package
+C). The select shows those six, each available once its kit file exists, so a
+kit without a roster entry is not on it until the client registers it (batch
+#147 decision 3, part 3). `ENEMY_ROSTER` and the sandbox roster hold neither, so
+no bot team and no probe scene plays an Ondrel or a Brimwick. `createMatch`
+validates the kits, and a bad kit file shows up as a page error. The arenas work
+the same way: every file under `data/arenas/` goes through `parseArenaDef` (a
+bad file is a page error too), sorted by id, and `arenaById` in `arenas.ts`
+hands the chosen one to `createLocalMatch`. `arenaModelUrl(arena.id)` and
+`data-arena` follow the id, so `arena02.glb` loads with no change in
+`models.ts`. Of the pure modules, `launch` takes the kit ids and the arena ids,
+`match-setup` takes the kit list and the arena, and `result-dom` and `menu-dom`
+take ids and `{ id, name, spawns }` records (`bot-driver`, `models` and `roster`
+take none of them), so the unit tests load the files statically instead:
 `tsconfig.tools.json` has `types: ["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
@@ -238,7 +243,22 @@ The combat view is made of small modules that `main.ts` wires together. The
 sim steps first and the views read its state afterwards.
 
 - `entity-views.ts`: pooled meshes for projectiles and areas, matched to sim
-  entities by id and interpolated between ticks.
+  entities by id and interpolated between ticks. Lingering areas are the first
+  areas a match draws: every area of v1 and of Brimwick lasts one tick
+  (`durationTicks` 1), so it is made in step 3 and removed in step 6 of the same
+  tick ([simulation.md, Tick order](simulation.md#tick-order)) and never reaches
+  `sync`, while Ondrel's lingering areas last 120 to 300 ticks and a sync sees
+  each for one tick fewer. A one-hit area never gets a view, so Reed Fence (Q),
+  a one-hit circle and a 120 tick one, shows one disc and not two. The disc is
+  the translucent team colour of the area for its whole life and is static
+  between pulses: there is no pulse cue, and the pulses are the sim's (batch
+  #177 decision 2). It is released at its expiry, or in the frame of a round
+  decision, which clears the areas. The pool of 16 covers the most Ondrel has
+  alive, five, since each lingering duration is shorter than its slot's cooldown
+  (roster-v2.md section 0), so a slot never has two of its own areas alive.
+  `entity-views-lingering.test.ts` plays each path of Ondrel on the real sim and
+  kits and reads the radius, the placement and the release;
+  `e2e/lingering.spec.ts` reads `data-areas` in the browser.
 - `health-bars.ts`: a world-space bar above each champion, green for allies
   and red for enemies.
 - `impact-rings.ts`: a fixed pool of rings that grow and fade where a
@@ -324,7 +344,7 @@ averages the clips that play where an upper-body strike must replace the arms
 and leave the legs alone
 ([batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811)).
 The mixer is the test oracle: `clip-sampler.test.ts` compares the sampler to it
-with `Object.is` per component, for every clip of all five models at 60 times
+with `Object.is` per component, for every clip of all seven models at 60 times
 per clip, with `action.time` and `update(0)`. Two counted modules, both on the
 frame path rules above:
 
@@ -404,9 +424,10 @@ to its next passing key, holds there while the weight fades, and the feet stay
 at or above the floor. `clip-sampler.test.ts` samples every transition (every
 stop phase of Run at four speeds and both directions, every overlay at every
 offset over Idle and Run, interrupts, Death from every state, a dash, the snap)
-for all five models, and the lowest skinned vertex stays at or above -1e-4 m
+for all seven models, and the lowest skinned vertex stays at or above -1e-4 m
 (the lowest figure is -9e-15 m). The highest stays under 1.91 m: every
-transition reaches 1.735 m on the three plain models and 1.8695 m on Lumeth,
+transition reaches 1.735 m on the three plain models, 1.8695 m on Lumeth,
+1.8758 m on Ondrel and 1.8641 m on Brimwick,
 but an overlay over Run adds the bounce of Run's Hips (up to 35 mm) to
 Quillon's staff at the strike, 1.9051 m in the sweep and 1.9078 m at the worst
 phase, 6 cm under the health bar at 1.97 m. Entering Run at its split, leaving
@@ -559,7 +580,7 @@ third copy of the rows, with the label "Play as") and a Start link
 (`data-action="start"`). The first choice is `parseLaunch('', ...)`: Hargrim,
 normal, arena01, 2v2. The champion row is `selectEntries`, that is the roster
 ids in roster order, each available once its kit file loads; with six kit files
-it still lists four.
+it lists all six, and a kit file the client has not registered is not on it.
 
 A pick is a plain click on a row entry, handled by one listener on the panel. An
 entry's href already is the next whole setup, so the click reads it back with
