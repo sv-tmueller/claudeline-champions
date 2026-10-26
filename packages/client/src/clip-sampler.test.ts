@@ -35,7 +35,7 @@ import { BONE_NAMES, HIPS_POSITION, STRIDE, createClipRig, poseChampion, sampleC
 // The sampler plays the six clips of a champion model by itself, on the clip data, and
 // poses the bones. three's AnimationMixer is the oracle of these tests, not the frame path.
 
-const MODEL_IDS = ['placeholder', 'hargrim', 'quillon', 'lumeth', 'skerrow'] as const;
+const MODEL_IDS = ['placeholder', 'hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick'] as const;
 const modelsDir = fileURLToPath(new URL('../../../assets/models/champions/', import.meta.url));
 
 async function loadModel(id: string): Promise<GLTF> {
@@ -497,7 +497,7 @@ const WALKS: { speed: number; facing: number; name: string }[] = [
 ];
 
 describe('the floor and the top through every transition', () => {
-  // Five cases, one per model; the lumeth case is the slowest. Runner (ubuntu-latest, Node 22):
+  // Seven cases, one per model; the lumeth case is the slowest. Runner (ubuntu-latest, Node 22):
   // 2.3 to 3.2 and 3.1 to 4.1 s green, 3.3 to 7.9, 4.2 to 8.0 and 3.7 to 7.6 s red on 5820f16
   // (runs 39001711657, 39008413462, 39009180211 x3); 1.1 to 1.8 s locally (Apple M5 Pro,
   // Node 22.23.2, full npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice
@@ -529,7 +529,7 @@ describe('the floor and the top through every transition', () => {
     expect(w.figures().low).toBeGreaterThanOrEqual(FLOOR);
   });
 
-  // Five cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.0 and up to 1.3 s
+  // Seven cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.0 and up to 1.3 s
   // green, 1.9 to 2.6, 1.1 to 2.2 and 1.9 to 2.6 s red on 5820f16 (runs 39001711657,
   // 39008413462, 39009180211 x3); 0.34 to 0.47 s locally (Apple M5 Pro, Node 22.23.2, full
   // npm run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest runner
@@ -591,7 +591,7 @@ describe('the floor and the top through every transition', () => {
     }
   });
 
-  // Five cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.2 and 1.1 to 1.5 s
+  // Seven cases, one per model. Runner (ubuntu-latest, Node 22): up to 1.2 and 1.1 to 1.5 s
   // green, 1.2 to 2.9, 1.1 to 1.5 and 1.1 to 3.0 s red on 5820f16 (runs 39001711657, 39008413462,
   // 39009180211 x3); 0.41 to 0.54 s locally (Apple M5 Pro, Node 22.23.2, full npm run test).
   // Timeout: the smallest of 10, 15 and 20 s at least twice the slowest runner time (testing.md,
