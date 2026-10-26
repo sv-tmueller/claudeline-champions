@@ -18,7 +18,13 @@ import { oracleBlocked, oracleSegmentViolates } from './helpers';
 export const ESCAPE_REACH = 6;
 
 /** The rangeMin of each champion's profile, literal: a kite closer than this is an escape think. */
-export const RANGE_MIN: Record<string, number> = { hargrim: 0, quillon: 6, skerrow: 0 };
+export const RANGE_MIN: Record<string, number> = {
+  hargrim: 0,
+  quillon: 6,
+  skerrow: 0,
+  ondrel: 5,
+  brimwick: 7,
+};
 
 /**
  * The champions with a trigger of their own, literal, in metres: any acted intent but idle with
@@ -38,9 +44,11 @@ export interface EscapeRow {
   dash?: number;
   /**
    * The slot that goes first when it is ready (a cooldown of 1 or less) and, with a `teleport`
-   * range, has a landing; a null `teleport` needs no landing, so ready is enough.
+   * range, has a landing; a null `teleport` needs no landing, so ready is enough. With a `dash` the
+   * first slot is a dash escape: it needs a dash landing too and a champion that is not rooted
+   * (Reed Step, ahead of Reed Screen).
    */
-  after: { slot: Slot; teleport: number | null } | null;
+  after: { slot: Slot; teleport: number | null; dash?: number } | null;
 }
 
 /** Why the acted intent and distance are not an escape think; empty when they are. */
@@ -210,7 +218,11 @@ function teleportOf(
 export interface TurnOrderTeleport {
   x: number;
   y: number;
-  /** A champion with a lower id than the caster has another point or alive flag after the step. */
+  /**
+   * A champion other than the caster has another alive flag after the step, or one with a lower id
+   * than the caster's has another point: a champion ahead that walked, or any champion that died
+   * to a cast of one ahead before the caster's own turn.
+   */
   aheadMoved: boolean;
 }
 
@@ -239,9 +251,9 @@ export function teleportAfterWalksAhead(
   const event = clone.events.find((e) => e.type === 'teleport' && e.championId === caster);
   if (event === undefined || event.type !== 'teleport' || event.blocked) return null;
   const aheadMoved = before.champions.some((o) => {
-    if (o.id >= caster) return false;
+    if (o.id === caster) return false;
     const now = clone.champions[o.id] as ChampionState;
-    return now.x !== o.x || now.y !== o.y || now.alive !== o.alive;
+    return now.alive !== o.alive || (o.id < caster && (now.x !== o.x || now.y !== o.y));
   });
   return { x: event.toX, y: event.toY, aheadMoved };
 }

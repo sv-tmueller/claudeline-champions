@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ChampionState, MatchConfig, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import { SLOTS } from '@claudeline/sim';
-import { WITHIN } from './escape-oracle';
-import { configMirror, configLumeth, configSkerrow, createRun, rosterKits } from './helpers';
-import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, TICKS, expectNoStall, play } from './press-oracle';
+import { RANGE_MIN, WITHIN } from './escape-oracle';
+import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sixKits } from './helpers';
+import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
 import type { AllyRow, KitSet } from './press-oracle';
 
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
@@ -383,5 +383,112 @@ describe('the band and clearance tables of the shipped kits', () => {
     expect(shipped.allies['lumeth:F']).toMatchObject({ need: 30, reach: 5.5 });
     // Her M1 is also pressed at an enemy, so it keeps its band beside its ally row.
     expect(shipped.bands['lumeth:M1']).toBeDefined();
+  });
+});
+
+// The two new kits, worked out again from ondrel.json and brimwick.json by the rule of bots.md for
+// the shapes they use: a bolt reaches speed times lifetime over 60 (multiplied first), an area at the
+// aim its range plus its radius plus 0.5, an area around the champion its radius plus 0.5, and the
+// first effect that reaches an enemy sets the band (the shield of Reed Screen reaches nobody).
+describe('the band and clearance tables of Ondrel and Brimwick', () => {
+  const kits = sixKits();
+  const slotOf = (id: string, key: string): AbilitySpec => {
+    const kit = kits.find((k) => k.id === id) as KitDef;
+    const [slot, variant] = key.split(':') as [Slot, string | undefined];
+    const base = kit.slots[slot];
+    return variant === 'ex' ? (base.ex as AbilitySpec) : base;
+  };
+  const bolt = (id: string, key: string) => {
+    const effect = slotOf(id, key).effects[0];
+    if (effect === undefined || effect.type !== 'projectile') throw new Error(`${id} ${key} is no bolt`);
+    return effect;
+  };
+  const area = (id: string, key: string, index = 0) => {
+    const effect = slotOf(id, key).effects[index];
+    if (effect === undefined || effect.type !== 'area') throw new Error(`${id} ${key} has no area`);
+    return effect;
+  };
+  /** The reach of an area: at the aim its range plus its radius, around the champion its radius, plus 0.5. */
+  const areaReach = (id: string, key: string, index = 0) => {
+    const effect = area(id, key, index);
+    const range = effect.placement.type === 'aim' ? effect.placement.range : 0;
+    return { reach: range + effect.radius + 0.5, aim: effect.placement.type === 'aim' };
+  };
+
+  it('has the reach and the shot width of every Ondrel ability that is pressed', () => {
+    const shipped = SIX_SET;
+    expect(shipped.bands['ondrel:M1']).toEqual({ min: 0, max: (bolt('ondrel', 'M1').speed * bolt('ondrel', 'M1').lifetimeTicks) / 60 });
+    expect(shipped.clearances['ondrel:M1']).toBe(bolt('ondrel', 'M1').radius);
+    // The Mire and Drowned Ground are areas at the aim, Reed Fence, Reed Step and Reed Screen areas
+    // around her: the clearance of an area is her own body, 0.5.
+    for (const key of ['M2', 'M2:ex', 'F']) {
+      expect(areaReach('ondrel', key).aim, key).toBe(true);
+      expect(shipped.bands[`ondrel:${key}`], key).toEqual({ min: 0, max: areaReach('ondrel', key).reach });
+      expect(shipped.clearances[`ondrel:${key}`], key).toBe(0.5);
+    }
+    // Reed Fence is the first area, the burst of its two; Reed Step's area comes after its dash.
+    expect(shipped.bands['ondrel:Q']).toEqual({ min: 0, max: areaReach('ondrel', 'Q').reach });
+    expect(shipped.bands['ondrel:SPACE']).toEqual({ min: 0, max: areaReach('ondrel', 'SPACE', 1).reach });
+    // Reed Screen: the shield reaches nobody, so the band is its area's.
+    expect(slotOf('ondrel', 'R').effects[0]?.type).toBe('shield');
+    expect(shipped.bands['ondrel:R']).toEqual({ min: 0, max: areaReach('ondrel', 'R', 1).reach });
+    for (const key of ['Q', 'SPACE', 'R']) expect(shipped.clearances[`ondrel:${key}`], key).toBe(0.5);
+    // Undertow is an opener on a target walking away: the kit band less the margin, EX without the condition.
+    for (const key of ['E', 'E:ex']) {
+      const undertow = bolt('ondrel', key);
+      const reach = { min: 0, max: (undertow.speed * undertow.lifetimeTicks) / 60 };
+      expect(shipped.bands[`ondrel:${key}`], key).toEqual(key === 'E' ? { ...reach, motion: 'away' } : reach);
+      expect(shipped.clearances[`ondrel:${key}`], key).toBe(undertow.radius);
+    }
+  });
+
+  it('has the reach, the shot width, the opener condition and the hold of every Brimwick ability', () => {
+    const shipped = SIX_SET;
+    for (const key of ['M1', 'Q', 'E', 'E:ex', 'F']) {
+      const b = bolt('brimwick', key);
+      const reach = { min: 0, max: (b.speed * b.lifetimeTicks) / 60 };
+      // Flash Powder is an opener: the kit band less the margin, at a target walking toward her.
+      expect(shipped.bands[`brimwick:${key}`], key).toEqual(key === 'Q' ? { ...reach, motion: 'closing' } : reach);
+      expect(shipped.clearances[`brimwick:${key}`], key).toBe(b.radius);
+    }
+    for (const key of ['M2', 'M2:ex', 'R']) {
+      expect(shipped.bands[`brimwick:${key}`], key).toEqual({ min: 0, max: areaReach('brimwick', key).reach });
+      expect(shipped.clearances[`brimwick:${key}`], key).toBe(0.5);
+    }
+    // Flare Step reaches nobody: no band, only its escape row. Grand Finale is held for the damage it does.
+    expect(shipped.bands['brimwick:SPACE']).toBeUndefined();
+    const damage = bolt('brimwick', 'F').effects.find((e) => e.type === 'damage');
+    expect(damage?.type === 'damage' && damage.amount).toBe(HELD['brimwick:F']);
+    // Drowned Ground is not held: its damage reads one pulse of five.
+    expect(HELD['ondrel:F']).toBeUndefined();
+  });
+
+  it('has the escape rows of Reed Step, Reed Screen, Flare Step and Smoke Pot, from the kit literals', () => {
+    const reedStep = slotOf('ondrel', 'SPACE').effects[0];
+    if (reedStep === undefined || reedStep.type !== 'dash') throw new Error('no dash');
+    expect(ESCAPES['ondrel:SPACE']).toEqual({ slot: 'SPACE', teleport: null, dash: reedStep.distance, after: null });
+    expect(ESCAPES['ondrel:R']).toEqual({
+      slot: 'R',
+      teleport: null,
+      after: { slot: 'SPACE', teleport: null, dash: reedStep.distance },
+    });
+    const flare = slotOf('brimwick', 'SPACE').effects[0];
+    if (flare === undefined || flare.type !== 'teleport') throw new Error('no teleport');
+    expect(flare.fixed).toBe(false);
+    expect(ESCAPES['brimwick:SPACE']).toEqual({ slot: 'SPACE', teleport: flare.range, after: null });
+    expect(ESCAPES['brimwick:R']).toEqual({
+      slot: 'R',
+      teleport: null,
+      after: { slot: 'SPACE', teleport: flare.range },
+    });
+    // Reed Step is a dash, which a root skips and an escape think holds; Flare Step is not.
+    expect(slotOf('ondrel', 'SPACE').effects[0]?.type).toBe('dash');
+  });
+
+  it('has the trigger of the common kind: rangeMin 5 and 7 of the roster, and no trigger of their own', () => {
+    expect(RANGE_MIN['ondrel']).toBe(5);
+    expect(RANGE_MIN['brimwick']).toBe(7);
+    expect(WITHIN['ondrel']).toBeUndefined();
+    expect(WITHIN['brimwick']).toBeUndefined();
   });
 });

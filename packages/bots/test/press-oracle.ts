@@ -18,6 +18,7 @@ import {
   jsonKits,
   kitOf,
   rosterKits,
+  sixKits,
   stallMessage,
   tallyTeleports,
   validInput,
@@ -95,6 +96,13 @@ export const ESCAPES: Record<string, EscapeRow> = {
   'lumeth:E': { slot: 'E', teleport: null, after: null },
   // Glide: a 4 m dash with a landing of its own, pressed only with Lantern Burst not ready.
   'lumeth:SPACE': { slot: 'SPACE', teleport: null, dash: 4, after: { slot: 'E', teleport: null } },
+  // Reed Step: a 4.5 m dash with a landing of its own, the first escape of Ondrel; Reed Screen
+  // follows it, pressed only when Reed Step is not ready, rooted or without a landing.
+  'ondrel:SPACE': { slot: 'SPACE', teleport: null, dash: 4.5, after: null },
+  'ondrel:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: null, dash: 4.5 } },
+  // Flare Step: a 6 m teleport that is not fixed, the first escape of Brimwick; Smoke Pot follows.
+  'brimwick:SPACE': { slot: 'SPACE', teleport: 6, after: null },
+  'brimwick:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: 6 } },
 };
 
 /**
@@ -127,10 +135,11 @@ function nearAlly(state: GameState, c: ChampionState, target: ChampionState): bo
 
 /**
  * The ultimates the bot holds for a low or cornered target: the key and the health at or below
- * which a target is low, the damage F does (written from the kit file: 40). A press passes only
- * when the target is that low or the oracle finds it cornered.
+ * which a target is low, the damage F does (written from the kit files: 40 for Reaper's Dance, 55
+ * for Grand Finale). A press passes only when the target is that low or the oracle finds it
+ * cornered. Drowned Ground is not held: its damage reads one pulse of the five.
  */
-export const HELD: Record<string, number> = { 'skerrow:F': 40 };
+export const HELD: Record<string, number> = { 'skerrow:F': 40, 'brimwick:F': 55 };
 
 const HARGRIM_BANDS: Record<string, Band> = {
   'hargrim:M1': { min: 0, max: 3 },
@@ -204,6 +213,59 @@ const LUMETH_ALLIES: Record<string, AllyRow> = {
   'lumeth:F': { bolt: false, reach: 5.5, need: 30, clearance: 0, speed: 0 },
 };
 
+// data/kits/ondrel.json, in the six-kit set only: the Mire is an area at the aim (range 8, radius 2,
+// and 2.5 for the EX variant) plus 0.5; Undertow is a bolt of 16 m/s for 30 ticks, an opener at a
+// target walking away; Reed Step reaches the area it leaves behind (radius 1.5 plus 0.5), which
+// is a band beside its escape row; Reed Fence and Reed Screen are areas around her (radius 2.5 and
+// 3, plus 0.5); Drowned Ground is the area at the aim (range 8, radius 4) plus 0.5 and is not held.
+const ONDREL_BANDS: Record<string, Band> = {
+  'ondrel:M1': { min: 0, max: (20 * 30) / 60 },
+  'ondrel:M2': { min: 0, max: 8 + 2 + 0.5 },
+  'ondrel:M2:ex': { min: 0, max: 8 + 2.5 + 0.5 },
+  'ondrel:SPACE': { min: 0, max: 1.5 + 0.5 },
+  'ondrel:Q': { min: 0, max: 2.5 + 0.5 },
+  'ondrel:E': { min: 0, max: (16 * 30) / 60, motion: 'away' },
+  'ondrel:E:ex': { min: 0, max: (16 * 30) / 60 },
+  'ondrel:R': { min: 0, max: 3 + 0.5 },
+  'ondrel:F': { min: 0, max: 8 + 4 + 0.5 },
+};
+const ONDREL_CLEARANCES: Record<string, number> = {
+  'ondrel:M1': 0.3,
+  'ondrel:M2': 0.5,
+  'ondrel:M2:ex': 0.5,
+  'ondrel:SPACE': 0.5,
+  'ondrel:Q': 0.5,
+  'ondrel:E': 0.5,
+  'ondrel:E:ex': 0.5,
+  'ondrel:R': 0.5,
+  'ondrel:F': 0.5,
+};
+
+// data/kits/brimwick.json, in the six-kit set only: Firecracker is an area at the aim (range 9,
+// radius 1.5, and 2 for the EX variant) plus 0.5; Flash Powder, Starshell and Grand Finale are
+// bolts, the first an opener at a target walking toward her; Flare Step reaches nobody (a teleport,
+// so it has no band); Smoke Pot is the area around her (radius 3.5) plus 0.5.
+const BRIMWICK_BANDS: Record<string, Band> = {
+  'brimwick:M1': { min: 0, max: (20 * 33) / 60 },
+  'brimwick:M2': { min: 0, max: 9 + 1.5 + 0.5 },
+  'brimwick:M2:ex': { min: 0, max: 9 + 2 + 0.5 },
+  'brimwick:Q': { min: 0, max: (24 * 25) / 60, motion: 'closing' },
+  'brimwick:E': { min: 0, max: (12 * 50) / 60 },
+  'brimwick:E:ex': { min: 0, max: (12 * 50) / 60 },
+  'brimwick:R': { min: 0, max: 3.5 + 0.5 },
+  'brimwick:F': { min: 0, max: (20 * 36) / 60 },
+};
+const BRIMWICK_CLEARANCES: Record<string, number> = {
+  'brimwick:M1': 0.3,
+  'brimwick:M2': 0.5,
+  'brimwick:M2:ex': 0.5,
+  'brimwick:Q': 0.35,
+  'brimwick:E': 0.6,
+  'brimwick:E:ex': 0.6,
+  'brimwick:R': 0.5,
+  'brimwick:F': 0.5,
+};
+
 export const KIT_SETS: KitSet[] = [
   {
     // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal
@@ -266,6 +328,19 @@ export const KIT_SETS: KitSet[] = [
 
 /** The shipped set with Lumeth's kit: `jsonKits()` has no Lumeth, so the plain runs stay as they were. */
 export const LUMETH_SET: KitSet = { ...(KIT_SETS[1] as KitSet), name: 'the four shipped kits', kits: rosterKits };
+/** The shipped set with Ondrel's and Brimwick's kits too: the six kits, for the runs of the two new champions. */
+export const SIX_SET: KitSet = {
+  ...(KIT_SETS[1] as KitSet),
+  name: 'the six shipped kits',
+  kits: sixKits,
+  bands: { ...(KIT_SETS[1] as KitSet).bands, ...ONDREL_BANDS, ...BRIMWICK_BANDS },
+  clearances: {
+    ...(KIT_SETS[1] as KitSet).clearances,
+    ...ONDREL_CLEARANCES,
+    ...BRIMWICK_CLEARANCES,
+  },
+};
+
 /** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
@@ -274,6 +349,7 @@ const DASHES = new Set([
   'skerrow:SPACE',
   'skerrow:SPACE:ex',
   'lumeth:SPACE',
+  'ondrel:SPACE',
 ]);
 const MARGIN = 1;
 const EX_COST = 25;
@@ -357,7 +433,17 @@ function pressProblems(
   const targetId = acted.targetId;
   const target = state.champions[targetId];
   const problems: string[] = [];
-  const escape = pressed.ex ? undefined : ESCAPES[key];
+  let escape = pressed.ex ? undefined : ESCAPES[key];
+  // A slot that is an escape and has a band of its own (Reed Step, Reed Screen, Smoke Pot) passes
+  // as an escape when the trigger holds, and otherwise as an ordinary press on its band.
+  if (
+    escape !== undefined &&
+    set.bands[key] !== undefined &&
+    target !== undefined &&
+    triggerProblems(c, target, acted.intent).length > 0
+  ) {
+    escape = undefined;
+  }
   let landing: OracleLanding | null = null;
   const d = target === undefined ? NaN : Math.hypot(c.x - target.x, c.y - target.y);
   const cooldown = c.cooldowns[SLOTS.indexOf(pressed.slot)] ?? Infinity;
@@ -401,13 +487,19 @@ function pressProblems(
       }
     }
     if (escape.after !== null) {
-      const { slot: firstSlot, teleport } = escape.after;
-      const ready = (c.cooldowns[SLOTS.indexOf(firstSlot)] ?? Infinity) <= 1;
-      if (
-        ready &&
-        (teleport === null || oracleLanding(state, c, target, firstSlot, teleport) !== null)
-      ) {
-        problems.push(`${key} pressed with ${firstSlot} ready${teleport === null ? '' : ' and a landing'}`);
+      const { slot: firstSlot, teleport, dash } = escape.after;
+      // A rooted champion cannot start a dash, so a dash escape ahead of this one is not ready.
+      const ready =
+        (c.cooldowns[SLOTS.indexOf(firstSlot)] ?? Infinity) <= 1 &&
+        !(dash !== undefined && hasStatus(c, 'root'));
+      const landing =
+        dash !== undefined
+          ? oracleDashLanding(state, c, target, dash) !== null
+          : teleport === null || oracleLanding(state, c, target, firstSlot, teleport) !== null;
+      if (ready && landing) {
+        problems.push(
+          `${key} pressed with ${firstSlot} ready${teleport === null && dash === undefined ? '' : ' and a landing'}`,
+        );
       }
     }
   } else if (allyRow !== undefined && (band === undefined || ally !== null)) {
@@ -598,9 +690,11 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
     tracker.observe(inputs);
     const tick = state.tick;
     // Before the step, only on a tick with an escape teleport press: the state the bots thought on
-    // and the real inputs, for the turn-order model of the champions ahead of the caster.
+    // and the real inputs, for the turn-order model of the champions ahead of the caster. The inputs
+    // are the bots' own records, which nothing overwrites before the model reads them in this
+    // tick; the model copies the ones it steps with.
     const beforeStep = pending.some((press) => press.landing !== null && press.dash === null)
-      ? { state: cloneState(state), inputs: inputs.map((i) => ({ ...i })) }
+      ? { state: cloneState(state), inputs }
       : null;
     // The inputs are the bots' own records; step reads them and keeps no reference.
     step(state, inputs);
@@ -628,9 +722,9 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       if (event === undefined || press.landing === null) return;
       // The sim puts the champion where the oracle found the first landing.
       if (event.toX === press.landing.x && event.toY === press.landing.y) return;
-      // Otherwise a champion ahead of it in the turn order (a lower id) walked or died first and
-      // the teleport pushed its end out of where that champion now stands: the end is the
-      // model's, bit for bit, and a champion ahead did move (#146).
+      // Otherwise a champion ahead of it in the turn order (a lower id) walked first, or a champion
+      // ahead killed one (a melee arc kills without moving, and the dead no longer push a landing
+      // out): the end is the model's, bit for bit, and a champion ahead moved or one died (#146).
       const model =
         beforeStep === null ? null : teleportAfterWalksAhead(beforeStep.state, press.id, beforeStep.inputs);
       const standing = `${press.landing.x},${press.landing.y}`;
@@ -642,7 +736,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       ).toEqual([model.x, model.y]);
       expect(
         model.aheadMoved,
-        `tick ${tick} champion ${press.id} teleport left the standing landing ${standing} and no champion ahead moved`,
+        `tick ${tick} champion ${press.id} teleport left the standing landing ${standing} and no champion ahead moved and none died`,
       ).toBe(true);
       displaced++;
     });

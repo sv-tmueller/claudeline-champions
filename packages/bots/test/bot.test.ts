@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, hasLineOfSight, step } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, KitDef, PlayerInput } from '@claudeline/sim';
+import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
 import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
