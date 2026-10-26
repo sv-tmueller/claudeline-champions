@@ -12,6 +12,9 @@ import type { TestClient } from './loopback';
 // every expectation here is a rule or a comparison with a local run of the same inputs.
 
 const data = roomData();
+// Two rounds to win, not the default three: the match still crosses a round boundary, and the file
+// runs in about a third of the time (the runner took 29 s of this file at three rounds).
+const ROUNDS_TO_WIN = 2;
 
 interface Spec {
   name: string;
@@ -34,7 +37,7 @@ interface Played {
 }
 
 function setUp(spec: Spec, entropy: number): Played {
-  const harness = new Harness({ entropy });
+  const harness = new Harness({ entropy, roundsToWin: ROUNDS_TO_WIN });
   const host = harness.client();
   host.create('Ada');
   harness.flush();
@@ -95,14 +98,14 @@ function firstDivergence(played: Played, arenaId: string, difficulty: Difficulty
   return null;
 }
 
-describe.each(SPECS)('loopback: $name', { timeout: 60_000 }, (spec) => {
+describe.each(SPECS)('loopback: $name', { timeout: 10_000 }, (spec) => {
   let first: Played;
   let second: Played;
 
   beforeAll(() => {
     first = play(spec, 1);
     second = play(spec, 1);
-  }, 180_000);
+  }, 20_000);
 
   it('plays to a result: a final snapshot, matchEnd, then the lobby', () => {
     const { harness, players } = first;
