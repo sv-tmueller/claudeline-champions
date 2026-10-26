@@ -102,6 +102,19 @@ the dodge and 62.4 s after it (job 117369238607). By the rule, twice the
 slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s over it;
 the test sits at 42 percent of its timeout.
 
+The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells) and
+`brimwick.test.ts` (eight) play each cell to matchEnd under the press oracle and
+have their own timeouts too: 60 s a cell and 30 s for a start-edit run (the
+long-match precedent of `lumeth.test.ts`, which has 120 s). A cell takes 2 to 5 s
+locally (Apple M5 Pro, Node 22.23.2; a file alone 27 to 40 s) and 7.0 to 25.4 s
+(Ondrel) and 7.2 to 22.2 s (Brimwick) on the runner, ubuntu-latest, Node 22 (job
+121726022078 of 056def8, with the other long files running beside them); twice
+the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
+10.0 and 10.4 s (Grand Finale) there, inside 30 s. The two files take 161 s and
+120 s of that job, beside `lumeth.test.ts` (117 s) and `headless-kits.test.ts`
+(95 s), and the unit job went from 2 min 24 s on main (4cfe695) to 5 min 49 s
+(305 s of Vitest), inside its 10 minutes.
+
 ## Test types
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,

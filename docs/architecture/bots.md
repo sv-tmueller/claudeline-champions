@@ -1214,10 +1214,11 @@ match replays exactly from its input stream.
   kits is not played either, nor is a balance report over six (the harness
   roster stays four).
 - A lead for an area that is derived from the kit: the nominal lead stays, which
-  the Mire and Drowned Ground measured at the optimum for, and the one-hit areas
-  (Firecracker, Binding Sigil) were measured at 93.5 percent of their pulses on an
-  enemy and at 98 and more with the offset capped at the radius (see Aim); a
-  follow-up, low priority.
+  the Mire and Drowned Ground measured at the optimum for. The one-hit areas
+  (Firecracker, and Binding Sigil, which was not measured) read the other way:
+  Firecracker lands 93.5 percent of its pulses on an enemy with the nominal lead
+  and 98 and more with the offset capped at the radius (see Aim); a follow-up,
+  low priority.
 - Local steering around champions (the dodge ignores them), and ally logic
   beyond Lumeth's ally slots (peeling for an ally).
   Dodging an area is not built either; the dodge is built for projectiles (see

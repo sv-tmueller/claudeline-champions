@@ -7,7 +7,10 @@ import { NORMAL_2V2, SEEDS_2V2, cellOf, expectEnded, playCell } from './six-cell
 // Seeded matches of bots with Ondrel on the six shipped kits, played to matchEnd on both arenas:
 // against each of the four shipped kits, and against Brimwick (the same pair as in brimwick.test.ts
 // with the sides swapped, so each is the bot of a cast and the champion of an escape). The cells
-// are in six-cells.ts. Local time per cell: 2 to 5 s on an Apple M5 Pro (Node 22.23.2).
+// are in six-cells.ts. A cell takes 2 to 5 s locally (Apple M5 Pro, Node 22.23.2; the file alone 27
+// to 40 s) and 7.0 to 25.4 s on the runner (ubuntu-latest, Node 22, run 40366453951 of 056def8; the
+// file 120 to 161 s beside the other long matches): the timeout of 60 s is at least twice the
+// slowest cell (testing.md, Check suite, with the long-match precedent of lumeth.test.ts).
 const CELLS = [
   cellOf('ondrel', 'hargrim', 'arena01', 4292, 1009),
   cellOf('ondrel', 'hargrim', 'arena02', 5573, 1444),
