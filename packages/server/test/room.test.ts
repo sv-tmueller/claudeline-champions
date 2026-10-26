@@ -335,6 +335,19 @@ describe('the loop', () => {
     expect(harness.observed.inputs.get(3)?.[id]).toBeDefined();
   });
 
+  it('moves the host to the human in the lowest seat when the host leaves a running match', () => {
+    const harness = new Harness({ roundsToWin: 1 });
+    const host = create(harness);
+    const second = join(harness, 'Bo');
+    const third = join(harness, 'Cy');
+    ready(harness, host, second, third);
+    host.send({ t: 'leave' });
+    harness.flush();
+    expect(second.room().hostSeat).toBe(1);
+    expect(second.room().seats[0]).toMatchObject({ kind: 'bot', connected: false });
+    expect(third.room().hostSeat).toBe(1);
+  });
+
   it('copies the events of a tick into the batch: the next step clears state.events', () => {
     const { harness, host } = started();
     // Frames until the first snapshot after a tick with events has been delivered.
@@ -385,6 +398,38 @@ describe('the end of a match', () => {
     ready(harness, host);
     expect(harness.room.phase).toBe('match');
     expect(host.of('matchStart')).toHaveLength(2);
+  });
+
+  it('keeps the host that moved when the host left mid-match: the new host can send settings', () => {
+    const harness = new Harness({ roundsToWin: 1 });
+    const host = create(harness);
+    const guest = join(harness, 'Bo');
+    ready(harness, host, guest);
+    host.send({ t: 'leave' });
+    harness.flush();
+    playOut(harness, [guest]);
+    const room = guest.room();
+    expect(room.seats.map((s) => s.kind)).toEqual(['open', 'human', 'open', 'open']);
+    expect(room.hostSeat).toBe(1);
+    guest.send({ t: 'settings', settings: { teamSize: 2, arenaId: data.listings[0]?.id ?? '', difficulty: 'hard' } });
+    harness.flush();
+    expect(guest.of('error')).toEqual([]);
+    expect(guest.room().settings.difficulty).toBe('hard');
+    // A newcomer takes the open seat 0 and is not the host.
+    const newcomer = join(harness, 'Di');
+    expect(newcomer.room().seats[0]).toMatchObject({ kind: 'human', name: 'Di' });
+    expect(newcomer.room().hostSeat).toBe(1);
+  });
+
+  it('has no host when the only human leaves mid-match, and calls empty() once at the end', () => {
+    const harness = new Harness({ roundsToWin: 1 });
+    const host = create(harness);
+    ready(harness, host);
+    host.send({ t: 'leave' });
+    harness.flush();
+    expect(harness.emptied).toBe(0);
+    playOut(harness, []);
+    expect(harness.emptied).toBe(1);
   });
 
   it('frees the seats of humans who were disconnected, moves the host, and calls empty() at the end', () => {

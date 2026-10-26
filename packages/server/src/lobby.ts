@@ -99,10 +99,18 @@ export function join(lobby: Lobby, data: LobbyData, who: Joiner): number | null 
   return seat;
 }
 
-/** Frees a seat. If it was the host's, the human in the lowest seat becomes host, else -1. */
+/**
+ * The host rule, for every way a host goes: if `seat` was the host's, the human in the lowest seat
+ * becomes host, else -1. Call it after the seat has stopped being a human's.
+ */
+export function moveHost(lobby: Lobby, seat: number): void {
+  if (lobby.hostSeat === seat) lobby.hostSeat = humanSeats(lobby)[0] ?? -1;
+}
+
+/** Frees a seat, and moves the host if it was the host's. */
 export function leave(lobby: Lobby, seat: number): void {
   lobby.seats[seat] = openSeat();
-  if (lobby.hostSeat === seat) lobby.hostSeat = humanSeats(lobby)[0] ?? -1;
+  moveHost(lobby, seat);
 }
 
 /** A team and a champion. A change of either clears the ready flag. */

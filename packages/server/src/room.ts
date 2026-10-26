@@ -31,6 +31,7 @@ import {
   humanSeats,
   join,
   leave,
+  moveHost,
   select,
   setReady,
 } from './lobby';
@@ -372,6 +373,7 @@ export class Room {
     seat.ready = false;
     seat.conn = null;
     seat.token = null;
+    moveHost(this.lobby, st.seat);
     run.bots[id] = createBot(id, run.difficulty, run.seed * 100 + id);
     run.queues[st.seat]?.reset();
     run.pending[st.seat] = [];
