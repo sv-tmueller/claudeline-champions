@@ -20,12 +20,12 @@ function boundaryRule(patterns) {
 }
 
 const intoBotsOrClient = {
-  regex: '(^|/)(bots|client|protocol)(/|$)',
-  message: 'sim must not reach into the bots, client or protocol packages.',
+  regex: '(^|/)(bots|client|protocol|server)(/|$)',
+  message: 'sim must not reach into the bots, client, protocol or server packages.',
 };
 const intoClient = {
-  regex: '(^|/)(client|protocol)(/|$)',
-  message: 'bots must not reach into the client or protocol packages.',
+  regex: '(^|/)(client|protocol|server)(/|$)',
+  message: 'bots must not reach into the client, protocol or server packages.',
 };
 // data/ stays allowed: packages.md says sim reads data/arenas, and sim tests
 // import it.
@@ -57,6 +57,21 @@ const protocolPatterns = (allowed) => [
     regex: '^\\.{1,2}/(.*/)?sim(/|$)',
     message: 'protocol imports sim through @claudeline/sim only, never by relative path.',
   },
+];
+
+// The server imports the three entry points, node: builtins and relative paths (online design
+// section 3). `ws` joins the list with package P3, which adds the dependency. The segment ban keeps
+// a relative path from reaching the packages it imports by name.
+const serverPatterns = (allowed) => [
+  {
+    regex: `^(?!\\.{1,2}(/|$)|node:|(${allowed.join('|')})$)`,
+    message: 'The server imports relative paths, node: builtins and the entry points of @claudeline/sim, @claudeline/bots and @claudeline/protocol only (online design section 3).',
+  },
+  {
+    regex: '^\\.{1,2}/(.*/)?(sim|bots|protocol|client)(/|$)',
+    message: 'The server imports its sibling packages by name, never by relative path, and never the client.',
+  },
+  outOfPackage,
 ];
 
 // The client never imports the server, by name or by a path with a server segment. The selectors
@@ -314,6 +329,27 @@ export default defineConfig(
     files: ['packages/protocol/test/**/*.ts'],
     rules: {
       'no-restricted-imports': boundaryRule(protocolPatterns(['@claudeline/sim', 'vitest'])),
+    },
+  },
+  {
+    // The server runs in Node and may read the wall clock, use timers and Math.random: no clock,
+    // timer or math bans (online design section 3).
+    files: ['packages/server/src/**'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': boundaryRule(
+        serverPatterns(['@claudeline/sim', '@claudeline/bots', '@claudeline/protocol']),
+      ),
+      'no-restricted-syntax': noDynamicImport,
+    },
+  },
+  {
+    files: ['packages/server/test/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': boundaryRule(
+        serverPatterns(['@claudeline/sim', '@claudeline/bots', '@claudeline/protocol', 'vitest']),
+      ),
     },
   },
 );

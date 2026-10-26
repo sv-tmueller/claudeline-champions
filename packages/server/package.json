@@ -1,0 +1,14 @@
+{
+  "name": "@claudeline/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@claudeline/sim": "*",
+    "@claudeline/bots": "*",
+    "@claudeline/protocol": "*"
+  }
+}
