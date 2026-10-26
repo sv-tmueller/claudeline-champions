@@ -53,7 +53,7 @@ ready pull requests and on main.
   wall clock, never calls `Math.random`, and never touches `window`,
   `document`, `fetch` or Node built-ins.
 - `bots` imports `sim` only.
-- `client` imports `sim` and `bots`. It owns rendering, input, audio and UI.
+- `client` imports `sim`, `bots` and `protocol`. It owns rendering, input, audio and UI.
 - Lint (`eslint.config.js`) enforces the import rules, including relative
   paths into `node_modules`, `packages`, `tests` or `e2e`, and relative paths
   from bots source and bots tests into sim. In sim and bots source it also bans

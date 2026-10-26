@@ -828,6 +828,77 @@ noise. The master gain is 0.2 and a voice peaks at 0.6.
   `grep -r __fakeAudio packages/client/dist` must print nothing, next to the
   dist grep above.
 
+## Online
+
+The client's net core, built in #168 (P4a of the [online design](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering),
+see [online](online.md)). It lives in `packages/client/src/net/` and has no
+DOM: it takes time as a `nowMs` parameter, and
+`packages/client/tsconfig.net.json` (`lib: ["ES2023"]`, `types: []`, on the
+`npm run typecheck` line) makes `window`, `document`, `WebSocket`,
+`performance`, `setTimeout`, `setInterval`, `requestAnimationFrame` and
+`console` type errors in it and in anything it imports. `Date` is in ES2023, so
+"time comes in as a parameter" is a review rule. Net files import only
+`@claudeline/protocol`, `@claudeline/sim` (types) and each other, never a client
+file outside `net/`: `AlphaClock` and `DrawnTime` are met by shape. No file of
+`net/` shares a basename with another client file or with an entry of the heap
+probe's `COMBAT_CODE` (the probe keys files by basename), and none is named
+`server`. Nothing in `main.ts` uses the net core yet: the local path is
+unchanged and the production bundle is byte-identical (P4b wires it in).
+
+- **`transport.ts`.** The seam to a socket, in strings only: `send(text)`,
+  `close()` and `setHandlers({ open, message, closed })`. No WebSocket adapter
+  yet (P4b or P4c). `fake-transport.ts` is the test-only fake: it records the
+  sent texts and `deliver(text)` pushes a server text in synchronously.
+- **`snapshot-buffer.ts`.** Up to `BUFFER_CAPACITY` (8) snapshots, sorted by
+  tick. `add` ignores a duplicate tick and a tick at or below the A of the
+  last `select` (the render tick never goes back). `select(renderTick)` writes
+  A, B and `alpha = (render - A) / (B - A)` into one reused record, whose
+  `alpha` is what the interpolation's `AlphaClock` reads, and drops what is
+  below A. Past the newest it holds it (A = B = newest, `alpha` 1, no
+  extrapolation); before the oldest it holds the oldest (`alpha` 0). A snapshot
+  off the cadence gives an uneven gap and the right alpha.
+- **`render-clock.ts`.** `onSnapshot(tick, nowMs)` and `update(nowMs)`; no
+  `renderTick` before the first snapshot (`started` is false). The estimate is
+  the newest tick plus the elapsed time at 60 ticks a second. A newer snapshot
+  corrects it by `CORRECTION_UP` (0.1) of the error when it is ahead of the
+  estimate and by `CORRECTION_DOWN` (0.02) when it is behind (late snapshots
+  and bursts must not drag it down). A late, duplicate or out-of-order tick
+  changes nothing. The render tick is the estimate minus the render delay of
+  `matchStart` (6), capped at the newest tick held (a stall holds, it does not
+  extrapolate), never backward, and after the first frame it rises at most
+  `MAX_CATCH_UP_RATE` (2) times real time, so a jump of the target is a run of
+  bounded steps. The three constants are module constants, not rows of the
+  defaults table of the design.
+- **`event-release.ts`.** `add(batches)` for every snapshot and
+  `release(renderTick)` each frame, which hands out the batches whose tick the
+  render tick has reached (`tick <= renderTick`), once each and in tick order,
+  in one array it reuses. A batch already pending, or at or below the last
+  released tick (the high-water mark), is dropped: over an ordered transport it
+  can only be a duplicate. A batch that arrives out of order and is above the
+  mark still releases in tick order. P4b writes each released batch into the
+  state that `routeEvents` and `routeSounds` read.
+- **`input-sender.ts`.** One `input` message per sampled tick through
+  `transport.send`, with `encodeClientMessage`, counted 0, 1, 2 ... A sender is
+  one per `matchStart`, with no reset: a reconnect's match start makes a new
+  one. Each aim is clamped to `MAX_AIM_CM` of the protocol on the sender's own
+  scratch record, so the input core's shared record is not changed.
+- **`updateAnimsAt`.** In `champion-anim.ts`, next to `updateAnims`, which is
+  unchanged (see Animation): `updateAnimsAt(anims, champions, drawn)` takes a
+  `DrawnTime` record, `{ ticks }`, and moves the clips to `drawn.ticks / 60`.
+  Online the two states a draw interpolates are a snapshot gap apart, so
+  `(state.tick + alpha) / 60` would jump the gap; the drawn time is the render
+  tick. Driven by the render clock over the scripted stream it moves at most two
+  frames a frame, and from the tick of B plus the buffer's alpha it would jump
+  more than that (the unit tests pin both). The local path keeps `updateAnims`
+  until P4b, which also primes `updateAnimsAt` in `scriptAnims` if it goes on
+  the frame path. The online receive path is outside the heap probe in this cut.
+- **The tests.** Each unit has a test next to it. They are driven by
+  `test-stream.ts`, a test-only module that copies the `matchStart` and
+  `snapshot` goldens of `packages/protocol/test/samples.ts` (a test folder, not
+  an export, so not imported) and pins each by a round trip through the
+  protocol's codec, then builds a stream with `encodeSnapshot` and a fixed
+  jitter table, and sends every text through `decodeServerMessage`.
+
 ## Steam readiness rules
 
 - Game code only talks to the `Platform` interface.

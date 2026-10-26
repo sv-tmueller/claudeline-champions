@@ -102,7 +102,7 @@ first.
   total decoders (first message, session message, server message), the
   encoders in the spec's key order and the snapshot splice, with the lint
   blocks that keep it to `@claudeline/sim` and relative paths (see
-  [Online](online.md)). Nothing imports it yet.
+  [Online](online.md)). The client's net core imports it (#168); `main.ts` does not yet.
 - `server`, `desktop`: not started (milestones 6 and 8).
 
 ## Index
