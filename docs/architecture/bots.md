@@ -621,22 +621,23 @@ makes that true, and what stays outside it:
   record of seven doubles and a boolean, and the kite points, the cornered
   test's move and the landing are scratch the bot owns: the landing search and
   the cornered test allocate nothing.
-  The dodge's `DodgeScratch` is the same kind: two points that start as doubles, the
-  tier's chance as a double field and its reaction as an integer, the think count and
-  the ring position as integer fields, and the memo as an `Int32Array` of ids, an
-  `Int32Array` of first thinks and an `Int8Array` of coins, all made in `createBot`;
-  `dodgeInto` takes objects only, keeps every double in a local, passes no double to a
-  call, writes the coin as mulberry32 over the bot's `Uint32Array` state and uses `sqrt`
-  and `ceil`.
-- `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates 32 B per
-  call, so a bot that measures a dozen distances allocated 400 B for them. A test
-  compares it, bit for bit, with `Math.hypot`. That test pins the `Math.hypot` of
-  current V8 (Node 22). If it fails after a Node upgrade, V8 changed `Math.hypot`: that
-  is a decision to make (follow it or keep these bits), not a bug in the bots.
-- `lineOfSight` is the sim's `hasLineOfSight` over a Float64Array of the obstacles,
-  because the sim's allocates about 128 B per call (each sweep returns a double). A test
-  compares the two on random segments. The table is rebuilt when the arena is another
-  object.
+  The dodge's `DodgeScratch` is the same kind: two points that start as
+  doubles, the tier's chance as a double field and its reaction as an integer,
+  the think count and the ring position as integer fields, and the memo as an
+  `Int32Array` of ids, an `Int32Array` of first thinks and an `Int8Array` of
+  coins, all made in `createBot`; `dodgeInto` takes objects only, keeps every
+  double in a local, passes no double to a call, writes the coin as mulberry32
+  over the bot's `Uint32Array` state and uses `sqrt` and `ceil`.
+- `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates
+  32 B per call, so a bot that measures a dozen distances allocated 400 B for
+  them. A test compares it, bit for bit, with `Math.hypot`. That test pins the
+  `Math.hypot` of current V8 (Node 22). If it fails after a Node upgrade, V8
+  changed `Math.hypot`: that is a decision to make (follow it or keep these
+  bits), not a bug in the bots.
+- `lineOfSight` is the sim's `hasLineOfSight` over a Float64Array of the
+  obstacles, because the sim's allocates about 128 B per call (each sweep
+  returns a double). A test compares the two on random segments. The table is
+  rebuilt when the arena is another object.
 - `segmentClear` reads the obstacles from `NavGrid.shapes` (a flat array of
   numbers, kept next to `obstacles` in the grid, which stays plain JSON) and
   has `hypot2` written out at its one site.
@@ -862,12 +863,12 @@ the control. So the final-length array saves about 370 B a window in
 percent) in Chromium. No code follows.
 
 What the Node check misses, by construction: it reaches Turbofan only (20000
-warm-up thinks and the settle), it runs frozen states (one kit, one cast state, so no
-polymorphic feedback), the median of single thinks hides the plans and the aim
-draw, and Node 22's V8 is not the browser's. The Maglev-only run is in the CI
-now (see Testing), on Node 26.7 and not in the browser: Node builds have no
-pointer compression, so a Smi is 32 bits there and 31 in Chromium, and an int32
-above 2^30 boxes only in the browser. The live probe stays the authority.
+warm-up thinks and the settle), it runs frozen states (one kit, one cast state,
+so no polymorphic feedback), the median of single thinks hides the plans and
+the aim draw, and Node 22's V8 is not the browser's. The Maglev-only run is in
+the CI now (see Testing), on Node 26.7 and not in the browser: Node builds have
+no pointer compression, so a Smi is 32 bits there and 31 in Chromium, and an
+int32 above 2^30 boxes only in the browser. The live probe stays the authority.
 
 ### The default tiers on the runner
 
@@ -888,9 +889,11 @@ check on the unchanged test, 1 to 20 runs in each configuration below). V8
 flags reach the workers only through `execArgv` in a project of the config
 (Vitest 5.0.3 ignores `--execArgv` on the command line when the config has
 projects), so each run used a scratch config of one forks project whose
-`execArgv` is the flags, started as `G133_FLAGS='<flags>' npx vitest run
---config <scratch config> --project bots packages/bots/test/allocation.test.ts
--t 'every scene'`; PR #184 has the config. Whole-worker tiers read what the
+`execArgv` is the flags, started from the repo root as `REPO=$PWD
+G133_FLAGS='<flags>' npx vitest run --config <scratch config> --project bots
+<test file> -t 'every scene'`, the test file being this one or, for the
+unchanged test, a copy of the file before #133 beside it; PR #184 has the
+config, which reads the repo root from `REPO`. Whole-worker tiers read what the
 header says: with `--no-turbofan` (and the same with `--no-sparkplug` added, or
 `--maglev --no-turbofan`) every scene reads 23 to 323 KB a think in all three
 rounds, the kite scene 322544 B. A delay of the background compile,
@@ -904,9 +907,12 @@ unchanged test:
   press scene at 1040 to 1696 B, the engage stand scene at 368 to 2576 B, the
   kite step and deadlock stand scenes at 32 to 128 B. An earlier set of ten
   runs at lower load read red in 8.
-- 15 and 25 ms: the press and engage stand scenes at 300 to 1700 B, the kite
-  step, deadlock stand and skerrow wait scenes at 32 to 464 B, a dozen scenes
-  clean; red in 3 of 3 runs each.
+- 15 ms: the press scene at 912 to 1696 B, the engage stand scene at 368 to
+  1360 B, the kite step, deadlock stand and skerrow wait scenes at 32 B, a
+  dozen scenes clean; 25 ms: the press scene at 1696 to 3424 B, the engage
+  stand scene at 368 to 1360 B, the lumeth windup scene at 864 B, the kite step
+  scene at 128 to 464 B, the path follow, escape press and lumeth escape scenes
+  at 16 to 96 B, ten scenes clean; red in 3 of 3 runs each.
 - 50 to 200 ms: most scenes at 16 B to 4 KB; 400 and 800 ms: the press and
   engage stand scenes at 44 and 36 KB, the kite scene at 64 and 127 KB.
 - Controls at 25 ms: `--no-concurrent-recompilation` read 0 B in every scene in
@@ -952,34 +958,36 @@ falls, a tier-up that came late. It does not cure a series that stays flat
 through the cap, which is a function that stays in a lower tier (or deoptimises
 and waits its reoptimisation again and again); the check is then red, as
 before, and the log line says which it was. The measure, at a 10 ms delay with
-the settle (20 runs, load average 20 to 50 on a shared machine, the command
+the settle (20 runs, load average 36 to 51 on a shared machine, the command
 above with `--concurrent-recompilation-delay=10`): the press scene's series
 fell to under the bound in 8 to 18 windows in 6 runs, all green, and stayed
-flat through the 20 windows at 320 to 1312 B in 14 runs, of which 3 were green
-only because one of the three rounds read low (32, 0, 0 B; 1040, 1040, 48 B;
-48, 48, 48 B) and 11 were red. So the check was green in 9 of 20 against 0 of
-20 on the unchanged test, not in all of them. At 15 ms (4 runs) 3 were green,
-the red one flat through 20 windows, and at 25 ms (3 runs) the press scene
-stayed flat through 20 windows in 3 of 3. For the record, at 10 ms with the
-settle: `--no-concurrent-recompilation` was green in 10 of 10 runs (every scene
-one window at 0 B, since nothing is delayed), `--no-use-osr` green in 3 of 10
-(7 flat through the cap at 864 to 1248 B). A flag-pinned project was not taken:
-the delay is a stress the runner does not show, and a pin would hide the tier
-the users run.
+flat through the 20 windows at 320 to 1312 B in 14 runs: in 2 of those the
+series fell in the rounds just after the cap (rounds 32, 0, 0 B and 48, 48, 48
+B, green), in 1 only the last round read low (1040, 1040, 48 B, green on the
+lowest-round rule), and 11 were red. So the check was green in 9 of 20 against
+0 of 20 on the unchanged test, not in all of them. At 15 ms (4 runs) 3 were
+green, the red one flat through 20 windows, and at 25 ms (3 runs) the press
+scene stayed flat through 20 windows in 3 of 3. For the record, at 10 ms with
+the settle: `--no-concurrent-recompilation` was green in 10 of 10 runs (every
+scene one window at 0 B, since nothing is delayed), `--no-use-osr` green in 3
+of 10 (7 flat through the cap at 864 to 1248 B). A flag-pinned project was not
+taken: the delay is a stress the runner does not show, and a pin would hide the
+tier the users run.
 
 A mutation that allocates on every think settles to the cap and stays red, in 3
 of 3 runs each, on Node 22 in the default tiers: a six-double object kept in
 `waitsFor` (168 B in the skerrow engage and wait scenes), a `{ slot, ex }`
 object per slot in `updateRuns` (all 17 scenes red, 280 B in twelve and 200 B
-in five, the whole red run 3.9 s against the 15 s timeout), and a two-double
-cell centre object in the sight scan (14328 to 17784 B in the kite, retreat and
-deadlock advance scenes). The clean tree reads 0 B in all 17 scenes with one
-settle window each, in every run without a delay, and on Node 26.7 the Maglev
-project reads 0 B in all 17 and its kite scene reads 16 B against 8 B with
-`bestDistance` of the sight scan made a local. The measured loop is written out
-twice, word for word (the settle's and the rounds'), because one copy in a loop
-over both read 80 B a think in 3 to 12 of 17 scenes of the clean tree: the loop
-sat in another tier, as in the 144 B case of Testing.
+in five, the whole red run 2.2 to 3.9 s locally against the 15 s timeout), and
+a two-double cell centre object in the sight scan (14328 to 17784 B in the
+kite, retreat and deadlock advance scenes). The clean tree reads 0 B in all 17
+scenes with one settle window each, in every run without a delay, and on Node
+26.7 the Maglev project reads 0 B in all 17 and its kite scene reads 16 B
+against 8 B with `bestDistance` of the sight scan made a local. The measured
+loop is written out twice, word for word (the settle's and the rounds'),
+because one copy in a loop over both read 80 B a think in 3 to 12 of 17 scenes
+of the clean tree: the loop sat in another tier, as in the 144 B case of
+Testing.
 
 On the runner (the three attempts of run 40339535608 of PR #184, the checks job
 and both heap jobs, nine jobs) every scene settled in one window of 10 to 58 ms
@@ -988,14 +996,15 @@ and read 0 B, and the scene check took 4.8 to 6.9 s in the checks job.
 Each scene's log line prints the settle windows and their wall time, then the
 rounds: `kite, no clear shot: settle 5440, 5440, 0 (3 windows, 41 ms); 0, 0, 0
 B per think`. That line is how a future failure says which state it was. A
-series that falls and then fails came late (raise the cap by its rule: the
-smallest of 10 and 20 that is at least twice the largest clean series; more
-than 10 windows in a clean tree is reported, not absorbed). A series flat
-through the cap did not tier up (a deopt loop, or a function V8 did not
-optimise), and its bytes name the function by the pin figures above. The test
-cannot name a tier itself: `%GetOptimizationStatus` needs
-`--allow-natives-syntax`, and V8's code statistics are in `node:v8`, which the
-bots tests do not import.
+series that falls but is still at or over the bound at the cap came late; the
+cap is already the largest the rule allows (the smallest of 10 and 20 that is
+at least twice the largest series seen), so such a failure is reported with its
+series and not absorbed by a larger cap; a clean tree that needs more than 10
+windows passes, and its log line is reported when seen. A series flat through
+the cap did not tier up (a deopt loop, or a function V8 did not optimise), and
+its bytes name the function by the pin figures above. The test cannot name a
+tier itself: `%GetOptimizationStatus` needs `--allow-natives-syntax`, and V8's
+code statistics are in `node:v8`, which the bots tests do not import.
 
 ## Aim
 

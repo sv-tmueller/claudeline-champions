@@ -63,9 +63,10 @@ import { spawnBolt } from './scenes';
  *
  * The branch reads 0 in the lowest round of every scene, and 256 in one round of the press scene
  * while V8 tiers up (the other two read 0). In the default tiers the three rounds come after a
- * settle, windows read like a round until one is under the bound (SETTLE_WINDOWS), which decides
- * nothing and which a mutation that allocates on every think settles to the cap of. The mutations that put a cost back each go over the
- * bound alone: a `{ slot, ex }` object per slot reads 280 in every scene, the kit derived again on
+ * settle (SETTLE_WINDOWS), windows read like a round until one is under the bound; it decides
+ * nothing, and a mutation that allocates on every think settles to the cap and stays red. The
+ * mutations that put a cost back each go over the bound alone: a `{ slot, ex }` object per slot
+ * reads 280 in every scene, the kit derived again on
  * every think 480 to 632, the two shifted points of a clear shot made fresh 720 to 2880 in the
  * scenes that test a shot, a cell centre object in the sight scan 10296. It cannot see one small
  * object per think: a fresh returned input reads 96, and the decision record is smaller still.
@@ -254,21 +255,21 @@ const WARM_UP = 20000;
  * reads windows until one is under the bound, or this many have been read, and only then the three
  * rounds. The warm-up counts thinks, but V8 optimises a hot function on a background thread and
  * installs the code when the job is done, so on a runner whose compile thread is starved the
- * measured rounds can begin before the code of a function on the scene's path has landed (the
- * first attempt of #132 read the kite, no clear shot scene at 5440 B in all three rounds; see
- * bots.md, Allocation, The default tiers on the runner). The settle gives that job wall time
- * without changing what is measured. The verdict is still the lowest of the three rounds against
- * the limit: a mutation that allocates on every think reads its bytes in every settle window too,
- * settles to this cap and stays red. The cap is 20, the most the rule allows (the smallest of 10 and
- * 20 that is at least twice the largest series seen). The settle absorbs a series that falls, a
- * tier-up that came late; it does not cure a series that stays flat through the cap, which is a
- * function that stays in a lower tier, and the log line names it. With the compile of every job
- * delayed by 10 ms (`--concurrent-recompilation-delay=10`, a delay the runner does not show) the
- * press scene's series fell to under the bound in 8 to 18 windows in 6 of 20 runs and stayed flat
- * through the cap in 14 (bots.md, The default tiers on the runner, has the command and the other
- * delays); no delay reproduced the runner's own figures. A clean tree that needs more than 10
- * windows is reported, not absorbed by raising this. Maglev alone does not settle: its flags pin
- * the compile timing.
+ * measured rounds can begin before the code of a function on the scene's path has landed (the first
+ * attempt of #132 read the kite, no clear shot scene at 5440 B in all three rounds; see bots.md,
+ * Allocation, The default tiers on the runner). The settle gives that job wall time without
+ * changing what is measured. The verdict is still the lowest of the three rounds against the limit:
+ * a mutation that allocates on every think reads its bytes in every settle window too, settles to
+ * this cap and stays red. The cap is 20, the most the rule allows (the smallest of 10 and 20 that
+ * is at least twice the largest series seen). The settle absorbs a series that falls, a tier-up
+ * that came late; it does not cure a series that stays flat through the cap, which is a function
+ * that stays in a lower tier, and the log line names it. With the compile of every job delayed by
+ * 10 ms (`--concurrent-recompilation-delay=10`, a delay the runner does not show) the press scene's
+ * series fell to under the bound in 8 to 18 windows in 6 of 20 runs and stayed flat through the cap
+ * in 14 (bots.md, The default tiers on the runner, has the command and the other delays); no delay
+ * reproduced the runner's own figures. A clean tree that needs more than 10 windows passes up to
+ * this cap, so its log line is reported when seen; the cap is not raised past 20. Maglev alone does
+ * not settle: its flags pin the compile timing.
  */
 const SETTLE_WINDOWS = 20;
 
@@ -630,7 +631,7 @@ describe('think allocation', () => {
   // (the three attempts of run 40339535608 of PR #184, one settle window of 10 to 58 ms a scene
   // each); 1.6 s locally (Apple M5 Pro, Node 22.23.2, full npm run test). Timeout: the smallest of
   // 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite): 13.8 s, so
-  // 15. A red run to the cap of the settle takes about 4 s locally (the `{ slot, ex }` mutation of
+  // 15. A red run to the cap of the settle takes 2 to 4 s locally (the `{ slot, ex }` mutation of
   // bots.md, all 17 scenes at the cap), inside it. The heap jobs (Node 24 and 26, both tiers)
   // read 3.6 to 5.3 s.
   it('allocates under the limit per think in every scene', { timeout: 15_000 }, () => {
@@ -649,9 +650,9 @@ describe('think allocation', () => {
       const figures: number[] = [];
       // The settle (default tiers only): windows read like a round, until one is under the limit or
       // SETTLE_WINDOWS have been read. It decides nothing; the verdict is the three rounds below.
-      // The measured loop is written out twice, word for word, and not once in a loop over both: with
-      // one copy the clean tree read 80 B a think in 12 of 17 scenes (the loop sat in another tier),
-      // with two it reads 0 B, as before the settle.
+      // The measured loop is written out twice, word for word, and not once in a loop over both:
+      // with one copy the clean tree read 80 B a think in 3 to 12 of 17 scenes (the loop sat in
+      // another tier), with two it reads 0 B, as before the settle.
       const settle: number[] = [];
       const settleStart = wallMs();
       for (let w = 0; w < (MAGLEV ? 0 : SETTLE_WINDOWS); w++) {
