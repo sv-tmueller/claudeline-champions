@@ -64,7 +64,9 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
-  timeout 15 s.
+  timeout 15 s. With the settle of #133 (one window a scene on the runner): 4.8
+  to 6.9 s over the three attempts of PR #184, the heap jobs 3.6 to 5.3 s, the
+  timeout stays 15 s (twice 6.9 s is 13.8 s).
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (seven models, lumeth slowest): 1.1 to 1.8 s locally, 3.6 to
   8.3 s green, 3.3 to 8.0 s red, timeout 20 s.
