@@ -188,7 +188,7 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
   dodge's coin (see Dodge) and no other use.
 
 Profiles live in `packages/bots/src/profile.ts`, keyed by champion id:
-`profileFor(championId, kit?)`. Without a kit the table applies. Hargrim, Quillon
+`profileFor(championId, kit?)`. Without a kit the table applies. Hargrim, Quillon,
 Skerrow, Lumeth, Ondrel and Brimwick have a rule: with a kit whose id equals the
 champion id, `rangeMax` is the top of the base M1 reach band minus the 1 m range
 margin (see Casting), and `rangeMin` is the rule's literal, because no kit field
@@ -199,9 +199,9 @@ kit id differs, M1 has no band, or the derived `rangeMax` is at most 1 or at mos
 `rangeMin`. Other ids keep the table even with a kit. Lumeth's M1 reaches 12 m,
 so her `rangeMax` with her kit is 11; Ondrel's reaches 10 m (20 m/s for 30
 ticks), so hers is 9, and Brimwick's 11 m (33 ticks), so hers is 10, the
-roster's 9 and 10. `KitDef` has no profile
-field and `createMatch` copies only the kit contract, so profiles stay in bots;
-the kit JSON must carry no bot fields.
+roster's 9 and 10. `KitDef` has no profile field and `createMatch` copies only
+the kit contract, so profiles stay in bots; the kit JSON must carry no bot
+fields.
 
 | Champion | rangeMin | rangeMax | rangeMax with a kit   | Note                                |
 | -------- | -------- | -------- | --------------------- | ----------------------------------- |
@@ -397,10 +397,12 @@ target is beyond F's reach.
 
 Cast delay: per slot, a run counts the consecutive thinks, this one included, on
 which the target was in reach with a clear shot of the ability the slot would
-cast (and the slot's condition held). On an escape think an escape slot's run
-counts the trigger instead, with no band and no shot test: one cast-delay rule
-for every press. The slot may be pressed when the run exceeds `castDelay`, so
-`castDelay` thinks after the first think of the run. The run restarts when the
+cast (and the slot's condition held). On an escape think the escape slots are
+gated on the escape streak instead, one run for the whole order (see Openers and
+escapes), and their own runs go on counting the trigger, with no band and no
+shot test: one cast-delay rule for every press. The slot may be pressed when the
+run exceeds `castDelay`, so `castDelay` thinks after the first think of the run.
+The run restarts when the
 test fails, on an idle or dead think, and when the acted target changes. It
 ignores cooldown, energy, status and windup, so a slot that comes off cooldown
 while the target stays in reach is pressed on the first tick the sim would cast
@@ -581,12 +583,12 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   (the press oracle tests the same raw point, decision 16 of batch #105), while a point in a free
   cell may still land within 0.5 m of a wall or on a champion, where the sim pushes the champion out
   after the teleport; the reach is the full range for a fixed teleport and
-  `min(range, aim distance)` otherwise (Skip is 4 m and fixed, Vanish Step 5 m and Flare Step
-  6 m and not: the bot aims the whole range straight away, so the aim distance is the range).
-  The line of sight is the one of Clear shot's `lineOfSight`: it sees only obstacles that block
-  projectiles, as the sim's teleport does, so a teleport may cross a low wall. When no direction passes the slot is
-  skipped and R comes next: a Quillon boxed in a corner shields herself, an Ondrel or a
-  Brimwick raises Reed Screen or Smoke Pot.
+  `min(range, aim distance)` otherwise (Skip is 4 m and fixed, Vanish Step 5 m and Flare Step 6 m
+  and not: the bot aims the whole range straight away, so the aim distance is the range). The line
+  of sight is the one of Clear shot's `lineOfSight`: it sees only obstacles that block
+  projectiles, as the sim's teleport does, so a teleport may cross a low wall. When no direction
+  passes the slot is skipped and R comes next: a Quillon boxed in a corner shields herself, an
+  Ondrel or a Brimwick raises Reed Screen or Smoke Pot.
 - A slot whose first effect is a dash (Lumeth's Glide, a dash of 4 m; Ondrel's Reed
   Step, a dash of 4.5 m with a slowing area around her at the point she leaves) needs a
   landing too: the end of the dash, which goes its whole distance along the aim
@@ -1093,25 +1095,27 @@ error.
 - Areas lead at the nominal speed too, and a kit-derived lead was measured and
   not built (#165). An ability with no projectile (the Mire and Drowned Ground
   of Ondrel, Firecracker of Brimwick, Binding Sigil of Lumeth) is placed at the
-  aim point, so the lead moves the point a target walking at 5.5 m/s will have
-  reached 20 m/s of flight later. The question was whether a lead bounded by the
-  area does better than the nominal one. A scratch copy of the head with the
+  aim point, so the lead moves the point to where a target walking at 5.5 m/s
+  would be after the flight of a 20 m/s projectile. The question was whether a
+  lead bounded by the area does better than the nominal one. A scratch copy of
+  the head with the
   lead of an area ability changed played 160 seeded 2v2 matches of Ondrel and
   Brimwick against each shipped kit on both arenas (normal tier, seeds 1 to 10,
   not committed: it patches `aim`), and counted the pulses of the areas they
   placed that had an enemy inside:
 
-  | Lead of an area ability       | Mire (r 2)      | Drowned Ground (r 4) | Firecracker (r 1.5) | Firecracker EX (r 2) |
-  | ----------------------------- | --------------- | -------------------- | ------------------- | -------------------- |
-  | nominal 20 m/s (built)        | 932 of 1185 (78.6) | 71 of 76 (93.4)   | 374 of 400 (93.5)   | 488 of 510 (95.7)    |
-  | offset at most the radius     | 943 of 1192 (79.1) | 72 of 77 (93.5)   | 387 of 395 (98.0)   | 482 of 499 (96.6)    |
-  | offset at most half the radius | 938 of 1207 (77.7) | 82 of 88 (93.2)  | 400 of 403 (99.3)   | 489 of 504 (97.0)    |
-  | none (the target's own point) | 863 of 1137 (75.9) | 81 of 88 (92.0)   | 394 of 397 (99.2)   | 488 of 503 (97.0)    |
-  | doubled                       | 793 of 1317 (60.2) | 71 of 89 (79.8)   | 239 of 449 (53.2)   | 402 of 484 (83.1)    |
+  | Lead of an area ability        | Mire (r 2)         | Drowned Ground (r 4) | Firecracker (r 1.5) | Firecracker EX (r 2) |
+  | ------------------------------ | ------------------ | -------------------- | ------------------- | -------------------- |
+  | nominal 20 m/s (built)         | 932 of 1185 (78.6) | 71 of 76 (93.4)      | 374 of 400 (93.5)   | 488 of 510 (95.7)    |
+  | offset at most the radius      | 943 of 1192 (79.1) | 72 of 77 (93.5)      | 387 of 395 (98.0)   | 482 of 499 (96.6)    |
+  | offset at most half the radius | 938 of 1207 (77.7) | 82 of 88 (93.2)      | 400 of 403 (99.3)   | 489 of 504 (97.0)    |
+  | none (the target's own point)  | 863 of 1137 (75.9) | 81 of 88 (92.0)      | 394 of 397 (99.2)   | 488 of 503 (97.0)    |
+  | doubled                        | 793 of 1317 (60.2) | 71 of 89 (79.8)      | 239 of 449 (53.2)   | 402 of 484 (83.1)    |
 
-  The nominal lead is at the optimum for the lingering areas (the Mire and
-  Drowned Ground, which pulse three and five times): a cap moves the share by
-  half a point either way and no lead costs 3, so a kit-derived lead would add
+  The nominal lead is within a point of the best for the lingering areas (the
+  Mire and Drowned Ground, which pulse three and five times): a cap at the
+  radius reads 0.5 and 0.1 points above it, a cap at half the radius 0.9 and 0.2
+  below, and no lead 2.7 and 1.4 below, so a kit-derived lead would add
   arithmetic on doubles to `aim` (the boxing hazard of the Allocation section)
   for nothing, and `aim` is unchanged. The one-hit areas read the other way:
   Firecracker gains 4 to 6 points from a cap (93.5 to 98.0 and 99.3), a
@@ -1531,8 +1535,7 @@ stepped scene and the tracker row are red and `pointBlocked` is green; with the
 circle branch of `overlapsObstacle` without it only the `pointBlocked` asserts
 of the two rows are red (as in #129 with the rect branch, the segment test
 decides the walks). The figures that follow are the scratch evidence of the
-architect of
-#123, in scripts that are not in the repository (in [the #123
+architect of #123, in scripts that are not in the repository (in [the #123
 sub-plan](https://github.com/sv-tmueller/claudeline-champions/issues/123#issuecomment-6417700905)):
 main's bots (normal tier) taken over each of the nine frozen states move on the
 first acting think (+15 ticks), press within +24 to +27 and end round 1 within
@@ -1546,11 +1549,12 @@ obstacles (`melee.ts`), so the touching pair of seed 98 (1.0 m, the pillar
 clips a shifted line) presses no M1 and walks on, which is no stall on main
 (the scene ends in 446 ticks). The harness row of
 `tools/balance/harness.test.ts` plays the match of seed 6 through `playMatch`
-and asserts that it ends in a decision (no end tick is pinned). It is green on main and red on the bots of
-9a9c653 (budget hit, 60000 ticks), which a scratch copy of that commit shows,
-but not under a mutation of the tolerance: without it the full match takes
-another course (it ends at tick 5769, not 5096) and never reaches the stand, so
-the frozen, stepped and tracker rows carry the mutation reading.
+and asserts that it ends in a decision (no end tick is pinned). It is green on
+main and red on the bots of 9a9c653 (budget hit, 60000 ticks), which a scratch
+copy of that commit shows, but not under a mutation of the tolerance: without it
+the full match takes another course (it ends at tick 5769, not 5096) and never
+reaches the stand, so the frozen, stepped and tracker rows carry the mutation
+reading.
 
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
@@ -1579,90 +1583,109 @@ is not the owner, a hit on an enemy a non-empty `effects`, and energy for an
 ally other than the caster a support kit and a heal that restored health in the
 same step.
 
-The rules of #165 (the Ondrel and Brimwick profiles), pinned on frozen states of the six
-shipped kits (`sixKits()` of the helpers; `rosterKits()` keeps its four, so a champion with no kit
-still reads none). `profile.test.ts` reads their rows (5 and 9, 7 and 10 with a kit, derived: an M1
-of 21 m/s for 30 ticks gives 9.5; the table with no kit, no band or another id; the fallback when
-the derived maximum is at most `rangeMin`) and freezes them; `openers.test.ts` Undertow (E at 4, 5
-and 7 m at a target walking away, not at 7.05, at a target that stands or closes in, and the EX
-variant with 25 energy) and Flash Powder (Q at 8 and 9 m at a target closing in, M2 at 9.05 m and
-at one that walks away or stands) and Quiet Dart at a kitted Ondrel or Brimwick; `escapes.test.ts`
-Reed Step (SPACE aimed 4.5 m straight away at 4.9 m, not at 5 or 5.5 m, on a retreat at 6 m and
-not at 6.05 m, ahead of Reed Screen, R alone when boxed in at the north-east corner or rooted, a
-low wall that skips a direction, and the sim starting the dash, dropping the area where she
-stood and ending 4.5 m off) and Flare Step (6 m, not at 7 or 7.5 m, ahead of Smoke Pot, R alone
-when boxed in, a low wall that does not skip, the teleport the sim reports, and the haste on her
-and the slow on a target inside 3.5 m); the kite goes on at exactly `rangeMin` and 0.5 m past it;
-the streak is one run for the whole order (see Openers and escapes), pinned for both kits by a
-target that jumps to 2 m while R's band run builds with R and SPACE on cooldown, and the two come
-off cooldown on the think after the first kite think: SPACE is pressed, not R, red when the gate
-reads the slot's run again; and the streak starts again after a break in the kite and after a
-change of the acted target (the press is `castDelay` thinks after the first think of the new
-streak). `grand-finale.test.ts` holds Grand Finale (pressed at 55 health, not at 56 or at a
-healthy target at 8 m, pressed at a healthy target in the north-east corner, not against a wall
-with a way along it; Ondrel presses Drowned Ground at a healthy target; the reserve spends
-`M2+SHIFT` at 80 energy at 10.2 m against a healthy target and holds it against 55 health).
-`area-lead.test.ts` pins the lead of the areas on the sim (see Aim). Mutations that turn each red
-(each alone, restored after): the `PROFILES` row, the `KIT_RULES` row or the `RULES` row dropped,
-`rangeMin` moved to 4 or 6 (Ondrel) and 6 or 8 (Brimwick), either `holdF` flipped; the motion of
-Undertow or Flash Powder dropped or inverted, either band moved to a literal one metre off, either
-opener dropped; `<=` for `<` in the held test, the damage read as 54 or 56, the cornered test dropped;
-the kite trigger made inclusive, either escape order reversed, the path test of Reed Step made
-the line of sight, that of Flare Step made `segmentClear`, the aim override dropped, `findLanding`
-true when none passes, the streak gate returned to `runs[i]`, the streak not zeroed on a change of
-target, the streak never reset; the lead dropped, doubled or taken from 10 m/s; an object per
-escape gate (168 B in the two escape scenes of the heap check).
+The rules of #165 (the Ondrel and Brimwick profiles), pinned on frozen states of
+the six shipped kits (`sixKits()` of the helpers; `rosterKits()` keeps its four,
+so a champion with no kit still reads none). `profile.test.ts` reads their rows
+(5 and 9, 7 and 10 with a kit, derived: an M1 of 21 m/s for 30 ticks gives 9.5;
+the table with no kit, no band or another id; the fallback when the derived
+maximum is at most `rangeMin`) and freezes them; `openers.test.ts` Undertow (E
+at 4, 5 and 7 m at a target walking away, not at 7.05, at a target that stands
+or closes in, and the EX variant with 25 energy) and Flash Powder (Q at 8 and 9
+m at a target closing in, M2 at 9.05 m and at one that walks away or stands) and
+Quiet Dart at a kitted Ondrel or Brimwick; `escapes.test.ts` Reed Step (SPACE
+aimed 4.5 m straight away at 4.9 m, not at 5 or 5.5 m, on a retreat at 6 m and
+not at 6.05 m, ahead of Reed Screen, R alone when boxed in at the north-east
+corner or rooted, a low wall that skips a direction, and the sim starting the
+dash, dropping the area where she stood and ending 4.5 m off) and Flare Step (6
+m, not at 7 or 7.5 m, ahead of Smoke Pot, R alone when boxed in, a low wall that
+does not skip, the teleport the sim reports, and the haste on her and the slow
+on a target inside 3.5 m); the kite goes on at exactly `rangeMin` and 0.5 m past
+it; the streak is one run for the whole order (see Openers and escapes), pinned
+for both kits by a target that jumps to 2 m while R's band run builds with R and
+SPACE on cooldown, and the two come off cooldown on the think after the first
+kite think: SPACE is pressed, not R, red when the gate reads the slot's run
+again; and the streak starts again after a break in the kite and after a change
+of the acted target (the press is `castDelay` thinks after the first think of
+the new streak). `grand-finale.test.ts` holds Grand Finale (pressed at 55
+health, not at 56 or at a healthy target at 8 m, pressed at a healthy target in
+the north-east corner, not against a wall with a way along it; Ondrel presses
+Drowned Ground at a healthy target; the reserve spends `M2+SHIFT` at 80 energy
+at 10.2 m against a healthy target and holds it against 55 health).
+`area-lead.test.ts` pins the lead of the areas on the sim (see Aim). Mutations
+that turn each red (each alone, restored after): the `PROFILES` row, the
+`KIT_RULES` row or the `RULES` row dropped, `rangeMin` moved to 4 or 6 (Ondrel)
+and 6 or 8 (Brimwick), either `holdF` flipped; the motion of Undertow or Flash
+Powder dropped or inverted, either band moved to a literal one metre off, either
+opener dropped; `<=` for `<` in the held test, the damage read as 54 or 56, the
+cornered test dropped; the kite trigger made inclusive, either escape order
+reversed, the path test of Reed Step made the line of sight, that of Flare Step
+made `segmentClear`, the aim override dropped, `findLanding` true when none
+passes, the streak gate returned to `runs[i]`, the streak not zeroed on a change
+of target, the streak never reset; the lead dropped, doubled or taken from 10
+m/s; an object per escape gate (168 B in the two escape scenes of the heap
+check).
 
-The seeded matches of #165 (`ondrel.test.ts` and `brimwick.test.ts`, over `six-cells.ts`, so Vitest
-runs the two in parallel) play each new kit, with a filler of Hargrim (Quillon when Hargrim is
-one of the two), against each of the four shipped kits with the same filler, on arena01 and
-arena02: 8 cells each, and Ondrel against Brimwick on both arenas as two more in the Ondrel file.
-Team A is the new kit and the filler; seeds 101 to 104, match seed 7, every bot on normal,
-`roundsToWin` the default (3), played to matchEnd on the six kits. Every press of every tick
-passes the oracle (`SIX_SET` of `press-oracle.ts`, `LUMETH_SET`'s pattern), the invariants hold,
-`think` leaves the checksum alone, no escape teleport is blocked, no bot stalls for more than 120
-ticks (the worst is 28), each match ends on 3 rounds before its budget, and no round that did not
-go to sudden death runs past its term (the formula of `lumeth.test.ts`, per cell). The end ticks
-and the longest ordinary round of each cell, which set the budgets: Ondrel against Hargrim 4292
-and 1009 (arena01), 5573 and 1444, Quillon 5126 and 1470, 5533 and 1023, Lumeth 4924 and 1607,
-6725 and 1313, Skerrow 3281 and 1105, 2510 and 621, Brimwick 3703 and 1027, 6098 and 1152; Brimwick
-against Hargrim 4046 and 1412, 4347 and 1039, Quillon 4802 and 1028, 3787 and 800, Lumeth 6551
-and 1710, 6159 and 2325, Skerrow 4057 and 1226, 2323 and 552. Across a kit's cells every slot
-but F is started (M1, M2, SPACE, Q, E, R), and Ondrel escapes by dashing, Brimwick by teleporting.
-F never fires in them, as the 2v2 of the first kits never did, so two declared start edits (the
-precedent of Reaper's Dance) run the whole play loop with the oracle's F row: Brimwick at 100
-energy with both enemies at 55 health starts Grand Finale, at 56 it does not in 3600 ticks, and
-Ondrel at 100 energy starts Drowned Ground. A miss after a change to the bots, the sim or the
-Node version is governed by decision 8.3 of batch #53, with the declared fallback of a duel at 9
-m. Two more start edits give the oracle's escape rows their cases: a rooted Ondrel with an enemy
-2 m off, or boxed in at the north-east corner, with Reed Step ready, presses Reed Screen.
+The seeded matches of #165 (`ondrel.test.ts` and `brimwick.test.ts`, over
+`six-cells.ts`, so Vitest runs the two in parallel) play each new kit, with a
+filler of Hargrim (Quillon when Hargrim is one of the two), against each of the
+four shipped kits with the same filler, on arena01 and arena02: 8 cells each,
+and Ondrel against Brimwick on both arenas as two more in the Ondrel file. Team
+A is the new kit and the filler; seeds 101 to 104, match seed 7, every bot on
+normal, `roundsToWin` the default (3), played to matchEnd on the six kits. Every
+press of every tick passes the oracle (`SIX_SET` of `press-oracle.ts`,
+`LUMETH_SET`'s pattern), the invariants hold, `think` leaves the checksum alone,
+no escape teleport is blocked, no bot stalls for more than 120 ticks (the worst
+is 28), each match ends on 3 rounds before its budget, and no round that did not
+go to sudden death runs past its term (the formula of `lumeth.test.ts`, per
+cell). The end ticks and the longest ordinary round of each cell, which set the
+budgets: Ondrel against Hargrim 4292 and 1009 (arena01), 5573 and 1444, Quillon
+5126 and 1470, 5533 and 1023, Lumeth 4924 and 1607, 6725 and 1313, Skerrow 3281
+and 1105, 2510 and 621, Brimwick 3703 and 1027, 6098 and 1152; Brimwick against
+Hargrim 4046 and 1412, 4347 and 1039, Quillon 4802 and 1028, 3787 and 800,
+Lumeth 6551 and 1710, 6159 and 2325, Skerrow 4057 and 1226, 2323 and 552. Across
+a kit's cells every slot but F is started (M1, M2, SPACE, Q, E, R), and Ondrel
+escapes by dashing, Brimwick by teleporting. F never fires in them, as the 2v2
+of the first kits never did, so two declared start edits (the precedent of
+Reaper's Dance) run the whole play loop with the oracle's F row: Brimwick at 100
+energy with both enemies at 55 health starts Grand Finale, at 56 it does not in
+3600 ticks, and Ondrel at 100 energy starts Drowned Ground. A miss after a
+change to the bots, the sim or the Node version is governed by decision 8.3 of
+batch #53, with the declared fallback of a duel at 9 m. Two more start edits
+give the oracle's escape rows their cases: a rooted Ondrel with an enemy 2 m
+off, or boxed in at the north-east corner, with Reed Step ready, presses Reed
+Screen.
 
-The oracle got three extensions (test code only; the first red of the seeded runs found the
-reason for each). A slot that is both an escape and a slot with a band of its own (Ondrel's
-SPACE and R, Brimwick's R) passes as an escape when the trigger holds and otherwise as an
-ordinary press on its band; before, the escape branch alone ran and a press on the band at 0.9
-m was a red. The `after` check of an escape row accepts a dash (`after: { slot: 'SPACE',
-teleport: null, dash: 4.5 }`): Reed Screen fails the run when Reed Step is ready and
-`oracleDashLanding` finds a landing, and a rooted champion counts Reed Step as not ready. And the
-widened turn-order condition above. The escape rows: Reed Step is `{ teleport: null, dash: 4.5 }`
-with no `after`, Reed Screen follows it, Flare Step is `{ teleport: 6 }`, Smoke Pot follows it;
-the held table has `'brimwick:F': 55`, the dash set has `'ondrel:SPACE'`, and the literal
-`RANGE_MIN` has 5 and 7. A table test in `headless-kits.test.ts` works every literal of the two
-kits out again from `ondrel.json` and `brimwick.json` (the reach of each bolt and area, the shot
-width, the opener motions, the escape rows, the held damage, no hold for Drowned Ground), so a
-change to a kit or a row fails it. Mutations of the oracle that turn something red: the
-either-or dropped (Ondrel against Skerrow, 2 cells), the `after` check as it was (the two start
-edits), without the root clause or without the dash landing (one each), the Ondrel dash row
-without its `dash` and ten rows or literals of the tables (each one test of the table test), the
-held literal at 54 (the Grand Finale run), and the old turn-order condition (the hand-built
-state).
+The oracle got three extensions (test code only; the first red of the seeded
+runs found the reason for each). A slot that is both an escape and a slot with a
+band of its own (Ondrel's SPACE and R, Brimwick's R) passes as an escape when
+the trigger holds and otherwise as an ordinary press on its band; before, the
+escape branch alone ran and a press on the band at 0.9 m was a red. The `after`
+check of an escape row accepts a dash (`after: { slot: 'SPACE', teleport: null,
+dash: 4.5 }`): Reed Screen fails the run when Reed Step is ready and
+`oracleDashLanding` finds a landing, and a rooted champion counts Reed Step as
+not ready. And the widened turn-order condition above. The escape rows: Reed
+Step is `{ teleport: null, dash: 4.5 }` with no `after`, Reed Screen follows it,
+Flare Step is `{ teleport: 6 }`, Smoke Pot follows it; the held table has
+`'brimwick:F': 55`, the dash set has `'ondrel:SPACE'`, and the literal
+`RANGE_MIN` has 5 and 7. A table test in `headless-kits.test.ts` works every
+literal of the two kits out again from `ondrel.json` and `brimwick.json` (the
+reach of each bolt and area, the shot width, the opener motions, the escape
+rows, the held damage, no hold for Drowned Ground), so a change to a kit or a
+row fails it. Mutations of the oracle that turn something red: the either-or
+dropped (Ondrel against Skerrow, 2 cells), the `after` check as it was (the two
+start edits), without the root clause or without the dash landing (one each),
+the Ondrel dash row without its `dash` and ten rows or literals of the tables
+(each one test of the table test), the held literal at 54 (the Grand Finale
+run), and the old turn-order condition (the hand-built state).
 
-The win rates are re-measured for the six-kit balance report (not for `balance.md`: the harness
-roster stays four). A scratch test, not committed (it is the design of #155's check), plays 9
-pairings with every other kit as the filler of both teams, on both arenas, seeds 1 to 10 (the
-match seed, the bots' seeds 100 times it plus the id), normal tier, the teams alternating by
-parity: 720 matches. The first kit's wins out of 80, and the longest match, before the profiles
-(`main`, the rules of #148 only) and after (the profiles and the streak):
+The win rates are re-measured for the six-kit balance report (not for
+`balance.md`: the harness roster stays four). A scratch test, not committed (it
+is the design of #155's check), plays 9 pairings with every other kit as the
+filler of both teams, on both arenas, seeds 1 to 10 (the match seed, the bots'
+seeds 100 times it plus the id), normal tier, the teams alternating by parity:
+720 matches. The first kit's wins out of 80, and the longest match, before the
+profiles (`main`, the rules of #148 only) and after (the profiles and the
+streak):
 
 | Pairing (X first) | X wins before | X wins after | Longest match before to after |
 | ----------------- | ------------- | ------------ | ----------------------------- |
@@ -1676,18 +1699,20 @@ parity: 720 matches. The first kit's wins out of 80, and the longest match, befo
 | skerrow v brimwick | 0 of 80      | 2 of 80      | 6108 to 12324                 |
 | ondrel v brimwick | 45 of 80      | 38 of 80     | 9188 to 9350                  |
 
-No budget hit before or after, and the worst stall is 37 ticks before and 33 after. Against
-roster-v2's counter web the profiled Ondrel matches it against Hargrim and Skerrow (she wins
-80 of 80 and 79 of 80) and Quillon and Lumeth (she loses 61 and 69 of 80), and wins 38 of 80
-against Brimwick where the roster has her win; the profiled Brimwick comes out the opposite of
-the roster on four of four (he wins 75 of 80 against Hargrim and 78 against Skerrow, and loses 61
-to Quillon and 71 to Lumeth): a matter of the kits and of the six-kit balance report, not of the
-bots.
+No budget hit before or after, and the worst stall is 37 ticks before and 33
+after. Against roster-v2's counter web the profiled Ondrel matches it against
+Hargrim and Skerrow (she wins 80 of 80 and 79 of 80) and Quillon and Lumeth (she
+loses 61 and 69 of 80), and wins 38 of 80 against Brimwick where the roster has
+her win; the profiled Brimwick comes out the opposite of the roster on four of
+four (she wins 75 of 80 against Hargrim and 78 against Skerrow, and loses 61 to
+Quillon and 71 to Lumeth): a matter of the kits and of the six-kit balance
+report, not of the bots.
 
-The identity harness (the "harness text" of the body of PR #142, 16 rows) is unchanged by the
-profiles and the streak: none of its 16 rows has an Ondrel or a Brimwick, and for the four
-kits the streak reads the same as the slot's run. Hashes before and after are the same for every
-row, and so are the input streams (`cmp` on `hashes-*.txt` and `streams-*.json`).
+The identity harness (the "harness text" of the body of PR #142, 16 rows) is
+unchanged by the profiles and the streak: none of its 16 rows has an Ondrel or a
+Brimwick, and for the four kits the streak reads the same as the slot's run.
+Hashes before and after are the same for every row, and so are the input streams
+(`cmp` on `hashes-*.txt` and `streams-*.json`).
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
 section. It builds nineteen frozen scenes on arena 1 with the six shipped kits (a
@@ -1705,7 +1730,8 @@ search and the aim override on every think, a Brimwick escape: a kite inside 7
 m with Flare Step ready, the landing search for a teleport that is not fixed
 and the aim override on every think, and a dodge: a Quillon standing with two
 bolts at her, one along an axis and one on a diagonal, so the threat scan of
-both and the sidestep run on every think), warms each bot up with 20000 thinks, settles it in the default tiers
+both and the sidestep run on every think), warms each bot up with 20000 thinks,
+settles it in the default tiers
 (windows read like a round until one is under the bound, at most 20, which
 decide nothing: a series that falls is a late tier-up the settle absorbs, a
 series flat through the cap is a state it does not cure and the log line names;
