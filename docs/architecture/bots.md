@@ -1277,12 +1277,15 @@ the circle limit of `obstacleShapes` without it the walks, the stepped scene
 and the tracker row are red and `pointBlocked` is green; with the circle branch
 of `overlapsObstacle` without it only the `pointBlocked` asserts of the two
 rows are red (as in #129 with the rect branch, the segment test decides the
-walks). Main's bots (normal tier) taken over each of the nine frozen states
-move on the first acting think (+15 ticks) and press within +24 to +27, and
-round 1 ends within +321 to +843 ticks; a scratch copy of main's bots with
-`TOUCH = 0` (the dodge still on) stands for 6000 ticks in all nine, so, as in
-#129, the tolerance resolves the stand and the dodge does not. The whole H3
-cell on main, seeds 1 to 100 in both fills (200 matches), has no budget hit.
+walks). The figures that follow are the scratch evidence of the architect of
+#123, in scripts that are not in the repository (in [the #123
+sub-plan](https://github.com/sv-tmueller/claudeline-champions/issues/123#issuecomment-6417700905)):
+main's bots (normal tier) taken over each of the nine frozen states move on the
+first acting think (+15 ticks), press within +24 to +27 and end round 1 within
++321 to +843 ticks; a copy of main's bots with `TOUCH = 0` (the dodge still on)
+stands for 6000 ticks in all nine, so, as in #129, the tolerance resolves the
+stand and the dodge does not; and the whole H3 cell on main, seeds 1 to 100 in
+both fills (200 matches), has no budget hit.
 No rule was missing in the bots; one case is out of scope: the bots test a
 Hargrim M1 for a clear shot of 0.5 m, while the sim's melee arc ignores
 obstacles (`melee.ts`), so the touching pair of seed 98 (1.0 m, the pillar
@@ -1293,7 +1296,7 @@ decision (no end tick is pinned). It is green on main and red on the bots of
 9a9c653 (budget hit, 60000 ticks), which a scratch copy of that commit shows,
 but not under a mutation of the tolerance: without it the full match takes
 another course (it ends at tick 5769, not 5096) and never reaches the stand, so
-the frozen and stepped rows carry the mutation reading.
+the frozen, stepped and tracker rows carry the mutation reading.
 
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,

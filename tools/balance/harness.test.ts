@@ -193,9 +193,10 @@ describe('playMatch', () => {
 
   // The match of issue #123, seed 6: Quillon v Skerrow, three a side with Lumeth and Hargrim, on
   // arena01. Its Hargrims stood from tick 480 to the budget on the bots of 9a9c653 (one ulp inside
-  // the centre pillar's inflated circle, no plan out), and the tolerance of the bots' geometry ends
-  // it. No end tick is pinned: any change to the bots would move it, and this row says only that the
-  // match ends.
+  // the centre pillar's inflated circle, no plan out); main's bots end it, but so do main's bots
+  // without the tolerance (the match takes another course), so this row is red on 9a9c653 and not
+  // under a mutation of the tolerance, which touching.test.ts pins. No end tick is pinned: any
+  // change to the bots would move it, and this row says only that the match ends.
   it('ends the match of #123, seed 6, in a decision and not at the budget', () => {
     const config: Config = { mode: '3v3', x: 'quillon', y: 'skerrow', fill: ['lumeth', 'hargrim'] };
     const record = playMatch(config, arenaOf('arena01'), DATA.kits, 6);
