@@ -268,3 +268,24 @@ describe('createStallTracker and the wait of Skerrow', () => {
     expect(stalls(sceneOf('hargrim', 7, { ready: [], cooldown: { SPACE: 50 } }))).toBe(10);
   });
 });
+
+// The recorded stand of #123, seed 6: two Hargrims 2.139 m apart, A one ulp inside the inflated
+// circle of arena01's centre pillar, B in the open. The kit's rangeMax is 2 (the band top of 3 m
+// less the margin of 1), so neither holds, and the pillar is between them, so neither has a clear
+// shot. The tracker's reachability uses the bots' own `nearestFreeCell`: with the tolerance of
+// `geometry.ts` it finds a free cell next to A and the enemy reachable, so the tracker counts the
+// stand; without it the search returns no cell, the enemy reads unreachable and the tracker reads
+// 0. That is why the tracker could not see the stand on the bots that stalled for thousands of
+// ticks, and why this row is red without the tolerance.
+describe('createStallTracker and the end-ring stand of #123', () => {
+  it('counts the two Hargrims that stand one ulp inside the centre pillar: 10 of 10', () => {
+    const state = sceneOf('hargrim', 0, {
+      arena: arena01,
+      me: [0.0855392913577604, -1.9981699201104024],
+      enemy: [2.0015268855029604, -1.0463832708773901],
+      enemyId: 'hargrim',
+    });
+    const bots = [stub('engage', 2), stub('idle', -1), stub('engage', 0)];
+    expect(worstAfter(state, bots, [ZERO, ZERO, ZERO])).toBe(10);
+  });
+});
