@@ -14,6 +14,8 @@ const TIERS = ['easy', 'normal', 'hard', 'normal'] as const;
 // The 3v3 that must start an ultimate: seeds and tiers pinned for that alone (see its test).
 const ULTIMATE_SEEDS = [101, 102, 103, 104, 105, 106];
 const ULTIMATE_TIERS = ['hard', 'hard', 'hard', 'hard', 'hard', 'hard'] as const;
+// The 3v3 free play whose tick 341 Skip is displaced by a walk ahead of it, at ULTIMATE_TIERS (hard for all six; see its test).
+const DISPLACED_SEEDS = [648, 649, 650, 651, 652, 653];
 
 /** Hargrim and two Quillons on each team. */
 function config3v3(): MatchConfig {
@@ -72,6 +74,25 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
     ).toBe(true);
     expect(played.state.tick).toBe(TICKS);
     expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expectNoStall(played);
+  }, 30_000);
+});
+
+// Free play of the same 3v3 on the shipped kits with no start edit, seeds 648 to 653 (#146). On
+// tick 341 champion 1's Skip ends 2.0 m from the standing landing: champion 0, ahead of it in the
+// step's turn order, walked first and slid along champion 2, and the teleport then pushed champion
+// 1's end out of where champion 0 now stands, which the oracle's own clone does not see. The
+// oracle models the walks of the champions ahead. The seeds are pinned for that alone: a miss
+// after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3.
+describe('a headless 3v3 free play on the shipped kits, seeds 648 to 653', () => {
+  const set = KIT_SETS[1] as KitSet;
+
+  it('every escape teleport passes the oracle, one displaced by a champion ahead of it in turn order', () => {
+    const run = createRun(DISPLACED_SEEDS, ULTIMATE_TIERS, 7, { config: config3v3(), kits: set.kits() });
+    const played = play(set, run);
+    expect(played.state.tick).toBe(TICKS);
+    expect(played.tally.blockedEscapes, played.summary).toBe(0);
+    expect(played.displaced, played.summary).toBeGreaterThanOrEqual(1);
     expectNoStall(played);
   }, 30_000);
 });

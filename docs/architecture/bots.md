@@ -1023,11 +1023,20 @@ champion; for Lumeth the literal 3 m of any intent but idle, a table of its
 own), and for a teleport its own first-of-five landing, found by casting the
 slot on a clone of the state, checked with `hasLineOfSight` and the clearance of
 the cell centre: the aim of the press must be that landing's and the sim must
-put the champion on it, and Hush Ward is pressed only when Skip is not ready or
-has no landing. A direction whose raw point, the one the teleport aims at before
-the sim's collision pushes a champion off a wall, is not a free cell is skipped
-too, as the bot does: a match played to its end has a Skip that ends 2 cm inside
-the south wall, which the sim pushes clear and the bot passes over. Lumeth's
+put the champion on it, unless a champion ahead of it in the step's turn order
+(a lower id) walked or died in that step: the teleport pushes its end out of
+every other champion where that champion stands at the caster's turn, and the
+oracle's clone, which gives no other champion an input, sees them standing.
+Then the end must equal, bit for bit, the teleport end of a clone of the state
+the bot thought on stepped with the inputs of the champions ahead and the
+caster's press, and a champion ahead must have moved or died: the oracle models
+the walks that land before the cast and nothing else (#146). The bot models
+neither the walks nor the deaths ahead of it; its landing search ignores
+champions. Hush Ward is pressed only when Skip is not ready or has no landing.
+A direction whose raw point, the one the teleport aims at before the sim's
+collision pushes a champion off a wall, is not a free cell is skipped too, as
+the bot does: a match played to its end has a Skip that ends 2 cm inside the
+south wall, which the sim pushes clear and the bot passes over. Lumeth's
 rows are Lantern Burst (an escape row), Glide (a dash row: the oracle's own
 first-of-five 4 m dash landing, a free cell and a path `oracleSegmentViolates`
 finds clean, the aim equal to it, a `dashStarted` in that direction after the
@@ -1067,8 +1076,11 @@ needed another size of match). Since the bots dodge (#137) the run is a declared
 start edit (decision 4 of batch #134): every champion starts at 75 energy,
 because no seed set reached an F by landing hits alone. Four (test kits) and
 five (shipped kits) of the six press F, and with the reserve dropped none does,
-so the energy reserve is still what lets it fire. A Skerrow 2v2 pins the Skerrow
-profile: Skerrow and
+so the energy reserve is still what lets it fire. A free-play run of the same
+3v3 on the shipped kits, seeds 648 to 653 with no start edit, pins the
+turn-order model above: on tick 341 champion 1's Skip ends 2.0 m from the
+standing landing because champion 0 slid along champion 2 first. A Skerrow
+2v2 pins the Skerrow profile: Skerrow and
 Quillon against Hargrim and Quillon on the shipped kits in free play, seeds 101
 to 104, every bot on normal, match seed 7; a team is eliminated by tick 3600 (a
 round is 5400 ticks in match flow, which would decide the same way), Skerrow

@@ -6,6 +6,13 @@ import { oracleBlocked, oracleSegmentViolates } from './helpers';
 // trigger and the first-of-five landing are written here from docs/architecture/bots.md (Openers
 // and escapes), and the point a teleport lands on is read from the sim itself (a cloned state
 // stepped with the one press), not computed by a copy of the formula the bot uses.
+//
+// That clone gives no other champion an input, and the sim skips a champion with none, so it sees
+// every other champion standing. In the real step the champions with a lower id take their turn
+// first and may walk or die before the caster's cast (step 3d), and the teleport then pushes its
+// end out of where they now stand. `teleportAfterWalksAhead` reads that end from a clone of the
+// state before the step stepped with the real inputs of the champions ahead of the caster and the
+// caster's own press, and nothing else: it models the walks that land before the cast (#146).
 
 /** An escape think: a retreat with the target within this many metres, inclusive. */
 export const ESCAPE_REACH = 6;
@@ -197,6 +204,46 @@ function teleportOf(
   const event = clone.events.find((e) => e.type === 'teleport' && e.championId === c.id);
   if (event === undefined || event.type !== 'teleport' || event.blocked) return null;
   return { x: event.toX, y: event.toY };
+}
+
+/** The teleport end of a caster in the turn order of the real step, and whether a champion ahead moved. */
+export interface TurnOrderTeleport {
+  x: number;
+  y: number;
+  /** A champion with a lower id than the caster has another point or alive flag after the step. */
+  aheadMoved: boolean;
+}
+
+/**
+ * Where the sim puts champion `caster` when it casts in the real turn order: `before` is a clone of
+ * the state the bots thought on (taken before the real step) and `inputs` are the real inputs of
+ * that tick. It is stepped with a copy of the input of every champion with an id up to the caster's
+ * (the lower ids take their turn first, so they may walk or die before the cast, and the caster's
+ * input is its real press, whose aim the caller has checked against the landing) and none for the
+ * rest, which act after the caster's cast and so cannot move it. The bot cannot see the inputs of
+ * the champions ahead; only the oracle models their turns. Null when the sim does not move the
+ * caster or blocks it.
+ */
+export function teleportAfterWalksAhead(
+  before: GameState,
+  caster: number,
+  inputs: readonly (PlayerInput | undefined)[],
+): TurnOrderTeleport | null {
+  const clone = cloneState(before);
+  const ahead: (PlayerInput | undefined)[] = [];
+  for (let id = 0; id <= caster; id++) {
+    const input = inputs[id];
+    ahead[id] = input === undefined ? undefined : { ...input };
+  }
+  step(clone, ahead);
+  const event = clone.events.find((e) => e.type === 'teleport' && e.championId === caster);
+  if (event === undefined || event.type !== 'teleport' || event.blocked) return null;
+  const aheadMoved = before.champions.some((o) => {
+    if (o.id >= caster) return false;
+    const now = clone.champions[o.id] as ChampionState;
+    return now.x !== o.x || now.y !== o.y || now.alive !== o.alive;
+  });
+  return { x: event.toX, y: event.toY, aheadMoved };
 }
 
 /**

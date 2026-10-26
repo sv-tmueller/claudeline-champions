@@ -1,10 +1,11 @@
 import { expect } from 'vitest';
-import { Button, SLOTS, checksum, hasLineOfSight, step } from '@claudeline/sim';
+import { Button, SLOTS, checksum, cloneState, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, KitDef, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import {
   oracleCornered,
   oracleDashLanding,
   oracleLanding,
+  teleportAfterWalksAhead,
   triggerProblems,
 } from './escape-oracle';
 import type { EscapeRow, OracleLanding } from './escape-oracle';
@@ -508,6 +509,11 @@ export interface Played {
   otherTeleporters: number[];
   /** Dash escapes (Glide) the sim started, each checked against the oracle's landing. */
   glides: number;
+  /**
+   * Escape teleports that did not end on the standing landing, because a champion ahead of the
+   * caster in the turn order walked or died first, and matched the turn-order model (#146).
+   */
+  displaced: number;
   /** The tick on which a team had no champion alive, or -1. */
   eliminatedAt: number;
   /** The tick on which a Skerrow first started a SPACE (a Lunge, EX or not), or -1. */
@@ -545,6 +551,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
   const otherTeleporters: number[] = [];
   let eliminatedAt = -1;
   let glides = 0;
+  let displaced = 0;
   let firstLunge = -1;
   let firstDeath = -1;
   const presses = state.champions.map(() => 0);
@@ -590,6 +597,11 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
     });
     tracker.observe(inputs);
     const tick = state.tick;
+    // Before the step, only on a tick with an escape teleport press: the state the bots thought on
+    // and the real inputs, for the turn-order model of the champions ahead of the caster.
+    const beforeStep = pending.some((press) => press.landing !== null && press.dash === null)
+      ? { state: cloneState(state), inputs: inputs.map((i) => ({ ...i })) }
+      : null;
     // The inputs are the bots' own records; step reads them and keeps no reference.
     step(state, inputs);
 
@@ -615,10 +627,24 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       const event = found[n];
       if (event === undefined || press.landing === null) return;
       // The sim puts the champion where the oracle found the first landing.
-      expect([event.toX, event.toY], `tick ${tick} champion ${press.id} teleport`).toEqual([
-        press.landing.x,
-        press.landing.y,
-      ]);
+      if (event.toX === press.landing.x && event.toY === press.landing.y) return;
+      // Otherwise a champion ahead of it in the turn order (a lower id) walked or died first and
+      // the teleport pushed its end out of where that champion now stands: the end is the
+      // model's, bit for bit, and a champion ahead did move (#146).
+      const model =
+        beforeStep === null ? null : teleportAfterWalksAhead(beforeStep.state, press.id, beforeStep.inputs);
+      const standing = `${press.landing.x},${press.landing.y}`;
+      expect(model, `tick ${tick} champion ${press.id} teleport is not the standing landing ${standing}`).not.toBeNull();
+      if (model === null) return;
+      expect(
+        [event.toX, event.toY],
+        `tick ${tick} champion ${press.id} teleport is neither the standing landing ${standing} nor the turn-order model`,
+      ).toEqual([model.x, model.y]);
+      expect(
+        model.aheadMoved,
+        `tick ${tick} champion ${press.id} teleport left the standing landing ${standing} and no champion ahead moved`,
+      ).toBe(true);
+      displaced++;
     });
     // A dash escape: the sim starts a dash from the press, along the direction of the aim the oracle
     // found, which leaves the target (the landing is on the far side of the champion).
@@ -693,7 +719,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
     if (state.match?.phase === 'matchEnd') break;
   }
 
-  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; dash escapes ${glides}; slots ${JSON.stringify(slots)}; hits ${JSON.stringify(hits)}; ally heals ${allyHeals.join(',')}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
+  const summary = `first death tick ${firstDeath}; casts ${started.join(',')}; ex ${exStarted.join(',')}; F ${ultimates.join(',')}; escape teleports ${tally.escapes} (${tally.blockedEscapes} blocked), others ${tally.others} (${tally.blockedOthers} blocked); eliminated ${eliminatedAt}; first Lunge ${firstLunge}; dash escapes ${glides}; displaced ${displaced}; slots ${JSON.stringify(slots)}; hits ${JSON.stringify(hits)}; ally heals ${allyHeals.join(',')}; presses ${presses.join(',')}; health ${state.champions.map((c) => `${c.health}/${c.maxHealth}`).join(',')}`;
   return {
     state,
     worst: tracker.worst(),
@@ -706,6 +732,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
     otherTeleporters,
     eliminatedAt,
     glides,
+    displaced,
     firstLunge,
     hits,
     allyHeals,
