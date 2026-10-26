@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor, rulesFor } from '../src/profile';
-import { jsonKits, rosterKits } from './helpers';
+import { jsonKits, rosterKits, sixKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -90,6 +90,44 @@ describe('profileFor with a kit', () => {
     expect(profileFor('skerrow', quietKit('hargrim'))).toEqual({ rangeMin: 0, rangeMax: 2.5 });
   });
 
+  it('reads Ondrel and Brimwick from the base M1 band: 20 m/s for 30 and 33 ticks, less the margin', () => {
+    const six = sixKits();
+    const ondrel = six.find((kit) => kit.id === 'ondrel') as KitDef;
+    const brimwick = six.find((kit) => kit.id === 'brimwick') as KitDef;
+    // Ondrel's M1 reaches 10 m, so rangeMax is 9; Brimwick's reaches 11 m, so 10.
+    expect(profileFor('ondrel', ondrel)).toEqual({ rangeMin: 5, rangeMax: 9 });
+    expect(profileFor('brimwick', brimwick)).toEqual({ rangeMin: 7, rangeMax: 10 });
+  });
+
+  it('derives the Ondrel and Brimwick rangeMax instead of hard-coding it', () => {
+    // 21 m/s for 30 ticks reaches 10.5 m: 9.5. 22 m/s for 33 ticks reaches 12.1 m: 11.1.
+    expect(profileFor('ondrel', withM1(quietKit('ondrel'), boltSlot(21, 30)))).toEqual({
+      rangeMin: 5,
+      rangeMax: 9.5,
+    });
+    expect(profileFor('brimwick', withM1(quietKit('brimwick'), boltSlot(22, 33)))).toEqual({
+      rangeMin: 7,
+      rangeMax: 11.1,
+    });
+  });
+
+  it('keeps the Ondrel and Brimwick table with no kit, no M1 band or a kit of another id', () => {
+    expect(profileFor('ondrel')).toEqual({ rangeMin: 5, rangeMax: 9 });
+    expect(profileFor('brimwick')).toEqual({ rangeMin: 7, rangeMax: 10 });
+    expect(profileFor('ondrel', quietKit('ondrel'))).toEqual({ rangeMin: 5, rangeMax: 9 });
+    expect(profileFor('brimwick', quietKit('brimwick'))).toEqual({ rangeMin: 7, rangeMax: 10 });
+    expect(profileFor('ondrel', quietKit('hargrim'))).toEqual({ rangeMin: 5, rangeMax: 9 });
+    expect(profileFor('brimwick', quietKit('hargrim'))).toEqual({ rangeMin: 7, rangeMax: 10 });
+  });
+
+  it('falls back to the table when the derived Ondrel rangeMax is at most rangeMin', () => {
+    // 20 m/s for 18 ticks reaches 6 m: rangeMax 5, not above rangeMin 5.
+    expect(profileFor('ondrel', withM1(quietKit('ondrel'), boltSlot(20, 18)))).toEqual({
+      rangeMin: 5,
+      rangeMax: 9,
+    });
+  });
+
   it('returns a fresh object every call', () => {
     const kit = hargrimKit();
     expect(profileFor('hargrim', kit)).not.toBe(profileFor('hargrim', kit));
@@ -106,7 +144,7 @@ describe('profileFor without a kit', () => {
 
 describe('rulesFor', () => {
   it('hands out frozen rules: the row, its openers and escapes, and each opener and band', () => {
-    for (const kit of jsonKits()) {
+    for (const kit of sixKits()) {
       const rules = rulesFor(kit.id, kit);
       expect(rules.openers.length + rules.escapes.length, kit.id).toBeGreaterThan(0);
       expect(Object.isFrozen(rules), `${kit.id} row`).toBe(true);
@@ -147,11 +185,11 @@ describe('rulesFor', () => {
     }
   });
 
-  it('gives Lumeth the escape trigger of 3 m, and Hargrim, Quillon and Skerrow none', () => {
-    const kits = rosterKits();
+  it('gives Lumeth the escape trigger of 3 m, and the other five none', () => {
+    const kits = sixKits();
     const kit = (id: string) => kits.find((k) => k.id === id) as KitDef;
     expect(rulesFor('lumeth', kit('lumeth')).escapeWithin).toBe(3);
-    for (const id of ['hargrim', 'quillon', 'skerrow']) {
+    for (const id of ['hargrim', 'quillon', 'skerrow', 'ondrel', 'brimwick']) {
       expect(rulesFor(id, kit(id)).escapeWithin, id).toBeNull();
     }
   });
@@ -182,5 +220,39 @@ describe('rulesFor', () => {
     expect(Object.isFrozen(rules.openers)).toBe(true);
     expect(Object.isFrozen(rules.escapes)).toBe(true);
     for (const opener of rules.openers) expect(Object.isFrozen(opener)).toBe(true);
+  });
+});
+
+describe('rulesFor Ondrel and Brimwick', () => {
+  const kits = sixKits();
+  const kit = (id: string) => kits.find((k) => k.id === id) as KitDef;
+
+  it('gives Ondrel Undertow on a target walking away and Reed Step, then Reed Screen, as escapes', () => {
+    const rules = rulesFor('ondrel', kit('ondrel'));
+    expect(rules.openers).toEqual([{ slot: 'E', band: null, motion: 'away', when: null }]);
+    expect(rules.escapes).toEqual(['SPACE', 'R']);
+    // The Drowned Ground reads 10 for one pulse, not the 50 of five: Ondrel does not hold it.
+    expect(rules.holdF).toBe(false);
+    expect(rules.wait).toBeNull();
+    expect(rules.escapeWithin).toBeNull();
+    expect(rules.allies).toEqual([]);
+  });
+
+  it('gives Brimwick Flash Powder on a target walking toward her and Flare Step, then Smoke Pot, and holds F', () => {
+    const rules = rulesFor('brimwick', kit('brimwick'));
+    expect(rules.openers).toEqual([{ slot: 'Q', band: null, motion: 'closing', when: null }]);
+    expect(rules.escapes).toEqual(['SPACE', 'R']);
+    expect(rules.holdF).toBe(true);
+    expect(rules.wait).toBeNull();
+    expect(rules.escapeWithin).toBeNull();
+    expect(rules.allies).toEqual([]);
+  });
+
+  it('gives them no rule without their kit or with a kit of another id', () => {
+    const none = { openers: [], escapes: [], holdF: false, wait: null, escapeWithin: null, allies: [] };
+    for (const id of ['ondrel', 'brimwick']) {
+      expect(rulesFor(id), id).toEqual(none);
+      expect(rulesFor(id, kit('hargrim')), id).toEqual(none);
+    }
   });
 });

@@ -12,7 +12,16 @@ import type { NavGrid, Vec2 } from '../src/grid';
 import { hypot2 } from '../src/hypot';
 import type { Intent } from '../src/intent';
 import type { MoveCommand } from '../src/steer';
-import { arena01, config2v2, configLumeth, configMirror, configSkerrow, rosterKits } from './helpers';
+import {
+  arena01,
+  config2v2,
+  configBrimwick,
+  configLumeth,
+  configMirror,
+  configOndrel,
+  configSkerrow,
+  sixKits,
+} from './helpers';
 import { spawnBolt } from './scenes';
 
 /*
@@ -53,9 +62,11 @@ import { spawnBolt } from './scenes';
  *   lumeth escape        (new scene)     (new scene)     0              (not run)
  *   lumeth heal          (new scene)     (new scene)     0              (not run)
  *   lumeth windup        (new scene)     (new scene)     0              (not run)
+ *   ondrel escape        (new scene)     (new scene)     0              (not run)
+ *   brimwick escape      (new scene)     (new scene)     0              (not run)
  *   dodge                (new scene)     (new scene)     0              (not run)
  *
- * The last eight scenes have no main figure: they test paths main does not have. The unit job of
+ * The last ten scenes have no main figure: they test paths main does not have. The unit job of
  * the draft pull request (#86) read 0 for each of the first three in both of its runs; the
  * skerrow wait scene (#98) reads 0 on macOS on Node 22 and Node 26, and its runner figure is the
  * unit job of that pull request. The lumeth escape scene (#106) reads 0 in every round on macOS on
@@ -343,7 +354,8 @@ function put(state: GameState, id: number, x: number, y: number): void {
 }
 
 /**
- * A frozen mirror match on arena01 with the shipped kits: nothing steps inside a scene, and
+ * A frozen mirror match on arena01 with the six shipped kits (`createMatch` keeps only the kits in
+ * use, so a scene of the first four is the match it always was): nothing steps inside a scene, and
  * `think` never mutates the state, so the same think repeats. Champions 0 and 3 are dead unless
  * a scene needs them; the bot is `id`, on a normal tier (reaction delay 15, cast delay 8) with
  * seed 5 unless the scene gives another.
@@ -358,7 +370,7 @@ function scene(
   config: MatchConfig = configMirror(),
   seed = 5,
 ): Scene {
-  const state = createMatch(config, arena01, 1, rosterKits());
+  const state = createMatch(config, arena01, 1, sixKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', seed);
   arrange(state, bot);
@@ -548,6 +560,44 @@ function buildScenes(): Scene[] {
         me.cooldowns[SLOTS.indexOf('M2')] = 100;
       },
       configLumeth(),
+    ),
+    // An Ondrel escape: Ondrel 3 m from a Hargrim, kiting, with Reed Step ready and every other slot
+    // cooling down: the trigger (a kite inside 5 m), the dash landing search with its clear path
+    // each, and the aim override on every think. The first escape scene of a kit that also has a
+    // band on its escape slots (Reed Step, Reed Screen): the one streak gate of `chooseEscape`.
+    scene(
+      'ondrel escape',
+      1,
+      'kite',
+      true,
+      true,
+      (state) => {
+        put(state, 1, -4, -3);
+        put(state, 2, -1, -3);
+        const me = ch(state, 1);
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('SPACE')] = 0;
+      },
+      configOndrel(),
+    ),
+    // A Brimwick escape: Brimwick 5 m from a Hargrim, kiting, with Flare Step ready and every other
+    // slot cooling down: the trigger (a kite inside 7 m), the landing search with a line of sight
+    // each for a teleport that is not fixed (`min(range, aim distance)` in `teleportEndInto`), and the
+    // aim override on every think.
+    scene(
+      'brimwick escape',
+      1,
+      'kite',
+      true,
+      true,
+      (state) => {
+        put(state, 1, -4, -3);
+        put(state, 2, 1, -3);
+        const me = ch(state, 1);
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('SPACE')] = 0;
+      },
+      configBrimwick(),
     ),
     // A dodge: Quillon 8 m from Hargrim on a clear lane, every slot on cooldown, so she stands and
     // presses nothing, and two bolts of the Hargrim's team aimed at her, one flying along an axis

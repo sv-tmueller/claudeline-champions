@@ -1,7 +1,7 @@
 # Roster v2: champions five and six
 
-Status: the kits (#148) and the two models (#149) are built; no bot profile
-yet (batch 13)
+Status: the kits (#148), the two models (#149) and the two bot profiles (#165)
+are built
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.5, 4.6, 6 and 10, and [rules](rules.md), sections 4.1 and 5
 
 This document defines champions five and six of the roster: a zone controller
@@ -565,6 +565,13 @@ in.
   Finale are projectiles, and the dodge of #137 acts on projectiles. Brimwick
   may measure differently before the dodge exists and after it, and Ondrel's
   pulses are areas, so the dodge is not expected to move her.
+  Measured on 2026-10-26 (#165, [bots.md](../architecture/bots.md), Aim): over
+  160 seeded 2v2 matches the nominal lead puts 78.6 percent of the Mire's pulses
+  on an enemy (932 of 1185), 93.4 percent of Drowned Ground's (71 of 76) and 93.5
+  percent of Firecracker's (374 of 400), and doubling it takes the Mire to 60.2
+  and Firecracker to 53.2, so no lead derived from the kit was built; the
+  one-hit Firecracker reads 98 to 99 percent with the offset capped at its radius
+  or less, a follow-up.
 
 A third limit points the other way. The bots press each slot on its own band
 and never combine them on purpose: no Undertow into a placed Mire, no Reed

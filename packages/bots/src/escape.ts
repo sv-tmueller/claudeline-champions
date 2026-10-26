@@ -97,10 +97,16 @@ export interface EscapeScratch {
   tried: number;
   /** True when the slot `chooseEscape` chose has a landing in `land`: the bot aims at it. */
   landed: boolean;
+  /**
+   * The consecutive escape thinks, this one included, 0 on any other think: the one run every
+   * escape slot is gated on (an integer, like the other counters). The bot sets it after
+   * `computeCues` and zeroes it where it zeroes the runs.
+   */
+  streak: number;
 }
 
 export function createEscapeScratch(kite: KiteScratch): EscapeScratch {
-  return { land: createLanding(), kite, tried: 0, landed: false };
+  return { land: createLanding(), kite, tried: 0, landed: false, streak: 0 };
 }
 
 /**
@@ -146,7 +152,8 @@ function findLanding(
 
 /**
  * On an escape think, the first slot of the escape order that passes its gates is chosen: the cast
- * delay run (an escape slot counts the trigger, see `updateRuns`), the cooldown at most 1, no
+ * delay run (one run for the whole order, the escape streak of `scratch`: the slot's own run also
+ * carries its band run, which would let Reed Screen jump Reed Step), the cooldown at most 1, no
  * windup in progress unless it fires on this tick, no stun or silence, no root for a dash, and for
  * a teleport or a dash a landing. Writes the slot into `choice` (never an EX variant) and returns
  * true; the landing is in `scratch.land` with `scratch.landed` set. Every slot of the order is
@@ -159,7 +166,6 @@ function findLanding(
 export function chooseEscape(
   choice: CastChoice,
   scratch: EscapeScratch,
-  runs: readonly number[],
   castDelay: number,
   kit: KitDef,
   cache: KitCache,
@@ -179,7 +185,7 @@ export function chooseEscape(
     const i = cache.escapeOrder[n] as number;
     if (i < 0) break;
     scratch.tried |= 1 << i;
-    if ((runs[i] as number) <= castDelay) continue;
+    if (scratch.streak <= castDelay) continue;
     if ((me.cooldowns[i] as number) > 1) continue;
     const slot = SLOTS[i] as Slot;
     if (rooted && hasDash(kit.slots[slot])) continue;

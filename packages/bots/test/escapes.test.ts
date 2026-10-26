@@ -20,7 +20,7 @@ import { createSightScratch } from '../src/sight';
 import { TIERS } from '../src/difficulty';
 import { createLanding, landingInto, teleportEndInto } from '../src/escape';
 import { createRng } from '../src/rng';
-import { arena01, copyInput, jsonKits, rosterKits } from './helpers';
+import { arena01, copyInput, jsonKits, rosterKits, sixKits } from './helpers';
 import { quietKit } from './kits';
 import { THINKS, firstPress, labelOf, pressOf, sceneOf, walks } from './scenes';
 
@@ -626,5 +626,298 @@ describe('the shipped escape abilities', () => {
     expect(quillon?.slots.SPACE.effects[0]).toEqual({ type: 'teleport', range: 4, fixed: true });
     expect(quillon?.slots.R.effects[0]?.type).toBe('shield');
     expect(kits.find((k) => k.id === 'hargrim')?.slots.R.effects[0]?.type).toBe('shield');
+  });
+});
+
+// Reed Step, the dash escape of Ondrel, is a dash of 4.5 m with a self area after it: like Glide,
+// its landing is the end of the dash, found over the five directions with `segmentClear`. Reed
+// Screen (R) comes second. Both use the common trigger: a kite inside rangeMin 5, or a retreat
+// with the target within 6 m.
+describe('Reed Step and Reed Screen, the escapes of Ondrel', () => {
+  const kits = sixKits();
+  const ondrel = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('ondrel', d, { kits, ready: ['SPACE'], ...options });
+  const corner = (ready: Parameters<typeof sceneOf>[2] = {}) =>
+    ondrel(0, { arena: arena01, me: [14.4, 9.4], enemy: [12.4, 7.4], ...ready });
+
+  it('presses Reed Step at a kiting target inside 5 m, aimed 4.5 m straight away', () => {
+    expect(firstPress(ondrel(4.9))).toEqual({ label: 'SPACE', aimX: -1050, aimY: 0 });
+    expect(firstPress(ondrel(4.9), 'easy', 7)).toEqual({ label: 'SPACE', aimX: -1050, aimY: 0 });
+  });
+
+  it('does not press it at a target at 5 m or 5.5 m, where the kite stops', () => {
+    expect(pressOf(ondrel(5))).toBeNull();
+    expect(pressOf(ondrel(5.5))).toBeNull();
+  });
+
+  it('presses it on a retreat with the target within 6 m, and not at 6.05 m', () => {
+    expect(pressOf(ondrel(6, { health: 0.2 }))).toBe('SPACE');
+    expect(pressOf(ondrel(6.05, { health: 0.2 }))).toBeNull();
+  });
+
+  it('comes before Reed Screen: with both ready SPACE is pressed, with only R ready R is', () => {
+    expect(pressOf(ondrel(4, { ready: ['SPACE', 'R'] }))).toBe('SPACE');
+    expect(pressOf(ondrel(4, { ready: ['R'] }))).toBe('R');
+  });
+
+  it('presses Reed Screen alone when boxed in at the north-east corner, and walks on without it', () => {
+    expect(pressOf(corner({ ready: ['SPACE', 'R'] }))).toBe('R');
+    expect(pressOf(corner())).toBeNull();
+    expect(walks(corner())).toBe(true);
+  });
+
+  it('skips a direction whose path a low wall blocks, which a teleport would cross', () => {
+    // Arena 01, Ondrel at (6, 3) with the target 2 m south of her: straight away is (6, 7.5), across
+    // the low wall at (6, 5), and so are +45 and -45 degrees. The first clear path is +90 degrees,
+    // west to (1.5, 3).
+    const state = ondrel(2, { arena: arena01, me: [6, 3], enemy: [6, 1] });
+    expect(firstPress(state)).toEqual({ label: 'SPACE', aimX: 150, aimY: 300 });
+  });
+
+  it('presses Reed Screen, not the dash, while rooted', () => {
+    const state = ondrel(3, { ready: ['SPACE', 'R'] });
+    (state.champions[0] as ChampionState).statuses.push({
+      type: 'root',
+      sourceId: 2,
+      slot: null,
+      remainingTicks: 600,
+    });
+    expect(pressOf(state)).toBe('R');
+  });
+
+  it('is a dash with a self area after it, in the kit data the pins above read', () => {
+    const slot = (kits.find((k) => k.id === 'ondrel') as KitDef).slots.SPACE;
+    expect(slot.effects[0]).toEqual({ type: 'dash', distance: 4.5, ticks: 15, then: [] });
+    const area = slot.effects[1];
+    expect(area?.type === 'area' && area.placement.type === 'self' && area.radius).toBe(1.5);
+  });
+
+  it('leaves the target: the sim starts the dash away, ends it 4.5 m off, and drops the area behind', () => {
+    const state = ondrel(3);
+    const me = state.champions[0] as ChampionState;
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('SPACE');
+    const [x, y] = [me.x, me.y];
+    stepWith(state, input as PlayerInput);
+    const started = state.events.find((e) => e.type === 'dashStarted');
+    if (started?.type !== 'dashStarted') throw new Error('no dash started');
+    expect([started.dirX, started.dirY]).toEqual([-1, 0]);
+    const spawned = state.events.find((e) => e.type === 'areaSpawned');
+    if (spawned?.type !== 'areaSpawned') throw new Error('no area spawned');
+    expect([spawned.x, spawned.y, spawned.radius]).toEqual([x, y, 1.5]);
+    for (let i = 0; i < 20; i++) step(state, []);
+    expect(me.x).toBeCloseTo(x - 4.5, 6);
+    expect(me.y).toBeCloseTo(y, 6);
+  });
+});
+
+// Flare Step, the teleport escape of Brimwick, is a teleport of up to 6 m that is not fixed: it
+// goes the lesser of the range and the distance to the aim, and the bot aims 6 m straight away, so
+// it goes the whole 6 m. Smoke Pot (R) comes second. The trigger is the common one with rangeMin 7.
+describe('Flare Step and Smoke Pot, the escapes of Brimwick', () => {
+  const kits = sixKits();
+  const brimwick = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('brimwick', d, { kits, ready: ['SPACE'], ...options });
+  const corner = (ready: Parameters<typeof sceneOf>[2] = {}) =>
+    brimwick(0, { arena: arena01, me: [14.4, 9.4], enemy: [12.4, 7.4], ...ready });
+
+  it('presses Flare Step at a kiting target inside 7 m, aimed 6 m straight away', () => {
+    expect(firstPress(brimwick(6.9))).toEqual({ label: 'SPACE', aimX: -1200, aimY: 0 });
+    expect(firstPress(brimwick(6.9), 'easy', 7)).toEqual({ label: 'SPACE', aimX: -1200, aimY: 0 });
+  });
+
+  it('does not press it at a target at 7 m or 7.5 m, where the kite stops', () => {
+    expect(pressOf(brimwick(7))).toBeNull();
+    expect(pressOf(brimwick(7.5))).toBeNull();
+  });
+
+  it('comes before Smoke Pot: with both ready SPACE is pressed, with only R ready R is', () => {
+    expect(pressOf(brimwick(6, { ready: ['SPACE', 'R'] }))).toBe('SPACE');
+    expect(pressOf(brimwick(6, { ready: ['R'] }))).toBe('R');
+  });
+
+  it('presses Smoke Pot alone when boxed in at the north-east corner, where no landing is free', () => {
+    expect(pressOf(corner({ ready: ['SPACE', 'R'] }))).toBe('R');
+    expect(pressOf(corner())).toBeNull();
+  });
+
+  it('crosses a low wall: the landing at (6, 9) behind the wall at (6, 5) is straight away', () => {
+    const state = brimwick(2, { arena: arena01, me: [6, 3], enemy: [6, 1] });
+    expect(firstPress(state)).toEqual({ label: 'SPACE', aimX: 600, aimY: 900 });
+  });
+
+  it('is a non-fixed teleport of 6 m, in the kit data the pins above read', () => {
+    const slot = (kits.find((k) => k.id === 'brimwick') as KitDef).slots.SPACE;
+    expect(slot.effects[0]).toEqual({ type: 'teleport', range: 6, fixed: false });
+  });
+
+  it('ends where the bot computed: the sim teleports 6 m away from the target', () => {
+    const state = brimwick(5);
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('SPACE');
+    stepWith(state, input as PlayerInput);
+    const teleport = state.events.find((e) => e.type === 'teleport');
+    if (teleport?.type !== 'teleport') throw new Error('no teleport');
+    expect(teleport.blocked).toBe(false);
+    expect([teleport.fromX, teleport.fromY]).toEqual([-6, 0]);
+    expect([teleport.toX, teleport.toY]).toEqual([-12, 0]);
+  });
+
+  it('gives haste to Brimwick and a slow to a target inside 3.5 m with Smoke Pot', () => {
+    const state = brimwick(3, { ready: ['R'] });
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('R');
+    stepWith(state, input as PlayerInput);
+    const applied = state.events.filter((e) => e.type === 'statusApplied');
+    expect(applied.map((e) => e.type === 'statusApplied' && [e.targetId, e.status])).toEqual([
+      [0, 'haste'],
+      [2, 'slow'],
+    ]);
+  });
+});
+
+// The escape order is one trigger run. A slot with a band also carries its ordinary band run (Reed
+// Screen reaches 2.5 m, Smoke Pot 3 m), so an escape gate that read the run of the slot let it jump
+// the queue: Reed Screen was pressed before Reed Step, which has no band at 2 m. Every escape slot
+// is gated on the number of consecutive escape thinks instead (`EscapeScratch.streak`).
+describe('the escape trigger of Ondrel and Brimwick', () => {
+  // The bot settles into the kite inside rangeMin with its escape cooling down, and the target then
+  // steps to exactly rangeMin (where `d < rangeMin` is false) or 0.5 m past it, inside the
+  // hysteresis band: it still kites, and the escape that comes off cooldown is not pressed.
+  for (const [id, rangeMin] of [
+    ['ondrel', 5],
+    ['brimwick', 7],
+  ] as const) {
+    it(`does not press ${id}'s escape at ${rangeMin} m or ${rangeMin + 0.5} m, where the kite goes on`, () => {
+      for (const d of [rangeMin, rangeMin + 0.5]) {
+        const state = sceneOf(id, rangeMin - 0.1, { kits: sixKits(), ready: [] });
+        const me = state.champions[0] as ChampionState;
+        const bot = createBot(0, 'hard', 1);
+        for (let i = 0; i < TIERS.hard.delay + 5; i++) bot.think(state);
+        expect(bot.inspect().intent).toBe('kite');
+        me.cooldowns[SLOTS.indexOf('SPACE')] = 0;
+        (state.champions[2] as ChampionState).x = me.x + d;
+        for (let i = 0; i < THINKS; i++) {
+          expect(bot.think(state).buttons, `${d} m, think ${i}`).toBe(0);
+          expect(bot.inspect().intent).toBe('kite');
+        }
+      }
+    });
+  }
+});
+
+describe('the order of an escape does not depend on a band run', () => {
+  /**
+   * The target stands `far` metres away for long enough to settle an engage, jumps to 2 m (inside
+   * the band of R, outside Reed Step's), and its escape slots come off cooldown only on the think
+   * after the first one that acts on a kite. Returns the labels pressed, in order.
+   */
+  function pressedAfterJump(id: string, far: number): string[] {
+    const state = sceneOf(id, far, { kits: sixKits(), ready: [] });
+    const me = state.champions[0] as ChampionState;
+    const target = state.champions[2] as ChampionState;
+    const bot = createBot(0, 'hard', 1);
+    for (let i = 0; i < TIERS.hard.delay + 4; i++) bot.think(state);
+    expect(bot.inspect().intent).not.toBe('kite');
+    target.x = me.x + 2;
+    const pressed: string[] = [];
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      const input = bot.think(state);
+      if (input.buttons !== 0) pressed.push(labelOf(input.buttons));
+      if (!ready && bot.inspect().intent === 'kite') {
+        ready = true;
+        for (const slot of ['SPACE', 'R'] as const) me.cooldowns[SLOTS.indexOf(slot)] = 0;
+      }
+      if (pressed.length > 0) break;
+    }
+    return pressed;
+  }
+
+  it('presses Reed Step, not Reed Screen, when R has a band run from before the kite began', () => {
+    expect(pressedAfterJump('ondrel', 7)).toEqual(['SPACE']);
+  });
+
+  it('presses Flare Step, not Smoke Pot, when R has a band run from before the kite began', () => {
+    expect(pressedAfterJump('brimwick', 9)).toEqual(['SPACE']);
+  });
+});
+
+// The streak starts again whenever the escape thinks stop or the acted target changes: the press
+// comes `castDelay` thinks after the first think of a new streak, not at once on a leftover count.
+describe('the escape streak starts again', () => {
+  const kits = sixKits();
+  const SPACE = SLOTS.indexOf('SPACE');
+
+  for (const [id, near] of [
+    ['ondrel', 4.9],
+    ['brimwick', 6.9],
+  ] as const) {
+    it(`after a break: ${id} presses on the fourth think of the new kite, and not on a leftover count`, () => {
+      const state = sceneOf(id, near, { kits, ready: [] });
+      const me = state.champions[0] as ChampionState;
+      const target = state.champions[2] as ChampionState;
+      const bot = createBot(0, 'hard', 1);
+      // A long kite with the escape cooling down, so the count would be large; then the target is far
+      // enough for the bot to engage again, long enough for the acted intent to follow.
+      for (let i = 0; i < 40; i++) expect(bot.think(state).buttons).toBe(0);
+      target.x = me.x + 12;
+      for (let i = 0; i < 40; i++) bot.think(state);
+      expect(bot.inspect().intent).not.toBe('kite');
+      // Back inside rangeMin with the escape ready: the first kite think is the first of the streak.
+      target.x = me.x + near;
+      me.cooldowns[SPACE] = 0;
+      let kiteThink = -1;
+      let pressThink = -1;
+      for (let i = 0; i < THINKS && pressThink < 0; i++) {
+        const input = bot.think(state);
+        if (kiteThink < 0 && bot.inspect().intent === 'kite') kiteThink = i;
+        if (input.buttons !== 0) pressThink = i;
+      }
+      expect(kiteThink).toBeGreaterThanOrEqual(0);
+      expect(pressThink - kiteThink).toBe(TIERS.hard.castDelay);
+    });
+  }
+
+  it('after a change of the acted target: the press comes castDelay thinks after the switch', () => {
+    const state = sceneOf('ondrel', 4.9, { kits, ready: [] });
+    const me = state.champions[0] as ChampionState;
+    const second = state.champions[3] as ChampionState;
+    second.alive = true;
+    second.x = me.x + 40;
+    second.y = me.y;
+    const bot = createBot(0, 'hard', 1);
+    for (let i = 0; i < 40; i++) expect(bot.think(state).buttons).toBe(0);
+    expect(bot.inspect().targetId).toBe(2);
+    // The second enemy comes to 2 m with the first still in reach, so every think of the switch is an
+    // escape think: the acted target follows after the delay.
+    second.x = me.x + 2;
+    let switchThink = -1;
+    let pressThink = -1;
+    for (let i = 0; i < THINKS && pressThink < 0; i++) {
+      const input = bot.think(state);
+      if (switchThink < 0 && bot.inspect().targetId === 3) {
+        switchThink = i;
+        me.cooldowns[SPACE] = 0;
+      }
+      if (input.buttons !== 0) pressThink = i;
+    }
+    expect(switchThink).toBeGreaterThanOrEqual(0);
+    expect(pressThink - switchThink).toBe(TIERS.hard.castDelay);
   });
 });

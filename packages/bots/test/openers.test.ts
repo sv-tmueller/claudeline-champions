@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AbilitySpec, ChampionState, KitDef, Slot, SlotSpec } from '@claudeline/sim';
 import { dashBand } from '../src/casting';
-import { jsonKits, rosterKits } from './helpers';
+import { jsonKits, rosterKits, sixKits } from './helpers';
 import { pressOf, sceneOf } from './scenes';
 
 function kitById(id: string): KitDef {
@@ -216,5 +216,67 @@ describe('Quiet Dart at a kitted Lumeth', () => {
     expect(pressOf(dart({ enemyReady: ['E'] }))).toBe('Q');
     expect(pressOf(dart({ enemyReady: ['SPACE'] }))).toBe('Q');
     expect(pressOf(dart({ enemyReady: [] }))).toBe('M2');
+  });
+});
+
+describe('Undertow, the opener of Ondrel on a target that walks away', () => {
+  // Undertow keeps the kit band less the margin (0 to 7 m: 16 m/s for 30 ticks reaches 8 m) and
+  // needs a target walking away. Only E is ready; the six-kit set carries Ondrel's kit.
+  const kits = sixKits();
+  const undertow = (distance: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('ondrel', distance, { kits, ready: ['E'], enemyVx: 5.5, ...options });
+
+  it('presses E from 4 to 7 m at a target walking away, inclusive', () => {
+    for (const d of [4, 5, 7]) expect(pressOf(undertow(d)), `at ${d} m`).toBe('E');
+  });
+
+  it('does not press E at 7.05 m, past the kit band less the margin', () => {
+    expect(pressOf(undertow(7.05))).toBeNull();
+  });
+
+  it('does not press E at a target that stands or closes in', () => {
+    expect(pressOf(undertow(6, { enemyVx: 0 }))).toBeNull();
+    expect(pressOf(undertow(6, { enemyVx: -5.5 }))).toBeNull();
+  });
+
+  it('presses the EX variant with 25 energy, and the base with 24', () => {
+    expect(pressOf(undertow(6, { energy: 25 }))).toBe('E+SHIFT');
+    expect(pressOf(undertow(6, { energy: 24 }))).toBe('E');
+  });
+});
+
+describe('Flash Powder, the opener of Brimwick on a target that closes in', () => {
+  // Flash Powder keeps the kit band less the margin (0 to 9 m: 24 m/s for 25 ticks reaches 10 m)
+  // and needs a target walking toward her; M2 (Starshell) is the press that takes over.
+  const kits = sixKits();
+  const powder = (distance: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('brimwick', distance, { kits, ready: ['Q', 'M2'], enemyVx: -5.5, ...options });
+
+  it('presses Q at a target walking toward her from 8 to 9 m, inclusive', () => {
+    for (const d of [8, 9]) expect(pressOf(powder(d)), `at ${d} m`).toBe('Q');
+  });
+
+  it('presses M2, not Q, at 9.05 m, past the band', () => {
+    expect(pressOf(powder(9.05))).toBe('M2');
+  });
+
+  it('presses M2, not Q, at a target that walks away or stands', () => {
+    expect(pressOf(powder(8, { enemyVx: 5.5 }))).toBe('M2');
+    expect(pressOf(powder(8, { enemyVx: 0 }))).toBe('M2');
+  });
+});
+
+describe('Quiet Dart at a kitted Ondrel or Brimwick', () => {
+  // The condition reads the escapes of the target's own rule: Reed Step then Reed Screen for
+  // Ondrel, Flare Step then Smoke Pot for Brimwick. Only with their kit in the match.
+  const dart = (enemyId: string, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('skerrow', 9, { kits: sixKits(), ready: ['Q', 'M2'], enemyId, ...options });
+
+  it('presses Q while one of their escapes is ready, and M2 with both cooling down', () => {
+    for (const id of ['ondrel', 'brimwick']) {
+      expect(pressOf(dart(id, { enemyReady: ['SPACE'] })), `${id} SPACE`).toBe('Q');
+      expect(pressOf(dart(id, { enemyReady: ['R'] })), `${id} R`).toBe('Q');
+      expect(pressOf(dart(id, { enemyReady: [] })), `${id} none`).toBe('M2');
+    }
   });
 });

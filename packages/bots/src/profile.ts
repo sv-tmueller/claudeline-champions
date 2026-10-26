@@ -16,6 +16,8 @@ const PROFILES = new Map<string, BotProfile>([
   ['quillon', { rangeMin: 6, rangeMax: 13 }],
   ['lumeth', { rangeMin: 6, rangeMax: 10 }],
   ['skerrow', { rangeMin: 0, rangeMax: 2.5 }],
+  ['ondrel', { rangeMin: 5, rangeMax: 9 }],
+  ['brimwick', { rangeMin: 7, rangeMax: 10 }],
 ]);
 
 /**
@@ -27,6 +29,8 @@ const KIT_RULES = new Map<string, number>([
   ['quillon', 6],
   ['lumeth', 6],
   ['skerrow', 0],
+  ['ondrel', 5],
+  ['brimwick', 7],
 ]);
 
 /**
@@ -96,8 +100,10 @@ export interface ChampionRules {
   /**
    * The ultimate is held for a target it can finish or one with no way out: its run counts only
    * while the target's health is at most the damage F does (read from the kit) or the target is
-   * cornered, and the energy reserve needs the same condition (see `computeCues`). No champion of
-   * the 2026-10 roster but Skerrow holds it.
+   * cornered, and the energy reserve needs the same condition (see `computeCues`). Skerrow (40,
+   * Reaper's Dance) and Brimwick (55, Grand Finale) hold it. Ondrel does not: the damage read from
+   * Drowned Ground is one pulse (10), not the 50 of the five it does in all, so the reading would
+   * hold the zone for a target it never finishes (docs/design/roster-v2.md, section 2).
    */
   readonly holdF: boolean;
   /** Where the champion stands to wait for an opener to come off cooldown, or null. */
@@ -148,6 +154,13 @@ const NO_RULES: ChampionRules = Object.freeze({
  * in escape.ts. She presses Dawnbloom, Aegis Veil, Soothing Surge and Mend Bolt at an ally that
  * needs them: the `allies` list (the roster: "M1 on the lowest-health ally"; see `allyKind` in
  * casting.ts).
+ * Ondrel and Brimwick (docs/design/roster-v2.md, sections 2 and 3, the bot profile sketches).
+ * Undertow keeps its kit band and needs a target walking away (it drags the target back into her
+ * ground); Flash Powder keeps its kit band and needs a target walking toward her (it stuns the
+ * one that walks in). Ondrel's escapes are Reed Step, a dash with a landing found like Glide's
+ * (a clear path), then Reed Screen; Brimwick's are Flare Step, a teleport whose landing is found
+ * like Skip's, then Smoke Pot, whose haste is the way out. Both use the common trigger, a kite
+ * inside rangeMin (5 and 7). Brimwick holds Grand Finale (55); Ondrel does not, see `holdF`.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -176,6 +189,11 @@ const RULES = new Map<string, ChampionRules>([
       true,
       { slot: 'SPACE', band: [6, 8], maxTicks: 90 },
     ),
+  ],
+  ['ondrel', rule([{ slot: 'E', band: null, motion: 'away', when: null }], ['SPACE', 'R'], false)],
+  [
+    'brimwick',
+    rule([{ slot: 'Q', band: null, motion: 'closing', when: null }], ['SPACE', 'R'], true),
   ],
   [
     'lumeth',

@@ -493,6 +493,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       if (!me.alive) {
         advancing = false;
         runs.fill(0);
+        // Zeroed with the runs. No test pins this line: the sim revives a champion only at a round
+        // start, where the champions stand over 20 m apart (an escape think needs 7 m or less), and
+        // any think that is not an escape think sets the streak to 0 below.
+        escapeScratch.streak = 0;
         input.moveX = 0;
         input.moveY = 0;
         input.aimX = me.aimX;
@@ -526,7 +530,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       if (acted.intent !== lastActed.intent || acted.targetId !== lastActed.targetId) {
         follower = createFollower();
       }
-      if (acted.targetId !== lastActed.targetId) runs.fill(0);
+      if (acted.targetId !== lastActed.targetId) {
+        runs.fill(0);
+        escapeScratch.streak = 0;
+      }
       lastActed.intent = acted.intent;
       lastActed.targetId = acted.targetId;
 
@@ -541,6 +548,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         cues.allyFor.fill(-1);
         sight.standClearance = SIGHT_CLEARANCE;
       }
+      escapeScratch.streak = cues.escapeThink ? escapeScratch.streak + 1 : 0;
       move(state, me, profile);
       input.moveX = command.moveX;
       input.moveY = command.moveY;
@@ -555,14 +563,14 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       escapeScratch.tried = 0;
       escapeScratch.landed = false;
       if (kit !== undefined) {
-        // On an escape think (see computeCues) the escape slots count the trigger as their run,
-        // and are chosen before the others.
+        // On an escape think (see computeCues) the escape slots are chosen before the others, gated
+        // on the escape streak: one run for the whole order, not the run of each slot (updateRuns
+        // still counts the trigger into those runs).
         updateRuns(runs, state, kitCache, me, target, sight, dist, cues);
         if (cues.escapeThink && kitCache.escapeOrder[0] !== -1) {
           pressed = chooseEscape(
             choice,
             escapeScratch,
-            runs,
             tier.castDelay,
             kit,
             kitCache,
