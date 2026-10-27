@@ -1,7 +1,7 @@
 # Roster v3: champions seven to nine
 
-Status: in progress; Durnhal's section is written, Wrenna's and Ysmeer's come
-in their own series
+Status: in progress; Durnhal's section is written and his kit is data,
+Wrenna's and Ysmeer's come in their own series
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -101,7 +101,6 @@ precedent of a kit that has the same shape:
 
 The effects are listed in the order the table names them: damage first, then
 the statuses (wound, then slow). F lists the area first and then the shield on
-him.
-A number changes in the file, here and in the scripted fixture in the same
+him. A number changes in the file, here and in the scripted fixture in the same
 change. Durnhal is not in the balance harness roster until step 1.3, and the
 server fields a bot of his on the default range profile until then.

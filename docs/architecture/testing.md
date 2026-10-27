@@ -93,19 +93,27 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   121633905207, 779e504), timeout 10 s.
 - `packages/server/test/room.test.ts`, "frees the seats of humans who were
   disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
-  3.7 s on the runner (job 121633905207, 779e504), timeout 10 s.
+  3.7 s on the runner (job 121633905207, 779e504), 2.1 s on main before #204
+  (job 122125510999), then 4.2 and 5.0 s with Durnhal's file (jobs 122175440820
+  and 122182006132); past half of 10 s, so the timeout is 15 s.
 
 Durnhal's file (#204) makes the server field a Durnhal bot on the default range
 profile in these matches and in both loopback specs, until step 1.3 of roadmap
-#176 gives him a profile. The loopback `beforeAll` is the row that moved: timed
+#176 gives him a profile. The loopback `beforeAll` is the row that moved. Timed
 around its body on one machine, the 2v2 hook went from 1.1 s to 1.5 to 1.7 s
-and the 3v3 hook from 2.5 to 3.1 s to 4.8 to 5.1 s. With the runner-to-local
-ratio the header of `loopback.test.ts` uses (4.5 s over 2.7 s) the 3v3 hook is
-about 8.3 s on the runner, over the 7.5 s mark of the 15 s timeout, so by the
-rule its timeout is 20 s (the file took 17.0 s in job 122173425469, rows about
-4.1 s, so the two hooks took up to 12.9 s there; the log has no time for a
-`beforeAll`). The room rows stay under their marks: "keeps the settings and the
-choices" took 0.44 s locally and 0.95 s on that runner.
+and the 3v3 hook from 2.5 to 3.1 s to 4.8 to 5.1 s, so the runner-to-local
+ratio of the header of `loopback.test.ts` (4.5 s over 2.7 s) gave about 8.3 s
+for the 3v3 hook. The runner was slower: the file took 17.0 s in job
+122173425469 (rows about 4.1 s); on f07e9df the 3v3 hook failed with "Hook
+timed out in 15000ms" (job 122175440820, the file 28.7 s with the 3v3 rows
+skipped); and with a 20 s timeout on 0d986a7 the file took 24.3 s and its two
+rows 5.9 s (job 122182006132), so the two hooks took 18.4 s and, by the local
+split of 1.6 s to 5.0 s, the 3v3 hook about 14 s. The log has no time for a
+`beforeAll`. Twice that is above the 20 s top of the rule, so the hook takes the
+60 s of the long-match precedent below and its work is not cut (decision 4 on
+issue #203). The room row "frees the seats" is the other one that moved, in the
+list above; "keeps the settings and the choices" took 0.44 s locally and 0.95 to
+1.4 s on those runners, inside its mark.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
 v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
@@ -167,10 +175,13 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
   same seed and inputs that reaches the server's checksum at every tick (and a
   run at another tier that does not), and a sha256 over every text in both
   directions that is the same across two runs. It pins no end tick, winner or
-  champion list. It plays to two rounds won, not three, and takes about 5.5 s
-  locally and 11.5 s on the runner (job 121656797139, de0ef18); at three
-  rounds it took 14 s locally and 29 s on the runner (job 121633905207). See
-  [online](online.md).
+  champion list. It plays to two rounds won, not three, and took about 5.5 s
+  locally and 11.5 s on the runner (job 121656797139, de0ef18) before
+  Durnhal's file; with it the file takes 8.8 to 9.1 s locally (5.1 to 5.6 s on
+  the same machine without it) and 17.0 to 28.7 s on the runner (jobs
+  122173425469, 122175440820 and 122182006132, see the timeouts above); at
+  three rounds it took 14 s locally and 29 s on the runner (job 121633905207).
+  See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
@@ -250,9 +261,8 @@ searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put back in
 memory, as #125 changed those numbers and regenerated only the checkpoints),
 with the checkpoints of the current kits. Each row of the test names the kit
 numbers it is pinned on, with the change that moved them. It runs on the CI
-unit job, on Linux x86,
-which is the cross-platform proof of the tool. The record is in the header of
-`roster-fixtures.test.ts`.
+unit job, on Linux x86, which is the cross-platform proof of the tool. The
+record is in the header of `roster-fixtures.test.ts`.
 
 A change to a kit file that turns the coverage red is met by rebuilding its
 fixture with the tool in the same commit ([balance.md](../design/balance.md),
@@ -283,7 +293,7 @@ batch 16 for Durnhal, #204):
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
    energy gains, the dash `then`s and the statuses) and to `SEEDS` (the next
-   match seed, 5561 and up) in `packages/sim/test/roster-fixture.ts`. The tool
+   match seed, 5562 and up) in `packages/sim/test/roster-fixture.ts`. The tool
    stops with a message that names the file when either is missing.
 3. Run `npm run fixtures:search -- <id>`. When no attempt within the limit
    covers, the kit's `EXPECTED` asks for something a mirror may never show:
