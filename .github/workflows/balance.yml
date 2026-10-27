@@ -1,10 +1,15 @@
 name: Balance reproduction
 
-# A manual run only: it plays 4800 bot matches (about 16 minutes on a runner, measured on the
-# first run on main, against about five and a half on Apple silicon) and checks
-# that docs/design/balance.md reproduces on linux/amd64. Trigger it on a branch with
+# A manual run only: it plays the bot matches of docs/design/balance.md and checks that the block
+# reproduces on linux/amd64. Two jobs run side by side, one per mode (--mode 2v2 and --mode 3v3),
+# each comparing that mode's cell rows and budget-hit lines with the committed block: the whole run
+# was 12 to 16 minutes at four kits on a runner (5.5 on Apple silicon) and grows with the kits, so
+# one job per mode keeps each inside its timeout. A job that fails plays its mode again in a
+# second step to print the differing rows, so each timeout-minutes is twice that job's check time
+# (starting values, until the six-kit run is measured on a runner: 2v2 30, 3v3 50). Trigger it on a
+# branch with
 #   gh workflow run balance.yml --ref <branch>
-# It never runs on pull requests or pushes.
+# It never runs on pull requests or pushes. A newer run on the same ref cancels the older one.
 on:
   workflow_dispatch:
 
@@ -17,9 +22,17 @@ permissions:
 
 jobs:
   reproduce:
-    name: npm run balance -- --check
+    name: npm run balance -- --check --mode ${{ matrix.mode }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: 2v2
+            timeout: 30
+          - mode: 3v3
+            timeout: 50
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -27,17 +40,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run balance -- --check
-      # On a difference: play again into a scratch file, put that block in place of the committed
-      # one and print the diff, so a mismatch shows the cells (the head line always differs).
+      - run: npm run balance -- --check --mode ${{ matrix.mode }}
+      # On a difference: play the mode again into a scratch file and diff its rows (the cell rows
+      # and the budget-hit lines of that mode) against the committed block, so a mismatch shows
+      # the cells. The head line and the other mode's rows are not in either side.
       - name: Show the differing cells
         if: failure()
+        env:
+          MODE: ${{ matrix.mode }}
         run: |
-          npm run balance -- --out "$RUNNER_TEMP/fresh.md"
-          awk -v f="$RUNNER_TEMP/fresh.md" '
-            /<!-- balance:report -->/ { while ((getline l < f) > 0) print l; skip = 1 }
-            !skip { print }
-            /<!-- \/balance:report -->/ { skip = 0 }
-          ' docs/design/balance.md > "$RUNNER_TEMP/balance.md"
-          cp "$RUNNER_TEMP/balance.md" docs/design/balance.md
-          git diff --no-color docs/design/balance.md
+          npm run balance -- --mode "$MODE" --out "$RUNNER_TEMP/fresh.md"
+          rows() { grep -E "^\| $MODE \||^- .+ v .+, $MODE, [^,]+, with " "$1" || true; }
+          sed -n '/<!-- balance:report -->/,/<!-- \/balance:report -->/p' docs/design/balance.md > "$RUNNER_TEMP/committed.md"
+          rows "$RUNNER_TEMP/committed.md" > "$RUNNER_TEMP/committed.rows"
+          rows "$RUNNER_TEMP/fresh.md" > "$RUNNER_TEMP/fresh.rows"
+          diff -u "$RUNNER_TEMP/committed.rows" "$RUNNER_TEMP/fresh.rows"

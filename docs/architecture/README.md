@@ -88,13 +88,15 @@ first.
   rigged, with six clips (the client registers and plays all six roster ids).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
-- `tools/balance`: the balance harness. `npm run balance` plays every
-  champion pairing bot against bot, in 2v2 and 3v3 on both arenas, over a seed
-  set and writes the win-rate report into
-  [balance.md](../design/balance.md); `--check` compares a fresh run with the
-  committed block. Its unit tests are the `tools` Vitest project, and a manual
-  workflow reproduces the report on a runner (see [Testing](testing.md)). It
-  needs Node 22.15 or later. It plays the four v1 kits, the `HARNESS_KITS` of
+- `tools/balance`: the balance harness. `npm run balance` plays every champion
+  pairing bot against bot, in 2v2 and 3v3 on both arenas, over a seed set and
+  writes the win-rate report into [balance.md](../design/balance.md); `--check`
+  compares a fresh run with the committed block. Each cell plays about 200
+  matches (seeds per config from the cell's fills, per mode), and `--mode
+  2v2|3v3` plays and checks one mode, which the manual workflow runs as two
+  jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
+  reproduces the report on a runner (see [Testing](testing.md)). It needs Node
+  22.15 or later. It plays the four v1 kits, the `HARNESS_KITS` of
   `tools/balance/inputs.ts`: Ondrel and Brimwick are in `data/kits` and not in
   the harness roster until the six-kit report of batch 13.
 - `tools/fixtures`: the scripted roster fixture search. `npm run

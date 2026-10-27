@@ -120,16 +120,18 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
   replay fixtures with checksums. See [simulation](simulation.md).
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
-- Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`):
-  the pairings, fills and seeds, `playMatch` against a reference loop, the
-  aggregation and the report text, and the CLI's flags. They run in
-  `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report. One `playMatch` row plays the match of #123 (Quillon v Skerrow, 3v3,
-  arena01, seed 6) and asserts that it ends in a decision, with no end tick.
-  The same project holds the fixture search's tests
-  (`tools/fixtures/*.test.ts`): the format against the committed bytes, the
-  pure search cases, the reproduction of the six roster fixtures and the CLI
-  (see [Fixture search](#fixture-search)).
+- Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
+  pairings, fills and the seed schedule, the cell plan (a six-name kit list
+  gives 15 pairings and 60 cells with 4 and 12 fills, played by nothing),
+  `playMatch` against a reference loop, the aggregation and the report text, the
+  one-mode `--check` on synthetic blocks, and the CLI's flags. They run in `npm
+  run test` with the other projects and play 1 or 2 seeds, not the full report;
+  no unit test plays six-kit cells. One `playMatch` row plays the match of #123
+  (Quillon v Skerrow, 3v3, arena01, seed 6) and asserts that it ends in a
+  decision, with no end tick. The same project holds the fixture search's tests
+  (`tools/fixtures/*.test.ts`): the format against the committed bytes, the pure
+  search cases, the reproduction of the six roster fixtures and the CLI (see
+  [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a
@@ -164,18 +166,25 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
-file and `-- --seeds N` plays the seeds 1 to N. It needs Node 22.15 or later,
-for `module.registerHooks` (see `tools/balance/register.ts`), which is why the
-`engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: a full run took about 5.5 minutes on Apple silicon. It plays
-the four v1 kits of `HARNESS_KITS` in `tools/balance/inputs.ts`, not every file
-of `data/kits`: Ondrel and Brimwick wait for the six-kit report of batch 13.
+file and `-- --seeds N` plays the seeds 1 to N in every mode played, instead of
+the schedule (about 200 matches a cell: seeds 1 to the largest even number at or
+under 200 over the cell's fills, per mode). `-- --mode 2v2|3v3` plays one mode;
+it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
+and budget-hit lines only. It needs Node 22.15 or later, for
+`module.registerHooks` (see `tools/balance/register.ts`), which is why the
+`engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in `npm
+run check`: a full run took about 5.5 minutes on Apple silicon. It plays the
+four v1 kits of `HARNESS_KITS` in `tools/balance/inputs.ts`, not every file of
+`data/kits`: Ondrel and Brimwick wait for the six-kit report of batch 13.
 
-`.github/workflows/balance.yml` runs `npm run balance -- --check` on a runner
-(`workflow_dispatch` only, so it never runs on a pull request or a push). It
-can be dispatched with `gh workflow run balance.yml --ref <branch>` once the
-file is on the default branch. Budget 12 to 16 minutes; the runs on record
-are in [balance.md](../design/balance.md#7-how-to-regenerate).
+`.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
+on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
+pull request or a push). It can be dispatched with `gh workflow run balance.yml
+--ref <branch>` once the file is on the default branch. The whole run was 12 to
+16 minutes at four kits; the jobs have `timeout-minutes` of 30 (2v2) and 50
+(3v3), twice the projected six-kit check time (the failure step plays the mode
+again), to be adjusted when the six-kit run is measured. The runs on record are
+in [balance.md](../design/balance.md#7-how-to-regenerate).
 
 ## Fixture search
 

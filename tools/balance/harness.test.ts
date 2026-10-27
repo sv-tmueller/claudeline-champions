@@ -11,12 +11,18 @@ import {
   inBand,
   matchConfig,
   pairings,
+  fillCount,
+  modeLines,
+  planCells,
   playMatch,
   playCells,
   playSpec,
   renderReport,
   reportBlock,
+  sameModeReport,
   sameReport,
+  seedSchedule,
+  seedsPerConfig,
   summarizeCell,
   summarizeChampions,
   withReport,
@@ -26,6 +32,10 @@ import { loadInputs } from './inputs.ts';
 
 const DATA = loadInputs(new URL('../../', import.meta.url));
 const KIT_IDS = DATA.kits.map((kit) => kit.id);
+// The runs below play the four v1 kits whatever HARNESS_KITS holds, so their cost does not grow when
+// the roster does (the six-kit shape is the cell plan test, which plays nothing).
+const V1_IDS = ['hargrim', 'lumeth', 'quillon', 'skerrow'];
+const V1 = { kits: DATA.kits.filter((kit) => V1_IDS.includes(kit.id)), arenas: DATA.arenas };
 function arenaOf(id: string): ArenaDef {
   const arena = DATA.arenas.find((a) => a.id === id);
   if (arena === undefined) throw new Error(`no arena ${id}`);
@@ -100,6 +110,102 @@ describe('the shipped data', () => {
     expect(DATA.arenas.map((a) => a.id)).toEqual(['arena01', 'arena02']);
     expect(pairings(KIT_IDS)).toHaveLength(6);
     expect(configs(KIT_IDS)).toHaveLength(24);
+  });
+});
+
+describe('the seed schedule', () => {
+  it('counts the fills of a pairing: kits - 2 in 2v2, ordered pairs of the others in 3v3', () => {
+    expect(fillCount('2v2', 4)).toBe(2);
+    expect(fillCount('3v3', 4)).toBe(2);
+    expect(fillCount('2v2', 6)).toBe(4);
+    expect(fillCount('3v3', 6)).toBe(12);
+    // It is the count the configs have.
+    for (const mode of ['2v2', '3v3'] as const) {
+      const first = configs(KITS).filter((c) => c.mode === mode && c.x === 'a' && c.y === 'b');
+      expect(first).toHaveLength(fillCount(mode, KITS.length));
+    }
+  });
+
+  it('gives the largest even number of seeds at or under 200 over the fills', () => {
+    expect(seedsPerConfig(2)).toBe(100);
+    expect(seedsPerConfig(4)).toBe(50);
+    expect(seedsPerConfig(12)).toBe(16);
+    // 200 / 3 is 66.7 and 200 / 7 is 28.6: rounded down to an even count, so the sides stay balanced.
+    expect(seedsPerConfig(3)).toBe(66);
+    expect(seedsPerConfig(7)).toBe(28);
+    for (let fills = 1; fills <= 100; fills++) {
+      const seeds = seedsPerConfig(fills);
+      expect(seeds % 2, `${fills} fills`).toBe(0);
+      expect(seeds * fills, `${fills} fills`).toBeLessThanOrEqual(200);
+      expect((seeds + 2) * fills, `${fills} fills`).toBeGreaterThan(200);
+    }
+  });
+
+  it('refuses a cell with so many fills that no even seed count fits', () => {
+    expect(() => seedsPerConfig(101)).toThrow(/fills/);
+    expect(() => seedsPerConfig(0)).toThrow(/fills/);
+  });
+
+  it('is 100 and 100 at four kits, today\'s 200 matches a cell', () => {
+    expect(seedSchedule(4)).toEqual({ '2v2': 100, '3v3': 100 });
+  });
+
+  it('is 50 and 16 at six kits', () => {
+    expect(seedSchedule(6)).toEqual({ '2v2': 50, '3v3': 16 });
+  });
+});
+
+describe('the cell plan', () => {
+  const SIX = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const ARENAS = ['arena01', 'arena02'];
+  // Nothing is played here: the shape of a six-kit run, which no unit test plays.
+  const plan = planCells(SIX, ARENAS, seedSchedule(6));
+
+  it('has 15 pairings and 60 cells over six kits and two arenas', () => {
+    expect(pairings(SIX)).toHaveLength(15);
+    expect(plan).toHaveLength(60);
+  });
+
+  it('has 4 fills in each 2v2 cell and 12 in each 3v3 cell', () => {
+    expect(plan.filter((c) => c.mode === '2v2').every((c) => c.configs.length === 4)).toBe(true);
+    expect(plan.filter((c) => c.mode === '3v3').every((c) => c.configs.length === 12)).toBe(true);
+    expect(plan.filter((c) => c.mode === '2v2')).toHaveLength(30);
+    expect(plan.filter((c) => c.mode === '3v3')).toHaveLength(30);
+    // A cell holds the configs of its own pairing and mode only.
+    const cell = plan.find((c) => c.mode === '3v3' && c.x === 'b' && c.y === 'e');
+    expect(cell?.configs.map((c) => c.fill.join('+'))).toEqual([
+      'a+c', 'a+d', 'a+f', 'c+a', 'c+d', 'c+f', 'd+a', 'd+c', 'd+f', 'f+a', 'f+c', 'f+d',
+    ]);
+  });
+
+  it('puts 50 seeds on the 2v2 cells and 16 on the 3v3 cells, 200 and 192 matches', () => {
+    expect(new Set(plan.filter((c) => c.mode === '2v2').map((c) => c.seeds))).toEqual(new Set([50]));
+    expect(new Set(plan.filter((c) => c.mode === '3v3').map((c) => c.seeds))).toEqual(new Set([16]));
+    const matches = (c: (typeof plan)[number]) => c.configs.length * c.seeds;
+    expect(plan.filter((c) => c.mode === '2v2').map(matches)).toEqual(Array<number>(30).fill(200));
+    expect(plan.filter((c) => c.mode === '3v3').map(matches)).toEqual(Array<number>(30).fill(192));
+  });
+
+  it('orders the cells by mode, then arena, then pairing', () => {
+    const name = (c: (typeof plan)[number]) => `${c.mode} ${c.arena} ${c.x} v ${c.y}`;
+    expect(plan.slice(0, 3).map(name)).toEqual(['2v2 arena01 a v b', '2v2 arena01 a v c', '2v2 arena01 a v d']);
+    expect(plan.slice(14, 17).map(name)).toEqual(['2v2 arena01 e v f', '2v2 arena02 a v b', '2v2 arena02 a v c']);
+    expect(plan.slice(29, 32).map(name)).toEqual(['2v2 arena02 e v f', '3v3 arena01 a v b', '3v3 arena01 a v c']);
+    expect(name(plan[59] as (typeof plan)[number])).toBe('3v3 arena02 e v f');
+  });
+
+  it('plans one mode only when the schedule names one', () => {
+    const only = planCells(SIX, ARENAS, { '3v3': 16 });
+    expect(only).toHaveLength(30);
+    expect(only.every((c) => c.mode === '3v3')).toBe(true);
+  });
+
+  it('refuses a mode that has a pairing with no fill, and no pairing at all', () => {
+    expect(() => planCells(['a', 'b', 'c'], ARENAS, { '2v2': 2, '3v3': 2 })).toThrow(/no fill/);
+    expect(() => planCells(['a', 'b'], ARENAS, { '2v2': 2 })).toThrow(/no fill/);
+    expect(() => planCells(['a'], ARENAS, { '2v2': 2 })).toThrow(/no pairing/);
+    // Three kits have every fill of 2v2, so a 2v2-only plan is fine there.
+    expect(planCells(['a', 'b', 'c'], ARENAS, { '2v2': 2 })).toHaveLength(6);
   });
 });
 
@@ -248,6 +354,7 @@ function round(length: number, firstHit: number | null, flags: { sudden?: true; 
 function record(winner: TeamId | null, rounds: MatchRecord['rounds'], budgetHit = false): MatchRecord {
   return { winner, endTick: 9000, budgetHit, rounds };
 }
+const TWO = { '2v2': 2, '3v3': 2 };
 const SYNTHETIC: Cell = {
   mode: '2v2',
   arena: 'arena01',
@@ -321,7 +428,7 @@ describe('the aggregation', () => {
 });
 
 describe('the report', () => {
-  const report = renderReport({ head: 'abc1234', seeds: 2, kitIds: ['a', 'b', 'c'], cells: [SYNTHETIC] });
+  const report = renderReport({ head: 'abc1234', seeds: TWO, kitIds: ['a', 'b', 'c'], cells: [SYNTHETIC] });
   const lines = report.split('\n');
 
   it('opens with the marker and the short head, and closes with the end marker', () => {
@@ -348,6 +455,17 @@ describe('the report', () => {
     expect(report).toContain('| c | - | n/a |');
   });
 
+  it('says "for each config" when the modes share a seed count, and each count when they differ', () => {
+    const same = renderReport({ head: 'abc1234', seeds: { '2v2': 100, '3v3': 100 }, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    expect(same).toContain("Seeds 1 to 100 for each config, every bot at the normal tier. X's rate");
+    const differ = renderReport({ head: 'abc1234', seeds: { '2v2': 50, '3v3': 16 }, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    expect(differ).toContain('Seeds 1 to 50 for each 2v2 config and 1 to 16 for each 3v3 config, every bot at');
+    expect(differ).not.toContain('for each config');
+    // One mode played: its count alone, for each config.
+    const one = renderReport({ head: 'abc1234', seeds: { '3v3': 16 }, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    expect(one).toContain('Seeds 1 to 16 for each config, every bot');
+  });
+
   it('marks a cell at 50 percent as in band and counts it', () => {
     const even: Cell = {
       ...SYNTHETIC,
@@ -356,7 +474,7 @@ describe('the report', () => {
         { fill: 'c', seed: 2, record: record('A', [round(1000, 300)]) },
       ],
     };
-    const text = renderReport({ head: 'abc1234', seeds: 2, kitIds: ['a', 'b'], cells: [even] });
+    const text = renderReport({ head: 'abc1234', seeds: TWO, kitIds: ['a', 'b'], cells: [even] });
     expect(text).toContain('| 50.0 | 1/1 | 0/1 | in band |');
     expect(text).toContain('Cells in band: 1 of 1.');
   });
@@ -364,7 +482,7 @@ describe('the report', () => {
   it('says so when no match hit the budget', () => {
     const none = renderReport({
       head: 'abc1234',
-      seeds: 2,
+      seeds: TWO,
       kitIds: ['a', 'b'],
       cells: [{ ...SYNTHETIC, played: SYNTHETIC.played.filter((p) => !p.record.budgetHit) }],
     });
@@ -378,8 +496,8 @@ describe('a run', () => {
   // time is 124.8 s, so 150 s (testing.md, Check suite; it was 120 s).
   it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 150_000 }, () => {
     const run = () => {
-      const cells = playCells(DATA, 2);
-      return { cells, text: renderReport({ head: 'abc1234', seeds: 2, kitIds: KIT_IDS, cells }) };
+      const cells = playCells(V1, TWO);
+      return { cells, text: renderReport({ head: 'abc1234', seeds: TWO, kitIds: V1_IDS, cells }) };
     };
     const first = run();
     const second = run();
@@ -404,13 +522,25 @@ describe('a run', () => {
   });
 });
 
+describe('a run of one mode', () => {
+  // 24 matches: 1.8 s locally (Apple M5 Pro, Node 22.23.2), 2.7 s on the runner (ubuntu-latest, Node 22).
+  // Timeout: twice the runner time is 5.4 s, so 10 s (testing.md, Check suite).
+  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 10_000 }, () => {
+    const cells = playCells(V1, { '2v2': 1 });
+    // 6 pairings on 2 arenas; one seed on each of the 2 fills.
+    expect(cells).toHaveLength(12);
+    expect(cells.every((c) => c.mode === '2v2' && c.played.length === 2)).toBe(true);
+    expect(cells.flatMap((c) => c.played).every((p) => p.seed === 1)).toBe(true);
+  });
+});
+
 describe('a run over too few kits', () => {
   it('throws before the first match when a pairing has no fill in a mode', () => {
     // Three kits give every pairing one fill in 2v2 and none in 3v3, which needs two champions outside the pair.
     const three = { kits: DATA.kits.slice(0, 3), arenas: DATA.arenas };
     let played = 0;
     expect(() =>
-      playCells(three, 1, () => {
+      playCells(three, { '2v2': 1, '3v3': 1 }, () => {
         played++;
       }),
     ).toThrow(/no fill/);
@@ -422,7 +552,7 @@ describe('a run over too few kits', () => {
     const one = { kits: DATA.kits.slice(0, 1), arenas: DATA.arenas };
     let played = 0;
     expect(() =>
-      playCells(one, 1, () => {
+      playCells(one, { '2v2': 1, '3v3': 1 }, () => {
         played++;
       }),
     ).toThrow(/no pairing/);
@@ -431,7 +561,7 @@ describe('a run over too few kits', () => {
 });
 
 describe('the committed block and --check', () => {
-  const report = renderReport({ head: 'abc1234', seeds: 2, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+  const report = renderReport({ head: 'abc1234', seeds: TWO, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
   const doc = `# Balance\n\nBefore.\n\n${report}\n\nAfter.\n`;
 
   it('finds the block between its markers, and null when there is none', () => {
@@ -446,7 +576,7 @@ describe('the committed block and --check', () => {
   });
 
   it('ignores the head line and nothing else', () => {
-    const other = renderReport({ head: 'fff0000', seeds: 2, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    const other = renderReport({ head: 'fff0000', seeds: TWO, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
     expect(other).not.toBe(report);
     expect(sameReport(other, report)).toBe(true);
     expect(sameReport(report.replace('66.7', '66.8'), report)).toBe(false);
@@ -455,8 +585,68 @@ describe('the committed block and --check', () => {
     // A block that continues the other one is not the same.
     expect(sameReport(report, `${report}\nmore`)).toBe(false);
     expect(sameReport(`${report}\nmore`, report)).toBe(false);
-    const moreSeeds = renderReport({ head: 'abc1234', seeds: 3, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    const moreSeeds = renderReport({ head: 'abc1234', seeds: { '2v2': 3, '3v3': 3 }, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
     expect(sameReport(moreSeeds, report)).toBe(false);
     expect(sameReport(report.replace('| outside |', '| in band |'), report)).toBe(false);
+  });
+});
+
+describe('--check of one mode', () => {
+  const cells: Cell[] = [
+    SYNTHETIC,
+    { ...SYNTHETIC, mode: '3v3', x: 'a', y: 'c', played: [{ fill: 'b+d', seed: 1, record: record('A', [round(1000, 300)]) }] },
+    { ...SYNTHETIC, mode: '3v3', arena: 'arena02', played: [{ fill: 'c+d', seed: 1, record: record(null, [], true) }] },
+  ];
+  const block = renderReport({ head: 'abc1234', seeds: TWO, kitIds: ['a', 'b', 'c', 'd'], cells });
+
+  it('reads the cell rows and the budget-hit lines of one mode', () => {
+    expect(modeLines(block, '2v2')).toEqual([
+      expect.stringMatching(/^\| 2v2 \| arena01 \| a v b \|/),
+      '- a v b, 2v2, arena01, with d: seed 1',
+    ]);
+    expect(modeLines(block, '3v3')).toEqual([
+      expect.stringMatching(/^\| 3v3 \| arena01 \| a v c \|/),
+      expect.stringMatching(/^\| 3v3 \| arena02 \| a v b \|/),
+      '- a v b, 3v3, arena02, with c+d: seed 1',
+    ]);
+  });
+
+  it('fails when a row of the mode changed', () => {
+    expect(sameModeReport(block, block.replace('| 66.7 | 1/1 |', '| 66.8 | 1/1 |'), '2v2')).toBe(false);
+    expect(sameModeReport(block, block.replace('| 1 of 8 |', '| 2 of 8 |'), '2v2')).toBe(false);
+  });
+
+  it('fails when a budget-hit line of the mode changed, appeared or went', () => {
+    expect(sameModeReport(block, block.replace('with d: seed 1', 'with d: seed 2'), '2v2')).toBe(false);
+    expect(sameModeReport(block, block.replace('- a v b, 2v2, arena01, with d: seed 1\n', ''), '2v2')).toBe(false);
+    expect(sameModeReport(block.replace('- a v b, 3v3, arena02, with c+d: seed 1\n', ''), block, '3v3')).toBe(false);
+  });
+
+  it('passes when only a row or a budget-hit line of the other mode changed', () => {
+    const otherRow = block.replace('| 3v3 | arena01 | a v c | b+d 100.0 |', '| 3v3 | arena01 | a v c | b+d 0.0 |');
+    expect(otherRow).not.toBe(block);
+    expect(sameModeReport(block, otherRow, '2v2')).toBe(true);
+    expect(sameModeReport(block, otherRow, '3v3')).toBe(false);
+    const otherHit = block.replace('with c+d: seed 1', 'with c+d: seed 9');
+    expect(sameModeReport(block, otherHit, '2v2')).toBe(true);
+    expect(sameModeReport(block, otherHit, '3v3')).toBe(false);
+  });
+
+  it('passes on the other lines of the block, the head and the rows of the other mode', () => {
+    const other = renderReport({ head: 'fff0000', seeds: TWO, kitIds: ['a', 'b', 'c', 'd'], cells });
+    expect(sameModeReport(block, other.replace('Cells in band: 0 of 3.', 'Cells in band: 1 of 3.'), '2v2')).toBe(true);
+    expect(sameModeReport(block, other, '2v2')).toBe(true);
+  });
+
+  it('compares a block of one mode with the committed block of both', () => {
+    const only2v2 = renderReport({ head: 'abc1234', seeds: { '2v2': 2 }, kitIds: ['a', 'b', 'c', 'd'], cells: [SYNTHETIC] });
+    expect(sameModeReport(block, only2v2, '2v2')).toBe(true);
+    // The fresh run of 2v2 has no 3v3 row, so it cannot stand for the 3v3 rows of the committed block.
+    expect(sameModeReport(block, only2v2, '3v3')).toBe(false);
+  });
+
+  it('fails when neither block has a row of the mode, so an empty comparison never passes', () => {
+    const only2v2 = renderReport({ head: 'abc1234', seeds: { '2v2': 2 }, kitIds: ['a', 'b'], cells: [SYNTHETIC] });
+    expect(sameModeReport(only2v2, only2v2, '3v3')).toBe(false);
   });
 });
