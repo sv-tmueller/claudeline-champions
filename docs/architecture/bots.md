@@ -402,11 +402,11 @@ gated on the escape streak instead, one run for the whole order (see Openers and
 escapes), and their own runs go on counting the trigger, with no band and no
 shot test: one cast-delay rule for every press. The slot may be pressed when the
 run exceeds `castDelay`, so `castDelay` thinks after the first think of the run.
-The run restarts when the
-test fails, on an idle or dead think, and when the acted target changes. It
-ignores cooldown, energy, status and windup, so a slot that comes off cooldown
-while the target stays in reach is pressed on the first tick the sim would cast
-it. The run of an ally slot is the one of Ally slots below.
+The run restarts when the test fails, on an idle or dead think, and when the
+acted target changes. It ignores cooldown, energy, status and windup, so a slot
+that comes off cooldown while the target stays in reach is pressed on the first
+tick the sim would cast it. The run of an ally slot is the one of Ally slots
+below.
 
 Ally slots: a champion's rule lists the slots it presses at an ally (`allies` in
 `RULES`; Lumeth's F, R, M2 and M1, the others none). The kit cache holds a kind,
@@ -612,10 +612,10 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   (`baseDash`, `exDash`), and the gate is in `chooseCast`. Glide is an escape
   slot that starts with a dash: `chooseEscape` marks it tried and aims it away
   from the target (see the landing above), so the hold never reaches it, and it
-  has no band, so nothing else presses it. Reed Step is the second: chosen on an
-  escape think the same way, and with a band of 1 m from its area, so the usual
-  walk presses it only at a target that touches her, and on an escape think the
-  hold withholds it there and the escape choice presses it instead. A dash escape
+  has no band, so nothing else presses it. Reed Step is the second: on an escape
+  think `chooseEscape` marks it tried the same way, so the walk skips it before
+  the hold; off one, its band of 1 m from its area lets the walk press it only at
+  a target that touches her. A dash escape
   for another kit (Lunge away) is not built. A press the hold withholds leaves
   the slot unpressed on that think: the walk goes on to the next slot, and a dash
   with an EX variant that would be cast is not replaced by its base.
@@ -1100,11 +1100,10 @@ error.
   aim point, so the lead moves the point to where a target walking at 5.5 m/s
   would be after the flight of a 20 m/s projectile. The question was whether a
   lead bounded by the area does better than the nominal one. A scratch copy of
-  the head with the
-  lead of an area ability changed played 160 seeded 2v2 matches of Ondrel and
-  Brimwick against each shipped kit on both arenas (normal tier, seeds 1 to 10,
-  not committed: it patches `aim`), and counted the pulses of the areas they
-  placed that had an enemy inside:
+  the head with the lead of an area ability changed played 160 seeded 2v2
+  matches of Ondrel and Brimwick against each shipped kit on both arenas (normal
+  tier, seeds 1 to 10, not committed: it patches `aim`), and counted the pulses
+  of the areas they placed that had an enemy inside:
 
   | Lead of an area ability        | Mire (r 2)         | Drowned Ground (r 4) | Firecracker (r 1.5) | Firecracker EX (r 2) |
   | ------------------------------ | ------------------ | -------------------- | ------------------- | -------------------- |
@@ -1220,7 +1219,8 @@ match replays exactly from its input stream.
   kits is not played in a bots test either; the balance report plays 3v3s over
   the six (`balance.md` section 5.9, #189).
 - A lead for an area that is derived from the kit: the nominal lead stays, which
-  the Mire and Drowned Ground measured at the optimum for. The one-hit areas
+  for the Mire and Drowned Ground measured within a point of the best (see Aim).
+  The one-hit areas
   (Firecracker, and Binding Sigil, which was not measured) read the other way:
   Firecracker lands 93.5 percent of its pulses on an enemy with the nominal lead
   and 98 and more with the offset capped at the radius (see Aim); a follow-up,
@@ -1266,96 +1266,94 @@ put the champion on it, unless a champion ahead of it in the step's turn order
 (a lower id) walked in that step, or a champion died before the caster's cast (a
 melee arc of a champion ahead kills one with a higher id without moving): the
 teleport pushes its end out of every other champion where that champion stands
-at the caster's turn, and the
-oracle's clone, which gives no other champion an input, sees them standing.
-Then the end must equal, bit for bit, the teleport end of a clone of the state
-the bot thought on stepped with the inputs of the champions ahead and the
-caster's press, and a champion ahead must have moved or some champion died: the
-oracle models the walks and the deaths that land before the cast and nothing
-else (#146; the deaths of a higher id were added in #165 after the review of
-#182 found that the first form looked only at the champions with a lower id, so
-an arc of a champion ahead that killed a champion behind the caster, whose body
-the landing depended on, failed it; `escape-oracle.test.ts` pins it on a hand-built
-state, with a fixture champion whose M1 is an arc with no windup). The bot models
-neither the walks nor the deaths ahead of it; its landing search ignores
-champions. Hush Ward is pressed only when Skip is not ready or has no landing.
-A direction whose raw point, the one the teleport aims at before the sim's
-collision pushes a champion off a wall, is not a free cell is skipped too, as
-the bot does: a match played to its end has a Skip that ends 2 cm inside the
-south wall, which the sim pushes clear and the bot passes over. Lumeth's
-rows are Lantern Burst (an escape row), Glide (a dash row: the oracle's own
-first-of-five 4 m dash landing, a free cell and a path `oracleSegmentViolates`
-finds clean, the aim equal to it, a `dashStarted` in that direction after the
-step, and E not ready), Binding Sigil (the kit band less the margin, a clear
-shot of 0.5, and the oracle's own check that the target is within 6 m of an
-alive ally of hers), Mend Bolt (its enemy band, or an ally row when an ally
-qualifies) and the ally rows of Soothing Surge, Aegis Veil and Dawnbloom, which
-have no enemy band: a press of them needs an ally. An ally row is written from
-the kit (a reach of the bolt's speed times its lifetime, or an area's radius
-plus 0.5, less the margin of 1 m; a need of 10, 14, 30 and 30; a shot width of
-0.35 and 0.5), and a table test works every literal out from `lumeth.json`
-again, so a change to the kit fails it. The oracle's own scan (alive, on her
-team, not herself for a bolt, missing at least the need, in reach, a clear shot
-for a bolt) picks the ally with the lowest health fraction, the lower id on a
-tie. A press with no ally that qualifies fails the run, and a bolt press must be
-aimed within 12.1 degrees (the widest tier error, 12, and the whole centimetres)
-of the lead point at that ally, unless a cast in progress fires on that tick.
-The EX variants of M2 and R have no row and fail the run. The ultimates of
-Skerrow and Brimwick pass only for a target at 40 or 55 health or less (the damage
-F does, written from each kit file), or one the oracle finds cornered by its
-own walk of the five points. The dash rows (Rush, EX Rush, Hargrim's ultimate,
-Lunge, EX Lunge, Reed Step) fail a press on an escape think, and Quiet
-Dart's row fails a press at a target the oracle finds with no escape ready (its
-own table of escape slots, a cooldown of at most 1, no stun or silence). A tally
-(`tallyTeleports` in the test helpers) counts the escape teleports of the runs
-(a press with a landing) apart from every other teleport (Reaper's Dance), each
-with its blocked count: every escape teleport must be reported unblocked, and
-Reaper's Dance may be blocked legitimately. The run must end with a death from a
-cast, every champion must start a cast, and one cast must be an EX. The seeds
-are 101 to 104, the match seed 7 and the tiers easy, normal, hard, normal; they
-are pinned, and a miss after a change to the bots, the sim or the Node version
-is governed by batch #53 decision 8.3. The ultimate has its own pinned run: the
-2v2 ends its fights by tick 700 with the energy bar at 75 at most, and 9000
-matches of it on the shipped kits gave no F cast, so a 3v3 of Hargrim and two
-Quillons a side, seeds 101 to 106 at the hard tier, runs through the same checks
-and must start an F (decision 8 of #63 allows a separate set for this alone; it
-needed another size of match). Since the bots dodge (#137) the run is a declared
-start edit (decision 4 of batch #134): every champion starts at 75 energy,
-because no seed set reached an F by landing hits alone. Four (test kits) and
-five (shipped kits) of the six press F, and with the reserve dropped none does,
-so the energy reserve is still what lets it fire. A free-play run of the same
-3v3 on the shipped kits, seeds 648 to 653 with no start edit, pins the
-turn-order model above: on tick 341 champion 1's Skip ends 2.0 m from the
-standing landing because champion 0 slid along champion 2 first. A Skerrow
-2v2 pins the Skerrow profile: Skerrow and
-Quillon against Hargrim and Quillon on the shipped kits in free play, seeds 101
-to 104, every bot on normal, match seed 7; a team is eliminated by tick 3600 (a
-round is 5400 ticks in match flow, which would decide the same way), Skerrow
-starts a Lunge, every press passes the oracle and no bot stalls for more than
-120 ticks. Hargrim and Lumeth against Hargrim and Quillon on the four shipped
-kits (seeds 101 to 104, normal, match seed 7, 3600 ticks) run the same checks,
-with two runs that declare a start edit because her escape never fires in free
-play: the enemy Hargrim 2 m east of her on tick 0, once with Lantern Burst ready
-(it is pressed) and once with it on cooldown (Glide is pressed, and the oracle
-checks its landing and the dash the sim starts). The same match with a start
-edit declared in the test, Skerrow at 100 energy and both enemies at 40 health,
-runs the oracle's F row on a real press: Skerrow starts Reaper's Dance, the
-tally counts a teleport of it apart, the escape teleports are exactly 2 and none
-is blocked. One run only, with the seeds above (a miss is governed by decision
-8.3 of batch #53; the declared fallback is Skerrow against a Quillon at 40
-health, the other two dead, 9 m apart). `reaper.test.ts` also blocks it: a
-target at 40 health steps behind the pillar of arena 1 during F's 18 tick
-windup, the sim fires toward the current aim, reports the teleport blocked,
-Skerrow stays where the cast began, and the tally counts it apart with no
-blocked escape. A shadow-edge test on arena 1 pins that a position where the
-centre line is clear and a shifted line hits the pillar gets no press and is not
-chosen as a sight cell. The determinism test runs the same match twice, and two
-matches stepped in turn, on the test kits and on the shipped kits (the second
-one interleaved with a match on the test kits), and compares input streams and
-final checksums in memory; a Skerrow 2v2 block does the same on the shipped
-kits, interleaved with a match on the test kits and against another match seed,
-each with the guard of one distinct record per bot per tick. See
-[testing](testing.md).
+at the caster's turn, and the oracle's clone, which gives no other champion an
+input, sees them standing. Then the end must equal, bit for bit, the teleport
+end of a clone of the state the bot thought on stepped with the inputs of the
+champions ahead and the caster's press, and a champion ahead must have moved or
+some champion died: the oracle models the walks and the deaths that land before
+the cast and nothing else (#146; the deaths of a higher id were added in #165
+after the review of #182 found that the first form looked only at the champions
+with a lower id, so an arc of a champion ahead that killed a champion behind the
+caster, whose body the landing depended on, failed it; `escape-oracle.test.ts`
+pins it on a hand-built state, with a fixture champion whose M1 is an arc with
+no windup). The bot models neither the walks nor the deaths ahead of it; its
+landing search ignores champions. Hush Ward is pressed only when Skip is not
+ready or has no landing. A direction whose raw point, the one the teleport aims
+at before the sim's collision pushes a champion off a wall, is not a free cell
+is skipped too, as the bot does: a match played to its end has a Skip that ends
+2 cm inside the south wall, which the sim pushes clear and the bot passes over.
+Lumeth's rows are Lantern Burst (an escape row), Glide (a dash row: the oracle's
+own first-of-five 4 m dash landing, a free cell and a path
+`oracleSegmentViolates` finds clean, the aim equal to it, a `dashStarted` in
+that direction after the step, and E not ready), Binding Sigil (the kit band
+less the margin, a clear shot of 0.5, and the oracle's own check that the target
+is within 6 m of an alive ally of hers), Mend Bolt (its enemy band, or an ally
+row when an ally qualifies) and the ally rows of Soothing Surge, Aegis Veil and
+Dawnbloom, which have no enemy band: a press of them needs an ally. An ally row
+is written from the kit (a reach of the bolt's speed times its lifetime, or an
+area's radius plus 0.5, less the margin of 1 m; a need of 10, 14, 30 and 30; a
+shot width of 0.35 and 0.5), and a table test works every literal out from
+`lumeth.json` again, so a change to the kit fails it. The oracle's own scan
+(alive, on her team, not herself for a bolt, missing at least the need, in
+reach, a clear shot for a bolt) picks the ally with the lowest health fraction,
+the lower id on a tie. A press with no ally that qualifies fails the run, and a
+bolt press must be aimed within 12.1 degrees (the widest tier error, 12, and the
+whole centimetres) of the lead point at that ally, unless a cast in progress
+fires on that tick. The EX variants of M2 and R have no row and fail the run.
+The ultimates of Skerrow and Brimwick pass only for a target at 40 or 55 health
+or less (the damage F does, written from each kit file), or one the oracle finds
+cornered by its own walk of the five points. The dash rows (Rush, EX Rush,
+Hargrim's ultimate, Lunge, EX Lunge, Reed Step) fail a press on an escape think,
+and Quiet Dart's row fails a press at a target the oracle finds with no escape
+ready (its own table of escape slots, a cooldown of at most 1, no stun or
+silence). A tally (`tallyTeleports` in the test helpers) counts the escape
+teleports of the runs (a press with a landing) apart from every other teleport
+(Reaper's Dance), each with its blocked count: every escape teleport must be
+reported unblocked, and Reaper's Dance may be blocked legitimately. The run must
+end with a death from a cast, every champion must start a cast, and one cast
+must be an EX. The seeds are 101 to 104, the match seed 7 and the tiers easy,
+normal, hard, normal; they are pinned, and a miss after a change to the bots,
+the sim or the Node version is governed by batch #53 decision 8.3. The ultimate
+has its own pinned run: the 2v2 ends its fights by tick 700 with the energy bar
+at 75 at most, and 9000 matches of it on the shipped kits gave no F cast, so a
+3v3 of Hargrim and two Quillons a side, seeds 101 to 106 at the hard tier, runs
+through the same checks and must start an F (decision 8 of #63 allows a separate
+set for this alone; it needed another size of match). Since the bots dodge
+(#137) the run is a declared start edit (decision 4 of batch #134): every
+champion starts at 75 energy, because no seed set reached an F by landing hits
+alone. Four (test kits) and five (shipped kits) of the six press F, and with the
+reserve dropped none does, so the energy reserve is still what lets it fire. A
+free-play run of the same 3v3 on the shipped kits, seeds 648 to 653 with no
+start edit, pins the turn-order model above: on tick 341 champion 1's Skip ends
+2.0 m from the standing landing because champion 0 slid along champion 2 first.
+A Skerrow 2v2 pins the Skerrow profile: Skerrow and Quillon against Hargrim and
+Quillon on the shipped kits in free play, seeds 101 to 104, every bot on normal,
+match seed 7; a team is eliminated by tick 3600 (a round is 5400 ticks in match
+flow, which would decide the same way), Skerrow starts a Lunge, every press
+passes the oracle and no bot stalls for more than 120 ticks. Hargrim and Lumeth
+against Hargrim and Quillon on the four shipped kits (seeds 101 to 104, normal,
+match seed 7, 3600 ticks) run the same checks, with two runs that declare a
+start edit because her escape never fires in free play: the enemy Hargrim 2 m
+east of her on tick 0, once with Lantern Burst ready (it is pressed) and once
+with it on cooldown (Glide is pressed, and the oracle checks its landing and the
+dash the sim starts). The same match with a start edit declared in the test,
+Skerrow at 100 energy and both enemies at 40 health, runs the oracle's F row on
+a real press: Skerrow starts Reaper's Dance, the tally counts a teleport of it
+apart, the escape teleports are exactly 2 and none is blocked. One run only,
+with the seeds above (a miss is governed by decision 8.3 of batch #53; the
+declared fallback is Skerrow against a Quillon at 40 health, the other two dead,
+9 m apart). `reaper.test.ts` also blocks it: a target at 40 health steps behind
+the pillar of arena 1 during F's 18 tick windup, the sim fires toward the
+current aim, reports the teleport blocked, Skerrow stays where the cast began,
+and the tally counts it apart with no blocked escape. A shadow-edge test on
+arena 1 pins that a position where the centre line is clear and a shifted line
+hits the pillar gets no press and is not chosen as a sight cell. The determinism
+test runs the same match twice, and two matches stepped in turn, on the test
+kits and on the shipped kits (the second one interleaved with a match on the
+test kits), and compares input streams and final checksums in memory; a Skerrow
+2v2 block does the same on the shipped kits, interleaved with a match on the
+test kits and against another match seed, each with the guard of one distinct
+record per bot per tick. See [testing](testing.md).
 
 The rules have their own pins on frozen states of the shipped kits
 (`openers.test.ts`, `escapes.test.ts`, `reserve.test.ts`, `reaper.test.ts`, with
@@ -1606,26 +1604,28 @@ it; the streak is one run for the whole order (see Openers and escapes), pinned
 for both kits by a target that jumps to 2 m while R's band run builds with R and
 SPACE on cooldown, and the two come off cooldown on the think after the first
 kite think: SPACE is pressed, not R, red when the gate reads the slot's run
-again; and the streak starts again after a break in the kite and after a change
-of the acted target (the press is `castDelay` thinks after the first think of
-the new streak). `grand-finale.test.ts` holds Grand Finale (pressed at 55
-health, not at 56 or at a healthy target at 8 m, pressed at a healthy target in
-the north-east corner, not against a wall with a way along it; Ondrel presses
-Drowned Ground at a healthy target; the reserve spends `M2+SHIFT` at 80 energy
-at 10.2 m against a healthy target and holds it against 55 health).
-`area-lead.test.ts` pins the lead of the areas on the sim (see Aim). Mutations
-that turn each red (each alone, restored after): the `PROFILES` row, the
-`KIT_RULES` row or the `RULES` row dropped, `rangeMin` moved to 4 or 6 (Ondrel)
-and 6 or 8 (Brimwick), either `holdF` flipped; the motion of Undertow or Flash
-Powder dropped or inverted, either band moved to a literal one metre off, either
-opener dropped; `<=` for `<` in the held test, the damage read as 54 or 56, the
-cornered test dropped; the kite trigger made inclusive, either escape order
-reversed, the path test of Reed Step made the line of sight, that of Flare Step
-made `segmentClear`, the aim override dropped, `findLanding` true when none
-passes, the streak gate returned to `runs[i]`, the streak not zeroed on a change
-of target, the streak never reset; the lead dropped, doubled or taken from 10
-m/s; an object per escape gate (168 B in the two escape scenes of the heap
-check).
+again; and the streak starts again after a break in the kite, after a change of
+the acted target and after a dead think with a hand-built revive (the press is
+`castDelay` thinks after the first think of the new streak; the revive pins the
+zeroing in `bot.ts`, as `casting.test.ts` pins `runs.fill(0)`).
+`grand-finale.test.ts` holds Grand Finale (pressed at 55 health, not at 56 or at
+a healthy target at 8 m, pressed at a healthy target in the north-east corner,
+not against a wall with a way along it; Ondrel presses Drowned Ground at a
+healthy target; the reserve spends `M2+SHIFT` at 80 energy at 10.2 m against a
+healthy target and holds it against 55 health). `area-lead.test.ts` pins the
+lead of the areas on the sim (see Aim). Mutations that turn each red (each
+alone, restored after): the `PROFILES` row, the `KIT_RULES` row or the `RULES`
+row dropped, `rangeMin` moved to 4 or 6 (Ondrel) and 6 or 8 (Brimwick), either
+`holdF` flipped; the motion of Undertow or Flash Powder dropped or inverted,
+either band moved to a literal one metre off, either opener dropped; `<=` for
+`<` in the held test, the damage read as 54 or 56, the cornered test dropped;
+the kite trigger made inclusive, either escape order reversed, the path test of
+Reed Step made the line of sight, that of Flare Step made `segmentClear`, the
+aim override dropped, `findLanding` true when none passes, the streak gate
+returned to `runs[i]`, the streak not zeroed on a change of target, the streak
+not zeroed on a dead think, the streak never reset; the lead dropped, doubled or
+taken from 10 m/s; an object per escape gate (168 B in the two escape scenes of
+the heap check).
 
 The seeded matches of #165 (`ondrel.test.ts` and `brimwick.test.ts`, over
 `six-cells.ts`, so Vitest runs the two in parallel) play each new kit, with a
@@ -1645,17 +1645,23 @@ budgets: Ondrel against Hargrim 4292 and 1009 (arena01), 5573 and 1444, Quillon
 and 1105, 2510 and 621, Brimwick 3703 and 1027, 6098 and 1152; Brimwick against
 Hargrim 4046 and 1412, 4347 and 1039, Quillon 4802 and 1028, 3787 and 800,
 Lumeth 6551 and 1710, 6159 and 2325, Skerrow 4057 and 1226, 2323 and 552. Across
-a kit's cells every slot but F is started (M1, M2, SPACE, Q, E, R), and Ondrel
-escapes by dashing, Brimwick by teleporting. F never fires in them, as the 2v2
-of the first kits never did, so two declared start edits (the precedent of
-Reaper's Dance) run the whole play loop with the oracle's F row: Brimwick at 100
-energy with both enemies at 55 health starts Grand Finale, at 56 it does not in
-3600 ticks, and Ondrel at 100 energy starts Drowned Ground. A miss after a
-change to the bots, the sim or the Node version is governed by decision 8.3 of
-batch #53, with the declared fallback of a duel at 9 m. Two more start edits
-give the oracle's escape rows their cases: a rooted Ondrel with an enemy 2 m
-off, or boxed in at the north-east corner, with Reed Step ready, presses Reed
-Screen.
+a kit's cells every slot but F is started (M1, M2, SPACE, Q, E, R). Ondrel
+dashes away in each of the 8 cells without another dash escaper (her own
+`glides`, since Lumeth's Glide counts in the others), and Brimwick casts Flare
+Step in all 8, each cast an escape because it has no band, no ally row and no EX
+(`slots['brimwick:SPACE']`, not `tally.escapes`, which counts Quillon's Skip and
+Skerrow's Vanish Step too). Each alone, these turn the rows red: champion 0's
+dash escapes left out of `glides` (the earlier summed row stayed green on
+Lumeth's three Glides), champion 0's SPACE casts left out of `slots`, and a band
+added for `brimwick:SPACE`. F never fires in them, as the 2v2 of the first kits
+never did, so two declared start edits (the precedent of Reaper's Dance) run the
+whole play loop with the oracle's F row: Brimwick at 100 energy with both
+enemies at 55 health starts Grand Finale, at 56 it does not in 3600 ticks, and
+Ondrel at 100 energy starts Drowned Ground. A miss after a change to the bots,
+the sim or the Node version is governed by decision 8.3 of batch #53, with the
+declared fallback of a duel at 9 m. Two more start edits give the oracle's
+escape rows their cases: a rooted Ondrel with an enemy 2 m off, or boxed in at
+the north-east corner, with Reed Step ready, presses Reed Screen.
 
 The oracle got three extensions (test code only; the first red of the seeded
 runs found the reason for each). A slot that is both an escape and a slot with a
@@ -1735,25 +1741,24 @@ m with Flare Step ready, the landing search for a teleport that is not fixed
 and the aim override on every think, and a dodge: a Quillon standing with two
 bolts at her, one along an axis and one on a diagonal, so the threat scan of
 both and the sidestep run on every think), warms each bot up with 20000 thinks,
-settles it in the default tiers
-(windows read like a round until one is under the bound, at most 20, which
-decide nothing: a series that falls is a late tier-up the settle absorbs, a
-series flat through the cap is a state it does not cure and the log line names;
-see The default tiers on the runner) and reads `process.memoryUsage().heapUsed`
-around one `think`, 600 samples per round. The figure of a round is the median
-delta minus the median delta of an empty pair of reads taken in the same loop,
-just before each think (a call of `process.memoryUsage()` allocates its result
-object, 144 B in a tier that does not optimise it away, and a pair read in
-another function sat in another tier and moved a scene by 144 B on Node 24),
-and the lowest of three rounds of every scene must be under a literal bound,
-128 B per think. The think before the rewrite (b09b437) read 4 to 56 KB per
-think; the current think reads 0 B, and the bound sits between the two. The
-test also reads the sim's baseline step against the floor of the sim's own
-check, which proves the counter moves, and it checks that `think` leaves the
-checksum alone and that every scene stayed in its intent. It gates on the
-native runner and not on the Linux container (batch #53 decision 12).
-Differential tests keep the allocation-free forms honest: `hypot2` and
-`distanceInto` against `Math.hypot`, `lineOfSight` against the sim's
+settles it in the default tiers (windows read like a round until one is under
+the bound, at most 20, which decide nothing: a series that falls is a late
+tier-up the settle absorbs, a series flat through the cap is a state it does not
+cure and the log line names; see The default tiers on the runner) and reads
+`process.memoryUsage().heapUsed` around one `think`, 600 samples per round. The
+figure of a round is the median delta minus the median delta of an empty pair of
+reads taken in the same loop, just before each think (a call of
+`process.memoryUsage()` allocates its result object, 144 B in a tier that does
+not optimise it away, and a pair read in another function sat in another tier
+and moved a scene by 144 B on Node 24), and the lowest of three rounds of every
+scene must be under a literal bound, 128 B per think. The think before the
+rewrite (b09b437) read 4 to 56 KB per think; the current think reads 0 B, and
+the bound sits between the two. The test also reads the sim's baseline step
+against the floor of the sim's own check, which proves the counter moves, and it
+checks that `think` leaves the checksum alone and that every scene stayed in its
+intent. It gates on the native runner and not on the Linux container (batch #53
+decision 12). Differential tests keep the allocation-free forms honest: `hypot2`
+and `distanceInto` against `Math.hypot`, `lineOfSight` against the sim's
 `hasLineOfSight`, and `segmentClear` against a copy of the implementation
 before the rewrite and against the sampled clearance oracle. The test helpers
 copy every input a bot returns, and a guard counts one distinct record per bot
