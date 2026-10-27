@@ -43,7 +43,7 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
 - Not in the toolkit, so not in any kit here: a delayed detonation, a
   projectile that spawns an area when it ends, a barrier or a wall, a cone or
   a rectangle (an area is one circle with one `targets` filter, and the arc is
-  the only cone), a cleanse, an anti-heal, a passive, and any speed change
+  the only cone), a cleanse, a passive, and any speed change
   other than slow and haste. An area reads the aim on the tick it fires, so a
   placed area follows its target through the windup. Areas ignore obstacles.
   `toward` pulls to the caster's position now and `away` pushes from the
