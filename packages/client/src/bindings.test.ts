@@ -3,7 +3,7 @@ import { ACTIONS, DEFAULT_BINDINGS, keyLabel, parseBindings, rebind, type Action
 
 describe('the default bindings', () => {
   // The table of docs/design/rules.md section 6.
-  it('are the keys of the rules: WASD, Space, Q, E, R and F', () => {
+  it('are the keys of the rules: WASD, Space, Q, E, R, F and the held C', () => {
     expect(DEFAULT_BINDINGS).toEqual({
       up: 'KeyW',
       left: 'KeyA',
@@ -14,12 +14,13 @@ describe('the default bindings', () => {
       E: 'KeyE',
       R: 'KeyR',
       F: 'KeyF',
+      selfCast: 'KeyC',
     });
   });
 
-  it('list nine actions, each with its own code', () => {
-    expect(ACTIONS).toEqual(['up', 'left', 'down', 'right', 'SPACE', 'Q', 'E', 'R', 'F']);
-    expect(new Set(Object.values(DEFAULT_BINDINGS)).size).toBe(9);
+  it('list ten actions, each with its own code', () => {
+    expect(ACTIONS).toEqual(['up', 'left', 'down', 'right', 'SPACE', 'Q', 'E', 'R', 'F', 'selfCast']);
+    expect(new Set(Object.values(DEFAULT_BINDINGS)).size).toBe(10);
   });
 });
 
@@ -37,6 +38,7 @@ describe('rebind', () => {
   it('rejects a code that another action holds as a duplicate', () => {
     expect(rebind(DEFAULT_BINDINGS, 'up', 'KeyD')).toEqual({ ok: false, reason: 'duplicate' });
     expect(rebind(DEFAULT_BINDINGS, 'SPACE', 'KeyQ')).toEqual({ ok: false, reason: 'duplicate' });
+    expect(rebind(DEFAULT_BINDINGS, 'down', 'KeyC')).toEqual({ ok: false, reason: 'duplicate' });
   });
 
   it('accepts the code an action already holds', () => {

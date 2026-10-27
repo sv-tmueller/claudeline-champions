@@ -146,7 +146,7 @@ describe('the keys view', () => {
     expect(rows.right.key.textContent).toBe('L');
     expect(rows.up.key.textContent).toBe('W');
     expect(rows.SPACE.key.textContent).toBe('Space');
-    expect(ACTIONS.map((action) => rows[action].key.textContent)).toEqual(['W', 'A', 'S', 'L', 'Space', 'Q', 'E', 'R', 'F']);
+    expect(ACTIONS.map((action) => rows[action].key.textContent)).toEqual(['W', 'A', 'S', 'L', 'Space', 'Q', 'E', 'R', 'F', 'C']);
   });
 
   it('writes a row only when its text changes', () => {
