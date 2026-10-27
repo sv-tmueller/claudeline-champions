@@ -351,6 +351,15 @@ const DASHES = new Set([
   'lumeth:SPACE',
   'ondrel:SPACE',
 ]);
+
+/**
+ * The pressed abilities whose first top-level effect is a melee arc, written from the kit files
+ * (data/kits/hargrim.json and skerrow.json; the test kits' Hargrim M1 is one too). The sim's arc
+ * ignores obstacles (melee.ts), so a press of one needs neither a line of sight nor a clear shot
+ * (bots.md, Clear shot). An arc after a dash or a teleport (the EX Lunge, Reaper's Dance) is not
+ * one: the dash stops at an obstacle and the teleport needs a line of sight.
+ */
+export const MELEE = new Set(['hargrim:M1', 'skerrow:M1', 'skerrow:E', 'skerrow:E:ex']);
 const MARGIN = 1;
 const EX_COST = 25;
 const ULTIMATE_COST = 100;
@@ -421,7 +430,7 @@ function oracleLead(from: ChampionState, to: ChampionState, speed: number): { x:
 const AIM_TOLERANCE = 12.1;
 
 /** The reasons a press of this input on this state breaks a documented gate; empty when none. */
-function pressProblems(
+export function pressProblems(
   state: GameState,
   c: ChampionState,
   pressed: { slot: Slot; ex: boolean },
@@ -521,9 +530,10 @@ function pressProblems(
       }
     }
   } else if (band !== undefined) {
-    if (!hasLineOfSight(state, c, target)) problems.push('no line of sight');
+    // A melee arc ignores obstacles: no line of sight and no clear shot are asked of its press.
+    if (!MELEE.has(key) && !hasLineOfSight(state, c, target)) problems.push('no line of sight');
     const clearance = set.clearances[key];
-    if (clearance !== undefined && !clearShotOracle(state, c, target, clearance)) {
+    if (!MELEE.has(key) && clearance !== undefined && !clearShotOracle(state, c, target, clearance)) {
       problems.push(`no clear shot of width ${clearance}`);
     }
     if (band !== undefined) {
