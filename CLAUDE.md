@@ -33,10 +33,14 @@ npm run balance                  # bot-versus-bot win-rate report: plays 4800
                                  # Apple silicon. Flags after `--`: --check
                                  # compares a fresh run with the committed
                                  # block, --out <file> writes there instead,
-                                 # --seeds N plays the seeds 1 to N. Needs Node
-                                 # 22.15. The manual workflow
-                                 # .github/workflows/balance.yml runs --check on
-                                 # a runner, 12 to 16 minutes.
+                                 # --seeds N plays the seeds 1 to N in every
+                                 # mode, --mode 2v2|3v3 plays one mode (needs
+                                 # --out or --check; --check then compares only
+                                 # that mode's rows). Seeds a config: the largest
+                                 # even number at or under 200 over the cell's
+                                 # fills. Needs Node 22.15. The manual workflow
+                                 # .github/workflows/balance.yml runs --check
+                                 # --mode on a runner, one job per mode.
 npm run fixtures:search -- <kit>   # rebuild a kit's scripted roster fixture; Node 22.15+
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
