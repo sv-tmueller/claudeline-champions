@@ -75,30 +75,29 @@ nothing is copied here but the two catalog numbers the kit leans on.
   [#176](https://github.com/sv-tmueller/claudeline-champions/issues/176)
   fixes the other applications, at the latest in step 1.2, the kit as data.
 
-**Model.** Cue: a shield and a hammer, three boxes in the body material, so
-the accent still marks only the front. The shield is a plate of 0.30 m by
-0.04 m by 0.60 m on `Arm_L`, centred at (0, 0.44, 1.04): 1 cm off the arm and
-from 0.74 m to 1.34 m, below the shoulder, so it does not read as Hargrim's
-shoulder blocks. The hammer hangs from the right fist on `Arm_R`: a haft of
-0.05 m by 0.05 m by 0.40 m centred at (0, -0.41, 0.60) and a head of 0.22 m
-by 0.14 m by 0.14 m centred at (0, -0.41, 0.33). Two numbers are fixed, by the
-shared `Death` clip and the overhead view, and are not to be changed. The head is 0.22 m long: at 0.28 m it
-reaches x -0.14 m and the `Death` clip's key 30 (on the back, `Hips` at -85
-degrees and -0.64 m) puts it 3.3 mm under the floor. The hammer sits at y
--0.41 m: at -0.34 m its y span equals the arm's, so from above it adds only
-4 cm strips in front of and behind the arm, and at -0.41 m it sticks out 7 cm
-to the side. The pose tables stay
-shared, with no per-champion pose: `Cast` raises the shield forward, `Attack`
-swings the hammer, and `Hit`, `Death` and `Run` throw or swing both arms
-outward without either part touching a leg. The whole cue is below the
-shoulders and reads from the 55 degree camera, not from straight above, and
-anything bulkier breaks the 0.5 m radius. The model's top is the head's 1.70 m
-at rest, and the clip tops are 1.7095 m (Idle), 1.7228 m (Run), 1.7000 m
-(Attack), 1.7000 m (Cast), 1.7000 m (Hit) and 1.7026 m (Death), all under
-1.90 m, with every clip's low at 0.0000 m. At key 30 of `Death` the lowest
+**Model.** Cue: a shield and a hammer, three boxes in the body material, so the
+accent still marks only the front. The shield is a plate of 0.30 m by 0.04 m by
+0.60 m on `Arm_L`, centred at (0, 0.44, 1.04): 1 cm off the arm and from 0.74 m
+to 1.34 m, below the shoulder, so it does not read as Hargrim's shoulder blocks.
+The hammer hangs from the right fist on `Arm_R`: a haft of 0.05 m by 0.05 m by
+0.40 m centred at (0, -0.41, 0.60) and a head of 0.22 m by 0.14 m by 0.14 m
+centred at (0, -0.41, 0.33). Two numbers are fixed, by the shared `Death` clip
+and the overhead view, and are not to be changed. The head is 0.22 m long: at
+0.28 m it reaches x -0.14 m and the `Death` clip's key 30 (on the back, `Hips`
+at -85 degrees and -0.64 m) puts it 3.3 mm under the floor. The hammer sits at y
+-0.41 m: at -0.34 m its y span equals the arm's, so from above it adds only 4 cm
+strips in front of and behind the arm, and at -0.41 m it sticks out 7 cm to the
+side. The pose tables stay shared, with no per-champion pose: `Cast` raises the
+shield forward, `Attack` swings the hammer, and `Hit`, `Death` and `Run` throw
+or swing both arms outward without either part touching a leg. The whole cue is
+below the shoulders and reads from the 55 degree camera, not from straight
+above, and anything bulkier breaks the 0.5 m radius. The model's top is the
+head's 1.70 m at rest, and the clip tops are 1.7095 m (Idle), 1.7228 m (Run),
+1.7000 m (Attack), 1.7000 m (Cast), 1.7000 m (Hit) and 1.7026 m (Death), all
+under 1.90 m, with every clip's low at 0.0000 m. At key 30 of `Death` the lowest
 point of the shield is 23.3 mm above the floor and of the hammer 26.6 mm. The
-ground radius is 0.4924 m. The model is 600 vertices, 288 triangles and
-39 780 bytes, and four builds are byte-identical.
+ground radius is 0.4924 m. The model is 600 vertices, 288 triangles and 39 780
+bytes, and four builds are byte-identical.
 
 Body colour: olive brass, linear (0.19, 0.18, 0.00), about `#797600`
 (decision 2 of batch #203). In 8-bit sRGB b minus g is -118, so the overlay
