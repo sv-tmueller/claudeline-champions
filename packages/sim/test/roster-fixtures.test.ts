@@ -1,7 +1,7 @@
 // Scripted roster fixtures: one per kit, `scripted-roster-hargrim-arena01-2v2.json`,
 // `scripted-roster-quillon-arena01-2v2.json`, `scripted-roster-skerrow-arena01-2v2.json`,
-// `scripted-roster-lumeth-arena01-2v2.json`, `scripted-roster-ondrel-arena01-2v2.json` and
-// `scripted-roster-brimwick-arena01-2v2.json`.
+// `scripted-roster-lumeth-arena01-2v2.json`, `scripted-roster-ondrel-arena01-2v2.json`,
+// `scripted-roster-brimwick-arena01-2v2.json` and `scripted-roster-durnhal-arena01-2v2.json`.
 //
 // Each fixture runs 2400 ticks on arena01 with the kit of `data/kits/<id>.json` for all four
 // champions (a mirror: two on team A, two on team B), so one kit meets itself in every exchange.
@@ -21,17 +21,17 @@
 // The search script is not committed; the script it produced is the data. It used mulberry32 seeded
 // with the attempt number (1, 2, 3 and so on) and ran the mirror config of the fixture for 2400
 // ticks. Match seed 5555 for Hargrim, 5556 for Quillon, 5557 for Lumeth, 5558 for Skerrow, 5559 for
-// Ondrel and 5560 for Brimwick.
+// Ondrel, 5560 for Brimwick and 5561 for Durnhal.
 // Attempt 1 was the first to cover everything for Hargrim, attempt 23 the first for Quillon,
 // attempt 6 the first for Skerrow and attempt 2 the first for Lumeth (attempts 1 to 22, 1 to 5 and
 // 1 each missed an item of the coverage test, and none had an oracle problem); each one's output is
 // that fixture's segments and actions exactly.
 //
-// Ondrel and Brimwick (batch #147, #148) came from the tool and from no earlier script: on their
-// committed kits, with no pins, `npm run fixtures:search -- ondrel` settled on attempt 2 and
-// `-- brimwick` on attempt 10 (the attempts before each missed an item of the coverage test, and the
-// settling attempt had no oracle problem), and each file is byte for byte the same on Node 22.23.2
-// and 26.7.0.
+// Ondrel, Brimwick and Durnhal (batches #147, #148 and #204) came from the tool and from no earlier
+// script: on their committed kits, with no pins, `npm run fixtures:search -- ondrel` settled on
+// attempt 2, `-- brimwick` on attempt 10 and `-- durnhal` on attempt 2 (the attempts before each
+// missed an item of the coverage test, and the settling attempt had no oracle problem), and each file
+// is byte for byte the same on Node 22.23.2 and 26.7.0.
 //
 // The search is now in the repository: `npm run fixtures:search -- <kit>` (tools/fixtures, which
 // shares this file's format, replay, coverage and oracle through `roster-fixture.ts`). It stops at
@@ -114,7 +114,7 @@
 // `npx vitest run --project sim packages/sim/test/roster-fixtures.test.ts`, copy the actual values
 // from the failing checkpoint and checksum assertions into the fixture, and rerun until it is green.
 // The tool's replay gives the same values. Changing a number in `data/kits/<id>.json` on purpose
-// means changing `docs/design/roster-v1.md` or `roster-v2.md` and regenerating that kit's checksums the same way in
+// means changing `docs/design/roster-v1.md`, `roster-v2.md` or `roster-v3.md` and regenerating that kit's checksums the same way in
 // the same change while the coverage test stays green (the search need not run again). When the
 // coverage test turns red, the fixture is rebuilt with `npm run fixtures:search -- <kit>` in the
 // same change instead (balance.md, section 6.3), and the rebuilt fixture moves every checkpoint, so
@@ -129,12 +129,14 @@ import skerrowFixtureJson from './fixtures/scripted-roster-skerrow-arena01-2v2.j
 import lumethFixtureJson from './fixtures/scripted-roster-lumeth-arena01-2v2.json';
 import ondrelFixtureJson from './fixtures/scripted-roster-ondrel-arena01-2v2.json';
 import brimwickFixtureJson from './fixtures/scripted-roster-brimwick-arena01-2v2.json';
+import durnhalFixtureJson from './fixtures/scripted-roster-durnhal-arena01-2v2.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
 import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
+import durnhalJson from '../../../data/kits/durnhal.json';
 import { checksum, cloneState } from '../src/index';
 import type { GameState } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -162,6 +164,7 @@ const SUBJECTS: Subject[] = [
   { name: 'lumeth', kit: validateKit(lumethJson), fixture: decodeFixture(lumethFixtureJson, 'lumeth') },
   { name: 'ondrel', kit: validateKit(ondrelJson), fixture: decodeFixture(ondrelFixtureJson, 'ondrel') },
   { name: 'brimwick', kit: validateKit(brimwickJson), fixture: decodeFixture(brimwickFixtureJson, 'brimwick') },
+  { name: 'durnhal', kit: validateKit(durnhalJson), fixture: decodeFixture(durnhalFixtureJson, 'durnhal') },
 ];
 
 describe.each(SUBJECTS)('scripted $name fixture', ({ name, kit, fixture }) => {
