@@ -493,9 +493,9 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       if (!me.alive) {
         advancing = false;
         runs.fill(0);
-        // Zeroed with the runs. No test pins this line: the sim revives a champion only at a round
-        // start, where the champions stand over 20 m apart (an escape think needs 7 m or less), and
-        // any think that is not an escape think sets the streak to 0 below.
+        // Zeroed with the runs. The sim revives a champion only at a round start, where the champions
+        // stand over 20 m apart, so no match reaches this line; escapes.test.ts pins it with a
+        // hand-built revive, as casting.test.ts pins `runs.fill(0)`.
         escapeScratch.streak = 0;
         input.moveX = 0;
         input.moveY = 0;

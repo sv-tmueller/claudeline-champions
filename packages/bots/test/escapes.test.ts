@@ -858,8 +858,9 @@ describe('the order of an escape does not depend on a band run', () => {
   });
 });
 
-// The streak starts again whenever the escape thinks stop or the acted target changes: the press
-// comes `castDelay` thinks after the first think of a new streak, not at once on a leftover count.
+// The streak starts again whenever the escape thinks stop, the acted target changes or the champion
+// is dead for a think (a hand-built revive): the press comes `castDelay` thinks after the first think
+// of a new streak, not at once on a leftover count.
 describe('the escape streak starts again', () => {
   const kits = sixKits();
   const SPACE = SLOTS.indexOf('SPACE');
@@ -891,6 +892,25 @@ describe('the escape streak starts again', () => {
       }
       expect(kiteThink).toBeGreaterThanOrEqual(0);
       expect(pressThink - kiteThink).toBe(TIERS.hard.castDelay);
+    });
+
+    // bot.ts zeroes the streak with the runs on a dead think. The sim revives a champion only at a
+    // round start, so the revive here is built by hand, as casting.test.ts does for `runs.fill(0)`.
+    it(`after a dead think: ${id} presses on the fourth think after the revive, and not on a leftover count`, () => {
+      const state = sceneOf(id, near, { kits, ready: [] });
+      const me = state.champions[0] as ChampionState;
+      const bot = createBot(0, 'hard', 1);
+      for (let i = 0; i < 40; i++) expect(bot.think(state).buttons, `think ${i}`).toBe(0);
+      expect(bot.inspect().intent).toBe('kite');
+      me.alive = false;
+      expect(bot.think(state).buttons).toBe(0);
+      me.alive = true;
+      me.cooldowns[SPACE] = 0;
+      let pressThink = -1;
+      for (let i = 0; i < THINKS && pressThink < 0; i++) {
+        if (bot.think(state).buttons !== 0) pressThink = i;
+      }
+      expect(pressThink).toBe(TIERS.hard.castDelay);
     });
   }
 
