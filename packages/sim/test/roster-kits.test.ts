@@ -2135,7 +2135,8 @@ describe('Durnhal', () => {
     expect(rig.applied()).toEqual([[2, 'wound', 240], [0, 'shield', 240], [2, 'wound', 300], [2, 'slow', 120]]);
     expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 3 }, { type: 'slow', percent: 50 }]);
     const wound = champion(rig.state, 2).statuses.find((status) => status.type === 'wound');
-    expect(wound?.remainingTicks).toBeGreaterThan(240);
+    // The merge keeps the longer timer, so the F application's 300 ticks, not what M1's had left.
+    expect(wound?.remainingTicks).toBe(300);
     rig.clean();
   });
 
