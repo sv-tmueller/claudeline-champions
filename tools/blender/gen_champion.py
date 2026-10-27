@@ -319,7 +319,7 @@ def add_fuse_cap(bm):  # brimwick, burst caster, on top of the head
 
 
 def add_shield_and_hammer(bm):  # durnhal, guardian tank, a shield and a hammer on the arms
-    # The shield is a plate 2 cm off the left arm, below the shoulder. The hammer
+    # The shield is a plate 1 cm off the left arm, below the shoulder. The hammer
     # hangs from the right fist, its head 0.22 m long (a longer head sinks under
     # the floor at Death key 30) and 7 cm outside the arm so it shows from above.
     carry(bm, "Arm_L", common.add_box, (0, 0.44, 1.04), (0.30, 0.04, 0.60), BODY)

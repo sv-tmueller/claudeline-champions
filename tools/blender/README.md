@@ -119,8 +119,9 @@ not vertical.
 - All eight files share the node layout, the origin, the facing, the body
   geometry, the rig, the clips and the accent. A roster champion differs only
   in the body colour and one cue, which is in the body colour so the accent
-  still marks only the front. The cue is one box on Spine for Ondrel and
-  Brimwick, and Durnhal's is three boxes on the two arms.
+  still marks only the front. A cue can be several boxes: one on Spine for
+  Ondrel and Brimwick, two on Spine for Hargrim, and three on the two arms for
+  Durnhal.
 - The scene lists `Rig`, whose children are the joint `Hips` and the skinned
   mesh `Champion`. The rest pose is the static geometry, so the bind pose
   equals it and a model with no clip playing looks as it did unrigged. Every
@@ -185,12 +186,13 @@ nearest colours are Hargrim at 91.9, Ondrel at 92.7, Lumeth at 95.0, Brimwick
 at 104.1, Skerrow at 112.0 and the dead grey at 118.3. The floor is 168.1 away,
 and the other client and trim colours 160.9 or more, the HUD colours 146.0 or
 more (the energy colour `#ffb000` is the nearest). The shield is a plate
-0.30 by 0.04 by 0.60 m, 2 cm off `Arm_L` and below the shoulder. The hammer
+0.30 by 0.04 by 0.60 m, 1 cm off `Arm_L` and below the shoulder. The hammer
 hangs from `Arm_R`: a haft 0.05 by 0.05 by 0.40 m and a head 0.22 by 0.14 by
 0.14 m, 7 cm outside the arm so it shows from above. The head is 0.22 m long
 and the hammer sits at y = -0.41 for two reasons: at 0.28 m the head sinks
-3.3 mm under the floor at Death key 30, and at y = -0.34 the arm hides it from
-overhead. The model has 600 vertices and 288 triangles, a ground radius of
+3.3 mm under the floor at Death key 30, and at y = -0.34 the head's y span
+equals the arm's, so from above it adds only 4 cm strips in front of and
+behind the arm. The model has 600 vertices and 288 triangles, a ground radius of
 0.4924 m and 39 780 bytes.
 
 That client test keeps its own `BODY_COLOURS` table with the bodies above, so
