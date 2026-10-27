@@ -357,6 +357,28 @@ other spec.
   (320x180) and 2 at 105 to 210 ms, about 50 reads at 32 to 75 ms, so the body
   takes about 9 to 13 s and the test about 15 s with the load; the 45 s
   timeout is more than twice that. It does not use `__runProbeFrames`.
+- `self-cast.spec.ts`: the held C key (no screenshot), on
+  `?champion=lumeth&difficulty=normal&arena=arena01&teamsize=2` with a paused
+  clock and tick budgets, like `lingering.spec.ts`. With the cursor at the
+  canvas centre (about 12 m from her), C and M1 read the `data-windup` of the
+  slot true and then false (the cast fired) with `data-projectiles` 0 at the
+  fire tick and four ticks after, and the slot not ready; the same for M2
+  (Soothing Surge, an 18 tick windup); C and R show the shield at absorb 30;
+  after C is released M1 reads ready again and the next cast reads
+  `data-projectiles` 1 or more, which shows that the aim returned to the
+  cursor. The page exposes no sim events, so the landing itself (no
+  `projectileSpawned`, the heals of 6, 8.4 and 13.2, the hot, the shield, and
+  the EX with its 25 energy, which only hits on bots earn) is asserted by
+  `packages/client/src/self-cast-scene.test.ts` on the real sim; the e2e leaves
+  the EX out so that it does not depend on bot behaviour. Bot projectiles also
+  count in `data-projectiles`: the first one of this match is 79 ticks into the
+  round with an idle human (measured), and the spec fails with that reason if a
+  read of 0 comes within 20 ticks of it (the last one is 35 ticks in). The
+  test runs about 250 frames at 17 to 24 ms (320x180) and about 70 reads at 32
+  to 75 ms, so the body takes about 6 to 11 s and the test about 15 s with the
+  load on the runner (2.0 to 2.7 s locally); the 45 s timeout is more than
+  twice that. The once-per-step mapping of `main.ts` is not pinned here (see
+  client.md, Input).
 - `walk.spec.ts`: input and the camera (`walk.png`), on the dev-only sandbox
   scene `/?scene=sandbox`, after the round phase begins. The sandbox has one bot
   that never comes near, so the exact-position assertions do not depend on bots.

@@ -64,8 +64,8 @@ first.
   the arena. The HUD has the ring warning and the kill feed, and the result
   screen has the champion, arena, team size and difficulty select. Escape
   opens a menu that pauses the match (Resume, Restart, the select again, a
-  keys view that rebinds the nine movement and slot keys, and a sound
-  toggle). The first-pass sound is generated in code (a hit, a cast, a death,
+  keys view that rebinds the nine movement and slot keys and the held
+  self-cast key C, and a sound toggle). The first-pass sound is generated in code (a hit, a cast, a death,
   a round start and a round end) and is counted by the heap probe. The
   `Platform` interface has its two settings methods, asynchronous, and a
   `sound` sub-object; the browser platform keeps the bindings and the mute in

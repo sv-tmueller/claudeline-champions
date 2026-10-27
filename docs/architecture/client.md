@@ -58,9 +58,9 @@ leave it stale. The mapping itself is unchanged, and `camera.test.ts` keeps
 the two functions it replaced as an oracle, compared to the new path with
 `Object.is` over a grid of canvases and pointers.
 
-Keys match on `event.code`, and the nine movement and slot actions can be
-rebound: `bindings.ts` (pure) holds `Action` (up, left, down, right, SPACE, Q,
-E, R, F), `DEFAULT_BINDINGS` (the table of rules.md section 6), `rebind`
+Keys match on `event.code`, and the ten movement, slot and self-cast actions
+can be rebound: `bindings.ts` (pure) holds `Action` (up, left, down, right,
+SPACE, Q, E, R, F, selfCast), `DEFAULT_BINDINGS` (the table of rules.md section 6), `rebind`
 (refuses a code another action holds, `duplicate`, and a reserved code,
 `reserved`: Escape, Tab, F3, F4, both Shift keys, Control, Alt, Meta and the
 empty code of a key the browser cannot identify) and `keyLabel`. The mouse
@@ -70,6 +70,55 @@ translates the physical code of an event into the default code of its action
 before it joins `held`, so `toPlayerInput` and its tables are the same whatever
 the bindings. A key held across a rebinding is cleared by the `releaseAll` the
 menu runs on close. Escape opens the menu (see Menu and keybinding).
+
+The held self-cast key is the action `selfCast`, default `KeyC` (rules.md
+section 6, design spec section 7.1 of roster-v3). It sets no button bit:
+`KEY_BUTTONS` has no entry for it, so `Button`, `PlayerInput`, the replay
+format and the protocol are unchanged. The contract is
+`toPlayerInput(aimX, aimY, self?)`: when `selfCast` is held and `self` is
+given, the aim is `self` as `Math.round(x * 100) + 0` and the same for y, the
+quantization of `groundAimFromPointer` inlined so that no raw double crosses
+the call; otherwise it is the cursor aim. `main.ts:stepSim` samples the cursor
+once per frame but maps the human's input before every step, with
+`state.champions[0]`, not once per frame: a cast reads the stored aim before
+the caster moves in that step (`step.ts` runs `advanceWindup` and `startCast`
+before movement), so a mapping once per frame would let a walking caster drift
+by every step of a long frame (0.37 m after 4 steps at 5.5 m/s, 0.48 m with
+Glide's 30 percent haste, past the 0.5 m circle at any dev `?timescale`). Per
+step the aim is exact to the centimetre rounding, at most 0.0071 m. At scale 1
+it is one call per frame, as before, and it allocates nothing. No spec pins the
+once-per-step mapping (a paused-clock frame in e2e runs one tick); it is a
+review item at that call site. The keys view has a tenth row, "Self-cast
+(hold)", built from `ACTIONS` like the others.
+
+Every shipped ability that has `allyEffects` is an ally projectile, and C
+changes the outcome for exactly these: Lumeth's Mend Bolt (M1), Soothing Surge
+(M2) and its EX (Shift, C and M2). The effects around the caster that already
+include her (Aegis Veil and its EX, Dawnbloom, Hargrim's Q haste circle) and
+the effects on the caster herself (the shields of Hargrim, Quillon and Ondrel's
+R, Brimwick's R haste, the dash hastes) are not changed by C. There are no
+exceptions: the one effect that could not reach its caster, a projectile's
+`allyEffects`, is the sim half of #162 (#191). `self-cast-scene.test.ts` plays
+Mend Bolt, Soothing Surge, the EX and Aegis Veil with the held key on the real
+sim and the real Lumeth kit and reads the events (no `projectileSpawned`, then
+`heal` with `targetId === sourceId`, then the hot); `e2e/self-cast.spec.ts`
+reads what the page shows. The EX is headless only, because its 25 energy only
+hits on bots earn; Dawnbloom costs 100 energy and C does not change it.
+
+Known effects of holding C, recorded and not fixed:
+
+- Facing. `step.ts` turns the champion toward the aim after she moves, so while
+  C is held a walking champion faces backwards and a standing one faces along
+  the rounding residue (or keeps her facing when it is 0). This is cosmetic,
+  since the sim reads facing nowhere else. A fix, with facing ignoring an aim
+  inside her circle, is a sim change that moves fixtures, so it is a follow-up.
+- Enemy skillshots. An aimed ability with enemy effects cast with C gets a
+  residue direction, or the team's forward direction when the aim is exactly on
+  her (`fireFrom`). Spec 7.1 calls this the player's choice.
+- Online. There is no prediction until P6a and P6b (online.md), so the local
+  position lags the server by the 100 ms render delay and a round trip, and a
+  walking online self-cast can miss the 0.5 m circle. The online client
+  packages own it; the protocol is untouched.
 
 Tab is reserved and fixed (rules.md section 6) and is no `Action`: the input
 core ignores it, since it is not in the translation. While it is held,
@@ -785,7 +834,10 @@ is unusable, since a per-field merge could create a duplicate: no text, bad
 JSON, a version other than the numbers 1 and 2, a version 2 text whose `muted`
 is not a boolean (`"true"` and `1` are refused), a missing action, or a code
 that is not a string, is reserved or is shared. A version 1 text, which has
-bindings only, migrates: its bindings stay and `muted` is false. Loading never
+bindings only, migrates: its bindings stay and `muted` is false. A set saved
+before the self-cast key (nine actions) has a missing action, so it loads as
+the defaults whole and `muted` resets to false too, with no version bump
+(`platform.test.ts` pins it); a saved rebinding is lost once. Loading never
 writes, so a version 1 store becomes version 2 on its first change. A throwing
 `getItem` reads the defaults, and a throwing `setItem` resolves after a
 `console.warn`, because a console error fails every e2e.
