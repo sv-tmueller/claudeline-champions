@@ -41,6 +41,22 @@ describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
     }
   });
 
+  it('writes the block of a 1-seed 3v3 run to --out: 3v3 rows and no 2v2 row', { timeout: 60_000 }, () => {
+    const dir = mkdtempSync(join(tmpdir(), 'balance-'));
+    try {
+      const file = join(dir, 'report.md');
+      const run = balance('--mode', '3v3', '--seeds', '1', '--out', file);
+      expect(run.status, run.stderr).toBe(0);
+      // Four kits: 6 pairings on 2 arenas, each with 2 ordered fills and 1 seed.
+      expect(run.stdout).toMatch(/played 24 matches in \d+\.\d s/);
+      const lines = readFileSync(file, 'utf8').split('\n');
+      expect(lines.filter((line) => /^\| 3v3 \|/.test(line))).toHaveLength(12);
+      expect(lines.filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(0);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
   it('exits 1 with a message on an unknown flag, a bad --seeds, a bad --mode, --check with --out and --mode alone', () => {
     const bad = [
       ['--bogus'],

@@ -56,7 +56,8 @@ function parseArgs(args: readonly string[]): Options {
       if (!Number.isSafeInteger(n) || n < 1) fail('--seeds needs a positive integer');
       options.seeds = n;
     } else if (arg === '--mode') {
-      const mode = MODES.find((m) => m === args[++i]);
+      const value = args[++i];
+      const mode = MODES.find((m) => m === value);
       if (mode === undefined) fail(`--mode needs one of ${MODES.join(', ')}`);
       options.mode = mode;
     } else if (arg === '--out') {
