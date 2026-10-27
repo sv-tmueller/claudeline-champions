@@ -551,9 +551,8 @@ describe('a run of the 3v3 mode alone', () => {
   // Replaces the 3v3 row of the CLI test (run.test.ts), which at six kits plays 360 matches: 34 s locally and
   // about 75 s on a runner (#195). This plays the same path on the four v1 kits, 24 matches: the 3v3 cells of a
   // one-seed schedule and their rendering, with no 2v2 row.
-  // 3.3 s locally (Apple M5 Pro, Node 22.23.2). This file took 79.7 s on the runner (ubuntu-latest, Node 22;
-  // unit job 122091170207) against 28.6 s locally, a factor of 2.8, so the row is about 9 s there. Twice that
-  // is 18 s, so the timeout is 20 s (testing.md, Check suite).
+  // 3.3 s locally (Apple M5 Pro, Node 22.23.2); 8.2 s on the runner (ubuntu-latest, Node 22; unit job
+  // 122091170207). Twice that is 16.5 s, so the timeout is 20 s (testing.md, Check suite).
   it('plays and renders the 3v3 cells of a one-seed schedule, and no 2v2 cell', { timeout: 20_000 }, () => {
     const seeds = { '3v3': 1 };
     const cells = playCells(V1, seeds);
