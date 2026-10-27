@@ -69,21 +69,21 @@ Sources:
   gets half of the matches. The table shows X's wins as A and as B.
 - **Seeds.** Each cell plays about 200 matches, whatever its fills: the seeds of
   a config are 1 to the largest even number at or under 200 divided by the
-  cell's fills, worked out per mode (`seedSchedule` in `tools/balance/harness.ts`).
-  With four kits a cell has 2 fills in either mode, so it is seeds 1 to 100 for
-  each config: 24 configs, 200 matches in every cell and 4800 in all. With six
-  kits it would be 50 seeds for each of the 4 fills of a 2v2 cell (200 matches)
-  and 16 for each of the 12 fills of a 3v3 cell (192 matches). The count is even
-  so that X plays each side equally often. When the two modes get the same count
-  the head of the block says "Seeds 1 to N for each config"; when they differ it
-  names each mode's count, and the Seeds / matches column states them in any
-  case. Decision 3 of batch #193 set this: it amends decision 21 of batch #105
-  ("seeds 1 to 100") and reads decision 6 of batch #12 as "about 200 matches a
-  cell", because 100 seeds on every fill is 48 000 matches at six kits. The noise
-  below and the keep threshold of decision 32 stand. The match seed is the seed and the bot of
-  champion id `i` gets `seed * 100 + i`, the rule of the client's
-  `bot-driver.ts`. The sim never draws from its own random state, so the bot
-  seeds are the only source of variation.
+  cell's fills, worked out per mode (`seedSchedule` in
+  `tools/balance/harness.ts`). With four kits a cell has 2 fills in either mode,
+  so it is seeds 1 to 100 for each config: 24 configs, 200 matches in every cell
+  and 4800 in all. With six kits it would be 50 seeds for each of the 4 fills of
+  a 2v2 cell (200 matches) and 16 for each of the 12 fills of a 3v3 cell (192
+  matches). The count is even so that X plays each side equally often. When the
+  two modes get the same count the head of the block says "Seeds 1 to N for each
+  config"; when they differ it names each mode's count, and the Seeds / matches
+  column states them in any case. Decision 3 of batch #193 set this: it amends
+  decision 21 of batch #105 ("seeds 1 to 100") and reads decision 6 of batch #12
+  as "about 200 matches a cell", because 100 seeds on every fill is 48 000
+  matches at six kits. The noise below and the keep threshold of decision 32
+  stand. The match seed is the seed and the bot of champion id `i` gets `seed *
+  100 + i`, the rule of the client's `bot-driver.ts`. The sim never draws from
+  its own random state, so the bot seeds are the only source of variation.
 - **Tier and rules.** Every bot is at the normal tier. The match is played to
   `DEFAULT_ROUNDS_TO_WIN` (3 rounds) with the kits read from the JSON as they
   are, and `createMatch` validates them.
@@ -650,14 +650,14 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 - The report was reproduced with `--check` on macOS (Apple silicon) with Node
   22.23.2 and Node 26.7.0. The linux/amd64 reproduction is the manual workflow
   `.github/workflows/balance.yml` (`workflow_dispatch` only, never on pull
-  requests or pushes): trigger it with
-  `gh workflow run balance.yml --ref <branch>`. It runs `npm ci` and
-  `npm run balance -- --check --mode <mode>` on ubuntu, as two jobs side by
-  side, one for 2v2 and one for 3v3 (a matrix by mode, so each stays inside its
-  `timeout-minutes`: 30 for 2v2 and 50 for 3v3 as the starting values, each twice
-  the job's check time because its failure step plays the mode again). On a
-  difference a job prints the differing rows of its mode (its cell rows and
-  budget-hit lines, from a fresh `--out` against the committed block). A newer
-  run on the same ref cancels the older one (`concurrency`). Bot output across platforms is not promised (bots.md,
-  "Determinism"), so the macOS table is the report, and a table that differs
-  on another platform gets a platform note here with the differing cells.
+  requests or pushes): trigger it with `gh workflow run balance.yml --ref
+  <branch>`. It runs `npm ci` and `npm run balance -- --check --mode <mode>` on
+  ubuntu, as two jobs side by side, one for 2v2 and one for 3v3 (a matrix by
+  mode, so each stays inside its `timeout-minutes`: 30 for 2v2 and 50 for 3v3 as
+  the starting values, each twice the projected six-kit check time, because the
+  failure step plays the mode again). On a difference a job prints the differing
+  rows of its mode (its cell rows and budget-hit lines, from a fresh `--out`
+  against the committed block). A newer run on the same ref cancels the older
+  one (`concurrency`). Bot output across platforms is not promised (bots.md,
+  "Determinism"), so the macOS table is the report, and a table that differs on
+  another platform gets a platform note here with the differing cells.
