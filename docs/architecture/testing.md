@@ -140,7 +140,7 @@ running beside them); twice the slowest is 50.8 s, so 60 s. The long start edits
 read 7.1 s (Drowned Ground) and 10.0 and 10.4 s (Grand Finale) there, and 11.5,
 9.4 and 8.5 s in job 122125510999; twice the slowest is 23 s, above the 20 s top
 of the rule, so they keep the 30 s of the long-match precedent. The two files
-take 161 s and 120 s of that job, beside `lumeth.test.ts` (117 s) and
+take 161 s and 120 s of job 121726022078, beside `lumeth.test.ts` (117 s) and
 `headless-kits.test.ts` (95 s), and the unit job went from 2 min 24 s on main
 (4cfe695) to 5 min 49 s (305 s of Vitest). On main it reads 6 min 4 s at bce9662
 (job 122194680307, 320 s of Vitest: `ondrel.test.ts` 154 s, `lumeth.test.ts` 125
