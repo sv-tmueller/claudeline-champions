@@ -93,7 +93,33 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   121633905207, 779e504), timeout 10 s.
 - `packages/server/test/room.test.ts`, "frees the seats of humans who were
   disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
-  3.7 s on the runner (job 121633905207, 779e504), timeout 10 s.
+  3.7 s on the runner (job 121633905207, 779e504), 2.1 s on main before #204
+  (job 122125510999), then 4.2, 5.05 (5049 ms) and 4.3 s with Durnhal's file
+  (jobs 122175440820, 122182006132 and 122189679246); twice 5.05 s is 10.1 s,
+  so the timeout is 15 s.
+
+Durnhal's file (#204) makes the server field a Durnhal bot on the default range
+profile in these matches and in both loopback specs, until step 1.3 of roadmap
+#176 gives him a profile. The loopback `beforeAll` is the row that moved. Timed
+around its body on one machine, the 2v2 hook went from 1.1 s to 1.5 to 1.7 s
+and the 3v3 hook from 2.5 to 3.1 s to 4.8 to 5.1 s, so the runner-to-local
+ratio of the header of `loopback.test.ts` (4.5 s over 2.7 s) gave about 8.3 s
+for the 3v3 hook. The runner was slower: the file took 17.0 s in job
+122173425469 (rows about 4.1 s); on f07e9df the 3v3 hook failed with "Hook
+timed out in 15000ms" (job 122175440820, the file 28.7 s with the 3v3 rows
+skipped); and with a 20 s timeout on 0d986a7 the file took 24.3 s and its two
+rows 5.9 s (job 122182006132), so the two hooks took 18.4 s and, by the local
+split of 1.6 s to 5.0 s, the 3v3 hook about 14 s; on 1019df2 the file took
+32.6 s (job 122189679246), so the hooks took about 24 s and the 3v3 hook about
+18 s. The log has no time for a `beforeAll`. Twice that is above the 20 s top
+of the rule, so the hook takes the 60 s of the long-match precedent below and
+its work is not cut (decision 4 on issue #203). The same job read 5.74 s for
+the 3v3 row "matches a local sim of the same seed, kits and inputs at every
+tick" (2.19 s for the 2v2 one; main read 3.2 s and 1.5 s), past half of its
+10 s, so the loopback rows take 15 s, set on the `describe.each` for both
+specs. The room row "frees the seats" is the other one that moved, in the list
+above; "keeps the settings and the choices" took 0.44 s locally and 0.95 to
+1.4 s on those runners, inside its mark.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
 v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
@@ -148,7 +174,7 @@ about 8 minutes, cut the cell count of these two files.
   seed 6) and asserts that it ends in a decision, with no end tick. The same
   project holds the fixture search's tests (`tools/fixtures/*.test.ts`): the
   format against the committed bytes, the pure search cases, the reproduction of
-  the six roster fixtures and the CLI (see [Fixture search](#fixture-search)).
+  the seven roster fixtures and the CLI (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a
@@ -165,10 +191,14 @@ about 8 minutes, cut the cell count of these two files.
   same seed and inputs that reaches the server's checksum at every tick (and a
   run at another tier that does not), and a sha256 over every text in both
   directions that is the same across two runs. It pins no end tick, winner or
-  champion list. It plays to two rounds won, not three, and takes about 5.5 s
-  locally and 11.5 s on the runner (job 121656797139, de0ef18); at three
-  rounds it took 14 s locally and 29 s on the runner (job 121633905207). See
-  [online](online.md).
+  champion list. It plays to two rounds won, not three, and took about 5.5 s
+  locally and 11.5 s on the runner (job 121656797139, de0ef18) before
+  Durnhal's file; with it the file takes 8.8 to 9.1 s locally (5.1 to 5.6 s on
+  the same machine without it) and 17.0 to 32.6 s on the runner (jobs
+  122173425469, 122175440820, 122182006132 and 122189679246, see the timeouts
+  above); at
+  three rounds it took 14 s locally and 29 s on the runner (job 121633905207).
+  See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
@@ -192,8 +222,9 @@ and budget-hit lines only. It needs Node 22.15 or later, for
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
 `npm run check`: a full run plays 11 760 matches and takes about 14 minutes on
 Apple silicon. It plays the six kits of `HARNESS_KITS` in
-`tools/balance/inputs.ts` (the six files of `data/kits`, so a kit added to the
-directory joins the report by being listed there).
+`tools/balance/inputs.ts` (six of the seven files of `data/kits`, so a kit added
+to the directory joins the report by being listed there; Durnhal's file is not
+until step 1.3).
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
@@ -239,16 +270,16 @@ What it does:
   every platform: no `Math.hypot` and no transcendental function. The tools lint
   does not ban them, so review enforces it.
 
-`tools/fixtures/reproduce.test.ts` runs the search on the six committed
+`tools/fixtures/reproduce.test.ts` runs the search on the seven committed
 fixtures and compares the bytes: Hargrim's attempt 1, Quillon's attempt 23,
-Ondrel's attempt 2 and Brimwick's attempt 10 on the current kits, and Skerrow's
-attempt 6 and Lumeth's attempt 2 on the kits they were searched on (the Rend
-damage 20 and the Binding Sigil radius 1.5 put back in memory, as #125 changed
-those numbers and regenerated only the checkpoints), with the checkpoints of
-the current kits. Each row of the test names the kit numbers it is pinned on,
-with the change that moved them. It runs on the CI unit job, on Linux x86,
-which is the cross-platform proof of the tool. The record is in the header of
-`roster-fixtures.test.ts`.
+Ondrel's attempt 2, Brimwick's attempt 10 and Durnhal's attempt 2 on the current
+kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
+searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put back in
+memory, as #125 changed those numbers and regenerated only the checkpoints),
+with the checkpoints of the current kits. Each row of the test names the kit
+numbers it is pinned on, with the change that moved them. It runs on the CI
+unit job, on Linux x86, which is the cross-platform proof of the tool. The
+record is in the header of `roster-fixtures.test.ts`.
 
 A change to a kit file that turns the coverage red is met by rebuilding its
 fixture with the tool in the same commit ([balance.md](../design/balance.md),
@@ -273,12 +304,13 @@ failed pre-check (decision 13 of batch #134):
   Skerrow on 2 and Lumeth on 5, and Lumeth on 6 after #191, whose self-cast
   rule moved only her checkpoints and checksum).
 
-A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
+A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148, and
+batch 16 for Durnhal, #204):
 
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
    energy gains, the dash `then`s and the statuses) and to `SEEDS` (the next
-   match seed, 5561 and up) in `packages/sim/test/roster-fixture.ts`. The tool
+   match seed, 5562 and up) in `packages/sim/test/roster-fixture.ts`. The tool
    stops with a message that names the file when either is missing.
 3. Run `npm run fixtures:search -- <id>`. When no attempt within the limit
    covers, the kit's `EXPECTED` asks for something a mirror may never show:
@@ -290,9 +322,9 @@ A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
 5. Replay `roster-fixtures.test.ts` and `roster-kits.test.ts` and then
    `reproduce.test.ts` and `format.test.ts` in a `linux/amd64` container, as
    above, and apply the timeout rule of the check suite to a reproduce row whose
-   runner time passes 2.5 s. The rows of Ondrel (attempt 2) and Brimwick
-   (attempt 10) took 1.23 and 0.84 s on the runner (0.36 and 0.32 s locally), so
-   they have no timeout of their own.
+   runner time passes 2.5 s. The rows of Ondrel (attempt 2), Brimwick (attempt
+   10) and Durnhal (attempt 2) took 1.23, 0.84 and 0.68 s on the runner (0.36,
+   0.32 and 0.28 s locally), so they have no timeout of their own.
 
 ## Playwright e2e
 

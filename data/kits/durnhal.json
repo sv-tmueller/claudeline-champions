@@ -1,0 +1,178 @@
+{
+  "id": "durnhal",
+  "maxHealth": 160,
+  "moveSpeed": 5.5,
+  "support": false,
+  "ex": ["M2", "E"],
+  "slots": {
+    "M1": {
+      "cooldownTicks": 36,
+      "windupTicks": 9,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "meleeArc",
+          "radius": 3.5,
+          "cosHalfAngle": 0.6427876097,
+          "effects": [
+            { "type": "damage", "amount": 10 },
+            { "type": "applyStatus", "status": { "type": "wound", "ticks": 240, "stacks": 1 } }
+          ]
+        }
+      ]
+    },
+    "M2": {
+      "cooldownTicks": 300,
+      "windupTicks": 24,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "ahead", "distance": 2 },
+          "radius": 2,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 16 },
+            { "type": "applyStatus", "status": { "type": "wound", "ticks": 240, "stacks": 1 } }
+          ]
+        }
+      ],
+      "ex": {
+        "windupTicks": 24,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "area",
+            "placement": { "type": "ahead", "distance": 2 },
+            "radius": 2,
+            "durationTicks": 1,
+            "intervalTicks": 1,
+            "targets": "enemies",
+            "effects": [
+              { "type": "damage", "amount": 22 },
+              { "type": "applyStatus", "status": { "type": "wound", "ticks": 240, "stacks": 2 } }
+            ]
+          }
+        ]
+      }
+    },
+    "SPACE": {
+      "cooldownTicks": 480,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "dash",
+          "distance": 5,
+          "ticks": 15,
+          "then": [
+            {
+              "type": "area",
+              "placement": { "type": "self" },
+              "radius": 1.5,
+              "durationTicks": 1,
+              "intervalTicks": 1,
+              "targets": "enemies",
+              "effects": [{ "type": "knockback", "distance": 2, "ticks": 8, "direction": "away" }]
+            }
+          ]
+        }
+      ]
+    },
+    "Q": {
+      "cooldownTicks": 600,
+      "windupTicks": 18,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 2.5,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 10 },
+            { "type": "applyStatus", "status": { "type": "root", "ticks": 60 } }
+          ]
+        }
+      ]
+    },
+    "E": {
+      "cooldownTicks": 420,
+      "windupTicks": 18,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 18,
+          "radius": 0.4,
+          "lifetimeTicks": 30,
+          "pierce": false,
+          "effects": [
+            { "type": "damage", "amount": 16 },
+            { "type": "applyStatus", "status": { "type": "wound", "ticks": 240, "stacks": 1 } },
+            { "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 90 } }
+          ]
+        }
+      ],
+      "ex": {
+        "windupTicks": 18,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "projectile",
+            "speed": 18,
+            "radius": 0.4,
+            "lifetimeTicks": 30,
+            "pierce": false,
+            "effects": [
+              { "type": "damage", "amount": 22 },
+              { "type": "applyStatus", "status": { "type": "wound", "ticks": 240, "stacks": 2 } },
+              { "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 90 } }
+            ]
+          }
+        ]
+      }
+    },
+    "R": {
+      "cooldownTicks": 840,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 4,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "allies",
+          "effects": [{ "type": "shield", "absorb": 25, "ticks": 240 }]
+        }
+      ]
+    },
+    "F": {
+      "cooldownTicks": 600,
+      "windupTicks": 30,
+      "movement": "locked",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "self" },
+          "radius": 4.5,
+          "durationTicks": 1,
+          "intervalTicks": 1,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 30 },
+            { "type": "applyStatus", "status": { "type": "wound", "ticks": 300, "stacks": 3 } },
+            { "type": "applyStatus", "status": { "type": "slow", "percent": 50, "ticks": 120 } }
+          ]
+        },
+        { "type": "shield", "absorb": 50, "ticks": 240 }
+      ]
+    }
+  }
+}

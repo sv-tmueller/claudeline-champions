@@ -315,7 +315,19 @@ or a thin wall parallel to the shot), and a flight line that the lead or the aim
 error (up to 12 degrees on easy) moves off the centre-to-centre segment.
 
 - A cast uses `c` = the radius of the first top-level projectile of the ability it
-  would press, or the champion radius 0.5 m when the ability has none.
+  would press, or the champion radius 0.5 m when the ability has none, with one exception: a
+  press whose ability's first top-level effect is a `meleeArc` gets no clear-shot test at all
+  (#186). The sim's arc ignores obstacles (`melee.ts`, and "A melee arc ignores obstacles" in
+  simulation.md), so the bot presses what the sim lands, as a human does. Why: the test is for
+  what an obstacle stops, and the reason above, a bolt that hits the obstacle at the smallest
+  aim error, does not hold for an arc. The exception reads the first effect only: an arc after a
+  dash (the EX Lunge, whose dash stops at an obstacle) or after a teleport (Reaper's Dance, whose
+  teleport needs a line of sight, `motion.ts`) keeps the 0.5 m test, and so does every area
+  (Hargrim's Shockwave, though the sim places an area through an obstacle too: the rule names the
+  arc). The four melee presses are Hargrim M1, Skerrow M1, Rend (Skerrow E) and its EX variant;
+  the cache holds the flag beside the dash flag (`baseMelee`, `exMelee`), and the press oracle of
+  the tests keeps the same set (`MELEE`), which a table test works out again from the kit files.
+  If the sim's choice about obstacles ever changes, this exception goes with it.
 - A stand (engage, kite), the sight-cell search and the finisher use `c` = 0.5 m, with one
   exception: a bot that could press F now stands, and searches for a sight cell, with `c` = the
   width of F's shot when that is wider than 0.5 m (`sight.standClearance`, a double field that
@@ -323,7 +335,8 @@ error (up to 12 degrees on easy) moves off the centre-to-centre segment.
   Why: a wide ultimate (Quillon's 0.6 m) waited behind cover that a 0.5 m shot clears and never
   cast; a Quillon at 100 energy stood on the edge of the pillar's shadow. The finisher, the
   reach test of the deadlock rule and the tests' stall oracle keep 0.5 m, and every other think
-  of a kit whose F is wider changes nothing.
+  of a kit whose F is wider changes nothing. These checks keep 0.5 m for a melee kit too (#186):
+  they decide where a bot stands or whom it fights, not whether a press lands.
 
 ## Casting
 
@@ -365,8 +378,8 @@ step 3d tries a new cast. For each slot, with the ability it would cast:
 - no `stun` and no `silence` (silence includes SPACE); under `root` an ability with
   a top-level `dash` is skipped;
 - on an escape think no ability that starts with a dash: the dash hold, below;
-- in reach, with a clear shot (see Clear shot) of the width of that ability, and the slot's
-  condition if its opener rule has one (see Openers and escapes);
+- in reach, with a clear shot (see Clear shot) of the width of that ability (none for a melee
+  arc), and the slot's condition if its opener rule has one (see Openers and escapes);
 - the cast delay, below.
 
 Order and variants: on an escape think (see Openers and escapes) the escape slots of the
@@ -1526,7 +1539,7 @@ seeds 601 and 603) and steps the sim: the first move comes within the reaction
 delay plus one think, a Hargrim presses, a damage event between the two
 follows, and one of them dies within 1400 ticks (twice the slowest death
 measured, 697 ticks on easy in seed 6 with the bot seeds 602 and 605, rounded
-up to 100; the seeds of the test give 618 on normal). Without the tolerance
+up to 100; the seeds of the test give 587 on normal since #186, 618 before). Without the tolerance
 (`TOUCH = 0`) every new assert that reads the bots' geometry is red:
 `pointBlocked`, the walks on both sides, the stepped scene and the stall
 tracker's row below (the clearance asserts read only the test's own oracle and
@@ -1543,11 +1556,13 @@ first acting think (+15 ticks), press within +24 to +27 and end round 1 within
 stands for 6000 ticks in all nine, so, as in #129, the tolerance resolves the
 stand and the dodge does not; and the whole H3 cell on main, seeds 1 to 100 in
 both fills (200 matches), has no budget hit.
-No rule was missing in the bots; one case is out of scope: the bots test a
+No rule was missing in the stand; one press was refused: the bots tested a
 Hargrim M1 for a clear shot of 0.5 m, while the sim's melee arc ignores
 obstacles (`melee.ts`), so the touching pair of seed 98 (1.0 m, the pillar
-clips a shifted line) presses no M1 and walks on, which is no stall on main
-(the scene ends in 446 ticks). The harness row of
+clips a shifted line) pressed no M1 and walked on, which was no stall on main
+(the scene ended in 446 ticks). #186 settled it: a melee arc gets no clear-shot
+test (see Clear shot), the pair presses M1 on the first think after the cast
+delay and the scene ends in 451 ticks (the rule of #186, below). The harness row of
 `tools/balance/harness.test.ts` plays the match of seed 6 through `playMatch`
 and asserts that it ends in a decision (no end tick is pinned). It is green on
 main and red on the bots of 9a9c653 (budget hit, 60000 ticks), which a scratch
@@ -1555,6 +1570,122 @@ copy of that commit shows, but not under a mutation of the tolerance: without it
 the full match takes another course (it ends at tick 5769, not 5096) and never
 reaches the stand, so the frozen, stepped and tracker rows carry the mutation
 reading.
+
+The rule of #186 (`melee.test.ts`, the `MELEE` keys of `press-oracle.ts`): a
+press whose ability's first top-level effect is a melee arc gets no clear-shot
+test (see Clear shot). Two outcomes were open, the exception and a rule that
+stays with a note on why a bot refuses a hit the sim grants; the exception is
+chosen (decision 3 on #203) because the sim's arc is the truth: a bot makes the
+input a human makes, and a human Hargrim lands that M1. The frozen scene is the
+seed 98 state of #123, copied literally from `touching.test.ts`: two Hargrims
+1.0 m apart on arena01 with the centre pillar on the line, a line of sight, no
+clear shot of 0.5 m from either side and a clear shot of 0.25 m. On main
+(8ce78fd) a Hargrim with only M1 ready presses nothing there, on any tier and
+from either side, and with every slot ready at 40 energy it presses nothing at
+all. With the rule M1 is pressed on the think after the reaction and cast delays
+(think 45, 23 and 9, counted from 0, on easy,
+normal and hard), and stepped from that press the
+sim's arc names the other Hargrim and deals 12. In the same state Skerrow M1,
+Rend and Rend's EX variant (at 25 energy) are pressed. The rows that keep the
+0.5 m test, in the same state: Hargrim M2 (an area) at 0 and at 40 energy, the
+EX Lunge (an arc after a dash) at 25, Reaper's Dance (an arc after a teleport)
+at 100 energy against a target at 40 health, and Hargrim F. Two edited Skerrow
+kits read the base and the EX flag apart, as the dash hold of #98 does: an arc
+base with a 0.6 m bolt EX presses the arc at 24 energy and refuses the EX bolt at
+25, and a 0.6 m bolt base with an arc EX refuses the base at 24 and presses the EX
+arc at 25. The oracle of the headless runs skips the line of sight and the clear
+shot for the four `MELEE` keys (Hargrim M1, Skerrow M1, Rend and its EX variant,
+which a table test of `headless-kits.test.ts` works out again from the kit
+files), and two direct rows call `pressProblems` on the same state: the M1 press
+has no problem, and a Hargrim M2 press still reports "no clear shot of width
+0.5". No seeded run presses a melee ability with no clear shot (the Lumeth runs,
+the 18 six-kit cells and the shipped headless mirror: none), so the exception
+needs these rows. `melee.test.ts` is red against main's `casting.ts` (12 of its
+20 rows; the counter rows, the oracle rows and the facts row pass there). Six
+mutations, each applied alone and then restored: the flag never set (12 red,
+the pressing rows, the landing and the two edited kits); the EX press reading
+the base flag (the two edited kits); the flag set for an arc anywhere in the
+ability (the EX Lunge row and the Reaper's Dance row, each red alone with the
+flag set for its own half);
+the flag set for areas (the M2 row, the every-slot row and the Lumeth headless
+run's oracle); the oracle's exception dropped (the direct M1 row) and applied to
+every key (the direct M2 row). The heap check reads 0 B per think in every scene
+(Node 22 `--project bots-heap`; Node 26.7.0 both projects), and a six-double
+object kept at the melee branch of `updateRuns` reads 168 B in the engage stand
+scene on both (also in skerrow engage, and 336 in skerrow wait), so an existing
+scene reaches the branch.
+
+What moved. The identity harness (the 16 rows of PR #142's harness, run on
+main's `packages/bots/src` and on the branch) moves none: headless fb22c35a5f68,
+stall 023b25dc3b04, kits 803c0466d16b, kits301 7caa05ab704f, kitsHard
+21dc77500889, kitsEasy 49a4540e98b4, kitsSwapped be866c24b934, kitsSeed99
+42d095f016c6, plain1200 3ad008d826fb, plainOther fc396896b5ae, kitsLowEarly
+c9914a11d463, kitsLow2 f68ca6808815, plainLow 8f9a01c750c4, skerrow
+d55b53efc5e5, lumeth2v2 06749c0ade0a and lumeth3v3 071221f5026e, the same old and
+new (the first diff tick is none). The seeded runs that move: the Lumeth 2v2 on
+arena01 ends at tick 5081, not 6623 (its budget 16000 and the harness row of
+`tools/balance/harness.test.ts` are re-recorded, as PR #142 re-recorded its
+pins), the other three Lumeth ticks (7521, 6773 and 10934) stand, Brimwick v
+Skerrow on arena02 ends at 2351, not 2323, and Ondrel v Quillon on arena02 and
+Brimwick v Skerrow on arena01 change their streams but not their end ticks
+(5533 and 4057); the literals of the six-cell rows are records of when each
+budget was set and stand. In the stepped scene of #123 the normal tier ends seed
+6 at 587 ticks, not 618, and seed 98 at 451, not 446.
+
+The rider: are the low standings of Hargrim (11.4) and Skerrow (13.7) in the
+six-kit block explained by refused presses? No. The measurement plays the 36
+cells of the block where Hargrim or Skerrow is X or Y on the block's own
+schedule (seeds 1 to 50 for each 2v2 config, 1 to 16 for each 3v3 config, normal
+tier, bot seed `seed * 100 + id`: 7 056 matches a side), with main's
+`packages/bots/src` before and the branch after, in scratch scripts that are not
+in the repository (their text is in the body of PR #208). The before side
+reproduces the committed rates of all 36 cells. A press is counted on the think
+whose input carries the slot's bit; a refused think is one on which every gate
+of the press held (a round phase, an acting intent, an alive enemy target
+within the band top less 1 m, a cooldown of at most 1, no stun or silence, no
+windup or `windupLeft` 1) and the 0.5 m clear shot failed, and an episode is a
+run of consecutive refused thinks of one champion and slot.
+
+| Slot | Presses before | Refused before | Presses after | Pressed after with no clear shot |
+| --- | --- | --- | --- | --- |
+| Hargrim M1 | 104 284 | 928 episodes (0.9% of presses), 5 281 thinks (1.2% of the ready thinks) | 104 482 | 236 |
+| Skerrow M1 | 82 758 | 728 episodes (0.9%), 2 031 thinks (0.5%) | 82 867 | 64 |
+| Rend (Skerrow E, EX pooled) | 25 457 | 933 episodes (3.7%), 4 853 thinks (2.6%) | 25 530 | 86 |
+
+Lifting the refusal adds 198, 109 and 73 presses over about 105 000, 83 000 and
+25 000, and the mean rate over each kit's 20 cells goes from 11.5 to 11.8
+(Hargrim) and from 13.7 to 13.9 (Skerrow); 18 of the 36 cells move, the largest
+by 5.7 points (3v3 on arena02, Brimwick v Skerrow, 88.5 to 82.8; Quillon v
+Skerrow 95.3 to 90.6), none across the band and none to a budget hit. The
+regenerated block (balance.md, 5.10) puts Hargrim at 11.7 and Skerrow at 13.9
+over all their cells. So refused presses are about 1 percent of the melee
+presses (3.7 for Rend) and do not explain the standing: it moves by tenths of a
+point.
+
+The diagnostic that names the next step: over the 60 cells of the block on a
+seed subset (seeds 1 to 8 in 2v2 and 1 to 2 in 3v3, after the change), per kit,
+over its alive round thinks.
+
+| Kit | Acted target within rangeMax | Damage dealt per alive second | Damage taken per alive second | Thinks retreating |
+| --- | --- | --- | --- | --- |
+| Hargrim | 33.5% | 8.56 | 16.06 | 34.0% |
+| Skerrow | 21.9% | 10.25 | 15.29 | 31.1% |
+| Quillon, Ondrel, Brimwick | 90.3%, 80.1%, 81.5% | 10.54, 10.54, 9.46 | 6.29, 8.55, 6.65 | 10.9%, 13.1%, 10.8% |
+| Lumeth | 87.6% | 4.63 (and heals) | 5.34 | 10.2% |
+
+The melee kits deal about as much damage per alive second as the ranged ones
+(8.6 and 10.3 against 9.5 to 10.5 for the three ranged damage kits; Lumeth's is
+mostly heals), take two to three times the damage (16.1 and
+15.3 against 5.3 to 8.6 for the four), have the target within their reach on a third and a
+fifth of their thinks (against 80 to 90 percent) and spend three times as long
+retreating (31 to 34 percent of their alive thinks against 10 to 13). The
+reading: the melee kits are exposed while they close and while they retreat,
+and not blind at the point of the press. The next bots step moves the approach
+and the retreat of the two rangeMin-0 profiles (the walk-in of the engage case
+and the spawn retreat of the 0.3 and 0.36 health thresholds, see Decisions) before
+any kit change or roster-v2 rewrite. This is a reading of one scratch
+diagnostic: no share of any cell is stated as the cause, and the decision
+stays with the lead.
 
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
@@ -1566,12 +1697,13 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (6623, 7521, 6773 and 10934 on the bots of #137),
+tick when the budget was set (5081, 7521, 6773 and 10934: the first moved from
+6623 with #186, the others stand on the bots of #137),
 plus two rounds of
 the longest round that did not go to sudden death, rounded up to 100 (1700 in
 the 2v2 runs, whose longest is 1619, and 2900 in the 3v3 runs, the client's
-longest for the same roster, 2801), and one of 7000, rounded up to 1000 (18000,
-18000, 20000 and 24000); a run whose longest round passes its term fails. Every
+longest for the same roster, 2801), and one of 7000, rounded up to 1000 (16000,
+18000, 20000 and 24000; the first was 18000 before #186); a run whose longest round passes its term fails. Every
 run has
 a Lumeth heal an ally; across the four, Soothing Surge heals an ally, Aegis Veil
 is cast, Mend Bolt hits an enemy, and Lantern Burst and Glide are pressed (both

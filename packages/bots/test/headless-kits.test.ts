@@ -4,7 +4,7 @@ import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import { SLOTS } from '@claudeline/sim';
 import { RANGE_MIN, WITHIN } from './escape-oracle';
 import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sixKits } from './helpers';
-import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
+import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
 import type { AllyRow, KitSet } from './press-oracle';
 
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
@@ -204,6 +204,22 @@ describe('the band and clearance tables of the shipped kits', () => {
     if (effect === undefined || effect.type !== 'projectile') throw new Error('not a projectile');
     return effect;
   };
+
+  // The keys the oracle asks no line of sight and no clear shot of (#186): every ability, base or EX
+  // variant of an EX slot, whose first top-level effect is a melee arc. The EX Lunge and Reaper's
+  // Dance start with a dash and a teleport, so they are not among them.
+  it('has the melee keys of the shipped kits: the abilities whose first effect is a melee arc', () => {
+    const found = new Set<string>();
+    for (const kit of sixKits()) {
+      for (const slot of SLOTS) {
+        const spec = kit.slots[slot];
+        if (spec.effects[0]?.type === 'meleeArc') found.add(`${kit.id}:${slot}`);
+        if (kit.ex.includes(slot) && spec.ex?.effects[0]?.type === 'meleeArc') found.add(`${kit.id}:${slot}:ex`);
+      }
+    }
+    expect([...found].sort()).toEqual(['hargrim:M1', 'skerrow:E', 'skerrow:E:ex', 'skerrow:M1']);
+    expect(MELEE).toEqual(found);
+  });
 
   it('has the reach and the shot width of every Quillon bolt', () => {
     for (const key of ['M1', 'M2', 'M2:ex', 'Q', 'E', 'E:ex', 'F']) {
