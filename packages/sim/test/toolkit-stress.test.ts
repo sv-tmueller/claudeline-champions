@@ -34,10 +34,11 @@ function between(state: GameState, lo: number, hi: number): number {
 }
 
 function randomSpec(state: GameState): StatusSpec {
-  const type = pick(state, ['stun', 'root', 'silence', 'invulnerable', 'slow', 'haste', 'dot', 'hot'] as const);
+  const type = pick(state, ['stun', 'root', 'silence', 'invulnerable', 'slow', 'haste', 'dot', 'hot', 'wound'] as const);
   const ticks = between(state, 1, 200);
   if (type === 'slow' || type === 'haste') return { type, percent: between(state, 1, 100), ticks };
   if (type === 'dot' || type === 'hot') return { type, perPulse: between(state, 1, 12), ticks };
+  if (type === 'wound') return { type, ticks, stacks: between(state, 1, 3) };
   return { type, ticks };
 }
 
@@ -143,7 +144,7 @@ function verify(run: Run, afterStep: boolean, blocked?: boolean[]): void {
     run.problems.push(`${where}: ${String(error)}`);
   }
   for (const c of state.champions) {
-    for (const type of ['stun', 'root', 'slow', 'haste', 'silence', 'invulnerable', 'shield', 'dot', 'hot', 'knockback']) {
+    for (const type of ['stun', 'root', 'slow', 'haste', 'silence', 'invulnerable', 'shield', 'dot', 'hot', 'wound', 'knockback']) {
       const count = c.statuses.filter((s) => s.type === type).length;
       const open = run.open.get(`${c.id}/${type}`) ?? 0;
       if (count !== open) run.problems.push(`${where}: champion ${c.id} ${type} has ${count} instances but ${open} open`);

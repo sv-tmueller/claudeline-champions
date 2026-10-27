@@ -159,20 +159,20 @@ hold the entities in ascending id order; removed ones are filtered out after a
 phase, never spliced during iteration.
 
 An effect is plain data and the entity holds its own copy, so kit constants are
-never aliased into the state. The `Effect` union is `damage { amount }`, `heal
-{ amount }`, `applyStatus { status }` (a status spec: the type, `ticks` and the
-strength field of that type), `shield { absorb, ticks }`, `knockback
-{ distance, ticks, direction: 'away' | 'toward' }` and `energyGain { amount }`
-(an integer from 1 to 100; only `landHit` reads it). A hit applies its effects
-in list order to each champion it lands on, with the owner as the source and
-the slot of the cast that made it, or no slot for a dev tool spawn. A
-projectile with `allyEffects` applies that list to a champion of the owner's team
-(never the owner) and `effects` to a champion of the other team; both lists hold
-the `Effect` union, and a `damage` in `allyEffects` is allowed and earns no
-energy. `away`
-points from the hit origin (the projectile contact point, the area centre, the
-arc origin) to the target, `toward` from the target to the owner's current
-position, and a zero vector means no push.
+never aliased into the state. The `Effect` union is `damage { amount }`, `heal {
+amount }`, `applyStatus { status }` (a status spec: the type, `ticks` and the
+strength field of that type, for `wound` the optional `stacks`), `shield {
+absorb, ticks }`, `knockback { distance, ticks, direction: 'away' | 'toward' }`
+and `energyGain { amount }` (an integer from 1 to 100; only `landHit` reads it).
+A hit applies its effects in list order to each champion it lands on, with the
+owner as the source and the slot of the cast that made it, or no slot for a dev
+tool spawn. A projectile with `allyEffects` applies that list to a champion of
+the owner's team (never the owner while it flies; a cast aimed at the caster
+applies it to her, see Firing) and `effects` to a champion of the other team;
+both lists hold the `Effect` union, and a `damage` in `allyEffects` is allowed
+and earns no energy. `away` points from the hit origin (the projectile contact
+point, the area centre, the arc origin) to the target, `toward` from the target
+to the owner's current position, and a zero vector means no push.
 
 `Slot` (`M1`, `M2`, `SPACE`, `Q`, `E`, `R`, `F`) and `SLOTS` in `input.ts` list the
 slots in `Button` bit order.
@@ -274,7 +274,8 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   `hitIds`, using the reach `0.5 + radius`. It never hits its owner. A champion
   of the other team is a candidate unless the projectile is ally-only (it has
   `allyEffects` and an empty `effects`); a champion of the owner's team is a
-  candidate only when the projectile has `allyEffects`. A projectile without
+  candidate only when the projectile has `allyEffects`. (A cast aimed at the
+  caster spawns no projectile at all, see Firing.) A projectile without
   `allyEffects` therefore never hits an ally, and an empty `effects` without
   `allyEffects` (a dev spawn) still stops at the first enemy. A champion it
   already overlaps at spawn is hit at t = 0, ally or enemy. A cast projectile
@@ -330,7 +331,10 @@ matter because the arena is convex.
 - Healing restores up to `maxHealth`, emits `heal` with the amount actually
   restored (health after minus health before), and emits nothing when that
   amount is 0, also when the amount is too small to change the health. A dead
-  champion is not revived.
+  champion is not revived. A wound on the target cuts the amount first, then
+  the clamp applies; see [Wound](#wound). Every heal goes through `applyHeal`:
+  the `heal` hit effect, each heal-over-time pulse and the caster-level `heal`
+  ability effect.
 - A non-finite or negative amount throws; 0 does nothing. An unknown target id
   throws `Error('Invalid damage: ...')` or `Error('Invalid heal: ...')`.
 - A dead champion is skipped in the movement loop (no input, aim, facing or
@@ -427,9 +431,9 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
 ## Statuses
 
 Catalog: stun, root, silence, invulnerable, slow (percent), haste (percent),
-shield (absorb amount), damage over time (`dot`), heal over time (`hot`) and
-knockback. The values and ranges that bind kits are in [rules](../design/rules.md)
-section 4; this section is what the sim does.
+shield (absorb amount), damage over time (`dot`), heal over time (`hot`), wound
+(an anti-heal, #158) and knockback. The values and ranges that bind kits are in
+[rules](../design/rules.md) section 4; this section is what the sim does.
 
 ### Record
 
@@ -443,6 +447,7 @@ section 4; this section is what the sim does.
 | `slow`, `haste` | `percent` (integer 1 to 100) |
 | `shield` | `absorb` (above 0) |
 | `dot`, `hot` | `perPulse`, `ticksToNextPulse` (1 to 30) |
+| `wound` | `stacks` (integer 1 to 3) |
 | `knockback` | `dirX`, `dirY` (unit), `distance` (D after the cap trim), `totalTicks` (N) |
 
 The source of a status is the pair (`sourceId`, `slot`). An EX variant shares the
@@ -459,6 +464,7 @@ first emits `statusExpired` with reason `replaced` for the instance it removes.
 | slow, haste | one per (type, source) | removes the old instance of the same source and appends the new one, with the new percent and ticks |
 | shield | one per source | removes the old shield of the same source and appends the new one, so the newest is last |
 | dot, hot | one per source | sets the new ticks and `perPulse`, keeps `ticksToNextPulse` and moves the instance to the end |
+| wound | one per holder | adds the stacks, from any source and the same one too, see [Wound](#wound); the merged source is the latest one that changed the instance |
 | knockback | one per source | replaces the instance of the same source, see below |
 
 Remaining stun is capped at 120 ticks when it is applied (`STUN_CAP_TICKS`).
@@ -503,6 +509,34 @@ the source's id. While the holder is invulnerable a damage pulse does nothing
 because the damage is blocked, and the timer keeps running. A damage pulse that
 kills the holder ends its upkeep.
 
+### Wound
+
+A wound cuts the healing its holder receives: 10 percent per stack, up to 3
+stacks (`WOUND_PERCENT_PER_STACK`, `WOUND_MAX_STACKS`). A spec is `{ type:
+'wound', ticks, stacks? }`; `stacks` is an integer from 1 to 3 and defaults to
+1, and when it is absent the copy leaves the key out (a `stacks: undefined`
+would break `checksum` and the kit round trip). The 120 to 300 tick range is a
+catalog range, held by the roster tests, not by the validator.
+
+An application adds its stacks to the holder's, up to 3, whoever applies it. The
+holder has one instance, with one stack count and one timer. The new timer is
+the longer of what is left and the new `ticks`, so a short application never
+cuts a long one. When neither the count nor the timer would change, the call
+returns false and emits nothing. Otherwise the old instance ends as `replaced`
+and the new one is appended, with the source of the application, so the events
+are `statusExpired` (`replaced`) then `statusApplied` with the merged timer. The
+timer counts down like any status, and all stacks fall together as one
+`expired`.
+
+The cut is in `applyHeal`, when each heal lands, before the max-health clamp, so
+a hot pulse reads the stacks again on every pulse. The restored amount is
+`amount * (100 - 10 * stacks) / 100`: the multiplication, then the division,
+each a correctly rounded double operation, and not rounded to an integer, as
+health is fractional. Without a wound the amount is used as it is, with no
+arithmetic. The `heal` event and the return value carry the cut amount, so
+`landHit` sees what was restored and a cut heal that still restores health pays
+support energy as before. Shields are not healing and are not cut.
+
 ### Knockback
 
 A knockback of `D` meters over `N` ticks leaves `D n (n + 1) / (N (N + 1))`
@@ -518,10 +552,11 @@ tick for a cast of a lower-numbered champion, from the next tick otherwise.
 
 ### Invulnerable
 
-Invulnerable blocks the application of stun, root, silence, slow, damage over
-time and knockback (the call returns false and emits nothing), and blocks
+Invulnerable blocks the application of stun, root, silence, slow, wound, damage
+over time and knockback (the call returns false and emits nothing), and blocks
 damage. It does not block heal, shield, haste, heal over time or another
-invulnerable, and it does not end statuses that are already running. Rules.md
+invulnerable, and it does not end statuses that are already running: a wound
+that is already running stays and keeps cutting heals. Rules.md
 says invulnerable blocks "No actions"; the sim reads that as blocking none of
 the holder's own actions.
 
@@ -609,6 +644,10 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
 - A status a cast lands carries the slot of the cast (its EX variant shares the
   slot); a status from a dev tool spawn or a direct call carries none.
 - A pulse due on the last tick of a status lands before the status ends.
+- A wound application that changes neither the stacks nor the timer returns
+  false with no event, as the stun family does for an application that does not
+  outlast the running one. One that changes either ends the old instance as
+  `replaced` and appends a new one; the instance is never changed in place.
 - `teleport` reports the end position, and a teleport that cannot be resolved
   reports `blocked: false` with the start as the end position.
 - Invulnerable blocks none of the holder's own actions (rules.md says "No
@@ -627,6 +666,17 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
   teleport followed by an arc swings where the teleport arrives. An effect
   listed after a dash still acts at the dash start; `then` is how an effect
   acts at the dash end.
+- The self-cast rule (rules.md section 2.5) has three readings the rules leave
+  open. The caster's circle is inclusive: the squared distance from the caster
+  to the aim point is compared with `CHAMPION_RADIUS` squared with `<=`, as the
+  area, arc and ring tests do. A projectile fired from a dash's `then` follows
+  the rule too, with the aim of the tick the dash ends. The rounding order is
+  the self factor first, then the wound cut inside the heal path: a heal of
+  `amount` gives `amount * 60 / 100`, which a wound then cuts by
+  `(100 - 10 * stacks) / 100`. In exact arithmetic this is the same as 60
+  percent of the wound-reduced amount, and in doubles the two orders differ in
+  the last bit for some amounts; both are deterministic, and this one is the
+  one the sim does.
 - The `then` effects of a dash take the dash direction and the aim of the tick
   the dash ends: a placement `aim` goes the dash direction for the smaller of
   the range and the distance to that aim.
@@ -705,7 +755,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 
 | Effect | Fields | What it does |
 | --- | --- | --- |
-| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner), `effects` on the other team |
+| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner in flight; aimed within the caster's own circle, nothing spawns and they land on her at 60 percent heal, see Firing), `effects` on the other team |
 | `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects` | spawns an area; `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
 | `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
@@ -795,6 +845,18 @@ it still act at the start point, and `then` is how an effect acts at the dash
 end. When a dash ends `complete`, `blocked` or `rooted`, `step` fires its `then`
 effects from the champion's position then, along the dash direction, with that
 tick's aim.
+
+A projectile with `allyEffects` whose stored aim lies within the caster's own
+circle (distance at most `CHAMPION_RADIUS` from where she stands when the effect
+runs) is a self-cast: it spawns nothing, and `applyEffects` lands the ally effects
+on the caster at once, with source and target both her. A `heal` and each pulse
+of a `hot` give `SELF_CAST_HEAL_PERCENT` (60) percent of their amount, computed
+as `amount * 60 / 100` (the stored `perPulse` is the reduced value); a shield, a
+haste and every other effect land in full. No energy is paid (`landHit` is not
+involved, so `energyGain` is skipped and nothing is credited), a knockback gets
+a zero vector and does nothing, and a `damage` lands on her unless she is
+invulnerable. The events are `castFired`, then the ally effects' own events
+(`heal`, `statusApplied`), with no projectile event.
 
 ### Energy
 

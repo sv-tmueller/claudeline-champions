@@ -1,11 +1,11 @@
 // The rebindable keys. The mouse buttons and Shift stay fixed (rules.md section 6):
 // Shift modifies any slot and is two physical keys for one bit.
 
-/** The nine actions a key can be bound to. Slots are named as in the HUD. */
-export type Action = 'up' | 'left' | 'down' | 'right' | 'SPACE' | 'Q' | 'E' | 'R' | 'F';
+/** The ten actions a key can be bound to. Slots are named as in the HUD; selfCast is the held self-cast key. */
+export type Action = 'up' | 'left' | 'down' | 'right' | 'SPACE' | 'Q' | 'E' | 'R' | 'F' | 'selfCast';
 
 /** The actions in the order of the keybinding view. */
-export const ACTIONS: readonly Action[] = ['up', 'left', 'down', 'right', 'SPACE', 'Q', 'E', 'R', 'F'];
+export const ACTIONS: readonly Action[] = ['up', 'left', 'down', 'right', 'SPACE', 'Q', 'E', 'R', 'F', 'selfCast'];
 
 /** A physical key code (`event.code`) for each action. */
 export type Bindings = Readonly<Record<Action, string>>;
@@ -21,6 +21,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   E: 'KeyE',
   R: 'KeyR',
   F: 'KeyF',
+  selfCast: 'KeyC',
 };
 
 // Keys that are never game input: the menu, the scoreboard, the debug keys, Shift (the EX

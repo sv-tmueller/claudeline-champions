@@ -35,7 +35,8 @@ first.
 
 - `sim`: the 60 Hz step with movement and collision; the effects toolkit
   (projectiles, areas, melee arcs, statuses, forced motion), with projectile
-  ally effects since #69; kits with casting, cooldowns, windups and energy;
+  ally effects since #69 and the self-cast rule (an ally projectile aimed at
+  its caster lands on her at 60 percent heal) since #191; kits with casting, cooldowns, windups and energy;
   match flow with rounds and the sudden-death ring, opt-in through
   `roundsToWin`; angles through `dmath.ts`; the sweep's heap check in
   `packages/sim/test/allocation.test.ts`.
@@ -63,8 +64,8 @@ first.
   the arena. The HUD has the ring warning and the kill feed, and the result
   screen has the champion, arena, team size and difficulty select. Escape
   opens a menu that pauses the match (Resume, Restart, the select again, a
-  keys view that rebinds the nine movement and slot keys, and a sound
-  toggle). The first-pass sound is generated in code (a hit, a cast, a death,
+  keys view that rebinds the nine movement and slot keys and the held
+  self-cast key C, and a sound toggle). The first-pass sound is generated in code (a hit, a cast, a death,
   a round start and a round end) and is counted by the heap probe. The
   `Platform` interface has its two settings methods, asynchronous, and a
   `sound` sub-object; the browser platform keeps the bindings and the mute in

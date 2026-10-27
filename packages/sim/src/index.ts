@@ -21,6 +21,7 @@ export {
   RING_SOURCE_ID,
   ROUND_END_TICKS,
   ROUND_TICKS,
+  SELF_CAST_HEAL_PERCENT,
   SLOWED_WINDUP_FACTOR,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
@@ -29,6 +30,8 @@ export {
   TICK_RATE,
   ULTIMATE_ENERGY_COST,
   WARMUP_TICKS,
+  WOUND_MAX_STACKS,
+  WOUND_PERCENT_PER_STACK,
 } from './constants';
 export { parseArenaDef } from './arena';
 export type {

@@ -18,6 +18,7 @@ import {
   RING_SOURCE_ID,
   ROUND_END_TICKS,
   ROUND_TICKS,
+  SELF_CAST_HEAL_PERCENT,
   SLOWED_WINDUP_FACTOR,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
@@ -25,6 +26,8 @@ import {
   SUDDEN_DEATH_TICKS,
   ULTIMATE_ENERGY_COST,
   WARMUP_TICKS,
+  WOUND_MAX_STACKS,
+  WOUND_PERCENT_PER_STACK,
 } from '../src/index';
 
 describe('status and motion constants', () => {
@@ -32,6 +35,8 @@ describe('status and motion constants', () => {
     expect(STUN_CAP_TICKS).toBe(120);
     expect(SLOW_CAP_PERCENT).toBe(70);
     expect(HASTE_CAP_PERCENT).toBe(50);
+    expect(WOUND_PERCENT_PER_STACK).toBe(10);
+    expect(WOUND_MAX_STACKS).toBe(3);
     expect(KNOCKBACK_CAP_METERS).toBe(6);
     expect(STATUS_PULSE_TICKS).toBe(30);
     expect(MOTION_SUBSTEP_METERS).toBe(0.25);
@@ -57,6 +62,7 @@ describe('status and motion constants', () => {
     expect(ULTIMATE_ENERGY_COST).toBe(100);
     expect(MAX_ENERGY).toBe(100);
     expect(SLOWED_WINDUP_FACTOR).toBe(0.5);
+    expect(SELF_CAST_HEAL_PERCENT).toBe(60);
     expect(ENERGY_GAIN_M1).toBe(5);
     expect(ENERGY_GAIN_SKILL).toBe(10);
     expect(ENERGY_GAIN_ULTIMATE).toBe(15);

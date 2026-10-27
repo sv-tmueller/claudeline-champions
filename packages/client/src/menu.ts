@@ -54,6 +54,7 @@ export class Menu {
     E: '',
     R: '',
     F: '',
+    selfCast: '',
   };
 
   constructor(

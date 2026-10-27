@@ -53,12 +53,21 @@
 // and, with the checkpoints of the current kits, writes the committed files. On the current kits the
 // search does not: Skerrow settles on attempt 2, and on Lumeth's current kit attempt 2 misses
 // `energyGained M2/true` (its inputs first differ from the committed ones at tick 1723) and the
-// search settles on attempt 5, whose file differs from the committed one from its first segment. So
+// search settles on attempt 6 (since #191; attempt 5 before it, and attempts 4 and 5 now miss
+// `energyGained M2/false`), whose file differs from the committed one from its first segment. So
 // the committed Skerrow and Lumeth fixtures are pinned on the kits before #125: the kit numbers the
 // searches ran on are Skerrow's Rend damage 20 (E, the base only) and Lumeth's Binding Sigil radius
 // 1.5 m (Q), every other number as in `data/kits` today, and the Lumeth pin also rests on reading
 // (b) below. A Skerrow or Lumeth fixture rebuilt by the tool on today's kit would replace the
 // committed one, not reproduce it. This record is what makes the player exact.
+//
+// #191 (the self-cast rule, rules.md section 2.5) moved the Lumeth fixture again: her random player
+// aims at herself in 8 percent of its windows (13 fire ticks, 12 of Mend Bolt and 1 of Soothing
+// Surge), and an ally bolt aimed within her own circle no longer spawns. The first diff is the step
+// that makes `state.tick` 367, where champion 3's Mend Bolt aimed 0.0017 m from her centre no
+// longer spawns. The oracle finds 0 problems and the coverage stays green, so only the checkpoints
+// from tick 400 on and the checksum were regenerated, in place, by the method below; the segments
+// and actions are unchanged, and the pinned search of `reproduce.test.ts` still settles on attempt 2.
 //
 // What a kit change does to this record: a change that turns the coverage red rebuilds the fixture
 // (balance.md, section 6.3), and the kit's row of `reproduce.test.ts` and its attempt above take

@@ -239,7 +239,7 @@ export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability' | 'mat
   matchEnded: 'match',
 };
 
-const UNIQUE_STATUSES = ['stun', 'root', 'silence', 'invulnerable'];
+const UNIQUE_STATUSES = ['stun', 'root', 'silence', 'invulnerable', 'wound'];
 
 /** Oracle for the status and dash rules. Returns one message per violation. */
 export function checkStatusInvariants(state: GameState): string[] {
@@ -262,6 +262,7 @@ export function checkStatusInvariants(state: GameState): string[] {
         bad(c, `${s.type} percent ${s.percent}`);
       }
       if (s.type === 'shield' && !(s.absorb > 0)) bad(c, `shield absorb ${s.absorb}`);
+      if (s.type === 'wound' && (!isInt(s.stacks) || s.stacks < 1 || s.stacks > 3)) bad(c, `wound stacks ${s.stacks}`);
       if ((s.type === 'dot' || s.type === 'hot') && (!isInt(s.ticksToNextPulse) || s.ticksToNextPulse < 1 || s.ticksToNextPulse > 30)) {
         bad(c, `${s.type} pulse timer ${s.ticksToNextPulse}`);
       }

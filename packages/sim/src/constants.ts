@@ -10,6 +10,9 @@ export const STUN_CAP_TICKS = 120;
 /** Caps on the summed percents of slow and haste over all sources. */
 export const SLOW_CAP_PERCENT = 70;
 export const HASTE_CAP_PERCENT = 50;
+/** Wound: the percent of healing cut per stack, and the most stacks one champion holds. */
+export const WOUND_PERCENT_PER_STACK = 10;
+export const WOUND_MAX_STACKS = 3;
 /** The most push, in meters, that all knockbacks on one champion may hold at once. */
 export const KNOCKBACK_CAP_METERS = 6;
 /** Ticks between the pulses of damage over time and heal over time. */
@@ -49,6 +52,11 @@ export const EX_ENERGY_COST = 25;
 export const ULTIMATE_ENERGY_COST = 100;
 /** Multiplies walking speed, after slow and haste, during a `slowed` windup. */
 export const SLOWED_WINDUP_FACTOR = 0.5;
+/**
+ * The share of a heal, and of each heal over time pulse, that a projectile aimed at its own
+ * caster restores. Applied as `amount * SELF_CAST_HEAL_PERCENT / 100`.
+ */
+export const SELF_CAST_HEAL_PERCENT = 60;
 /** What a hit on an enemy, or a heal on an ally, gives, by the slot that cast it. */
 export const ENERGY_GAIN_M1 = 5;
 export const ENERGY_GAIN_SKILL = 10;

@@ -135,6 +135,16 @@ Silence, root, slow and knockback do not interrupt a windup. Root skips only the
 
 An interrupted cast fires no effects. Its cooldown stays running and its energy cost is not refunded.
 
+### 2.5 The self-cast rule
+
+When a cast fires a projectile that has ally effects, and the aim position of that tick lies within the caster's own circle (a distance of at most 0.5 m from the caster's centre, the boundary included), the projectile does not spawn. Its ally effects land on the caster instead `[spec]`.
+
+- A heal, and each pulse of a heal over time, restores 60 percent of its amount `[tuned]`. The other ally effects, such as a shield or a haste, land in full.
+- The effects meant for enemies do nothing, because no projectile exists to meet one.
+- Energy is unchanged: healing yourself gives nothing (section 3.1), and the cast pays no more than any other cast of that slot.
+- A wound status, which cuts healing, multiplies the reduced amount: the self-cast factor comes first, then the wound cut.
+- A player who holds the mouse on their own champion triggers the rule, as the aim position alone decides it.
+
 ## 3. Energy economy
 
 - Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.
@@ -191,12 +201,12 @@ Note on the acceptance criterion "reaches its ultimate within two to three round
 
 ## 4. Statuses
 
-Every status has a remaining tick count `[spec]`. The catalog below is the full v1 list `[spec]`.
+Every status has a remaining tick count `[spec]`. The catalog below is the v1 list `[spec]` plus `wound`, added by the roster v3 design (section 4.1 there, #158).
 
 Stacking rules:
 
 - The source of a status is the pair (casting champion, ability slot) `[tuned]`. An EX variant has the same source as its normal slot.
-- Spec rule: the same status from the same source refreshes its duration rather than stacking `[spec]`. A refresh also replaces the strength (percent, amount or impulse) with the new value `[tuned]`.
+- Spec rule: the same status from the same source refreshes its duration rather than stacking, except `wound` (4.1) `[spec]`. A refresh also replaces the strength (percent, amount or impulse) with the new value `[tuned]`.
 - Spec rule: different sources stack unless this document says otherwise for that status `[spec]`. The table gives the rule per status.
 - No v1 ability removes statuses. A status ends when its time runs out, when the champion dies, or at a round reset `[tuned]`.
 
@@ -216,6 +226,7 @@ The ranges in the Duration range column bind kits. Every ability must pick its d
 | Heal over time | 2.0 to 5.0 s (120 to 300 ticks), one tick every 0.5 s (30 ticks) | Nothing. | Stacks. Each source ticks on its own. |
 | Knockback | 1 to 4 m of push over 6 to 15 ticks (0.1 to 0.25 s) | Nothing. It moves the champion. Root does not stop it. | Stacks. Impulses add. The total remaining push is capped at 6 m. |
 | Invulnerable | 0.5 to 2.0 s (30 to 120 ticks) | No actions; blocks incoming damage and hostile statuses, see below | Does not stack. The longest remaining time wins. |
+| Wound | 10 percent less healing per stack, up to 3 stacks, 2.0 to 5.0 s (120 to 300 ticks) | Nothing. It cuts the healing the holder receives. | Stacks from every source, the same source included, up to 3. One stack count and one timer per holder: the timer takes the longer of what is left and the new duration, and all stacks fall together. |
 
 Per-status details:
 
@@ -227,7 +238,8 @@ Per-status details:
 - Damage over time: the total damage of one application stays inside the 8 to 30 per hit range `[tuned]`. The range is from the spec, but applying it to the total of a damage over time is a choice made here. A refresh resets the remaining time and takes the new damage per tick. It keeps the current tick timer.
 - Heal over time: the total healing of one application also stays inside 8 to 30 `[tuned]`. Refresh works like damage over time.
 - Knockback: a champion moves along the push direction with a linearly decaying speed. An obstacle or the arena wall stops the push. Pushes deal no damage.
-- Invulnerable: blocks all damage, including ring damage. Blocks new stun, root, silence, slow, damage over time and knockback. Does not block healing, shields or haste. It does not remove statuses that are already running, but damage over time deals no damage while it lasts.
+- Invulnerable: blocks all damage, including ring damage. Blocks new stun, root, silence, slow, wound, damage over time and knockback. Does not block healing, shields or haste. It does not remove statuses that are already running (a wound that is already running stays and keeps cutting heals), but damage over time deals no damage while it lasts.
+- Wound `[tuned]`: every `heal` effect and every heal-over-time pulse that lands on the holder is cut when it lands, before the maximum-health clamp. The restored amount is `amount * (100 - 10 * stacks) / 100`: 10 percent per stack, so 30 percent at 3 stacks. The percent per stack is a catalog constant, not a kit field. An application carries `stacks` from 1 to 3 (default 1) and adds that many, whoever applies it, up to a total of 3. Shields are not healing and are not cut. A cut heal that still restores health pays support energy under 3.1 as before.
 
 ## 5. Health
 
@@ -251,10 +263,12 @@ Default controls `[spec]`:
 | Q, E, R | Q, E and R slots |
 | F | Ultimate |
 | Shift (held) | EX variant of the slot that is cast |
+| C (held) | Self-cast |
 | Tab | Scoreboard |
 | Escape | Menu |
 
-- Rebinding arrives in milestone 5 `[spec]`. The nine keys of the movement and the slots can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R and F `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
+- Rebinding arrives in milestone 5 `[spec]`. The ten keys of the movement, the slots and the self-cast can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R, F and C `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
+- Hold C to self-cast `[spec]`. Hold it and cast a slot: while C is held the aim is the champion's own position, so a projectile with ally effects lands on her at once (section 2.5). Releasing C before the cast fires returns the aim to the mouse. Shift, C and a slot self-cast the EX variant. The rule reaches every ally projectile that ships: Lumeth's Mend Bolt (M1), Soothing Surge (M2) and its EX; there is no exception. The ally effects of an area or on the caster already include her, so C changes nothing for Aegis Veil, Dawnbloom, Hargrim's haste circle or any shield or haste the champion puts on herself. Any other aimed ability cast with C lands at her feet, which is the player's choice. C sets no button bit.
 - Sound is generated in code, with no sound files and no music `[tuned]`. It
   plays a hit (a projectile that touches a champion, and a melee arc with at
   least one target), a cast (the local champion's casts only), a death
@@ -279,7 +293,7 @@ Default controls `[spec]`:
   ([batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441), designed in the
   [online design](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering)).
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
-- The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
+- The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`. While C is held the aim is the champion's own position in whole centimeters, on every tick, and C sets no bit `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.
 
 ## 7. Camera

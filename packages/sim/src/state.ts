@@ -14,6 +14,7 @@ export type StatusType =
   | 'shield'
   | 'dot'
   | 'hot'
+  | 'wound'
   | 'knockback';
 export type StatusEndReason = 'expired' | 'depleted' | 'stopped' | 'replaced' | 'death';
 export type DashEndReason = 'complete' | 'blocked' | 'rooted' | 'stunned' | 'death' | 'replaced';
@@ -34,6 +35,7 @@ export type StatusInstance = StatusBase &
     | { type: 'slow' | 'haste'; percent: number }
     | { type: 'shield'; absorb: number }
     | { type: 'dot' | 'hot'; perPulse: number; ticksToNextPulse: number }
+    | { type: 'wound'; stacks: number }
     | {
         type: 'knockback';
         /** Unit vector. */
@@ -50,7 +52,8 @@ export type StatusInstance = StatusBase &
 export type StatusSpec =
   | { type: 'stun' | 'root' | 'silence' | 'invulnerable'; ticks: number }
   | { type: 'slow' | 'haste'; percent: number; ticks: number }
-  | { type: 'dot' | 'hot'; perPulse: number; ticks: number };
+  | { type: 'dot' | 'hot'; perPulse: number; ticks: number }
+  | { type: 'wound'; ticks: number; stacks?: number };
 
 export type Effect =
   | { type: 'damage'; amount: number }

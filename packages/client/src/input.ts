@@ -26,6 +26,16 @@ export interface KeyMods {
   altKey: boolean;
 }
 
+/** The champion's own position in metres, read at the moment of the call. */
+export interface SelfPosition {
+  readonly x: number;
+  readonly y: number;
+}
+
+// The default code of the held self-cast action. No button bit: while it is held and a position
+// is given, the aim is that position (rules.md section 6).
+const SELF_CAST = DEFAULT_BINDINGS.selfCast;
+
 export interface InputCore {
   /** The key bindings in use: the defaults until `setBindings`. */
   readonly bindings: Bindings;
@@ -49,9 +59,10 @@ export interface InputCore {
    * The input for this frame. Every call overwrites and returns the same
    * object, so a frame allocates nothing. `step` copies it through
    * `resolveInput`, so sharing is safe there; a caller that keeps inputs
-   * (a replay, a bot) must copy them.
+   * (a replay, a bot) must copy them. While the self-cast key is held and `self` is
+   * given, the aim is `self` in whole centimetres, as `groundAimFromPointer` rounds.
    */
-  toPlayerInput(aimX: number, aimY: number): PlayerInput;
+  toPlayerInput(aimX: number, aimY: number, self?: SelfPosition): PlayerInput;
 }
 
 /** Physical code to the default code of its action, and the fixed Shift keys to themselves. */
@@ -67,7 +78,7 @@ function hasCommandModifier(mods: KeyMods): boolean {
 }
 
 /**
- * Held-state only, sampled once per frame. There is no press latch, so a tap
+ * Held-state only, read once per tick. There is no press latch, so a tap
  * shorter than one frame can be missed; the ability framework decides whether
  * that matters. macOS swallows keyup while Cmd is held, so Cmd combos are not
  * recorded at all.
@@ -119,7 +130,7 @@ export function createInputCore(): InputCore {
       held.clear();
       mouseBits = 0;
     },
-    toPlayerInput(aimX, aimY) {
+    toPlayerInput(aimX, aimY, self) {
       let buttons = mouseBits;
       for (let i = 0; i < KEY_CODES.length; i++) {
         const code = KEY_CODES[i] as string;
@@ -128,8 +139,14 @@ export function createInputCore(): InputCore {
       // The subtraction of two 0/1 values is never -0.
       out.moveX = axis('KeyD', 'KeyA');
       out.moveY = axis('KeyW', 'KeyS');
-      out.aimX = aimX;
-      out.aimY = aimY;
+      if (self !== undefined && held.has(SELF_CAST)) {
+        // `+ 0` turns -0 into 0, as the sim does for aim.
+        out.aimX = Math.round(self.x * 100) + 0;
+        out.aimY = Math.round(self.y * 100) + 0;
+      } else {
+        out.aimX = aimX;
+        out.aimY = aimY;
+      }
       out.buttons = buttons;
       return out;
     },
