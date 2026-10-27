@@ -30,8 +30,8 @@ ARENA_GLBS = {
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
-IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick"}
-ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick")
+IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal"}
+ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal")
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
 MAX_TOP = 1.90
@@ -662,19 +662,44 @@ def rounded(position):
     return tuple(round(c, 6) for c in position)
 
 
-# The silhouette cue of each new roster id as a box on Spine in Blender
-# coordinates, (centre, size): ondrel's reed bundle on the back and brimwick's
-# fuse cap on top of the head (docs/design/roster-v2.md).
+# The silhouette cue of each new roster id as a list of boxes in Blender
+# coordinates, (bone, centre, size): ondrel's reed bundle on the back and
+# brimwick's fuse cap on top of the head, each one box on Spine
+# (docs/design/roster-v2.md), and durnhal's shield on Arm_L with his hammer's
+# haft and head on Arm_R (docs/design/roster-v3.md).
 CUE_BOXES = {
-    "ondrel": ((-0.16, 0.0, 1.56), (0.08, 0.16, 0.52)),
-    "brimwick": ((-0.02, 0.0, 1.74), (0.22, 0.22, 0.16)),
+    "ondrel": (("Spine", (-0.16, 0.0, 1.56), (0.08, 0.16, 0.52)),),
+    "brimwick": (("Spine", (-0.02, 0.0, 1.74), (0.22, 0.22, 0.16)),),
+    "durnhal": (
+        ("Arm_L", (0.0, 0.44, 1.04), (0.30, 0.04, 0.60)),
+        ("Arm_R", (0.0, -0.41, 0.60), (0.05, 0.05, 0.40)),
+        ("Arm_R", (0.0, -0.41, 0.33), (0.22, 0.14, 0.14)),
+    ),
 }
 CUE_TOLERANCE = 1e-4
 
 
+def box_corners(centre, size):
+    """The 8 corners of a Blender-coordinate box, as glTF positions.
+
+    Blender (x, y, z) is glTF (x, z, -y).
+    """
+    return [
+        (
+            centre[0] + sx * size[0] / 2,
+            centre[2] + sz * size[2] / 2,
+            -(centre[1] + sy * size[1] / 2),
+        )
+        for sx in (-1, 1)
+        for sy in (-1, 1)
+        for sz in (-1, 1)
+    ]
+
+
 class CueTests(unittest.TestCase):
-    """A cue is one box on Spine: add_box takes its faces and vertices as a slice
-    of the bmesh, so a cue that landed in the wrong slot would show here."""
+    """A cue is a list of boxes, each on one bone: add_box takes its faces and
+    vertices as a slice of the bmesh, so a cue that landed in the wrong slot
+    would show here."""
 
     def setUp(self):
         self.placeholder = load(CHAMPIONS_DIR / "placeholder.glb")
@@ -698,31 +723,29 @@ class CueTests(unittest.TestCase):
         ]
         return cue, extra
 
-    def test_the_cue_is_one_box_of_24_vertices_on_top_of_the_placeholder_body(self):
-        for champion in CUE_BOXES:
+    def test_the_cue_is_24_vertices_per_box_on_top_of_the_placeholder_body(self):
+        for champion, boxes in CUE_BOXES.items():
             with self.subTest(champion=champion):
-                _, extra = self.cue_vertices(champion)
-                self.assertEqual(sum(extra.values()), 24)
+                cue, extra = self.cue_vertices(champion)
+                self.assertEqual(sum(extra.values()), 24 * len(boxes))
+                self.assertEqual(len(cue), 24 * len(boxes))
 
-    def test_every_cue_vertex_is_on_spine_at_weight_1(self):
-        for champion in CUE_BOXES:
+    def test_every_box_corner_is_three_cue_vertices_on_the_boxs_bone_at_weight_1(self):
+        for champion, boxes in CUE_BOXES.items():
             with self.subTest(champion=champion):
                 cue, _ = self.cue_vertices(champion)
-                self.assertEqual(len(cue), 24)
-                for _, joint, weight in cue:
-                    self.assertEqual(joint, "Spine")
-                    self.assertAlmostEqual(weight, 1.0, delta=WEIGHT_TOLERANCE)
-
-    def test_the_cue_bounds_are_the_box(self):
-        for champion, (centre, size) in CUE_BOXES.items():
-            with self.subTest(champion=champion):
-                cue, _ = self.cue_vertices(champion)
-                # Blender (x, y, z) is glTF (x, z, -y).
-                low = (centre[0] - size[0] / 2, centre[2] - size[2] / 2, -(centre[1] + size[1] / 2))
-                high = (centre[0] + size[0] / 2, centre[2] + size[2] / 2, -(centre[1] - size[1] / 2))
-                for axis in range(3):
-                    self.assertAlmostEqual(min(v[0][axis] for v in cue), low[axis], delta=CUE_TOLERANCE)
-                    self.assertAlmostEqual(max(v[0][axis] for v in cue), high[axis], delta=CUE_TOLERANCE)
+                for bone, centre, size in boxes:
+                    for corner in box_corners(centre, size):
+                        with self.subTest(champion=champion, bone=bone, corner=corner):
+                            here = [
+                                v
+                                for v in cue
+                                if all(abs(v[0][axis] - corner[axis]) <= CUE_TOLERANCE for axis in range(3))
+                            ]
+                            self.assertEqual(len(here), 3)
+                            for _, joint, weight in here:
+                                self.assertEqual(joint, bone)
+                                self.assertAlmostEqual(weight, 1.0, delta=WEIGHT_TOLERANCE)
 
     def test_the_accent_is_the_placeholders(self):
         placeholder_doc, placeholder_bin = self.placeholder
