@@ -193,7 +193,7 @@ describe('wound and healing', () => {
   it('gives back an amount untouched when there is no wound', () => {
     const state = open();
     champion(state, 2).health = 0;
-    expect(applyHeal(state, 2, 0.07, 0)).toBe(0.07);
+    expect(applyHeal(state, 2, 0.007, 0)).toBe(0.007);
   });
 
   it('cuts a heal over time pulse from its next pulse when the wound comes later', () => {

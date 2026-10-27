@@ -121,7 +121,7 @@ export function applyHeal(
   checkAmount('heal', amount);
   if (!champion.alive) return 0;
   const stacks = woundStacks(champion);
-  // No wound: the amount stays as it is, as `amount * 100 / 100` is not always `amount`.
+  // No wound: the amount stays as it is, as `amount * 100 / 100` is not always `amount`, 0.007 for one.
   const cut = stacks === 0 ? amount : (amount * (100 - WOUND_PERCENT_PER_STACK * stacks)) / 100;
   const before = champion.health;
   champion.health = before + Math.min(champion.maxHealth - before, cut);
