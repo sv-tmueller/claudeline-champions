@@ -633,12 +633,13 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   the walk goes on to the next slot, and a dash with an EX variant that would be
   cast is not replaced by its base.
 - Smoke Pot (Brimwick R) is the second escape of her order, with no landing: its
-  area slows every enemy within 3.5 m by 40 percent for 90 ticks, and she herself
-  gains 40 percent haste for the same time, which is the way out that a Flare Step
-  without a landing does not give (roster-v2: "teleport away, then slow and haste").
-  The haste is not read: she presses it as the second escape, as Reed Screen (a shield
-  of 40 and a slowing area of 3 m) is pressed second in Ondrel's. A sim step pins it:
-  `statusApplied` of haste on her and of slow on a target inside 3.5 m.
+  area slows every enemy within 3.5 m by 40 percent for 90 ticks, and she
+  herself gains 40 percent haste for the same time, which is the way out that a
+  Flare Step without a landing does not give (roster-v2: "teleport away, then
+  slow and haste"). The haste is not read: she presses it as the second escape,
+  as Reed Screen (a shield of 40 and a slowing area of 3 m) is pressed second in
+  Ondrel's. A sim step pins it: `statusApplied` of haste on her and of slow on a
+  target inside 3.5 m.
 - The aim: `aim()` runs on every think, so the draw cadence of the aim error does not change; an
   escape press with a landing then overwrites `aimX` and `aimY` with the landing's aim, with no
   error and no draw.
