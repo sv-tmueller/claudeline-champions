@@ -708,12 +708,19 @@ cell is stated as a cause of it, and none of the shares of her losses to Lumeth
 (heals through her damage) or Quillon (a range of 9 to 13 m against her 7 to
 10) was measured.
 
-**The decision on #188.** DECISION-188-PLACEHOLDER: the lead posts the decision
-(tune, rewrite roster-v2 section 3, or accept as measured) on #193 with its
-reason, and a follow-up commit records it here. A tuning package, if one is
-chosen, is filed separately and names the cells it must move (6.3); a rewrite
-edits the roster-v2 section 1 row and section 3's intended counters and keeps
-the web closed. This package changes no kit and no bots rule.
+**The decision on #188.** Accepted as measured (decision 7 of batch #193,
+[the comment](https://github.com/sv-tmueller/claudeline-champions/issues/193#issuecomment-6437420482)).
+No tuning package is filed. The reason: Hargrim and Skerrow are the two lowest
+kits over all 60 cells (11.4 and 13.7, against Lumeth's 89.1 and Quillon's
+73.3) and the roster-v1 web is already inverted the same way, so the inversion
+is the bots' strength order across the melee kits and not a Brimwick fault, and
+tuning her would need 16 cells moved 17 to 39 points, past what rule 6.3 lets a
+tuning package claim without a bots reading first. The 720-match table of #165
+agrees. The open question is that bots-side reading: it goes to the next bots
+package (with the carries of #192), which decides whether the profiles or the
+kits move before any roster-v2 rewrite. Sections 1 and 3 of roster-v2.md stay
+as the design intent, and #188 closes with PR #200. This package changes no kit
+and no bots rule.
 
 ## 6. Changes made
 
@@ -929,8 +936,13 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   raised instead. On a difference a job prints the differing rows of its mode
   (its cell rows and budget-hit lines, from a fresh `--out` against the
   committed block). A newer run on the same ref cancels the older one
-  (`concurrency`). The run on the branch of #189: RUN-ID-PLACEHOLDER (the lead
-  dispatches it after the report and records the run id and both job times
-  here). Bot output across platforms is not promised (bots.md, "Determinism"),
-  so the macOS table is the report, and a table that differs on another
-  platform gets a platform note here with the differing cells.
+  (`concurrency`). The run on the branch of #189 is
+  [40475468875](https://github.com/sv-tmueller/claudeline-champions/actions/runs/40475468875),
+  conclusion success: the `--check --mode 2v2` job ran 08:43:16 to 08:58:56
+  (15 min 40 s, timeout 45) and the `--check --mode 3v3` job 08:43:15 to
+  09:09:54 (26 min 39 s, timeout 75). Against the local 315 s and 532 s of the
+  default schedule that is a factor of 3.0 in both modes (the job times include
+  setup), so a replayed 3v3 check is about 53 minutes, inside 75. Bot output
+  across platforms is not promised (bots.md, "Determinism"), so the macOS table
+  is the report, and a table that differs on another platform gets a platform
+  note here with the differing cells.
