@@ -14,7 +14,7 @@ import { OPEN } from './scenes';
 describe('teleportAfterWalksAhead', () => {
   /**
    * A fixture champion (0) whose M1 is a melee arc with no windup swings north on this tick, at a
-   * Quillon (3) with 1 health standing 0.3 m east of where the caster's Skip would land. The caster
+   * Quillon (3) with 1 health standing 0.3 m west of where the caster's Skip would land. The caster
    * is Quillon (1) at (-6, 0), aiming 4 m east, away from the dummy (2) at (-9, 0). Champion 0 does
    * not move and is the only champion ahead of the caster; the oracle's standing clone gives it no
    * input, so there the Quillon lives and pushes the landing out of its body.
@@ -56,7 +56,7 @@ describe('teleportAfterWalksAhead', () => {
     at(0, -2.3, -1.5);
     at(1, -6, 0);
     at(2, -9, 0);
-    (at(3, -2.3, 0)).health = 1;
+    at(3, -2.3, 0).health = 1;
     const inputs: PlayerInput[] = [
       { moveX: 0, moveY: 0, aimX: -230, aimY: 0, buttons: Button.M1 },
       { moveX: 0, moveY: 0, aimX: -200, aimY: 0, buttons: Button.SPACE },

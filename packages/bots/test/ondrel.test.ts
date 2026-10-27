@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ChampionState, MatchConfig } from '@claudeline/sim';
 import { createRun } from './helpers';
-import { SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
-import { NORMAL_2V2, SEEDS_2V2, cellOf, expectEnded, playCell } from './six-cells';
+import { ESCAPES, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
+import { NORMAL_2V2, SEEDS_2V2, cellOf, configOf, expectEnded, playCell } from './six-cells';
 
 // Seeded matches of bots with Ondrel on the six shipped kits, played to matchEnd on both arenas:
 // against each of the four shipped kits, and against Brimwick (that pair is played here only;
@@ -31,36 +31,47 @@ describe('a match of bots with Ondrel, played to matchEnd', () => {
 
   // What fires across the cells, as measured: every slot but the ultimate, which these matches
   // never reach with 100 energy (the declared start edit below does), and Reed Step as an escape
-  // in every cell, with Reed Screen after it.
+  // in every cell without another dash escaper. `glides` counts the dash escapes of every champion
+  // in the cell, so the cells where another kit's Glide could count are left out: the escapers are
+  // read from `ESCAPES`, which today gives Lumeth alone, and the fillers have no dash row.
   it('starts M1, M2, Reed Step, Reed Fence, Undertow and Reed Screen, and escapes by dashing', { timeout: 60_000 }, () => {
     const all = CELLS.map(playCell);
     const casts = (slot: string) => all.reduce((n, r) => n + (r.slots[`ondrel:${slot}`] ?? 0), 0);
     for (const slot of ['M1', 'M2', 'SPACE', 'Q', 'E', 'R']) {
       expect(casts(slot), `${slot} casts`).toBeGreaterThan(0);
     }
-    expect(
-      all.reduce((n, r) => n + r.glides, 0),
-      'dash escapes',
-    ).toBeGreaterThan(0);
+    const others = Object.entries(ESCAPES)
+      .filter(([key, row]) => row.dash !== undefined && !key.startsWith('ondrel:'))
+      .map(([key]) => key.split(':')[0]);
+    const own = CELLS.filter((cell) =>
+      configOf(cell.mine, cell.other).players.every((p) => !others.includes(p.championId)),
+    );
+    expect(own).toHaveLength(8);
+    for (const cell of own) {
+      expect(playCell(cell).glides, cell.name).toBeGreaterThan(0);
+    }
   });
 });
 
-describe('a free-play match with Ondrel and a start edit', () => {
-  /** Ondrel and Quillon against Hargrim and Quillon, Ondrel at champion 0. */
-  const config = (): MatchConfig => ({
-    teamSize: 2,
-    players: [
-      { championId: 'ondrel', team: 'A' },
-      { championId: 'quillon', team: 'A' },
-      { championId: 'hargrim', team: 'B' },
-      { championId: 'quillon', team: 'B' },
-    ],
-  });
+/** Ondrel and Quillon against Hargrim and Quillon, Ondrel at champion 0. */
+const config = (): MatchConfig => ({
+  teamSize: 2,
+  players: [
+    { championId: 'ondrel', team: 'A' },
+    { championId: 'quillon', team: 'A' },
+    { championId: 'hargrim', team: 'B' },
+    { championId: 'quillon', team: 'B' },
+  ],
+});
 
+describe('a free-play match with Ondrel and a start edit', () => {
   // A declared start edit (the precedent of Reaper's Dance in headless-kits.test.ts): Ondrel at 100
   // energy, so that Drowned Ground is reachable. It is not held, so a healthy target gets it. A
   // miss after a change to the bots, the sim or the Node version is governed by batch #53 decision
   // 8.3; the fallback is Ondrel against a Quillon, the other two champions dead, 9 m apart.
+  // Runner time 7.1 s (job 121726022078) and 11.5 s (job 122125510999), local 2.5 s (Apple M5 Pro,
+  // Node 22.23.2). Twice the slowest is 23 s, above the 20 s top of the rule (testing.md, Check
+  // suite), so the 30 s of the long-match precedent applies.
   it('starts Drowned Ground at 100 energy against healthy targets', { timeout: 30_000 }, () => {
     const run = createRun(SEEDS_2V2, NORMAL_2V2, 7, { config: config(), kits: SIX_SET.kits() });
     (run.state.champions[0] as ChampionState).energy = 100;
@@ -73,23 +84,12 @@ describe('a free-play match with Ondrel and a start edit', () => {
 });
 
 describe('a free-play match with Ondrel, her escape and a start edit', () => {
-  /** Ondrel and Quillon against Hargrim and Quillon, Ondrel at champion 0. */
-  const config = (): MatchConfig => ({
-    teamSize: 2,
-    players: [
-      { championId: 'ondrel', team: 'A' },
-      { championId: 'quillon', team: 'A' },
-      { championId: 'hargrim', team: 'B' },
-      { championId: 'quillon', team: 'B' },
-    ],
-  });
-
   // Declared start edits: Reed Screen is pressed ahead of Reed Step only when Reed Step cannot be,
   // and the oracle has to know that, whole: a rooted Ondrel cannot dash, and a boxed-in one has no
   // landing. In both runs Reed Step is ready, so the oracle's check of "Reed Step ready and with a
   // landing" is what lets the press of Reed Screen through. A miss after a change to the bots, the
   // sim or the Node version is governed by batch #53 decision 8.3.
-  it('presses Reed Screen while rooted, with Reed Step ready, and the oracle lets it through', { timeout: 30_000 }, () => {
+  it('presses Reed Screen while rooted, with Reed Step ready, and the oracle lets it through', () => {
     const run = createRun(SEEDS_2V2, NORMAL_2V2, 7, { config: config(), kits: SIX_SET.kits() });
     const ondrel = run.state.champions[0] as ChampionState;
     const hargrim = run.state.champions[2] as ChampionState;
@@ -101,7 +101,7 @@ describe('a free-play match with Ondrel, her escape and a start edit', () => {
     expect(played.slots['ondrel:SPACE'] ?? 0, played.summary).toBe(0);
   });
 
-  it('presses Reed Screen boxed in at the north-east corner, with Reed Step ready and no landing', { timeout: 30_000 }, () => {
+  it('presses Reed Screen boxed in at the north-east corner, with Reed Step ready and no landing', () => {
     const run = createRun(SEEDS_2V2, NORMAL_2V2, 7, { config: config(), kits: SIX_SET.kits() });
     const ondrel = run.state.champions[0] as ChampionState;
     const hargrim = run.state.champions[2] as ChampionState;

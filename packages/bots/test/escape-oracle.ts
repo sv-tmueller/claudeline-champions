@@ -219,9 +219,10 @@ export interface TurnOrderTeleport {
   x: number;
   y: number;
   /**
-   * A champion other than the caster has another alive flag after the step, or one with a lower id
-   * than the caster's has another point: a champion ahead that walked, or any champion that died
-   * to a cast of one ahead before the caster's own turn.
+   * A champion other than the caster has another alive flag after the clone's whole step: any
+   * death in the step, a cast of a champion ahead before the caster's turn, or a projectile, an
+   * area or damage over time after it too. Or one with a lower id than the caster's has another
+   * point: a champion ahead that walked.
    */
   aheadMoved: boolean;
 }

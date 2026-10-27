@@ -8,7 +8,7 @@ import { sceneOf } from './scenes';
 // An ability with no projectile (Ondrel's Mire and Drowned Ground, Brimwick's Firecracker) is
 // aimed with the nominal 20 m/s lead, `NOMINAL_PROJECTILE_SPEED` of bot.ts. The sim is the oracle:
 // the pin steps a real match and counts how many pulses of the first area the bot placed hit an
-// enemy that walks away at full speed across the line of fire (docs/architecture/bots.md, Aim,
+// enemy that walks north at full speed, across the line of fire (docs/architecture/bots.md, Aim,
 // has the measurement of the other leads that this one was chosen from).
 
 interface AreaRun {
