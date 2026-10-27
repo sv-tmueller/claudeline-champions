@@ -95,12 +95,12 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
   3.7 s on the runner (job 121633905207, 779e504), timeout 10 s.
 
-`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four v1 kits) has a
-150 s timeout (120 s before the dodge of #137), and it is the thinnest margin in
-the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on the runner before
-the dodge and 62.4 s after it (job 117369238607). By the rule, twice the
-slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s over it;
-the test sits at 42 percent of its timeout.
+`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
+v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
+thinnest margin in the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on
+the runner before the dodge and 62.4 s after it (job 117369238607). By the rule,
+twice the slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s
+over it; the test sits at 42 percent of its timeout.
 
 The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells) and
 `brimwick.test.ts` (eight) play each cell to matchEnd under the press oracle and
@@ -127,12 +127,16 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
   report; only the CLI row plays six-kit cells (120 matches, one seed of the 2v2
-  mode, 6.3 s locally), the 3v3 success path is a 24-match row on the four v1
-  kits (the CLI's 3v3 row at six kits is 360 matches, 34 s locally and about 75
-  s on a runner, so it was replaced, not given a longer timeout), and two smoke
-  rows play Brimwick v Ondrel at seed 1, one match a mode, to a decision. One `playMatch` row plays the match of #123
-  (Quillon v Skerrow, 3v3, arena01, seed 6) and asserts that it ends in a
-  decision, with no end tick. The same project holds the fixture search's tests
+  mode, 6.6 s locally and about 23 s on the runner, where run.test.ts took
+  25.4 s against 7.5 s locally, a factor of 3.4, in unit job 122091170207), the
+  3v3 success path is a 24-match row on the four v1 kits (3.3 s locally, about 9
+  s on the runner at the file's factor of 2.8, timeout 20 s; the CLI's 3v3 row
+  at six kits is 360 matches, 34 s locally and projected at about 75 s on a
+  runner, so it was replaced, not given a longer timeout), and two smoke rows
+  play Brimwick v Ondrel at seed 1, one match a mode, to a decision. One
+  `playMatch` row plays the match of #123 (Quillon v Skerrow, 3v3, arena01,
+  seed 6) and asserts that it ends in a decision, with no end tick. The same
+  project holds the fixture search's tests
   (`tools/fixtures/*.test.ts`): the format against the committed bytes, the pure
   search cases, the reproduction of the six roster fixtures and the CLI (see
   [Fixture search](#fixture-search)).

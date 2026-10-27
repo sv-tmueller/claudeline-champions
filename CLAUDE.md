@@ -28,7 +28,7 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # scoreboard.png, select.png, lingering.png
                                  # in test-results/*/
 npm run balance                  # bot-versus-bot win-rate report: plays 11760
-                                 # matches (the six kits) and writes the block of
+                                 # matches (six kits) and writes the block of
                                  # docs/design/balance.md, about 14 minutes on
                                  # Apple silicon. Flags after `--`: --check
                                  # compares a fresh run with the committed

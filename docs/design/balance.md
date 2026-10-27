@@ -57,9 +57,10 @@ Sources:
   harness roster (`brimwick`, `hargrim`, `lumeth`, `ondrel`, `quillon`,
   `skerrow`). A rate under 50 means Y is ahead.
 - A roster counter (an intended counter in roster-v1.md, or in the web of
-  roster-v2.md section 1) is read as the favoured side inside the band: the favourite at 50 to 60 percent and the
-  other side at 40 to 50. A favourite above 60 is too strong, and an
-  underdog above 60 percent is an inverted counter.
+  roster-v2.md section 1) is read as the favoured side inside the band: the
+  favourite at 50 to 60 percent and the other side at 40 to 50. A favourite
+  above 60 is too strong, and an underdog above 60 percent is an inverted
+  counter.
 
 ## 3. The method
 
@@ -695,8 +696,8 @@ bottom two, the reverse of that order, and the four v1 kits stood in the same
 order in the report of 9a9c653 (Lumeth, Quillon, Skerrow, Hargrim), where three
 of the six roster-v1 counters measure inverted in every cell. So the inversion
 of Brimwick's web is the same finding as the inversion of the v1 web, and not
-a finding about her alone: Hargrim and Skerrow, the divers her web counts as
-her counters, are the two kits with the lowest rate over all their cells. The limits
+a finding about her alone: Hargrim and Skerrow, the divers her web counts as her
+counters, are the two kits with the lowest rate over all their cells. The limits
 of the bots that roster-v2 section 6 forecast, as this report bears on them: the
 forecast that Ondrel "will probably measure strong" holds in part (third of six,
 and 87.5 to 100.0 against the two lowest), and the report cannot say how much of
@@ -922,27 +923,27 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   with the committed one except for the head line. It exits 1 on a difference.
   Run it after any change to a kit, the sim or the bots.
 - The report was reproduced with `--check` on macOS (Apple silicon) with Node
-  22.23.2 (`played 11760 matches in 842.7 s`, the check of the committed
-  block) and, for the four-kit report, Node 26.7.0. The linux/amd64 reproduction is the manual workflow
-  `.github/workflows/balance.yml` (`workflow_dispatch` only, never on pull
-  requests or pushes): trigger it with
+  22.23.2 (`played 11760 matches in 842.7 s`, the check of the committed block)
+  and, for the four-kit report, Node 26.7.0. The linux/amd64 reproduction is the
+  manual workflow `.github/workflows/balance.yml` (`workflow_dispatch` only,
+  never on pull requests or pushes): trigger it with
   `gh workflow run balance.yml --ref <branch>`. It runs `npm ci` and
   `npm run balance -- --check --mode <mode>` on ubuntu, as two jobs side by
   side, one for 2v2 and one for 3v3 (a matrix by mode, so each stays inside its
-  `timeout-minutes`: 45 for 2v2 and 75 for 3v3, measured at six kits on the
-  projection of the runner above: twice the check time of the mode, because
-  the failure step plays the mode again, and a margin). The seeds are never
-  lowered to fit the runner: they set the noise of section 3, and a timeout is
-  raised instead. On a difference a job prints the differing rows of its mode
-  (its cell rows and budget-hit lines, from a fresh `--out` against the
+  `timeout-minutes`: 45 for 2v2 and 75 for 3v3, set from the projection of the
+  runner above, twice the check time of the mode because the failure step plays
+  the mode again, and a margin; the run below confirmed them). The seeds are
+  never lowered to fit the runner: they set the noise of section 3, and a
+  timeout is raised instead. On a difference a job prints the differing rows of
+  its mode (its cell rows and budget-hit lines, from a fresh `--out` against the
   committed block). A newer run on the same ref cancels the older one
   (`concurrency`). The run on the branch of #189 is
   [40475468875](https://github.com/sv-tmueller/claudeline-champions/actions/runs/40475468875),
-  conclusion success: the `--check --mode 2v2` job ran 08:43:16 to 08:58:56
-  (15 min 40 s, timeout 45) and the `--check --mode 3v3` job 08:43:15 to
-  09:09:54 (26 min 39 s, timeout 75). Against the local 315 s and 532 s of the
-  default schedule that is a factor of 3.0 in both modes (the job times include
-  setup), so a replayed 3v3 check is about 53 minutes, inside 75. Bot output
-  across platforms is not promised (bots.md, "Determinism"), so the macOS table
-  is the report, and a table that differs on another platform gets a platform
-  note here with the differing cells.
+  conclusion success: the `--check --mode 2v2` job ran 08:43:16 to 08:58:56 (15
+  min 40 s, timeout 45) and the `--check --mode 3v3` job 08:43:15 to 09:09:54
+  (26 min 39 s, timeout 75). Against the local 315 s and 532 s of the default
+  schedule that is a factor of 3.0 in both modes (the job times include setup),
+  so a replayed 3v3 check is about 53 minutes, inside 75. Bot output across
+  platforms is not promised (bots.md, "Determinism"), so the macOS table is the
+  report, and a table that differs on another platform gets a platform note here
+  with the differing cells.
