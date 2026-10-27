@@ -241,7 +241,8 @@ failed pre-check (decision 13 of batch #134):
   pin that puts the old number back in memory, with a comment naming the change,
   and let the header say which kit numbers the search ran on. The search on the
   current kit may settle on another attempt without any rebuild (after #125,
-  Skerrow on 2 and Lumeth on 5).
+  Skerrow on 2 and Lumeth on 5, and Lumeth on 6 after #191, whose self-cast
+  rule moved only her checkpoints and checksum).
 
 A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
 

@@ -17,7 +17,7 @@ import { buildFixture, searchFixture } from './search.ts';
 //   commit, and its row then takes the new attempt and the current kit (no pins).
 // - A change that keeps the coverage green regenerates only the checksums of the fixture, so its
 //   segments and actions stay the ones searched on the kit before the change. The search on the
-//   current kit may then settle elsewhere (Skerrow on attempt 2, Lumeth on attempt 5), so the row
+//   current kit may then settle elsewhere (Skerrow on attempt 2, Lumeth on attempt 6 since #191), so the row
 //   is pinned on the kit as searched: a pin puts the number the search ran on back in memory, and
 //   the fixture is then written with the checkpoints of the current kit.
 // A row names the kit numbers it is pinned on, each with the change that moved it.

@@ -18,6 +18,7 @@ import {
   RING_SOURCE_ID,
   ROUND_END_TICKS,
   ROUND_TICKS,
+  SELF_CAST_HEAL_PERCENT,
   SLOWED_WINDUP_FACTOR,
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
@@ -57,6 +58,7 @@ describe('status and motion constants', () => {
     expect(ULTIMATE_ENERGY_COST).toBe(100);
     expect(MAX_ENERGY).toBe(100);
     expect(SLOWED_WINDUP_FACTOR).toBe(0.5);
+    expect(SELF_CAST_HEAL_PERCENT).toBe(60);
     expect(ENERGY_GAIN_M1).toBe(5);
     expect(ENERGY_GAIN_SKILL).toBe(10);
     expect(ENERGY_GAIN_ULTIMATE).toBe(15);

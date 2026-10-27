@@ -421,8 +421,10 @@ slot. The numbers come from the kit once, on a rebuild:
 | R (Aegis Veil)      | area on herself | 5.5 - 1 = 4.5 m            | 30   | none       |
 | F (Dawnbloom)       | area on herself | 5.5 - 1 = 4.5 m            | 30   | none       |
 
-- Kind 1 is a projectile with `allyEffects`: a bolt, which never hits its owner,
-  so it is never pressed at herself. Kind 2 is an area on allies placed on self,
+- Kind 1 is a projectile with `allyEffects`: a bolt, which never hits its owner
+  in flight and is never pressed at herself: bots do not self-cast (a bolt aimed
+  at herself would land on her at 60 percent heal, the sim's self-cast rule).
+  Kind 2 is an area on allies placed on self,
   which includes the caster. The reach is the bolt's speed times its lifetime
   over 60, or the area's radius plus 0.5.
 - Hurt means missing at least what the slot gives (decision 1 of batch #105):
