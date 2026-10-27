@@ -236,7 +236,7 @@ export function applyStatus(
       // Stacks add from every source, the same one included: one instance, one timer.
       const old = target.statuses.find((s) => s.type === 'wound');
       const added = checked.stacks ?? 1;
-      let stacks = Math.min(WOUND_MAX_STACKS, added);
+      let stacks = added;
       let remainingTicks = checked.ticks;
       if (old && old.type === 'wound') {
         stacks = Math.min(WOUND_MAX_STACKS, old.stacks + added);

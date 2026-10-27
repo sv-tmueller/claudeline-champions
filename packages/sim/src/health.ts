@@ -3,7 +3,7 @@ import { direction } from './geometry';
 import type { Point } from './geometry';
 import type { Slot } from './input';
 import { endDash, interruptCast } from './state';
-import type { ChampionState, Effect, GameState } from './state';
+import type { ChampionState, Effect, GameState, StatusInstance } from './state';
 import {
   applyKnockback,
   applyShield,
@@ -100,7 +100,11 @@ export function applyDamage(
 
 /** The wound stacks the champion holds, 0 without a wound. A plain loop: heals run in live matches. */
 function woundStacks(champion: ChampionState): number {
-  for (const status of champion.statuses) if (status.type === 'wound') return status.stacks;
+  const { statuses } = champion;
+  for (let i = 0; i < statuses.length; i++) {
+    const status = statuses[i] as StatusInstance;
+    if (status.type === 'wound') return status.stacks;
+  }
   return 0;
 }
 
