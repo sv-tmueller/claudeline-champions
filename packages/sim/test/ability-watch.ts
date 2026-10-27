@@ -414,7 +414,7 @@ export class AbilityWatcher {
     for (const c of state.champions) {
       this.check(c.health === running[c.id], `champion ${c.id} health is not conserved`, state);
       this.health[c.id] = c.health;
-      for (const type of ['stun', 'root', 'slow', 'haste', 'silence', 'invulnerable', 'shield', 'dot', 'hot', 'knockback']) {
+      for (const type of ['stun', 'root', 'slow', 'haste', 'silence', 'invulnerable', 'shield', 'dot', 'hot', 'wound', 'knockback']) {
         const count = c.statuses.filter((s) => s.type === type).length;
         this.check(count === (this.statusOpen.get(`${c.id}/${type}`) ?? 0), `champion ${c.id} ${type} events do not match`, state);
       }
