@@ -127,6 +127,121 @@ describe('applyHeal', () => {
   });
 });
 
+describe('wound and healing', () => {
+  const Q0 = { sourceId: 0, slot: 'Q' } as const;
+  const wound = (state: GameState, stacks: number, ticks = 120): void => {
+    applyStatus(state, 2, { type: 'wound', ticks, stacks }, Q0);
+    state.events.length = 0;
+  };
+  /** The heal amounts that landed over `ticks` steps; each step starts a fresh event list. */
+  const run = (state: GameState, ticks: number): number[] => {
+    const amounts: number[] = [];
+    for (let i = 0; i < ticks; i++) {
+      step(state, []);
+      for (const e of state.events) if (e.type === 'heal') amounts.push(e.amount);
+    }
+    return amounts;
+  };
+
+  it('cuts a heal by 10 percent per stack: amount * (100 - 10 * stacks) / 100', () => {
+    for (const stacks of [1, 2, 3]) {
+      const state = open();
+      champion(state, 2).health = 10;
+      wound(state, stacks);
+      const restored = applyHeal(state, 2, 20, 0);
+      expect(restored, `stacks ${stacks}`).toBe((20 * (100 - 10 * stacks)) / 100);
+      expect(champion(state, 2).health).toBe(10 + restored);
+    }
+  });
+
+  it('multiplies by the integer factor first and then divides by 100', () => {
+    const state = open();
+    champion(state, 2).health = 0;
+    wound(state, 2);
+    // 7 * 80 / 100 is 5.6; 7 * 0.8 is 5.6000000000000005.
+    expect(applyHeal(state, 2, 7, 0)).toBe((7 * 80) / 100);
+    expect((7 * 80) / 100).not.toBe(7 * 0.8);
+  });
+
+  it('carries the cut amount in the heal event', () => {
+    const state = open();
+    champion(state, 2).health = 10;
+    wound(state, 3);
+    applyHeal(state, 2, 20, 1);
+    expect(state.events).toEqual([{ type: 'heal', targetId: 2, sourceId: 1, amount: 14, health: 24 }]);
+  });
+
+  it('cuts before the max-health clamp', () => {
+    const near = open();
+    champion(near, 2).health = 115;
+    wound(near, 3);
+    expect(applyHeal(near, 2, 20, 0)).toBe(5);
+    const far = open();
+    champion(far, 2).health = 100;
+    wound(far, 3);
+    expect(applyHeal(far, 2, 20, 0)).toBe(14);
+  });
+
+  it('cuts a heal effect that lands in a hit, and returns the cut amount', () => {
+    const state = open();
+    champion(state, 2).health = 10;
+    wound(state, 2);
+    const restored = applyEffects(state, 0, 2, [{ type: 'heal', amount: 10 }], { x: 0, y: 0 });
+    expect(restored).toBe(8);
+  });
+
+  it('gives back an amount untouched when there is no wound', () => {
+    const state = open();
+    champion(state, 2).health = 0;
+    expect(applyHeal(state, 2, 0.007, 0)).toBe(0.007);
+  });
+
+  it('cuts a heal over time pulse from its next pulse when the wound comes later', () => {
+    const state = open();
+    champion(state, 2).health = 50;
+    applyStatus(state, 2, { type: 'hot', perPulse: 10, ticks: 100 }, { sourceId: 3, slot: 'R' });
+    run(state, 10);
+    wound(state, 1);
+    expect(run(state, 20)).toEqual([9]);
+  });
+
+  it('cuts the pulse due on the wound last tick, and not the pulse after the wound ends', () => {
+    const state = open();
+    champion(state, 2).health = 50;
+    applyStatus(state, 2, { type: 'hot', perPulse: 10, ticks: 100 }, { sourceId: 3, slot: 'R' });
+    wound(state, 1, 30);
+    expect(run(state, 90)).toEqual([9, 10, 10]);
+  });
+
+  it('reads the stack count again at every pulse', () => {
+    const state = open();
+    champion(state, 2).health = 50;
+    applyStatus(state, 2, { type: 'hot', perPulse: 10, ticks: 100 }, { sourceId: 3, slot: 'R' });
+    wound(state, 1, 200);
+    const first = run(state, 30);
+    applyStatus(state, 2, { type: 'wound', ticks: 120, stacks: 2 }, Q0);
+    expect([...first, ...run(state, 30)]).toEqual([9, 7]);
+  });
+
+  it('keeps a shield at its full absorb, and it absorbs in full', () => {
+    const state = open();
+    wound(state, 3);
+    applyShield(state, 2, { absorb: 30, ticks: 60 }, Q0);
+    const shield = champion(state, 2).statuses.find((s) => s.type === 'shield');
+    expect(shield).toMatchObject({ absorb: 30 });
+    applyDamage(state, 2, 30, 0);
+    expect(champion(state, 2).health).toBe(120);
+  });
+
+  it('keeps cutting while invulnerable', () => {
+    const state = open();
+    champion(state, 2).health = 10;
+    wound(state, 1);
+    applyStatus(state, 2, { type: 'invulnerable', ticks: 60 }, Q0);
+    expect(applyHeal(state, 2, 20, 0)).toBe(18);
+  });
+});
+
 describe('applyEffects', () => {
   it('applies the effects in order', () => {
     const state = open();

@@ -200,6 +200,19 @@ describe('landHit support heals', () => {
     }
   });
 
+  it('still gives the table value for a heal a wound cut, when it restores health', () => {
+    const state = setup();
+    champion(state, 0).health = 100;
+    applyStatus(state, 0, { type: 'wound', ticks: 120, stacks: 3 }, { sourceId: 2, slot: 'Q' });
+    const castId = newCast(state, 1, 'E');
+    hit(state, castId, 0, [{ type: 'heal', amount: 8 }], 1);
+    expect(champion(state, 0).health).toBe(100 + (8 * 70) / 100);
+    expect(champion(state, 1).energy).toBe(10);
+    expect(gained(state)).toEqual([
+      { type: 'energyGained', championId: 1, castId, targetId: 0, amount: 10, energy: 10 },
+    ]);
+  });
+
   it('gives nothing when the heal restores nothing, then counts the same cast later', () => {
     const state = setup();
     const castId = newCast(state, 1, 'M1');

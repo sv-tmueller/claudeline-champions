@@ -30,6 +30,8 @@ export {
   TICK_RATE,
   ULTIMATE_ENERGY_COST,
   WARMUP_TICKS,
+  WOUND_MAX_STACKS,
+  WOUND_PERCENT_PER_STACK,
 } from './constants';
 export { parseArenaDef } from './arena';
 export type {

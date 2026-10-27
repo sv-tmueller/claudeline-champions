@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DT, MAX_MAGNITUDE, MAX_STATUS_TICKS, createMatch, step } from '../src/index';
 import type { GameState, SimEvent, StatusInstance, StatusSpec, StatusType } from '../src/index';
 import { applyDamage } from '../src/health';
-import { applyKnockback, applyShield, applyStatus } from '../src/status';
+import { applyKnockback, applyShield, applyStatus, copyStatusSpec } from '../src/status';
 import { champion, config2v2, input, openArena } from './helpers';
 
 function open(): GameState {
@@ -20,6 +20,10 @@ function fresh(state: GameState): SimEvent[] {
 }
 
 const NONE = { sourceId: 0, slot: null } as const;
+
+function fail(problem: string): never {
+  throw new Error(`Invalid status: ${problem}`);
+}
 
 describe('applyStatus: stun, root, silence and invulnerable', () => {
   const unique: StatusType[] = ['stun', 'root', 'silence', 'invulnerable'];
@@ -194,6 +198,144 @@ describe('applyStatus: damage over time and heal over time', () => {
   }
 });
 
+describe('applyStatus: wound', () => {
+  const wound = (ticks: number, stacks?: number): StatusSpec =>
+    stacks === undefined ? { type: 'wound', ticks } : { type: 'wound', ticks, stacks };
+  const Q0 = { sourceId: 0, slot: 'Q' } as const;
+  const E1 = { sourceId: 1, slot: 'E' } as const;
+
+  it('adds one stack when the spec has no stacks', () => {
+    const state = open();
+    expect(applyStatus(state, 2, wound(120), Q0)).toBe(true);
+    expect(statuses(state, 2)).toEqual([
+      { type: 'wound', sourceId: 0, slot: 'Q', remainingTicks: 120, stacks: 1 },
+    ]);
+    expect(state.events).toEqual([
+      { type: 'statusApplied', targetId: 2, sourceId: 0, slot: 'Q', status: 'wound', remainingTicks: 120 },
+    ]);
+  });
+
+  it('adds three stacks in one application with one statusApplied', () => {
+    const state = open();
+    expect(applyStatus(state, 2, wound(150, 3), Q0)).toBe(true);
+    expect(statuses(state, 2)).toMatchObject([{ type: 'wound', stacks: 3, remainingTicks: 150 }]);
+    expect(state.events).toHaveLength(1);
+  });
+
+  it('stacks from another source, one instance per holder', () => {
+    const state = open();
+    applyStatus(state, 2, wound(120), Q0);
+    applyStatus(state, 2, wound(120), E1);
+    expect(statuses(state, 2)).toMatchObject([{ type: 'wound', stacks: 2, sourceId: 1, slot: 'E' }]);
+  });
+
+  it('stacks from the same source and slot too, unlike the same-source refresh rule', () => {
+    const state = open();
+    applyStatus(state, 2, wound(120), Q0);
+    applyStatus(state, 2, wound(120, 1), Q0);
+    expect(statuses(state, 2)).toMatchObject([{ type: 'wound', stacks: 2, sourceId: 0, slot: 'Q' }]);
+  });
+
+  it('caps the stacks at 3: 2 and 2 give 3', () => {
+    const state = open();
+    applyStatus(state, 2, wound(120, 2), Q0);
+    applyStatus(state, 2, wound(120, 2), E1);
+    expect(statuses(state, 2)).toHaveLength(1);
+    expect(statuses(state, 2)).toMatchObject([{ stacks: 3 }]);
+  });
+
+  it('keeps the timer when a shorter application adds stacks, and extends it for a longer one', () => {
+    const state = open();
+    applyStatus(state, 2, wound(200), Q0);
+    (statuses(state, 2)[0] as StatusInstance).remainingTicks = 150;
+    applyStatus(state, 2, wound(120), E1);
+    expect(statuses(state, 2)).toMatchObject([{ stacks: 2, remainingTicks: 150 }]);
+    applyStatus(state, 2, wound(300), E1);
+    expect(statuses(state, 2)).toMatchObject([{ stacks: 3, remainingTicks: 300 }]);
+  });
+
+  it('ends the old instance as replaced and appends the new one, moved to the end, with the new source', () => {
+    const state = open();
+    applyStatus(state, 2, wound(200), Q0);
+    applyStatus(state, 2, { type: 'haste', percent: 20, ticks: 60 }, NONE);
+    (statuses(state, 2)[0] as StatusInstance).remainingTicks = 150;
+    fresh(state);
+    expect(applyStatus(state, 2, wound(120), E1)).toBe(true);
+    expect(statuses(state, 2).map((s) => s.type)).toEqual(['haste', 'wound']);
+    expect(statuses(state, 2)[1]).toEqual({
+      type: 'wound',
+      sourceId: 1,
+      slot: 'E',
+      remainingTicks: 150,
+      stacks: 2,
+    });
+    expect(fresh(state)).toEqual([
+      { type: 'statusExpired', targetId: 2, sourceId: 0, slot: 'Q', status: 'wound', reason: 'replaced' },
+      { type: 'statusApplied', targetId: 2, sourceId: 1, slot: 'E', status: 'wound', remainingTicks: 150 },
+    ]);
+  });
+
+  it('returns false with no event at the cap when the timer is not longer', () => {
+    const state = open();
+    applyStatus(state, 2, wound(200, 3), Q0);
+    fresh(state);
+    expect(applyStatus(state, 2, wound(200), E1)).toBe(false);
+    expect(applyStatus(state, 2, wound(120, 3), E1)).toBe(false);
+    expect(state.events).toEqual([]);
+    expect(statuses(state, 2)).toMatchObject([{ sourceId: 0, slot: 'Q', stacks: 3, remainingTicks: 200 }]);
+  });
+
+  it('extends the timer at the cap when the application is longer', () => {
+    const state = open();
+    applyStatus(state, 2, wound(120, 3), Q0);
+    expect(applyStatus(state, 2, wound(121), E1)).toBe(true);
+    expect(statuses(state, 2)).toMatchObject([{ stacks: 3, remainingTicks: 121, sourceId: 1 }]);
+  });
+
+  it('loses all stacks together in one expired event', () => {
+    const state = open();
+    applyStatus(state, 2, wound(2, 3), Q0);
+    fresh(state);
+    expect(tick(state)).toEqual([]);
+    expect(tick(state)).toEqual([
+      { type: 'statusExpired', targetId: 2, sourceId: 0, slot: 'Q', status: 'wound', reason: 'expired' },
+    ]);
+    expect(statuses(state, 2)).toEqual([]);
+  });
+
+  it('is blocked by invulnerable with no event, and a running wound stays', () => {
+    const state = open();
+    applyStatus(state, 2, wound(120, 2), Q0);
+    applyStatus(state, 2, { type: 'invulnerable', ticks: 60 }, NONE);
+    fresh(state);
+    expect(applyStatus(state, 2, wound(200), E1)).toBe(false);
+    expect(state.events).toEqual([]);
+    expect(statuses(state, 2)).toMatchObject([
+      { type: 'wound', stacks: 2, remainingTicks: 120 },
+      { type: 'invulnerable' },
+    ]);
+    const blocked = open();
+    applyStatus(blocked, 2, { type: 'invulnerable', ticks: 60 }, NONE);
+    fresh(blocked);
+    expect(applyStatus(blocked, 2, wound(120), NONE)).toBe(false);
+    expect(blocked.events).toEqual([]);
+  });
+
+  it('throws Invalid status for stacks that are not an integer from 1 to 3', () => {
+    const state = open();
+    for (const stacks of [0, 4, 1.5, NaN, '2']) {
+      const spec = { type: 'wound', ticks: 120, stacks } as unknown as StatusSpec;
+      expect(() => applyStatus(state, 2, spec, NONE), String(stacks)).toThrow(/^Invalid status: stacks /);
+    }
+    expect(statuses(state, 2)).toEqual([]);
+  });
+
+  it('accepts a spec without stacks and copies it without a stacks key', () => {
+    expect(copyStatusSpec(wound(120), fail)).toStrictEqual({ type: 'wound', ticks: 120 });
+    expect(copyStatusSpec(wound(120, 3), fail)).toStrictEqual({ type: 'wound', ticks: 120, stacks: 3 });
+  });
+});
+
 describe('applyShield', () => {
   it('adds a shield instance and emits statusApplied', () => {
     const state = open();
@@ -329,6 +471,8 @@ describe('status validation', () => {
       { type: 'hot', perPulse: -1, ticks: 60 },
       { type: 'dot', perPulse: NaN, ticks: 60 },
       { type: 'hot', ticks: 60 },
+      { type: 'wound' },
+      { type: 'wound', ticks: 0 },
     ];
     for (const spec of bad) {
       expect(() => applyStatus(state, 2, spec as StatusSpec, NONE), JSON.stringify(spec)).toThrow(
