@@ -127,19 +127,18 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
   report; only the CLI row plays six-kit cells (120 matches, one seed of the 2v2
-  mode, 6.6 s locally and about 23 s on the runner, where run.test.ts took
-  25.4 s against 7.5 s locally, a factor of 3.4, in unit job 122091170207), the
-  3v3 success path is a 24-match row on the four v1 kits (3.3 s locally, about 9
-  s on the runner at the file's factor of 2.8, timeout 20 s; the CLI's 3v3 row
-  at six kits is 360 matches, 34 s locally and projected at about 75 s on a
-  runner, so it was replaced, not given a longer timeout), and two smoke rows
-  play Brimwick v Ondrel at seed 1, one match a mode, to a decision. One
-  `playMatch` row plays the match of #123 (Quillon v Skerrow, 3v3, arena01,
+  mode, 6.6 s locally and 23.6 s on the runner, timeout 60 s, unit job
+  122091170207), the 3v3 success path is a 24-match row on the four v1 kits
+  (3.3 s locally and 8.2 s on the runner, timeout 20 s; the CLI's 3v3 row at six
+  kits is 360 matches, 34 s locally and projected at about 75 s on a runner, so
+  it was replaced, not given a longer timeout). The CLI's error rows pin the
+  message of each rule, so a parser that rejects `--mode 3v3` fails them. Two
+  smoke rows play Brimwick v Ondrel at seed 1, one match a mode, to a decision.
+  One `playMatch` row plays the match of #123 (Quillon v Skerrow, 3v3, arena01,
   seed 6) and asserts that it ends in a decision, with no end tick. The same
-  project holds the fixture search's tests
-  (`tools/fixtures/*.test.ts`): the format against the committed bytes, the pure
-  search cases, the reproduction of the six roster fixtures and the CLI (see
-  [Fixture search](#fixture-search)).
+  project holds the fixture search's tests (`tools/fixtures/*.test.ts`): the
+  format against the committed bytes, the pure search cases, the reproduction of
+  the six roster fixtures and the CLI (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a

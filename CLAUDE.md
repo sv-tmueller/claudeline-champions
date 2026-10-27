@@ -39,9 +39,9 @@ npm run balance                  # bot-versus-bot win-rate report: plays 11760
                                  # that mode's rows). Seeds per config: the
                                  # largest even number at or under 200 over the
                                  # cell's fills (50 in 2v2, 16 in 3v3). Needs
-                                 # Node 22.15. The manual
-                                 # workflow .github/workflows/balance.yml runs
-                                 # --check --mode on a runner, one job per mode.
+                                 # Node 22.15. The manual workflow
+                                 # .github/workflows/balance.yml runs --check
+                                 # --mode on a runner, one job per mode.
 npm run fixtures:search -- <kit>   # rebuild a kit's scripted roster fixture; Node 22.15+
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
