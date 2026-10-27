@@ -95,6 +95,15 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
   3.7 s on the runner (job 121633905207, 779e504), timeout 10 s.
 
+Durnhal's file (#204) makes the server field a Durnhal bot on the default range
+profile in these matches and in both loopback specs, until step 1.3 of roadmap
+#176 gives him a profile. Locally the loopback file went from 3.4 to 5.8 or 6.6
+s, and the room row read 0.44 to 0.65 s. On the runner (job 122173425469 of the
+pull request, in the unit job beside the other files) the room row took 0.95 s
+and the loopback file 17.0 s, against 2.8 s and 19.8 s on main before it (job
+122125510999), so no row passed its mark and no timeout moved. The log has no
+time for a `beforeAll`.
+
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
 v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
 thinnest margin in the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on
@@ -283,9 +292,9 @@ batch 16 for Durnhal, #204):
 5. Replay `roster-fixtures.test.ts` and `roster-kits.test.ts` and then
    `reproduce.test.ts` and `format.test.ts` in a `linux/amd64` container, as
    above, and apply the timeout rule of the check suite to a reproduce row whose
-   runner time passes 2.5 s. The rows of Ondrel (attempt 2) and Brimwick
-   (attempt 10) took 1.23 and 0.84 s on the runner (0.36 and 0.32 s locally), so
-   they have no timeout of their own.
+   runner time passes 2.5 s. The rows of Ondrel (attempt 2), Brimwick (attempt
+   10) and Durnhal (attempt 2) took 1.23, 0.84 and 0.68 s on the runner (0.36,
+   0.32 and 0.28 s locally), so they have no timeout of their own.
 
 ## Playwright e2e
 
