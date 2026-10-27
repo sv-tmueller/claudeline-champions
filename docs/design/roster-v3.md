@@ -84,7 +84,7 @@ shoulder blocks. The hammer hangs from the right fist on `Arm_R`: a haft of
 by 0.14 m by 0.14 m centred at (0, -0.41, 0.33). Two numbers are fixed by the
 shared clips and are not to be changed. The head is 0.22 m long: at 0.28 m it
 reaches x -0.14 m and the `Death` clip's key 30 (on the back, `Hips` at -85
-degrees and -0.64 m) puts it 7.2 mm under the floor. The hammer sits at y
+degrees and -0.64 m) puts it 3.3 mm under the floor. The hammer sits at y
 -0.41 m: at -0.34 m its y span equals the arm's and the arm hides the head
 from overhead, and at -0.41 m it sticks out 7 cm. The pose tables stay
 shared, with no per-champion pose: `Cast` raises the shield forward, `Attack`

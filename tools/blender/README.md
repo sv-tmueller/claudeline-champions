@@ -189,7 +189,7 @@ more (the energy colour `#ffb000` is the nearest). The shield is a plate
 hangs from `Arm_R`: a haft 0.05 by 0.05 by 0.40 m and a head 0.22 by 0.14 by
 0.14 m, 7 cm outside the arm so it shows from above. The head is 0.22 m long
 and the hammer sits at y = -0.41 for two reasons: at 0.28 m the head sinks
-7 mm under the floor at Death key 30, and at y = -0.34 the arm hides it from
+3.3 mm under the floor at Death key 30, and at y = -0.34 the arm hides it from
 overhead. The model has 600 vertices and 288 triangles, a ground radius of
 0.4924 m and 39 780 bytes.
 

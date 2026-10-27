@@ -4,9 +4,9 @@ Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
     --champion placeholder --out assets/models/champions/placeholder.glb
 
 The ids are placeholder (the generic model), hargrim, quillon, lumeth, skerrow,
-ondrel, brimwick and durnhal. They share the placeholder's body and accent and differ
-only in the body colour and one silhouette cue, listed in
-tools/blender/README.md.
+ondrel, brimwick and durnhal. They share the placeholder's body and accent and
+differ only in the body colour and one cue, Durnhal's in parts on both arms,
+listed in tools/blender/README.md.
 
 The glb holds a node `Rig` with the six bones as joints and the skinned mesh
 node `Champion`. The mesh origin is at the feet and it faces +X in both Blender
