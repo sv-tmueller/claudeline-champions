@@ -2,6 +2,7 @@
 
 Status: v1 roster. All four kits are implemented as data in `data/kits/`.
 Champions five and six: [roster v2](roster-v2.md), also implemented as data in `data/kits/`.
+Champions seven to nine: [roster v3](roster-v3.md), in design.
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.5, 4.6, 6 and 10
 
 This document defines the four champions of roster v1, one per archetype: melee bruiser, ranged skillshot, healer and support, mobile assassin. The sim, the client and the bots implement these kits. Arena layouts and match rules are covered elsewhere.
