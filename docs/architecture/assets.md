@@ -95,10 +95,11 @@ The commands and file list are in `tools/blender/README.md`.
   model is about 1.7 m tall.
 - Flat colours only. Every champion model is rigged and has six clips, which
   the client plays through its own sampler ([client](client.md#animation)).
-- Each of the six roster ids has `champions/<id>.glb` with the placeholder's
+- Each of the seven roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
-  in body colour and one silhouette cue that stays below 1.9 m. The client
-  registers and loads all six (batch #177, package C).
+  in body colour and one cue that stays below 1.9 m, Durnhal's in parts on
+  both arms. The client registers and loads six of them (batch #177, package
+  C); Durnhal's file waits for step 1.3 of the roster v3 build order.
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours and cues are in
   [`tools/blender/README.md`](../../tools/blender/README.md).
@@ -114,7 +115,7 @@ The commands and file list are in `tools/blender/README.md`.
 
 ### Rig
 
-One rig for all seven models, in Blender coordinates (Z up). Every bone has
+One rig for all eight models, in Blender coordinates (Z up). Every bone has
 roll 0 and is not connected to its parent. L is +Y, the champion's left when
 it faces +X. The validator checks the names and the parents.
 
@@ -122,8 +123,8 @@ it faces +X. The validator checks the names and the parents.
 |------|--------|------|------|-----------------------------|
 | `Hips` | node `Rig` | (0, 0, 0.80) | (0, 0, 0.90) | nothing; the root that moves the whole body |
 | `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap |
-| `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box |
-| `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade |
+| `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box, Durnhal's shield |
+| `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade, Durnhal's hammer |
 | `Leg_L` | `Hips` | (0, 0.12, 0.80) | (0, 0.12, 0.00) | the left leg box |
 | `Leg_R` | `Hips` | (0, -0.12, 0.80) | (0, -0.12, 0.00) | the right leg box |
 
@@ -192,9 +193,10 @@ In the Channels column a bare bone name means that bone's rotation.
   client holds the last frame.
 - The cue meshes ride the bones that move them: Hargrim's shoulder blocks,
   Lumeth's halo, Ondrel's reed bundle and Brimwick's fuse cap on `Spine` (the
-  `Attack` yaw, the `Hit` lean) and Quillon's staff and Skerrow's blade on
-  `Arm_R` (the `Attack` swing, the `Hit` lift). All clips are shared, with no
-  per-champion poses.
+  `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's blade and Durnhal's
+  hammer on `Arm_R` (the `Attack` swing, the `Hit` lift) and Durnhal's shield
+  on `Arm_L` (the `Cast` raise). All clips are shared, with no per-champion
+  poses.
 
 ### Export
 
