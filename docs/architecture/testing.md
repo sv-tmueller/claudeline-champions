@@ -97,12 +97,15 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
 
 Durnhal's file (#204) makes the server field a Durnhal bot on the default range
 profile in these matches and in both loopback specs, until step 1.3 of roadmap
-#176 gives him a profile. Locally the loopback file went from 3.4 to 5.8 or 6.6
-s, and the room row read 0.44 to 0.65 s. On the runner (job 122173425469 of the
-pull request, in the unit job beside the other files) the room row took 0.95 s
-and the loopback file 17.0 s, against 2.8 s and 19.8 s on main before it (job
-122125510999), so no row passed its mark and no timeout moved. The log has no
-time for a `beforeAll`.
+#176 gives him a profile. The loopback `beforeAll` is the row that moved: timed
+around its body on one machine, the 2v2 hook went from 1.1 s to 1.5 to 1.7 s
+and the 3v3 hook from 2.5 to 3.1 s to 4.8 to 5.1 s. With the runner-to-local
+ratio the header of `loopback.test.ts` uses (4.5 s over 2.7 s) the 3v3 hook is
+about 8.3 s on the runner, over the 7.5 s mark of the 15 s timeout, so by the
+rule its timeout is 20 s (the file took 17.0 s in job 122173425469, rows about
+4.1 s, so the two hooks took up to 12.9 s there; the log has no time for a
+`beforeAll`). The room rows stay under their marks: "keeps the settings and the
+choices" took 0.44 s locally and 0.95 s on that runner.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
 v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
