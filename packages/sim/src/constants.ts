@@ -10,6 +10,9 @@ export const STUN_CAP_TICKS = 120;
 /** Caps on the summed percents of slow and haste over all sources. */
 export const SLOW_CAP_PERCENT = 70;
 export const HASTE_CAP_PERCENT = 50;
+/** Wound: the percent of healing cut per stack, and the most stacks one champion holds. */
+export const WOUND_PERCENT_PER_STACK = 10;
+export const WOUND_MAX_STACKS = 3;
 /** The most push, in meters, that all knockbacks on one champion may hold at once. */
 export const KNOCKBACK_CAP_METERS = 6;
 /** Ticks between the pulses of damage over time and heal over time. */

@@ -25,6 +25,8 @@ import {
   SUDDEN_DEATH_TICKS,
   ULTIMATE_ENERGY_COST,
   WARMUP_TICKS,
+  WOUND_MAX_STACKS,
+  WOUND_PERCENT_PER_STACK,
 } from '../src/index';
 
 describe('status and motion constants', () => {
@@ -32,6 +34,8 @@ describe('status and motion constants', () => {
     expect(STUN_CAP_TICKS).toBe(120);
     expect(SLOW_CAP_PERCENT).toBe(70);
     expect(HASTE_CAP_PERCENT).toBe(50);
+    expect(WOUND_PERCENT_PER_STACK).toBe(10);
+    expect(WOUND_MAX_STACKS).toBe(3);
     expect(KNOCKBACK_CAP_METERS).toBe(6);
     expect(STATUS_PULSE_TICKS).toBe(30);
     expect(MOTION_SUBSTEP_METERS).toBe(0.25);

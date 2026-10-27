@@ -6,6 +6,7 @@ import {
   SLOW_CAP_PERCENT,
   STATUS_PULSE_TICKS,
   STUN_CAP_TICKS,
+  WOUND_MAX_STACKS,
 } from './constants';
 import { direction } from './geometry';
 import { SLOTS } from './input';
@@ -86,6 +87,15 @@ export function copyStatusSpec(spec: StatusSpec, reject: (problem: string) => ne
       const { perPulse } = spec as { perPulse: unknown };
       if (!isMagnitude(perPulse)) return reject(`perPulse ${String(perPulse)} ${MAGNITUDE_PROBLEM}`);
       return { type, perPulse, ticks };
+    }
+    case 'wound': {
+      const { stacks } = spec as { stacks?: unknown };
+      // No stacks key means one stack; the copy keeps the key out, as checksum rejects undefined.
+      if (stacks === undefined) return { type, ticks };
+      if (typeof stacks !== 'number' || !Number.isInteger(stacks) || stacks < 1 || stacks > WOUND_MAX_STACKS) {
+        return reject(`stacks ${String(stacks)} is not an integer from 1 to ${WOUND_MAX_STACKS}`);
+      }
+      return { type, ticks, stacks };
     }
     default:
       return reject(`unknown status type ${String(type)}`);
@@ -168,6 +178,7 @@ export function isBlockedByInvulnerable(type: StatusType): boolean {
     type === 'root' ||
     type === 'silence' ||
     type === 'slow' ||
+    type === 'wound' ||
     type === 'dot'
   );
 }
@@ -176,8 +187,9 @@ export function isBlockedByInvulnerable(type: StatusType): boolean {
  * Applies a status to a champion and returns whether anything changed. A stun that lands also
  * cancels the dash and the windup the champion has, in that order. Rules per type are in
  * the Statuses section of simulation.md. Returns false, with no event, for a dead target, for
- * a hostile status on an invulnerable one and for a stun, root, silence or invulnerable that
- * does not outlast the one already running. Throws `Invalid status: ...` for an unknown target
+ * a hostile status on an invulnerable one, for a stun, root, silence or invulnerable that
+ * does not outlast the one already running and for a wound that changes neither the stacks nor
+ * the timer. Throws `Invalid status: ...` for an unknown target
  * or source or a bad spec, even when the target is dead.
  */
 export function applyStatus(
@@ -218,6 +230,21 @@ export function applyStatus(
       const old = target.statuses.find((s) => s.type === type && sameSource(s, from));
       if (old) endStatus(state, target, old, 'replaced');
       addStatus(state, target, { ...base, type, percent: checked.percent });
+      return true;
+    }
+    case 'wound': {
+      // Stacks add from every source, the same one included: one instance, one timer.
+      const old = target.statuses.find((s) => s.type === 'wound');
+      const added = checked.stacks ?? 1;
+      let stacks = Math.min(WOUND_MAX_STACKS, added);
+      let remainingTicks = checked.ticks;
+      if (old && old.type === 'wound') {
+        stacks = Math.min(WOUND_MAX_STACKS, old.stacks + added);
+        remainingTicks = Math.max(old.remainingTicks, checked.ticks);
+        if (stacks === old.stacks && remainingTicks === old.remainingTicks) return false;
+        endStatus(state, target, old, 'replaced');
+      }
+      addStatus(state, target, { ...from, type: 'wound', remainingTicks, stacks });
       return true;
     }
     case 'dot':
