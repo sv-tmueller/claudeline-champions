@@ -138,7 +138,7 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
   seed 6) and asserts that it ends in a decision, with no end tick. The same
   project holds the fixture search's tests (`tools/fixtures/*.test.ts`): the
   format against the committed bytes, the pure search cases, the reproduction of
-  the six roster fixtures and the CLI (see [Fixture search](#fixture-search)).
+  the seven roster fixtures and the CLI (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a
@@ -182,8 +182,9 @@ and budget-hit lines only. It needs Node 22.15 or later, for
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
 `npm run check`: a full run plays 11 760 matches and takes about 14 minutes on
 Apple silicon. It plays the six kits of `HARNESS_KITS` in
-`tools/balance/inputs.ts` (the six files of `data/kits`, so a kit added to the
-directory joins the report by being listed there).
+`tools/balance/inputs.ts` (six of the seven files of `data/kits`, so a kit added
+to the directory joins the report by being listed there; Durnhal's file is not
+until step 1.3).
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
@@ -229,14 +230,15 @@ What it does:
   every platform: no `Math.hypot` and no transcendental function. The tools lint
   does not ban them, so review enforces it.
 
-`tools/fixtures/reproduce.test.ts` runs the search on the six committed
+`tools/fixtures/reproduce.test.ts` runs the search on the seven committed
 fixtures and compares the bytes: Hargrim's attempt 1, Quillon's attempt 23,
-Ondrel's attempt 2 and Brimwick's attempt 10 on the current kits, and Skerrow's
-attempt 6 and Lumeth's attempt 2 on the kits they were searched on (the Rend
-damage 20 and the Binding Sigil radius 1.5 put back in memory, as #125 changed
-those numbers and regenerated only the checkpoints), with the checkpoints of
-the current kits. Each row of the test names the kit numbers it is pinned on,
-with the change that moved them. It runs on the CI unit job, on Linux x86,
+Ondrel's attempt 2, Brimwick's attempt 10 and Durnhal's attempt 2 on the current
+kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
+searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put back in
+memory, as #125 changed those numbers and regenerated only the checkpoints),
+with the checkpoints of the current kits. Each row of the test names the kit
+numbers it is pinned on, with the change that moved them. It runs on the CI
+unit job, on Linux x86,
 which is the cross-platform proof of the tool. The record is in the header of
 `roster-fixtures.test.ts`.
 
@@ -263,7 +265,8 @@ failed pre-check (decision 13 of batch #134):
   Skerrow on 2 and Lumeth on 5, and Lumeth on 6 after #191, whose self-cast
   rule moved only her checkpoints and checksum).
 
-A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148):
+A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148, and
+batch 16 for Durnhal, #204):
 
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the

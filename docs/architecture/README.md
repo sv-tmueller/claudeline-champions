@@ -85,7 +85,8 @@ first.
   `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
-  profiles since #165); models for the six roster ids and the placeholder, each
+  profiles since #165); Durnhal's kit as data (#204), with no bot profile and
+  no model yet; models for the six roster ids and the placeholder, each
   rigged, with six clips (the client registers and plays all six roster ids).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
@@ -97,15 +98,15 @@ first.
   `--mode 2v2|3v3` plays and checks one mode, which the manual workflow runs as
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
-  22.15 or later. It plays the six kits of `data/kits`, the `HARNESS_KITS` of
-  `tools/balance/inputs.ts`: 60 cells and 11 760 matches, about 14 minutes on
-  Apple silicon (the report of batch 15, #189).
+  22.15 or later. It plays six of the seven kits of `data/kits`, the
+  `HARNESS_KITS` of `tools/balance/inputs.ts`: 60 cells and 11 760 matches,
+  about 14 minutes on Apple silicon (the report of batch 15, #189).
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test
   requires, and writes that kit's fixture in the committed layout; it shares
   the format, the replay, the coverage and the oracle with the test through
-  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the six committed
+  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the seven committed
   fixtures byte for byte (see [Testing](testing.md#fixture-search)). It needs
   Node 22.15 or later.
 - `protocol`: the message types of the online design, `PROTOCOL_VERSION`, three

@@ -71,6 +71,37 @@ nothing is copied here but the two catalog numbers the kit leans on.
 
 - **Strength:** 10 percent less healing per stack `[tuned]`.
 - **Duration:** 120 to 300 ticks per application in the catalog `[tuned]`.
-  The table gives 240 ticks for M1; the tank series of roadmap
-  [#176](https://github.com/sv-tmueller/claudeline-champions/issues/176)
-  fixes the other applications, at the latest in step 1.2, the kit as data.
+  The table gives 240 ticks for M1. The other applications are 240 ticks for
+  M2, E and their EX variants, and 300 ticks for F `[tuned]` (#204, the kit as
+  data). A holder has one wound timer, and each application sets it to the
+  longer of what is left and the new duration. Below 240, a skill hit would
+  never move a timer that M1 refreshes, so its duration would mean nothing
+  whenever M1 is in play; above 240, the skill hits would own the timer. So
+  the landed hits take the one value the table gives for a landed hit, and F
+  takes the catalog maximum: its 3-stack cut outlasts its own slow (120
+  ticks) and shield (240 ticks).
+
+**Kit data (built).** `data/kits/durnhal.json`, one file named after his id,
+built by #204 under roster-v1 section 0, with a scripted fixture
+(`scripted-roster-durnhal-arena01-2v2.json`, seed 5561). The conversions are
+ticks = seconds x 60, one hit = `durationTicks` 1 and `intervalTicks` 1, the
+100 degree arc = `cosHalfAngle` 0.6427876097, and the 9 m throw = 30 ticks at
+18 m/s. The table leaves these numbers open, each `[tuned]` and chosen by the
+precedent of a kit that has the same shape:
+
+- M1 windup 9 ticks, slowed (Hargrim's Maul Swing).
+- SPACE windup 0, free, like every SPACE; the dash is 5 m in 15 ticks
+  (Hargrim's Rush), and the end push is 2 m in 8 ticks, `away` (Lumeth's
+  Lantern Burst).
+- Q windup 18 ticks, slowed (Ondrel's Reed Fence, the same circle).
+- E windup 18 ticks, slowed (Quillon's Bind Shot), projectile radius 0.4
+  (Hargrim's Chain Hook), lifetime 30 ticks.
+- R windup 0, free, like every R.
+- The EX variants copy the windup and the movement of their base.
+
+The effects are listed in the order the table names them: damage first, then
+the statuses (wound, then slow). F lists the area first and then the shield on
+him.
+A number changes in the file, here and in the scripted fixture in the same
+change. Durnhal is not in the balance harness roster until step 1.3, and the
+server fields a bot of his on the default range profile until then.
