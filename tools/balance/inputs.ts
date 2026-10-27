@@ -4,11 +4,11 @@ import { parseArenaDef } from '@claudeline/sim';
 import type { ArenaDef, KitDef } from '@claudeline/sim';
 
 /**
- * The kits the harness plays: the four v1 kits. data/kits holds more (Ondrel and Brimwick are data
- * but not in the harness roster until the six-kit report), so this list, not the directory, fixes the
- * run, the committed block and the CI times.
+ * The kits the harness plays: the six kits of data/kits, in file name order (loadInputs returns them in
+ * that order, and inputs.test.ts pins it). The list, not the directory, fixes the run, the committed
+ * block and the CI times, so a kit added to data/kits joins the report only when it is listed here.
  */
-export const HARNESS_KITS: readonly string[] = ['hargrim', 'lumeth', 'quillon', 'skerrow'];
+export const HARNESS_KITS: readonly string[] = ['brimwick', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow'];
 
 /** What a run plays on and with: the HARNESS_KITS of data/kits and every arena of data/arenas, in file name order. */
 export interface Inputs {

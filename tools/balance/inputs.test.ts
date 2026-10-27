@@ -8,8 +8,8 @@ import { HARNESS_KITS, loadInputs } from './inputs.ts';
 const ROOT = new URL('../../', import.meta.url);
 
 describe('the harness roster', () => {
-  it('plays the four v1 kits, whatever else data/kits holds', () => {
-    expect(HARNESS_KITS).toEqual(['hargrim', 'lumeth', 'quillon', 'skerrow']);
+  it('plays the six kits of data/kits, in file order', () => {
+    expect(HARNESS_KITS).toEqual(['brimwick', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
     const files = readdirSync(fileURLToPath(new URL('data/kits/', ROOT))).filter((n) => n.endsWith('.json'));
     expect(files).toHaveLength(6);
     for (const id of HARNESS_KITS) expect(files).toContain(`${id}.json`);
@@ -25,7 +25,7 @@ describe('the harness roster', () => {
         cpSync(fileURLToPath(new URL(`data/kits/${id}.json`, ROOT)), join(dir, 'data', 'kits', `${id}.json`));
       }
       const root = pathToFileURL(`${dir}/`);
-      expect(() => loadInputs(root)).toThrow(new Error('the harness kit skerrow has no file in data/kits'));
+      expect(() => loadInputs(root)).toThrow(new Error('the harness kit ondrel has no file in data/kits'));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
