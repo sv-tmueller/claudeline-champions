@@ -8,10 +8,11 @@ import { HARNESS_KITS, loadInputs } from './inputs.ts';
 const ROOT = new URL('../../', import.meta.url);
 
 describe('the harness roster', () => {
-  it('plays the six kits of data/kits, in file order', () => {
+  it('plays six of the seven kits of data/kits, in file order', () => {
     expect(HARNESS_KITS).toEqual(['brimwick', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
     const files = readdirSync(fileURLToPath(new URL('data/kits/', ROOT))).filter((n) => n.endsWith('.json'));
-    expect(files).toHaveLength(6);
+    expect(files).toHaveLength(7);
+    expect(files).toContain('durnhal.json');
     for (const id of HARNESS_KITS) expect(files).toContain(`${id}.json`);
     expect(loadInputs(ROOT).kits.map((kit) => kit.id)).toEqual([...HARNESS_KITS]);
   });

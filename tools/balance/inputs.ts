@@ -4,9 +4,10 @@ import { parseArenaDef } from '@claudeline/sim';
 import type { ArenaDef, KitDef } from '@claudeline/sim';
 
 /**
- * The kits the harness plays: the six kits of data/kits, in file name order (loadInputs returns them in
- * that order, and inputs.test.ts pins it). The list, not the directory, fixes the run, the committed
- * block and the CI times, so a kit added to data/kits joins the report only when it is listed here.
+ * The kits the harness plays: six of the seven kits of data/kits, in file name order (loadInputs returns
+ * them in that order, and inputs.test.ts pins it). The list, not the directory, fixes the run, the
+ * committed block and the CI times, so a kit added to data/kits joins the report only when it is listed
+ * here: Durnhal's file is not, until step 1.3 of the roster-v3 build order.
  */
 export const HARNESS_KITS: readonly string[] = ['brimwick', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow'];
 
