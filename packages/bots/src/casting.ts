@@ -125,6 +125,14 @@ export interface KitCache {
    */
   baseDash: Uint8Array;
   exDash: Uint8Array;
+  /**
+   * 1 when the base ability of the slot has a melee arc as its first effect, and the same for the
+   * EX variant (set whenever the variant exists, as `exDash` is). The sim's arc ignores obstacles,
+   * so the press of such an ability gets no clear-shot test (see `updateRuns`); an arc after a dash
+   * or a teleport is not one, since the dash stops at an obstacle and the teleport needs a sight.
+   */
+  baseMelee: Uint8Array;
+  exMelee: Uint8Array;
   /** The slots of the escape rule in priority order, as indices into SLOTS, ended by -1. */
   escapeOrder: Int8Array;
   /** 1 when the slot is in `escapeOrder`. */
@@ -250,6 +258,8 @@ export function createKitCache(): KitCache {
     waitBand: new Float64Array(3),
     baseDash: new Uint8Array(SLOTS.length),
     exDash: new Uint8Array(SLOTS.length),
+    baseMelee: new Uint8Array(SLOTS.length),
+    exMelee: new Uint8Array(SLOTS.length),
     escapeOrder: new Int8Array(SLOTS.length).fill(-1),
     isEscape: new Uint8Array(SLOTS.length),
     escapeRange: new Float64Array(SLOTS.length),
@@ -290,6 +300,8 @@ export function refreshKitCache(
     cache.needsNearAlly[i] = 0;
     cache.baseDash[i] = 0;
     cache.exDash[i] = 0;
+    cache.baseMelee[i] = 0;
+    cache.exMelee[i] = 0;
     cache.isEscape[i] = 0;
     cache.escapeRange[i] = 0;
     cache.escapeFixed[i] = 0;
@@ -309,9 +321,11 @@ export function refreshKitCache(
     }
     cache.baseClearance[i] = clearanceOf(spec);
     cache.baseDash[i] = startsWithDash(spec) ? 1 : 0;
+    cache.baseMelee[i] = startsWithMeleeArc(spec) ? 1 : 0;
     const variant = spec.ex;
     if (variant !== undefined && slot !== 'F' && kit.ex.includes(slot)) {
       cache.exDash[i] = startsWithDash(variant) ? 1 : 0;
+      cache.exMelee[i] = startsWithMeleeArc(variant) ? 1 : 0;
       const band = abilityReach(variant);
       if (band !== null) {
         cache.hasEx[i] = 1;
@@ -457,6 +471,11 @@ export function dashBand(spec: AbilitySpec): readonly [number, number] | null {
 function startsWithDash(spec: AbilitySpec): boolean {
   const first = spec.effects[0];
   return first !== undefined && first.type === 'dash';
+}
+
+function startsWithMeleeArc(spec: AbilitySpec): boolean {
+  const first = spec.effects[0];
+  return first !== undefined && first.type === 'meleeArc';
 }
 
 export function hasStatus(me: ChampionState, type: StatusType): boolean {
@@ -619,7 +638,8 @@ export function computeCues(
 
 /**
  * The width of the shot of an ability: the radius of its first top-level projectile, or the
- * champion radius when it has none.
+ * champion radius when it has none. An ability whose first effect is a melee arc is tested with no
+ * width at all (`KitCache.baseMelee`): the sim's arc ignores obstacles.
  */
 export function clearanceOf(spec: AbilitySpec): number {
   for (let i = 0; i < spec.effects.length; i++) {
@@ -671,8 +691,9 @@ function allyForSlot(
 
 /**
  * Counts, per slot, the consecutive thinks on which the target was inside the band of the ability
- * the slot would cast, with a clear shot of that ability's width, this think included. Anything
- * else puts the count back to 0. It ignores cooldown, energy, status and windup, so a slot that
+ * the slot would cast, with a clear shot of that ability's width (none for an ability whose first
+ * effect is a melee arc, which ignores obstacles), this think included. Anything else puts the
+ * count back to 0. It ignores cooldown, energy, status and windup, so a slot that
  * comes off cooldown while the target stays in reach is pressed on the first tick the sim would
  * cast it. Allocates nothing: the bands come from the cache and the shot uses `scratch`.
  *
@@ -706,11 +727,14 @@ export function updateRuns(
     }
     const ex = exFor(cache, i, me, cues);
     let inBand = false;
+    let melee = false;
     if (ex) {
+      melee = cache.exMelee[i] === 1;
       // `inReach` of the EX band, written out over the typed arrays.
       inBand = (cache.exMin[i] as number) <= d && d <= (cache.exMax[i] as number) - RANGE_MARGIN;
       scratch.clearance = cache.exClearance[i] as number;
     } else {
+      melee = cache.baseMelee[i] === 1;
       if (cache.hasOpen[i] === 1) {
         inBand = (cache.openMin[i] as number) <= d && d <= (cache.openMax[i] as number);
       } else if (cache.hasBase[i] === 1) {
@@ -728,7 +752,7 @@ export function updateRuns(
       if (cache.needsNearAlly[i] === 1 && !cues.nearAlly) inBand = false;
       if (i === F_INDEX && !cues.fOk) inBand = false;
     }
-    runs[i] = inBand && clearShotWith(state, me, target, scratch) ? (runs[i] as number) + 1 : 0;
+    runs[i] = inBand && (melee || clearShotWith(state, me, target, scratch)) ? (runs[i] as number) + 1 : 0;
   }
 }
 

@@ -104,6 +104,11 @@ import { spawnBolt } from './scenes';
  * dodge scene in the threat scan of `dodgeInto` (per projectile: two bolts in the scene) on Node 22
  * and Node 26, and 120 in the sidestep (per think), which is under the bound in the default tiers
  * and over the Maglev one. A double argument to `dodgeInto` reads 16.
+ * The same object (six doubles) kept in a module variable at the melee branch of `updateRuns` (#186,
+ * the press that gets no clear-shot test) reads 168 in the engage stand scene (Hargrim 1.5 m from
+ * Hargrim, M1 in its band on every think), and also 168 in skerrow engage and 336 in skerrow wait,
+ * on Node 22 and Node 26, in both tiers: a scene that already exists reaches the branch, so the
+ * branch needs none of its own.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *

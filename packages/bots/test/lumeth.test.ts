@@ -49,9 +49,9 @@ const ROWS: Row[] = [
     arena: arena01,
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
-    endTick: 6623,
+    endTick: 5081,
     round: 1700,
-    budget: 18_000,
+    budget: 16_000,
   },
   {
     name: 'a 2v2 on arena02',
