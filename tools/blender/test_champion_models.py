@@ -732,19 +732,20 @@ class CueTests(unittest.TestCase):
 
     def test_every_box_corner_is_three_cue_vertices_on_the_boxs_bone_at_weight_1(self):
         for champion, boxes in CUE_BOXES.items():
-            cue, _ = self.cue_vertices(champion)
-            for bone, centre, size in boxes:
-                for corner in box_corners(centre, size):
-                    with self.subTest(champion=champion, bone=bone, corner=corner):
-                        here = [
-                            v
-                            for v in cue
-                            if all(abs(v[0][axis] - corner[axis]) <= CUE_TOLERANCE for axis in range(3))
-                        ]
-                        self.assertEqual(len(here), 3)
-                        for _, joint, weight in here:
-                            self.assertEqual(joint, bone)
-                            self.assertAlmostEqual(weight, 1.0, delta=WEIGHT_TOLERANCE)
+            with self.subTest(champion=champion):
+                cue, _ = self.cue_vertices(champion)
+                for bone, centre, size in boxes:
+                    for corner in box_corners(centre, size):
+                        with self.subTest(champion=champion, bone=bone, corner=corner):
+                            here = [
+                                v
+                                for v in cue
+                                if all(abs(v[0][axis] - corner[axis]) <= CUE_TOLERANCE for axis in range(3))
+                            ]
+                            self.assertEqual(len(here), 3)
+                            for _, joint, weight in here:
+                                self.assertEqual(joint, bone)
+                                self.assertAlmostEqual(weight, 1.0, delta=WEIGHT_TOLERANCE)
 
     def test_the_accent_is_the_placeholders(self):
         placeholder_doc, placeholder_bin = self.placeholder
