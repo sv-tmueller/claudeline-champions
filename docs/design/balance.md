@@ -176,9 +176,9 @@ band, 1561.3 points (883.9 and 677.4) and Brimwick 52.3, Hargrim 11.4, Lumeth
 89.1, Ondrel 60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in section
 5.10. The four-kit report that the six-kit report replaced is the block
 regenerated after the dodge of #137, and nothing between it and #189 moved a
-four-kit cell: #155, #165, #191 and #158 landed after it, and PR #185 and PR #196
-each reproduced that block with `--check` on main (PR #196 after #191, #158 and
-#162). Its 24 cells moved because Ondrel and Brimwick are new fills (section
+four-kit cell: #155, #165, #191 and #158 landed after it, and PR #185 and PR
+#196 each reproduced that block with `--check` on main (PR #196 after #191, #158
+and #162). Its 24 cells moved because Ondrel and Brimwick are new fills (section
 5.9).
 
 What follows, up to the block, is the history of the four-kit report that this
@@ -765,17 +765,18 @@ the machine).
 
 **The block against the block of #189.** Cells in band: 7 of 60 (8). One cell
 leaves the band: 3v3 on arena02, Brimwick v Ondrel, 40.6 to 38.5, 1.5 points
-outside it, within the noise of section 3 (Hargrim and Skerrow are among its fills
-and it has no Hargrim or Skerrow as X or Y). The 36 new cells have 4 in band (5) and the 24 four-kit cells 3
-(3). The summed distance falls from 1561.3 to 1552.9 points (883.9 to 882.7 in
-the new cells, 677.4 to 670.2 in the four-kit cells). 33 of the 60 rates move:
-18 of the 36 cells where Hargrim or Skerrow is X or Y and 15 of the other 24,
-where the two are fill. Two cells move more than 4 points, both 3v3 on arena02
-with Skerrow: Brimwick v Skerrow 88.5 to 82.8 and Quillon v Skerrow 95.3 to
-90.6; the other 31 move by 2.6 points or less, and no cell moves past the 7
-points of the noise. No match hit the budget. Per champion over all of its
-cells: Brimwick 52.3 to 51.9, Hargrim 11.4 to 11.7, Lumeth 89.1 to 89.3, Ondrel
-60.1 to 60.2, Quillon 73.3 to 73.0 and Skerrow 13.7 to 13.9.
+outside it, within the noise of section 3 (Hargrim and Skerrow are among its
+fills and it has no Hargrim or Skerrow as X or Y). The 36 new cells have 4 in
+band (5) and the 24 four-kit cells 3 (3). The summed distance falls from 1561.3
+to 1552.9 points (883.9 to 882.7 in the new cells, 677.4 to 670.2 in the
+four-kit cells). 33 of the 60 rates move: 18 of the 36 cells where Hargrim or
+Skerrow is X or Y and 15 of the other 24, where the two are fill. Two cells move
+more than 4 points, both 3v3 on arena02 with Skerrow: Brimwick v Skerrow 88.5 to
+82.8 and Quillon v Skerrow 95.3 to 90.6; the other 31 move by 2.6 points or
+less, and no cell moves past the 7 points of the noise. No match hit the budget.
+Per champion over all of its cells: Brimwick 52.3 to 51.9, Hargrim 11.4 to 11.7,
+Lumeth 89.1 to 89.3, Ondrel 60.1 to 60.2, Quillon 73.3 to 73.0 and Skerrow 13.7
+to 13.9.
 
 **The answer to the open question of 5.9.** Do the refused melee presses
 explain the low standing of Hargrim (11.4) and Skerrow (13.7)? No. Over the 36
