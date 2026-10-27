@@ -167,7 +167,8 @@ strength field of that type), `shield { absorb, ticks }`, `knockback
 in list order to each champion it lands on, with the owner as the source and
 the slot of the cast that made it, or no slot for a dev tool spawn. A
 projectile with `allyEffects` applies that list to a champion of the owner's team
-(never the owner) and `effects` to a champion of the other team; both lists hold
+(never the owner while it flies; a cast aimed at the caster applies it to her, see
+Firing) and `effects` to a champion of the other team; both lists hold
 the `Effect` union, and a `damage` in `allyEffects` is allowed and earns no
 energy. `away`
 points from the hit origin (the projectile contact point, the area centre, the
@@ -274,7 +275,8 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   `hitIds`, using the reach `0.5 + radius`. It never hits its owner. A champion
   of the other team is a candidate unless the projectile is ally-only (it has
   `allyEffects` and an empty `effects`); a champion of the owner's team is a
-  candidate only when the projectile has `allyEffects`. A projectile without
+  candidate only when the projectile has `allyEffects`. (A cast aimed at the
+  caster spawns no projectile at all, see Firing.) A projectile without
   `allyEffects` therefore never hits an ally, and an empty `effects` without
   `allyEffects` (a dev spawn) still stops at the first enemy. A champion it
   already overlaps at spawn is hit at t = 0, ally or enemy. A cast projectile
@@ -627,6 +629,17 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
   teleport followed by an arc swings where the teleport arrives. An effect
   listed after a dash still acts at the dash start; `then` is how an effect
   acts at the dash end.
+- The self-cast rule (rules.md section 2.5) has three readings the rules leave
+  open. The caster's circle is inclusive: the squared distance from the caster
+  to the aim point is compared with `CHAMPION_RADIUS` squared with `<=`, as the
+  area, arc and ring tests do. A projectile fired from a dash's `then` follows
+  the rule too, with the aim of the tick the dash ends. The rounding order is
+  the self factor first, then the wound cut inside the heal path: a heal of
+  `amount` gives `amount * 60 / 100`, which a wound then cuts by
+  `(100 - 10 * stacks) / 100`. In exact arithmetic this is the same as 60
+  percent of the wound-reduced amount, and in doubles the two orders differ in
+  the last bit for some amounts; both are deterministic, and this one is the
+  one the sim does.
 - The `then` effects of a dash take the dash direction and the aim of the tick
   the dash ends: a placement `aim` goes the dash direction for the smaller of
   the range and the distance to that aim.
@@ -705,7 +718,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 
 | Effect | Fields | What it does |
 | --- | --- | --- |
-| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner), `effects` on the other team |
+| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner in flight; aimed within the caster's own circle, nothing spawns and they land on her at 60 percent heal, see Firing), `effects` on the other team |
 | `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects` | spawns an area; `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
 | `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
@@ -795,6 +808,18 @@ it still act at the start point, and `then` is how an effect acts at the dash
 end. When a dash ends `complete`, `blocked` or `rooted`, `step` fires its `then`
 effects from the champion's position then, along the dash direction, with that
 tick's aim.
+
+A projectile with `allyEffects` whose stored aim lies within the caster's own
+circle (distance at most `CHAMPION_RADIUS` from where she stands when the effect
+runs) is a self-cast: it spawns nothing, and `applyEffects` lands the ally effects
+on the caster at once, with source and target both her. A `heal` and each pulse
+of a `hot` give `SELF_CAST_HEAL_PERCENT` (60) percent of their amount, computed
+as `amount * 60 / 100` (the stored `perPulse` is the reduced value); a shield, a
+haste and every other effect land in full. No energy is paid (`landHit` is not
+involved, so `energyGain` is skipped and nothing is credited), a knockback gets
+a zero vector and does nothing, and a `damage` lands on her unless she is
+invulnerable. The events are `castFired`, then the ally effects' own events
+(`heal`, `statusApplied`), with no projectile event.
 
 ### Energy
 

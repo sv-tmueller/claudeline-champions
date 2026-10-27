@@ -35,7 +35,8 @@ first.
 
 - `sim`: the 60 Hz step with movement and collision; the effects toolkit
   (projectiles, areas, melee arcs, statuses, forced motion), with projectile
-  ally effects since #69; kits with casting, cooldowns, windups and energy;
+  ally effects since #69 and the self-cast rule (an ally projectile aimed at
+  its caster lands on her at 60 percent heal) since #191; kits with casting, cooldowns, windups and energy;
   match flow with rounds and the sudden-death ring, opt-in through
   `roundsToWin`; angles through `dmath.ts`; the sweep's heap check in
   `packages/sim/test/allocation.test.ts`.
