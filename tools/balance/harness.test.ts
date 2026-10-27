@@ -32,6 +32,10 @@ import { loadInputs } from './inputs.ts';
 
 const DATA = loadInputs(new URL('../../', import.meta.url));
 const KIT_IDS = DATA.kits.map((kit) => kit.id);
+// The runs below play the four v1 kits whatever HARNESS_KITS holds, so their cost does not grow when
+// the roster does (the six-kit shape is the cell plan test, which plays nothing).
+const V1_IDS = ['hargrim', 'lumeth', 'quillon', 'skerrow'];
+const V1 = { kits: DATA.kits.filter((kit) => V1_IDS.includes(kit.id)), arenas: DATA.arenas };
 function arenaOf(id: string): ArenaDef {
   const arena = DATA.arenas.find((a) => a.id === id);
   if (arena === undefined) throw new Error(`no arena ${id}`);
@@ -492,8 +496,8 @@ describe('a run', () => {
   // time is 124.8 s, so 150 s (testing.md, Check suite; it was 120 s).
   it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 150_000 }, () => {
     const run = () => {
-      const cells = playCells(DATA, TWO);
-      return { cells, text: renderReport({ head: 'abc1234', seeds: TWO, kitIds: KIT_IDS, cells }) };
+      const cells = playCells(V1, TWO);
+      return { cells, text: renderReport({ head: 'abc1234', seeds: TWO, kitIds: V1_IDS, cells }) };
     };
     const first = run();
     const second = run();
@@ -519,8 +523,10 @@ describe('a run', () => {
 });
 
 describe('a run of one mode', () => {
-  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 60_000 }, () => {
-    const cells = playCells(DATA, { '2v2': 1 });
+  // 24 matches: 1.8 s locally (Apple M5 Pro, Node 22.23.2), 2.7 s on the runner (ubuntu-latest, Node 22).
+  // Timeout: twice the runner time is 5.4 s, so 10 s (testing.md, Check suite).
+  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 10_000 }, () => {
+    const cells = playCells(V1, { '2v2': 1 });
     // 6 pairings on 2 arenas; one seed on each of the 2 fills.
     expect(cells).toHaveLength(12);
     expect(cells.every((c) => c.mode === '2v2' && c.played.length === 2)).toBe(true);

@@ -21,6 +21,9 @@ function balance(...args: string[]) {
 }
 
 describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
+  // 24 matches in a spawned process: 1.5 s locally (Apple M5 Pro, Node 22.23.2). The 60 s is the timeout
+  // of the 48-match row this one replaced, kept: it reads HARNESS_KITS, so #189 re-times it at six kits
+  // (120 matches) and applies the rule of testing.md, Check suite.
   it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 60_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), 'balance-'));
     try {
@@ -41,6 +44,9 @@ describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
     }
   });
 
+  // 24 matches: 2.4 s locally, 5.3 s on the runner (ubuntu-latest, Node 22; unit job 122044371924). Twice
+  // the runner time would be 11 s; the 60 s is kept as above, and at six kits it plays 360 matches (about
+  // 32 s locally), so #189 re-times it or replaces the row.
   it('writes the block of a 1-seed 3v3 run to --out: 3v3 rows and no 2v2 row', { timeout: 60_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), 'balance-'));
     try {
