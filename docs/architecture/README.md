@@ -33,7 +33,7 @@ first.
 
 ## Status on main
 
-- - `sim`: the 60 Hz step with movement and collision; the effects toolkit
+- `sim`: the 60 Hz step with movement and collision; the effects toolkit
   (projectiles, areas, melee arcs, statuses, forced motion), with projectile
   ally effects since #69, the self-cast rule (an ally projectile aimed at its
   caster lands on her at 60 percent heal) since #191 and the `wound` status (10
@@ -59,7 +59,7 @@ first.
   health or less or a cornered one (#165). One escape streak gates the whole
   escape order, and the areas lead at the nominal 20 m/s (measured, see
   [bots](bots.md), Aim).
-- - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
+- `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
   champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
   arena. The HUD has the ring warning and the kill feed, and the result screen
