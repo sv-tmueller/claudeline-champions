@@ -1,7 +1,8 @@
 // The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json`, `lumeth.json`,
-// `ondrel.json` and `brimwick.json`, whose numbers come from docs/design/roster-v1.md and
-// docs/design/roster-v2.md (ticks = seconds x 60, one hit = durationTicks 1 / intervalTicks 1, and
-// the lingering areas of Ondrel carry the three rules of roster-v2 section 0).
+// `ondrel.json`, `brimwick.json` and `durnhal.json`, whose numbers come from docs/design/roster-v1.md,
+// docs/design/roster-v2.md and docs/design/roster-v3.md (ticks = seconds x 60, one hit =
+// durationTicks 1 / intervalTicks 1, and the lingering areas of Ondrel carry the three rules of
+// roster-v2 section 0).
 //
 // Every number the doc fixes is written out again here as a literal, so a kit file that drifts from
 // the doc fails a named test. The catalog ranges that `validateKit` leaves to roster tests (rules.md
@@ -14,6 +15,7 @@ import skerrowJson from '../../../data/kits/skerrow.json';
 import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
+import durnhalJson from '../../../data/kits/durnhal.json';
 import { Button, SLOTS, createMatch, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -28,6 +30,7 @@ const KITS = [
   { stem: 'lumeth', json: lumethJson },
   { stem: 'ondrel', json: ondrelJson },
   { stem: 'brimwick', json: brimwickJson },
+  { stem: 'durnhal', json: durnhalJson },
 ];
 
 const hargrim = validateKit(hargrimJson);
@@ -36,6 +39,7 @@ const skerrow = validateKit(skerrowJson);
 const lumeth = validateKit(lumethJson);
 const ondrel = validateKit(ondrelJson);
 const brimwick = validateKit(brimwickJson);
+const durnhal = validateKit(durnhalJson);
 
 function mirror(id: string) {
   return {
@@ -94,6 +98,7 @@ describe('the kit stats', () => {
     expect(stats(lumeth)).toEqual({ id: 'lumeth', maxHealth: 120, moveSpeed: 5.5, support: true, ex: ['M2', 'R'] });
     expect(stats(ondrel)).toEqual({ id: 'ondrel', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(brimwick)).toEqual({ id: 'brimwick', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
+    expect(stats(durnhal)).toEqual({ id: 'durnhal', maxHealth: 160, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
   });
 
   it('gives a path-precise message for a number outside the contract', () => {
@@ -265,6 +270,10 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(brimwick)).toEqual([]);
   });
 
+  it('hold for the Durnhal kit', () => {
+    expect(catalogProblems(durnhal)).toEqual([]);
+  });
+
   it('name the path of a number outside them', () => {
     const copy = copyOf(hargrim);
     const dash = copy.slots.F.effects[0];
@@ -334,9 +343,12 @@ describe('the catalog ranges', () => {
     expect(arc(skerrow.slots.F.effects[1], 'Skerrow F').cosHalfAngle).toBe(-1);
   });
 
-  it('keep the Hargrim M1 cosine the 10-decimal literal of cos 50 degrees', () => {
-    const arc = hargrim.slots.M1.effects[0];
-    if (arc?.type !== 'meleeArc') throw new Error('Hargrim M1 is not a meleeArc');
+  it.each([
+    ['Hargrim', hargrim],
+    ['Durnhal', durnhal],
+  ])('keep the %s M1 cosine the 10-decimal literal of cos 50 degrees', (name, kit) => {
+    const arc = kit.slots.M1.effects[0];
+    if (arc?.type !== 'meleeArc') throw new Error(`${name} M1 is not a meleeArc`);
     expect(arc.cosHalfAngle).toBe(0.6427876097);
     expect(String(arc.cosHalfAngle).split('.')[1]).toHaveLength(10);
     // Math.cos is an accuracy reference here only: no kit value is computed with it.
@@ -398,6 +410,8 @@ describe('the EX variants', () => {
     );
     expect(exDiff(brimwick, 'M2')).toEqual(['effects[0].radius', 'effects[0].effects[0].amount', 'effects[0].effects[1]'].sort());
     expect(exDiff(brimwick, 'E')).toEqual(['windupTicks', 'effects[0].effects[0].amount', 'effects[0].effects[1].distance'].sort());
+    expect(exDiff(durnhal, 'M2')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
+    expect(exDiff(durnhal, 'E')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
   });
 });
 
@@ -477,6 +491,8 @@ class Rig {
           return { type: s.type, percent: s.percent };
         case 'shield':
           return { type: s.type, absorb: s.absorb };
+        case 'wound':
+          return { type: s.type, stacks: s.stacks };
         case 'knockback':
           return { type: s.type, distance: s.distance, totalTicks: s.totalTicks, dirX: s.dirX, dirY: s.dirY };
         default:
@@ -513,6 +529,17 @@ function lingeringPaths(kit: KitDef): string[] {
   return visitKit(kit)
     .filter(({ effect }) => effect.type === 'area' && effect.durationTicks > 1)
     .map(({ path }) => path);
+}
+
+/** The wound applications of a kit: where each is, and the ticks and stacks it writes. */
+function woundPaths(kit: KitDef): { path: string; ticks: number; stacks: number | undefined }[] {
+  const out: { path: string; ticks: number; stacks: number | undefined }[] = [];
+  for (const { path, effect } of visitKit(kit)) {
+    if (effect.type === 'applyStatus' && effect.status.type === 'wound') {
+      out.push({ path, ticks: effect.status.ticks, stacks: effect.status.stacks });
+    }
+  }
+  return out;
 }
 
 /** The area at `effects[index]` of a slot, or of its EX variant; `then` reaches into a leading dash. */
@@ -633,7 +660,7 @@ describe('the lingering area rules', () => {
   });
 });
 
-describe('every slot of the six kits', () => {
+describe('every slot of the seven kits', () => {
   interface Row {
     kit: KitDef;
     slot: Slot;
@@ -699,6 +726,15 @@ describe('every slot of the six kits', () => {
     { kit: brimwick, slot: 'E', ex: true, cooldown: 540, windup: 24, walk: 0, cost: 25 },
     { kit: brimwick, slot: 'R', ex: false, cooldown: 780, windup: 0, cost: 0 },
     { kit: brimwick, slot: 'F', ex: false, cooldown: 600, windup: 60, walk: 0, cost: 100 },
+    { kit: durnhal, slot: 'M1', ex: false, cooldown: 36, windup: 9, walk: 2.75, cost: 0 },
+    { kit: durnhal, slot: 'M2', ex: false, cooldown: 300, windup: 24, walk: 2.75, cost: 0 },
+    { kit: durnhal, slot: 'M2', ex: true, cooldown: 300, windup: 24, walk: 2.75, cost: 25 },
+    { kit: durnhal, slot: 'SPACE', ex: false, cooldown: 480, windup: 0, cost: 0 },
+    { kit: durnhal, slot: 'Q', ex: false, cooldown: 600, windup: 18, walk: 2.75, cost: 0 },
+    { kit: durnhal, slot: 'E', ex: false, cooldown: 420, windup: 18, walk: 2.75, cost: 0 },
+    { kit: durnhal, slot: 'E', ex: true, cooldown: 420, windup: 18, walk: 2.75, cost: 25 },
+    { kit: durnhal, slot: 'R', ex: false, cooldown: 840, windup: 0, cost: 0 },
+    { kit: durnhal, slot: 'F', ex: false, cooldown: 600, windup: 30, walk: 0, cost: 100 },
   ];
 
   it.each(rows)('$kit.id $slot ex=$ex casts with its cooldown, windup, cost and walk rule', (row) => {
@@ -1894,5 +1930,229 @@ describe('Brimwick', () => {
 
   it('keeps no lingering area: every area is one hit', () => {
     expect(lingeringPaths(brimwick)).toEqual([]);
+  });
+});
+
+describe('Durnhal', () => {
+  const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
+  const gains = (rig: Rig) => rig.events('energyGained').map(({ e }) => [e.championId, e.targetId, e.amount]);
+
+  it('M1 Warhammer hits the enemy at 3.9 m for 10 and a one-stack wound, and not the one at 4.1 m', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 3.9, 0], 3: [X0 + 4.1, 0] });
+    rig.run(10, press('M1'));
+    expect(rig.events('meleeArc').map(({ step, e }) => ({ step, radius: e.radius, cos: e.cosHalfAngle, targets: e.targetIds }))).toEqual([
+      { step: 9, radius: 3.5, cos: 0.6427876097, targets: [2] },
+    ]);
+    expect(damages(rig)).toEqual([[2, 10, 150]]);
+    expect(rig.applied()).toEqual([[2, 'wound', 240]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 1 }]);
+    expect(gains(rig)).toEqual([[0, 2, 5]]);
+    expect(rig.health(3)).toBe(160);
+    expect(rig.statuses(3)).toEqual([]);
+    rig.clean();
+  });
+
+  it('M2 Sundering Blow lands 2 m ahead in a circle of radius 2: 16 damage and a one-stack wound at 4.4 m, nothing at 4.6 m', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 4.4, 0], 3: [X0 + 4.6, 0] });
+    rig.run(25, press('M2'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 2, 9);
+    expect(spawned?.e.radius).toBe(2);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(damages(rig)).toEqual([[2, 16, 144]]);
+    expect(rig.applied()).toEqual([[2, 'wound', 240]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 1 }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(160);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('M2 EX Sundering Blow does 22 and a two-stack wound, in the same circle', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 4.4, 0], 3: [X0 + 4.6, 0] }, 25);
+    rig.run(25, press('M2', { ex: true }));
+    expect(rig.events('areaSpawned')[0]?.e.radius).toBe(2);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(damages(rig)).toEqual([[2, 22, 138]]);
+    expect(rig.applied()).toEqual([[2, 'wound', 240]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 2 }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(160);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('SPACE Bulwark Charge dashes 5 m in 15 ticks, then pushes the enemy at 1.9 m 2 m away in 8 ticks and leaves the one at 2.1 m', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 6.9, 0], 3: [X0 + 5, 2.1] });
+    rig.run(15, press('SPACE'));
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 5, 15]]);
+    const ended = rig.events('dashEnded');
+    expect(ended.map(({ step, e }) => [step, e.reason])).toEqual([[14, 'complete']]);
+    expect(ended[0]?.e.x).toBeCloseTo(X0 + 5, 9);
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(14);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 5, 9);
+    expect(spawned?.e.radius).toBe(1.5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 8]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 2, totalTicks: 8, dirX: 1, dirY: 0 }]);
+    expect(rig.statuses(3)).toEqual([]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    rig.run(8);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 8.9, 9);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('SPACE Bulwark Charge into an enemy 4 m ahead ends blocked and still pushes it', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 4, 0] });
+    rig.run(15, press('SPACE'));
+    expect(rig.events('dashEnded').map(({ e }) => e.reason)).toEqual(['blocked']);
+    expect(rig.events('areaSpawned')).toHaveLength(1);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 8]]);
+    expect(rig.events('damage')).toEqual([]);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('Q Grounding Slam hits the enemy at 2.9 m for 10 and a 60 tick root, earns 10, and misses the one at 3.1 m', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 2.9, 0], 3: [X0, 3.1] });
+    rig.run(18 + 1, press('Q'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.x).toBe(X0);
+    expect(spawned?.e.radius).toBe(2.5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(damages(rig)).toEqual([[2, 10, 150]]);
+    expect(rig.applied()).toEqual([[2, 'root', 60]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'root' }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(160);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('E Breaker Throw flies 9 m in 30 sweeps', () => {
+    const rig = new Rig(durnhal);
+    rig.run(18 + 30, press('E'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.4);
+    expect(spawned?.e.vx).toBe(18);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(30);
+    expect(expired?.e.x).toBeCloseTo(X0 + 9, 9);
+    rig.clean();
+  });
+
+  it('E Breaker Throw does 16 damage, a one-stack wound for 240 ticks and a 30 percent slow for 90, and stops on the hit', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 6, 0] });
+    rig.run(18 + 20, press('E'));
+    expect(damages(rig)).toEqual([[2, 16, 144]]);
+    expect(rig.applied()).toEqual([[2, 'wound', 240], [2, 'slow', 90]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 1 }, { type: 'slow', percent: 30 }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E EX Breaker Throw does 22 damage and a two-stack wound, with the same slow', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 6, 0] }, 25);
+    rig.run(18 + 20, press('E', { ex: true }));
+    expect(damages(rig)).toEqual([[2, 22, 138]]);
+    expect(rig.applied()).toEqual([[2, 'wound', 240], [2, 'slow', 90]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 2 }, { type: 'slow', percent: 30 }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('R Aegis Line shields the caster and the ally at 4.4 m for 25 over 240 ticks, not the enemy, and earns nothing', () => {
+    const rig = new Rig(durnhal, { 1: [X0 + 4.4, 0], 2: [X0, 3] });
+    rig.step(press('R'));
+    expect(rig.events('areaSpawned')[0]?.e.radius).toBe(4);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[0, 1]]);
+    expect(rig.applied()).toEqual([[0, 'shield', 240], [1, 'shield', 240]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 25 }]);
+    expect(rig.statuses(1)).toEqual([{ type: 'shield', absorb: 25 }]);
+    expect(rig.statuses(2)).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('R Aegis Line does not reach an ally at 4.6 m', () => {
+    const rig = new Rig(durnhal, { 1: [X0 + 4.6, 0] });
+    rig.step(press('R'));
+    expect(rig.applied()).toEqual([[0, 'shield', 240]]);
+    expect(rig.statuses(1)).toEqual([]);
+    rig.clean();
+  });
+
+  it('F Last Bastion winds up 30 ticks locked, then hits both enemies within 5.0 m for 30, a three-stack wound for 300 ticks and a 50 percent slow, and shields the caster', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 5, 0], 3: [X0, 4.9] }, 100);
+    rig.run(30 + 1, press('F'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(30);
+    expect(spawned?.e.x).toBe(X0);
+    expect(spawned?.e.radius).toBe(4.5);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2, 3]]);
+    expect(damages(rig)).toEqual([[2, 30, 130], [3, 30, 130]]);
+    // The shield is a step effect of the cast and lands before the area acts.
+    expect(rig.applied()).toEqual([
+      [0, 'shield', 240],
+      [2, 'wound', 300],
+      [2, 'slow', 120],
+      [3, 'wound', 300],
+      [3, 'slow', 120],
+    ]);
+    for (const id of [2, 3]) expect(rig.statuses(id)).toEqual([{ type: 'wound', stacks: 3 }, { type: 'slow', percent: 50 }]);
+    expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 50 }]);
+    expect(gains(rig)).toEqual([[0, 2, 15], [0, 3, 15]]);
+    expectOneHit(rig);
+    rig.clean();
+  });
+
+  it('F Last Bastion misses an enemy at 5.1 m', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 5.1, 0] }, 100);
+    rig.run(30 + 1, press('F'));
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[]]);
+    expect(rig.health(2)).toBe(160);
+    expect(rig.statuses(2)).toEqual([]);
+    expect(rig.applied()).toEqual([[0, 'shield', 240]]);
+    rig.clean();
+  });
+
+  it('F Last Bastion after an M1 wound merges to three stacks on the 300 tick timer', () => {
+    const rig = new Rig(durnhal, { 2: [X0 + 3.9, 0] }, 100);
+    rig.run(10, press('M1'));
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 1 }]);
+    rig.run(31, press('F'));
+    expect(rig.applied()).toEqual([[2, 'wound', 240], [0, 'shield', 240], [2, 'wound', 300], [2, 'slow', 120]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'wound', stacks: 3 }, { type: 'slow', percent: 50 }]);
+    const wound = champion(rig.state, 2).statuses.find((status) => status.type === 'wound');
+    expect(wound?.remainingTicks).toBeGreaterThan(240);
+    rig.clean();
+  });
+
+  it('keeps six wound applications over four slots: 240 ticks from every skill hit, 300 from the ultimate', () => {
+    const at = (path: string, ticks: number, stacks: number) => ({ path: `durnhal.slots.${path}`, ticks, stacks });
+    expect(woundPaths(durnhal)).toEqual([
+      at('M1.effects[0].effects[1]', 240, 1),
+      at('M2.effects[0].effects[1]', 240, 1),
+      at('M2.ex.effects[0].effects[1]', 240, 2),
+      at('E.effects[0].effects[1]', 240, 1),
+      at('E.ex.effects[0].effects[1]', 240, 2),
+      at('F.effects[0].effects[1]', 300, 3),
+    ]);
+    for (const kit of [hargrim, quillon, skerrow, lumeth, ondrel, brimwick]) expect(woundPaths(kit)).toEqual([]);
+  });
+
+  it('keeps no lingering area: every area is one hit', () => {
+    expect(lingeringPaths(durnhal)).toEqual([]);
   });
 });
