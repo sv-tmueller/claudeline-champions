@@ -1,9 +1,10 @@
-# Balance: the bands, the baseline and the first tuning pass
+# Balance: the bands, the baseline, the tuning passes and the six-kit report
 
 ## 1. Status and sources
 
 Status: the harness and the baseline of batch #105 (issue #109), its first
-tuning pass (issue #121) and the Hargrim and Quillon pass (issue #124). The
+tuning pass (issue #121), the Hargrim and Quillon pass (issue #124) and the
+six-kit report of batch 15 (issue #189, section 5.9). The
 first pass moved two numbers, one of Skerrow's and one of Lumeth's (section 6),
 and the second moved none: each of its 20 candidates was dropped, by a
 pre-check or by its full run (section 6.2). Sections 5 and 6 record the report
@@ -11,7 +12,10 @@ after the two numbers of #121, with 3 of 24 cells in band, where the baseline
 had 1, which is also the report of #124's head, since no kit changed. Every
 cell is in band or accepted with its reason there. The report in section 4 was
 regenerated after the bots began to dodge (issue #137): 5 of 24 cells in band
-(the note of section 4).
+(the note of section 4). The six-kit report added Ondrel and Brimwick to the
+harness: the block of section 4 is now its 60 cells, 8 of them in band, and
+section 5.9 reads it. Sections 5.1 to 5.8 and 6 stay the record of the four-kit
+report at 9a9c653 and of the passes made on it.
 
 Sources:
 
@@ -27,6 +31,15 @@ Sources:
   baseline and this document; #121 and #124 change numbers (decision 28 gives
   Skerrow and Lumeth to #121 and Hargrim and Quillon to #124). It also fixes the
   fill, the sides, the seeds, and the runner described below.
+- Decision 3 of batch #147 put Ondrel and Brimwick in the harness at the
+  six-kit report, and decision 3 of batch #193 set how it is played: about 200
+  matches a cell, one job a mode on the runner (section 3). The report is #189
+  (the tools half is #195), and the question of Brimwick's counter web, which
+  #188 filed against [roster-v2.md](roster-v2.md) section 3, is read in section
+  5.9.
+- [roster-v2.md](roster-v2.md) holds the two kits of #148 and their counter web
+  (section 1), the intended counters of the six-kit report; its section 6
+  forecasts how the bots will bias it.
 - [roster-v1.md](roster-v1.md) holds the kits and the intended counters (the
   "Intended counters" lists); its section 6, "Balance notes", reads the
   baseline against them.
@@ -35,35 +48,36 @@ Sources:
 ## 2. The bands
 
 - A cell is one mode (2v2 or 3v3), one arena and one pairing, so there are
-  24 cells with the four kits of the harness roster and two arenas.
+  60 cells with the six kits of the harness roster and two arenas, 15 pairings
+  a mode and arena (the 24 of the four v1 kits are among them).
 - The band is 40 to 60 percent inclusive on X's win rate in the cell. The test
   is on the exact rate (wins times 100 against 40 and 60 times the decided
   matches), not on the rounded figure in the table.
 - X is the first kit of the pairing in the order of the kit files of the
-  harness roster (`hargrim`, `lumeth`, `quillon`, `skerrow`). A rate under 50
-  means Y is ahead.
-- A roster counter (an intended counter in roster-v1.md) is read as the
-  favoured side inside the band: the favourite at 50 to 60 percent and the
+  harness roster (`brimwick`, `hargrim`, `lumeth`, `ondrel`, `quillon`,
+  `skerrow`). A rate under 50 means Y is ahead.
+- A roster counter (an intended counter in roster-v1.md, or in the web of
+  roster-v2.md section 1) is read as the favoured side inside the band: the favourite at 50 to 60 percent and the
   other side at 40 to 50. A favourite above 60 is too strong, and an
   underdog above 60 percent is an inverted counter.
 
 ## 3. The method
 
 - **Pairing.** An unordered pair X v Y of different kits of the harness
-  roster, so six pairings with four kits. The roster is the fixed list
-  `HARNESS_KITS` in `tools/balance/inputs.ts`, the four v1 kits, and a listed
-  kit with no file is an error. `data/kits` also holds Ondrel and Brimwick
-  (#148); they are not in the harness roster until the six-kit report of
-  batch 13 ([decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
-  so the 24 cells, the 4800 matches and the block of section 4 are those of
-  four kits. "Pairing" is read as the
-  matchup of two champions, as decision 6 words it, and not as the duo of
-  roster-v1.md section 5.
+  roster, so 15 pairings with six kits. The roster is the fixed list
+  `HARNESS_KITS` in `tools/balance/inputs.ts`, the six kits of `data/kits` in
+  file order, and a listed kit with no file is an error. Ondrel and Brimwick
+  (#148) joined the four v1 kits in the six-kit report (#189; [decision 3 of
+  batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
+  so the 60 cells, the 11 760 matches and the block of section 4 are those of
+  six kits. "Pairing" is read as the matchup of two champions, as decision 6
+  words it, and not as the duo of roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
-  In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: two fills,
-  pooled in the cell and each shown in the Fills column. In 3v3 they are
-  [X, Z, W] v [Y, Z, W] and [X, W, Z] v [Y, W, Z] for the two kits outside the
-  pair: both orders, pooled and each shown, because the order sets the spawn
+  In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: four fills
+  with six kits (two with four), pooled in the cell and each shown in the Fills
+  column. In 3v3 they are [X, Z, W] v [Y, Z, W] for each ordered pair of two
+  kits outside the pair: twelve fills with six kits (two with four), both
+  orders of each two, pooled and each shown, because the order sets the spawn
   slots (see Noise). X takes the first spawn slot of its team.
 - **Sides.** Odd seeds put X on team A and even seeds on team B, so each side
   gets half of the matches. The table shows X's wins as A and as B.
@@ -72,18 +86,20 @@ Sources:
   cell's fills, worked out per mode (`seedSchedule` in
   `tools/balance/harness.ts`). With four kits a cell has 2 fills in either mode,
   so it is seeds 1 to 100 for each config: 24 configs, 200 matches in every cell
-  and 4800 in all. With six kits it would be 50 seeds for each of the 4 fills of
-  a 2v2 cell (200 matches) and 16 for each of the 12 fills of a 3v3 cell (192
-  matches). The count is even so that X plays each side equally often. When the
+  and 4800 in all. With six kits it is 50 seeds for each of the 4 fills of a
+  2v2 cell (200 matches) and 16 for each of the 12 fills of a 3v3 cell (192
+  matches): 60 cells and 11 760 matches in all (6000 in 2v2 and 5760 in 3v3).
+  The count is even so that X plays each side equally often. When the
   two modes get the same count the head of the block says "Seeds 1 to N for each
   config"; when they differ it names each mode's count, and the Seeds / matches
   column states them in any case. Decision 3 of batch #193 set this: it amends
   decision 21 of batch #105 ("seeds 1 to 100") and reads decision 6 of batch #12
   as "about 200 matches a cell", because 100 seeds on every fill is 48 000
   matches at six kits. The noise below and the keep threshold of decision 32
-  stand. The match seed is the seed and the bot of champion id `i` gets `seed *
-  100 + i`, the rule of the client's `bot-driver.ts`. The sim never draws from
-  its own random state, so the bot seeds are the only source of variation.
+  stand. The match seed is the seed and the bot of champion id `i` gets
+  `seed * 100 + i`, the rule of the client's `bot-driver.ts`. The sim never
+  draws from its own random state, so the bot seeds are the only source of
+  variation.
 - **Tier and rules.** Every bot is at the normal tier. The match is played to
   `DEFAULT_ROUNDS_TO_WIN` (3 rounds) with the kits read from the JSON as they
   are, and `createMatch` validates them.
@@ -121,10 +137,14 @@ Sources:
   heals count the instant part only; no Lunge away for Skerrow. A kit that is
   balanced for players may not be for these bots, and the reverse.
 - **Noise.** A rate over `n` decided matches has a 95 percent interval of
-  about 7 points at n = 200 (every cell) around 50 percent, and about 10 at
-  n = 100 (one fill alone). A cell within that distance of 40 or 60 cannot be
-  told from the band by one run. Two things were measured once with scratch
-  code that is not part of the tool (X's rate over 100 matches). First, the
+  about 7 points at n = 200 (every cell, 192 in a six-kit 3v3 cell) around 50
+  percent, and about 10 at n = 100 (one fill alone, as the four-kit report
+  had it). A six-kit fill has fewer matches, 50 in 2v2 (about 14 points) and
+  16 in 3v3 (about 24), so one fill of a six-kit cell is read with that
+  distance. A cell within the 7 points of 40 or 60 cannot be told from the
+  band by one run. Two things were measured once with scratch
+  code that is not part of the tool (X's rate over 100 matches, in the
+  four-kit report). First, the
   order of the 3v3 fill changes a rate by up to 37 points, because it changes
   the spawn slots. This is why 3v3 pools both orders. Hargrim v Skerrow on
   arena02 gave 11 percent with the fill [lumeth, quillon] and 46 with
@@ -139,9 +159,21 @@ Sources:
 ## 4. The report
 
 The block below is generated by `npm run balance`; do not edit it. The head
-line names the commit the sources were read at. It is the report after the
-tuning pass of #121, and of #124, which changed no kit, regenerated after the
-dodge of #137 (the note below). The baseline, before any number moved, had 1
+line names the commit the sources were read at. It is the six-kit report
+(#189, batch 15): 60 cells and 11 760 matches, 8 cells in band (5 of the 36
+cells with Ondrel or Brimwick and 3 of the 24 four-kit cells), the summed
+distance of the 60 cells to the band 1561.3 points (883.9 in the 36 new cells
+and 677.4 in the 24 four-kit cells, 666.5 in the four-kit report), and no
+budget hit. Per champion over all of its cells: Brimwick 52.3, Hargrim 11.4,
+Lumeth 89.1, Ondrel 60.1, Quillon 73.3 and Skerrow 13.7. No kit, sim or bots
+rule changed since the four-kit report: its 24 cells moved because Ondrel and
+Brimwick are new fills (section 5.9).
+
+What follows, up to the block, is the history of the four-kit report that this
+one replaces. That report was the one after the tuning pass of #121, and of
+#124, which changed no kit, regenerated after the dodge of #137 (the note
+below), and "the block" in that history is the four-kit block. The baseline,
+before any number moved, had 1
 cell in band (3v3 on arena01, Lumeth v Quillon, 56.5) and a summed distance of
 695.5 points from the band; per champion Hargrim 14.2, Lumeth 77.9, Quillon
 86.4 and Skerrow 21.5.
@@ -167,13 +199,13 @@ was (decision 3 of batch #134). Sections 5 and 6 stay the record of the report
 at 9a9c653 and are for the second tuning pass (batch 12) to read again. The
 four stalls of 6.2 that turned the no-stall clause red for four candidates are
 gone with the tolerance of #137 and pinned (#129, bots.md, Testing); their four
-rows are annotated in 6.2, and the block below is as generated.
+rows are annotated in 6.2, and the four-kit block was as generated.
 
 Note (2026-10-26, #123): the premise above that the rule behind the stall of
 #123 is unchanged was wrong. The stall is the same state as those four, a
 champion one ulp inside an inflated obstacle, so it is gone with the tolerance
 of #137 as well and pinned (#123, bots.md, Testing). No bots rule was missing
-and the block below is as generated: no source it reads changed.
+and the four-kit block was as generated: no source it reads changed.
 
 <!-- balance:report -->
 Generated by `npm run balance` from the sources at `3704221`.
@@ -267,6 +299,9 @@ Win rate in percent over the cells the champion is in, as X or as Y.
 <!-- /balance:report -->
 
 ## 5. The cells after the tuning passes
+
+Sections 5.1 to 5.8 read the four-kit report at 9a9c653; the block of section 4
+is the six-kit report, which 5.9 reads.
 
 After the tuning passes of #121 and #124 three cells are in the band and 21 are
 outside. Each is in band or accepted with its reason, with its reading. The
@@ -492,6 +527,194 @@ also ends with the tolerance removed (at 5769), so the full match is no pin of
 the tolerance. No row of the report above moves (no source it reads changed),
 so it is not regenerated.
 
+### 5.9 The six-kit report (batch 15, #189 and #188)
+
+The block of section 4 plays six kits: 60 cells, 11 760 matches, each cell
+about 200 (section 3), with no kit, sim-rule or bots change since 9a9c653 that
+moves a four-kit cell. Ondrel and Brimwick (#148, with the bot profiles of
+#165) are in the harness for the first time. Of the 60 cells 8 are in band: 5 of
+the 36 cells that have a new kit (table below) and 3 of the 24 four-kit cells
+(5 in the four-kit report). No match hit the budget. The summed distance of the
+60 cells to the band is 1561.3 points, 883.9 of them in the 36 new cells. X is
+the first kit in file order (`brimwick`, `hargrim`, `lumeth`, `ondrel`,
+`quillon`, `skerrow`), so Brimwick is X in her five pairings and Ondrel's rate
+is 100 minus X's in her pairings with Brimwick, Hargrim and Lumeth.
+
+**The 36 new cells.** Their standing against the band and the noise (the 7
+points of section 3; 192 matches in a 3v3 cell put its interval at about 7.1):
+5 are in band, none is outside within the 7 points, 2 sit 7.2 from the band (at
+the edge of the noise) and 29 are further out, 11.5 to 40.0 points. Each is one
+run, never repeated on other seeds.
+
+| Mode | Arena | X v Y | X rate | Standing |
+|------|-------|-------|--------|----------|
+| 2v2 | arena01 | brimwick v hargrim | 88.5 | outside, 28.5 from the band |
+| 2v2 | arena01 | brimwick v lumeth | 6.5 | outside, 33.5 from the band |
+| 2v2 | arena01 | brimwick v ondrel | 49.0 | in band |
+| 2v2 | arena01 | brimwick v quillon | 17.0 | outside, 23.0 from the band |
+| 2v2 | arena01 | brimwick v skerrow | 93.5 | outside, 33.5 from the band |
+| 2v2 | arena01 | hargrim v ondrel | 0.5 | outside, 39.5 from the band |
+| 2v2 | arena01 | lumeth v ondrel | 79.0 | outside, 19.0 from the band |
+| 2v2 | arena01 | ondrel v quillon | 21.5 | outside, 18.5 from the band |
+| 2v2 | arena01 | ondrel v skerrow | 100.0 | outside, 40.0 from the band |
+| 2v2 | arena02 | brimwick v hargrim | 99.0 | outside, 39.0 from the band |
+| 2v2 | arena02 | brimwick v lumeth | 10.0 | outside, 30.0 from the band |
+| 2v2 | arena02 | brimwick v ondrel | 56.0 | in band |
+| 2v2 | arena02 | brimwick v quillon | 13.0 | outside, 27.0 from the band |
+| 2v2 | arena02 | brimwick v skerrow | 94.5 | outside, 34.5 from the band |
+| 2v2 | arena02 | hargrim v ondrel | 0.5 | outside, 39.5 from the band |
+| 2v2 | arena02 | lumeth v ondrel | 83.0 | outside, 23.0 from the band |
+| 2v2 | arena02 | ondrel v quillon | 28.5 | outside, 11.5 from the band |
+| 2v2 | arena02 | ondrel v skerrow | 95.0 | outside, 35.0 from the band |
+| 3v3 | arena01 | brimwick v hargrim | 96.4 | outside, 36.4 from the band |
+| 3v3 | arena01 | brimwick v lumeth | 6.8 | outside, 33.2 from the band |
+| 3v3 | arena01 | brimwick v ondrel | 32.8 | outside, 7.2 from the band (the edge of the noise) |
+| 3v3 | arena01 | brimwick v quillon | 23.4 | outside, 16.6 from the band |
+| 3v3 | arena01 | brimwick v skerrow | 96.4 | outside, 36.4 from the band |
+| 3v3 | arena01 | hargrim v ondrel | 2.6 | outside, 37.4 from the band |
+| 3v3 | arena01 | lumeth v ondrel | 84.4 | outside, 24.4 from the band |
+| 3v3 | arena01 | ondrel v quillon | 44.8 | in band |
+| 3v3 | arena01 | ondrel v skerrow | 98.4 | outside, 38.4 from the band |
+| 3v3 | arena02 | brimwick v hargrim | 88.5 | outside, 28.5 from the band |
+| 3v3 | arena02 | brimwick v lumeth | 13.0 | outside, 27.0 from the band |
+| 3v3 | arena02 | brimwick v ondrel | 40.6 | in band |
+| 3v3 | arena02 | brimwick v quillon | 32.8 | outside, 7.2 from the band (the edge of the noise) |
+| 3v3 | arena02 | brimwick v skerrow | 88.5 | outside, 28.5 from the band |
+| 3v3 | arena02 | hargrim v ondrel | 5.2 | outside, 34.8 from the band |
+| 3v3 | arena02 | lumeth v ondrel | 85.4 | outside, 25.4 from the band |
+| 3v3 | arena02 | ondrel v quillon | 45.8 | in band |
+| 3v3 | arena02 | ondrel v skerrow | 87.5 | outside, 27.5 from the band |
+
+**The 24 four-kit cells, old rate against new.** The kits and the rules did not
+change, so the movement is the effect of the added fills: a cell now pools four
+2v2 fills or twelve 3v3 fills instead of two, and the fills with Brimwick or
+Ondrel are new, and the seeds are fewer. Decision 3 of batch #193 asks that the
+old fills be read at their own sample size. The old report played seeds 1 to
+100 on each of its two fills; the new one plays seeds 1 to 50 (2v2) or 1 to 16
+(3v3) on the same fills, a subset of the same seeds, so a fill is read at 50
+matches (about 14 points of interval) or 16 (about 24). A scratch check, not
+part of the tool, played Hargrim v Skerrow on arena01 in 2v2 with the fill
+Quillon: seeds 1 to 100 give 62.0, the old report's figure, and seeds 1 to 50
+give 74.0, the new one's, so the sim reproduces the old fills and the
+difference is the seeds alone. The table splits each move into the old fills on
+the new seeds (their mean, against the old rate: the seed subset) and the
+fills with Ondrel or Brimwick (the pooled new rate against that mean):
+
+| Mode | Arena | X v Y | Old rate | Old fills, new seeds | New rate | Seed subset | Added fills |
+|------|-------|-------|----------|----------------------|----------|-------------|-------------|
+| 2v2 | arena01 | hargrim v lumeth | 0.0 | 0.0 | 0.0 | +0.0 | +0.0 |
+| 2v2 | arena01 | hargrim v quillon | 1.0 | 0.0 | 0.0 | -1.0 | +0.0 |
+| 2v2 | arena01 | hargrim v skerrow | 40.0 | 46.0 | 52.5 | +6.0 | +6.5 |
+| 2v2 | arena01 | lumeth v quillon | 85.5 | 91.0 | 70.0 | +5.5 | -21.0 |
+| 2v2 | arena01 | lumeth v skerrow | 99.5 | 99.0 | 99.5 | -0.5 | +0.5 |
+| 2v2 | arena01 | quillon v skerrow | 98.0 | 99.0 | 99.5 | +1.0 | +0.5 |
+| 2v2 | arena02 | hargrim v lumeth | 0.5 | 1.0 | 1.0 | +0.5 | +0.0 |
+| 2v2 | arena02 | hargrim v quillon | 0.5 | 0.0 | 0.0 | -0.5 | +0.0 |
+| 2v2 | arena02 | hargrim v skerrow | 33.5 | 29.0 | 32.5 | -4.5 | +3.5 |
+| 2v2 | arena02 | lumeth v quillon | 57.0 | 59.0 | 68.0 | +2.0 | +9.0 |
+| 2v2 | arena02 | lumeth v skerrow | 99.5 | 100.0 | 100.0 | +0.5 | +0.0 |
+| 2v2 | arena02 | quillon v skerrow | 100.0 | 100.0 | 100.0 | +0.0 | +0.0 |
+| 3v3 | arena01 | hargrim v lumeth | 0.0 | 0.0 | 0.0 | +0.0 | +0.0 |
+| 3v3 | arena01 | hargrim v quillon | 5.0 | 6.2 | 3.1 | +1.2 | -3.1 |
+| 3v3 | arena01 | hargrim v skerrow | 50.5 | 43.8 | 53.1 | -6.8 | +9.4 |
+| 3v3 | arena01 | lumeth v quillon | 77.0 | 75.0 | 78.1 | -2.0 | +3.0 |
+| 3v3 | arena01 | lumeth v skerrow | 100.0 | 100.0 | 99.5 | +0.0 | -0.5 |
+| 3v3 | arena01 | quillon v skerrow | 98.0 | 100.0 | 97.4 | +2.0 | -2.6 |
+| 3v3 | arena02 | hargrim v lumeth | 0.0 | 0.0 | 1.0 | +0.0 | +1.0 |
+| 3v3 | arena02 | hargrim v quillon | 9.5 | 9.4 | 6.8 | -0.1 | -2.6 |
+| 3v3 | arena02 | hargrim v skerrow | 53.0 | 43.8 | 42.7 | -9.2 | -1.1 |
+| 3v3 | arena02 | lumeth v quillon | 52.0 | 50.0 | 74.5 | -2.0 | +24.5 |
+| 3v3 | arena02 | lumeth v skerrow | 100.0 | 100.0 | 100.0 | +0.0 | +0.0 |
+| 3v3 | arena02 | quillon v skerrow | 99.0 | 100.0 | 95.3 | +1.0 | -4.7 |
+
+The old fills moved by at most 12.0 points in 2v2 (Quillon as the fill of
+Hargrim v Skerrow on arena01, 62.0 to 74.0; 53.0 to 44.0 on arena02) and by
+10.7 in 3v3 (the fill [lumeth, quillon] of Hargrim v Skerrow on arena02, 42.0 to
+31.3), inside the intervals above: that movement is the smaller sample and no
+kit effect is claimed from it. Five cells moved by more than 7 points of the
+pooled rate. In three of them the added fills moved it: Lumeth v Quillon in 2v2
+on arena01 (85.5 to 70.0, the fills with a new kit average 49.0 against 91.0 for
+the old ones), in 2v2 on arena02 (57.0 to 68.0, 9.0 of the move) and in 3v3 on
+arena02 (52.0 to 74.5, 24.5 of the move, the fills with a new kit average 79.4
+against 50.0). In Hargrim v Skerrow in 2v2 on arena01 (40.0 to 52.5) the
+seed subset and the added fills each account for about 6 points (+6.0 and +6.5),
+neither over the 7 of one cell's noise. In Hargrim v Skerrow in 3v3 on arena02
+(53.0 to 42.7) the move is the seed subset (-9.2 on 16 seeds of the old 100, at
+about 17 points of interval for two fills of 16) and the added fills moved it
+by -1.1. The cells in band went from 5 to 3: Lumeth v Quillon on arena02, in 2v2
+and in 3v3, left it for Lumeth ahead beyond 60 (68.0 and 74.5), and the three
+that stay are Hargrim v Skerrow in 2v2 on arena01 and in 3v3 on both arenas.
+The summed distance of the 24 cells went from 666.5 to 677.4. The 16 cells at 0
+to 10 or 90 to 100 percent stayed there. Two cells changed side of 50, both
+Hargrim v Skerrow (2v2 on arena01, 40.0 to 52.5, where Hargrim is now ahead as
+roster-v1 has it, and 3v3 on arena02, 53.0 to 42.7); sections 5.2 to 5.7 stay
+the record of the four-kit report.
+
+**The two kits against roster-v2 section 1.** The web of that section, with the
+measured rate of each kit in its four cells (2v2 arena01, 2v2 arena02, 3v3
+arena01 and 3v3 arena02), and how many of the four are in band:
+
+| Kit | Against | Intended | Rate of the kit | In band |
+|-----|---------|----------|-----------------|---------|
+| brimwick | hargrim | loses | 88.5 / 99.0 / 96.4 / 88.5 | 0 |
+| brimwick | skerrow | loses | 93.5 / 94.5 / 96.4 / 88.5 | 0 |
+| brimwick | quillon | beats | 17.0 / 13.0 / 23.4 / 32.8 | 0 |
+| brimwick | lumeth | beats | 6.5 / 10.0 / 6.8 / 13.0 | 0 |
+| brimwick | ondrel | loses | 49.0 / 56.0 / 32.8 / 40.6 | 3 |
+| ondrel | hargrim | beats | 99.5 / 99.5 / 97.4 / 94.8 | 0 |
+| ondrel | skerrow | beats | 100.0 / 95.0 / 98.4 / 87.5 | 0 |
+| ondrel | quillon | loses | 21.5 / 28.5 / 44.8 / 45.8 | 2 |
+| ondrel | lumeth | loses | 21.0 / 17.0 / 15.6 / 14.6 | 0 |
+| ondrel | brimwick | beats | 51.0 / 44.0 / 67.2 / 59.4 | 3 |
+
+Ondrel is on the intended side of 50 in all 20 of her cells but one (2v2 on
+arena02 against Brimwick, 44.0, in band): she beats Hargrim and Skerrow by 87.5
+to 100.0 and loses to Lumeth (14.6 to 21.0 as her own rate) and to Quillon (21.5
+and 28.5 in 2v2; 44.8 and 45.8 in 3v3, in band). So her web holds, and
+strongly against the two lowest of the six over all their cells (Hargrim 11.4
+and Skerrow 13.7). Her 60.1 over all her cells is third of the six, after Lumeth
+(89.1) and Quillon (73.3).
+
+Brimwick's 20 cells are the inverse of roster-v2 section 3 on four pairings of
+five, 16 cells in all, as #188 filed from the 720 matches of #165: she beats
+Hargrim (88.5 to 99.0) and Skerrow (88.5 to 96.4), where the web has both beat
+her, and loses to Quillon (13.0 to 32.8) and Lumeth (6.5 to 13.0), where the
+web has her beat both. None of the 16 is in band: the nearest is 7.2 from it, at
+the edge of the noise, and the other 15 are 16.6 or more from it, so the
+inversion holds in both modes and on both arenas. Against Ondrel, where the web
+has her lose, she is on the right side in three of four cells (49.0, 32.8 and
+40.6, against 56.0), and three of the four are in band. The 720 matches of
+#165 (bots.md, Testing) read the same four pairings the same way, so the two
+measurements agree and the harness adds the arenas, the modes and the fills.
+Her 52.3 over all her cells is fourth of six.
+
+What the inversion is made of. The measured order of the six over all their
+cells is Lumeth (89.1), Quillon (73.3), Ondrel (60.1), Brimwick (52.3), Skerrow
+(13.7) and Hargrim (11.4). The web has Brimwick beat the top two and lose to the
+bottom two, the reverse of that order, and the four v1 kits stood in the same
+order in the report of 9a9c653 (Lumeth, Quillon, Skerrow, Hargrim), where three
+of the six roster-v1 counters measure inverted in every cell. So the inversion
+of Brimwick's web is the same finding as the inversion of the v1 web, and not
+a finding about her alone: Hargrim and Skerrow, the divers her web counts as
+her counters, are the two kits with the lowest rate over all their cells. The limits
+of the bots that roster-v2 section 6 forecast, as this report bears on them: the
+forecast that Ondrel "will probably measure strong" holds in part (third of six,
+and 87.5 to 100.0 against the two lowest), and the report cannot say how much of
+that is the bots, which steer around no area; the forecast that a placed area's
+lead may miss a bot did not show as Brimwick measuring high, since she is mid
+table and the Firecracker is not the number to look at first; her projectiles
+face the dodge of #137, which the forecast was written before. No share of any
+cell is stated as a cause of it, and none of the shares of her losses to Lumeth
+(heals through her damage) or Quillon (a range of 9 to 13 m against her 7 to
+10) was measured.
+
+**The decision on #188.** DECISION-188-PLACEHOLDER: the lead posts the decision
+(tune, rewrite roster-v2 section 3, or accept as measured) on #193 with its
+reason, and a follow-up commit records it here. A tuning package, if one is
+chosen, is filed separately and names the cells it must move (6.3); a rewrite
+edits the roster-v2 section 1 row and section 3's intended counters and keeps
+the web closed. This package changes no kit and no bots rule.
+
 ## 6. Changes made
 
 Two numbers changed, both in #121; #124 changed none. The rates are X's, in
@@ -665,12 +888,18 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 
 ## 7. How to regenerate
 
-- `npm run balance` plays all 4800 matches and writes the block of section 4.
+- `npm run balance` plays all 11 760 matches and writes the block of section 4.
   It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
-  stops with a message below that. A full run takes about 5.5 minutes on one
-  core of an Apple silicon laptop and 12 to 16 minutes on the runner of the
-  manual workflow (runs 38990892639 at 933 s, 38997052269 at 953 s and
-  39005677735 at 737 s); the wall time goes to stdout and never into the file.
+  stops with a message below that. A full run takes about 14 minutes on one
+  core of an Apple silicon laptop (850.6 s for the block of section 4, Node
+  22.23.2; the cells are about 52 ms a 2v2 match and 92 ms a 3v3 match, so 2v2
+  is about 5.3 minutes of it and 3v3 about 8.9). On the runner of the manual
+  workflow the four-kit run took 12 to 16 minutes in one job (runs 38990892639
+  at 933 s, 38997052269 at 953 s and 39005677735 at 737 s) and 6 min 28 s (2v2)
+  and 11 min 26 s (3v3) in the check steps of the split (run 40461329366), 2.9
+  to 3.1 times the local time in 3v3. At six kits the same factor projects to
+  about 16 minutes for 2v2 and about 27 for 3v3, one mode a job. The wall time
+  goes to stdout and never into the file.
 - It refuses to write when `data/`, `packages/sim/src`, `packages/bots/src` or
   `tools/balance` differ from HEAD, because the head line would then name a
   commit that does not hold the sources. Commit the change first.
@@ -686,16 +915,22 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   with the committed one except for the head line. It exits 1 on a difference.
   Run it after any change to a kit, the sim or the bots.
 - The report was reproduced with `--check` on macOS (Apple silicon) with Node
-  22.23.2 and Node 26.7.0. The linux/amd64 reproduction is the manual workflow
+  22.23.2 (`played 11760 matches in 842.7 s`, the check of the committed
+  block) and, for the four-kit report, Node 26.7.0. The linux/amd64 reproduction is the manual workflow
   `.github/workflows/balance.yml` (`workflow_dispatch` only, never on pull
-  requests or pushes): trigger it with `gh workflow run balance.yml --ref
-  <branch>`. It runs `npm ci` and `npm run balance -- --check --mode <mode>` on
-  ubuntu, as two jobs side by side, one for 2v2 and one for 3v3 (a matrix by
-  mode, so each stays inside its `timeout-minutes`: 30 for 2v2 and 50 for 3v3 as
-  the starting values, each twice the projected six-kit check time, because the
-  failure step plays the mode again). On a difference a job prints the differing
-  rows of its mode (its cell rows and budget-hit lines, from a fresh `--out`
-  against the committed block). A newer run on the same ref cancels the older
-  one (`concurrency`). Bot output across platforms is not promised (bots.md,
-  "Determinism"), so the macOS table is the report, and a table that differs on
-  another platform gets a platform note here with the differing cells.
+  requests or pushes): trigger it with
+  `gh workflow run balance.yml --ref <branch>`. It runs `npm ci` and
+  `npm run balance -- --check --mode <mode>` on ubuntu, as two jobs side by
+  side, one for 2v2 and one for 3v3 (a matrix by mode, so each stays inside its
+  `timeout-minutes`: 45 for 2v2 and 75 for 3v3, measured at six kits on the
+  projection of the runner above: twice the check time of the mode, because
+  the failure step plays the mode again, and a margin). The seeds are never
+  lowered to fit the runner: they set the noise of section 3, and a timeout is
+  raised instead. On a difference a job prints the differing rows of its mode
+  (its cell rows and budget-hit lines, from a fresh `--out` against the
+  committed block). A newer run on the same ref cancels the older one
+  (`concurrency`). The run on the branch of #189: RUN-ID-PLACEHOLDER (the lead
+  dispatches it after the report and records the run id and both job times
+  here). Bot output across platforms is not promised (bots.md, "Determinism"),
+  so the macOS table is the report, and a table that differs on another
+  platform gets a platform note here with the differing cells.

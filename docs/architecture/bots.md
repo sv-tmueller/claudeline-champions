@@ -1217,8 +1217,8 @@ match replays exactly from its input stream.
 - A full match to matchEnd in the headless runs of the first three kits: they run
   a fixed 3600 ticks of free play, and only Lumeth's four seeded runs and the 18
   cells of Ondrel and Brimwick play to the end (see Testing). A 3v3 with the six
-  kits is not played either, nor is a balance report over six (the harness
-  roster stays four).
+  kits is not played in a bots test either; the balance report plays 3v3s over
+  the six (`balance.md` section 5.9, #189).
 - A lead for an area that is derived from the kit: the nominal lead stays, which
   the Mire and Drowned Ground measured at the optimum for. The one-hit areas
   (Firecracker, and Binding Sigil, which was not measured) read the other way:
@@ -1680,9 +1680,10 @@ the Ondrel dash row without its `dash` and ten rows or literals of the tables
 (each one test of the table test), the held literal at 54 (the Grand Finale
 run), and the old turn-order condition (the hand-built state).
 
-The win rates are re-measured for the six-kit balance report (not for
-`balance.md`: the harness roster stays four). A scratch test, not committed (it
-is the design of #155's check), plays 9 pairings with every other kit as the
+The win rates are re-measured for the six-kit balance report (the harness
+roster is six since #189, and `balance.md` section 5.9 reads the same pairings
+on 200 matches a cell). A scratch test, not committed (it is the design of
+#155's check), plays 9 pairings with every other kit as the
 filler of both teams, on both arenas, seeds 1 to 10 (the match seed, the bots'
 seeds 100 times it plus the id), normal tier, the teams alternating by parity:
 720 matches. The first kit's wins out of 80, and the longest match, before the
@@ -1708,7 +1709,8 @@ loses 61 and 69 of 80), and wins 38 of 80 against Brimwick where the roster has
 her win; the profiled Brimwick comes out the opposite of the roster on four of
 four (she wins 75 of 80 against Hargrim and 78 against Skerrow, and loses 61 to
 Quillon and 71 to Lumeth): a matter of the kits and of the six-kit balance
-report, not of the bots.
+report, not of the bots; the report (`balance.md` section 5.9) measures the same
+inversion in all 16 cells of those four pairings.
 
 The identity harness (the "harness text" of the body of PR #142, 16 rows) is
 unchanged by the profiles and the streak: none of its 16 rows has an Ondrel or a
