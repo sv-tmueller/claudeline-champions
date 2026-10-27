@@ -186,7 +186,7 @@ describe.each(RECORDED)('the recorded state, $name', (row) => {
 // land a damage event between them and one of them must die. The ring of the round clock played no
 // part (both stood from tick 480, before the ring closed), so the scene is free play. The budget
 // is twice the slowest death measured, rounded up to 100: 697 ticks (easy, seed 6, bot seeds 602
-// and 605; the seeds of the test, 601 and 603, give 618 at the slowest on normal).
+// and 605; the seeds of the test, 601 and 603, give 587 at the slowest on normal).
 describe('the end-ring stand of #123, stepped', () => {
   const BUDGET = 1400;
   const ZERO: PlayerInput = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0 };
