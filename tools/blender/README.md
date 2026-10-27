@@ -21,6 +21,7 @@ tools/blender/run.sh tools/blender/gen_champion.py -- --champion lumeth --out as
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion skerrow --out assets/models/champions/skerrow.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion ondrel --out assets/models/champions/ondrel.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion brimwick --out assets/models/champions/brimwick.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion durnhal --out assets/models/champions/durnhal.glb
 python3 tools/blender/validate_glb.py assets/models
 python3 -B -m unittest discover -s tools/blender -p 'test_*.py'
 ```
@@ -34,12 +35,12 @@ newer and no packages, so they can run in CI.
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
-| `gen_champion.py` | Builds the placeholder or one of the six roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
+| `gen_champion.py` | Builds the placeholder or one of the seven roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
 | `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
 | `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json`: the five materials, the floor field and trim border, one trim disc per spawn, the chamfered obstacle tops and the wall caps. Standard library only, no Blender |
-| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel and Brimwick and colour rules. Standard library only, no Blender |
+| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel, Brimwick and Durnhal and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names, a champion's rig and clips and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator, one rejection per rig and clip rule against a synthetic rigged document, and a drift test between the two tables in `assets.md` and the validator's constants. The committed-model tests need `assets/models` to exist |
 
@@ -105,7 +106,7 @@ not vertical.
 ### Champion
 
 - `--champion <id>` writes `assets/models/champions/<id>.glb`. The ids are
-  `placeholder`, the generic model, and the six roster ids below.
+  `placeholder`, the generic model, and the seven roster ids below.
 - One mesh node named `Champion`, built in one bmesh with a material per part.
   The head sphere and the halo ring are built from explicit vertices and
   faces, because `bmesh.ops.create_uvsphere` changes its face vertex order
@@ -115,10 +116,12 @@ not vertical.
   `rotation.y = aimAngle` directly. An accent-coloured visor and chest plate
   mark the front.
 - Body and accent are flat colours.
-- All seven files share the node layout, the origin, the facing, the body
+- All eight files share the node layout, the origin, the facing, the body
   geometry, the rig, the clips and the accent. A roster champion differs only
-  in the body colour and one cue mesh, which is in the body colour so the
-  accent still marks only the front.
+  in the body colour and one cue, which is in the body colour so the accent
+  still marks only the front. A cue can be several boxes: one on Spine for
+  Ondrel and Brimwick, two on Spine for Hargrim, and three on the two arms for
+  Durnhal.
 - The scene lists `Rig`, whose children are the joint `Hips` and the skinned
   mesh `Champion`. The rest pose is the static geometry, so the bind pose
   equals it and a model with no clip playing looks as it did unrigged. Every
@@ -149,6 +152,7 @@ not vertical.
 | `skerrow` | assassin | (0.03, 0.03, 0.03) | `#303030` | short blade forward from the right hand |
 | `ondrel` | zone controller | (0.03, 0.30, 0.03) | `#309530` | reed bundle on the back, top at 1.82 m |
 | `brimwick` | burst caster | (0.74, 0.12, 0.00) | `#df6100` | fuse cap on top of the head, top at 1.82 m |
+| `durnhal` | guardian tank | (0.19, 0.18, 0.00) | `#797600` | box shield on the left arm and a hammer in the right hand, top at 1.34 m |
 
 The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
 checked by `test_champion_models.py`. No body has a blue channel more than 45
@@ -176,6 +180,20 @@ the result panel and the menu, so one of the two had to move. The body moved,
 24.1 from the reserved value, and the HUD stayed. Its nearest colours are
 Hargrim at 84.7, the HUD energy colour at 85.2 and the enemy bar at 87.5. The
 nearest to Ondrel are the dead grey at 93.1 and Skerrow at 101.0.
+
+Durnhal's olive brass, (0.19, 0.18, 0.00), is decision 2 of batch #203. Its
+nearest colours are Hargrim at 91.9, Ondrel at 92.7, Lumeth at 95.0, Brimwick
+at 104.1, Skerrow at 112.0 and the dead grey at 118.3. The floor is 168.1 away,
+and the other client and trim colours 160.9 or more, the HUD colours 146.0 or
+more (the energy colour `#ffb000` is the nearest). The shield is a plate
+0.30 by 0.04 by 0.60 m, 1 cm off `Arm_L` and below the shoulder. The hammer
+hangs from `Arm_R`: a haft 0.05 by 0.05 by 0.40 m and a head 0.22 by 0.14 by
+0.14 m, 7 cm outside the arm so it shows from above. The head is 0.22 m long
+and the hammer sits at y = -0.41 for two reasons: at 0.28 m the head sinks
+3.3 mm under the floor at Death key 30, and at y = -0.34 the head's y span
+equals the arm's, so from above it adds only 4 cm strips in front of and
+behind the arm. The model has 600 vertices and 288 triangles, a ground radius of
+0.4924 m and 39 780 bytes.
 
 That client test keeps its own `BODY_COLOURS` table with the bodies above, so
 change both in the same commit.
