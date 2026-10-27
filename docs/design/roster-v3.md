@@ -1,0 +1,85 @@
+# Roster v3: champions seven to nine
+
+Status: in progress; Durnhal's section is written, Wrenna's and Ysmeer's come in their own series
+Source of truth for numbers: [roster v3 design spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
+
+This document defines champions seven to nine of the roster: a guardian tank,
+a bow archer and a star caster. The [design
+spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md) proposes
+the names, the ids and the archetypes, and gives every number as a draft. Each
+champion's design package fixes its numbers here, against the catalog, the
+same way [roster v2](roster-v2.md) fixed Ondrel's and Brimwick's. The six
+champions of [roster v1](roster-v1.md) and [roster v2](roster-v2.md) are
+unchanged.
+
+## 0. How to read the numbers
+
+- Numbers marked `[draft]` are the spec's proposals and are not final. A
+  number marked `[tuned]` is a first value that the balance pass may move.
+  Both markers are kept exactly as the spec has them until a design package
+  fixes the number and says so.
+- [Roster v1](roster-v1.md), section 0, and [roster v2](roster-v2.md),
+  section 0, hold unchanged and are not copied here: the spec values, the
+  tuning values, the energy table, the toolkit, the windup rules, the EX
+  rules, the move speed and radius, the kit data rules and the model rules.
+- The names are the spec's proposal. The "-like" tags are the mechanical
+  inspiration only; every name, look and colour is original (ADR-005).
+- One section per champion. Durnhal's is section 1. Wrenna's and Ysmeer's
+  sections are added by their own series (roadmap issue
+  [#176](https://github.com/sv-tmueller/claudeline-champions/issues/176),
+  steps 3.1 and 4.1), and the counter web over all nine and the range table
+  come when the three are in (spec section 5.4).
+- Statuses and mechanics a kit needs that the catalog does not have yet are
+  named in the champion's section. Each is built in its own package with a
+  rules entry before the kit that uses it.
+
+## 1. Durnhal, the guardian tank
+
+Durnhal is Sentinel-like and brings the `wound` status (#158).
+
+**Fantasy.** A heavy shield-and-hammer warden who walks into the enemy healer
+and makes every heal worth less. His own name, look and colours.
+
+**Role and range.** Frontline tank and healer-breaker. Intended range 0 to
+3.5 m, with a thrown hammer that reaches 9 m. Max health 160.
+
+**Abilities.**
+
+| Slot | Name | What it does `[draft]` |
+|---|---|---|
+| M1 | Warhammer | Melee arc 100 degrees, 3.5 m: 10 damage and 1 `wound` stack (240 ticks). Cooldown 0.6 s. |
+| M2 | Sundering Blow | Area 2 m ahead, radius 2 m, one hit: 16 damage and 1 `wound` stack. Windup 0.4 s, slowed. Cooldown 5 s. **EX:** 22 damage and 2 stacks. |
+| SPACE | Bulwark Charge | Dash 5 m; at the end a one-hit self area, radius 1.5 m: knockback 2 m away. Cooldown 8 s. |
+| Q | Grounding Slam | Self area, radius 2.5 m, one hit: 10 damage and root 1 s. Cooldown 10 s. |
+| E | Breaker Throw | Projectile, speed 18, range 9 m: 16 damage, 1 `wound` stack and slow 30 percent for 1.5 s. Cooldown 7 s. **EX:** 22 damage and 2 stacks. |
+| R | Aegis Line | Self area, radius 4 m, targets allies (him included): shield 25 for 4 s. Cooldown 14 s. |
+| F | Last Bastion | Self area, radius 4.5 m, one hit: 30 damage, 3 `wound` stacks and slow 50 percent for 2 s; he gains a 50 shield for 4 s. Windup 0.5 s, locked. |
+
+**Counter web (intent).** Beats Lumeth (`wound` on her targets), Skerrow
+(roots and shields stop the dive), Hargrim (outlasts the bruiser). Loses to
+Quillon (kited from 13 m) and Brimwick (her burst ignores shields' timing).
+
+**Statuses the kit needs.** One, `wound`, an anti-heal (#158, built in batch
+#193 as PR #194). Durnhal is the champion that brings it, and no shipped kit
+uses it. Every other effect in his table is in the toolkit. The summary below
+is the spec's section 4.1, and rules.md 4.1 holds the catalog row once the
+status is merged.
+
+- **What it reduces:** every `heal` effect and every `hot` pulse that lands
+  on the holder. Shields are not healing and are not reduced.
+- **Stacks, BLC style:** every application adds stacks, whoever applies it,
+  the same caster included, up to a cap of 3 stacks. An application carries
+  `stacks: 1..3` (default 1) and adds that many, so one hit that applies 3
+  stacks is one application. The holder keeps one stack count and one timer.
+  On each application the timer becomes the longer of what is left and the
+  new application's duration. When the timer runs out, all stacks go at once.
+- **Strength:** 10 percent less healing per stack, so 30 percent at the cap
+  `[tuned]`. The percent per stack is a catalog constant, not a per-kit
+  field.
+- **Duration:** 120 to 300 ticks per application in the catalog `[tuned]`.
+  The table gives 240 ticks for M1 and leaves the other `wound`
+  applications to the design package.
+- **Invulnerable** blocks its application, like every hostile status.
+- **Energy:** a reduced heal still pays support energy by the existing rule:
+  it pays if it restores any health.
+- **Arithmetic:** the reduced amount is `amount * (100 - 10 * stacks) / 100`.
