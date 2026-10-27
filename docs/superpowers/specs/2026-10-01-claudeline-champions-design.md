@@ -178,7 +178,7 @@ Different sources stack unless the design doc says otherwise for that status.
 Stun blocks movement and casting. Root blocks movement only. Silence blocks
 casting only.
 
-Amended 2026-10-27 by [batch #193 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/193), for #158, per the roster v3 design section 4.1 (#175): the catalog gains `wound`, whose stacks add from every source, the same one included, so the same-source refresh rule does not apply to it.
+Amended 2026-10-27 by [batch #193 decision 2](https://github.com/sv-tmueller/claudeline-champions/issues/193#issuecomment-6434714202), for #158, per the roster v3 design section 4.1 (#175): the catalog gains `wound`, whose stacks add from every source, the same one included, so the same-source refresh rule does not apply to it.
 
 ### 4.6 Abilities
 

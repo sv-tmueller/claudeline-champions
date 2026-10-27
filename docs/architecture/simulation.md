@@ -159,21 +159,20 @@ hold the entities in ascending id order; removed ones are filtered out after a
 phase, never spliced during iteration.
 
 An effect is plain data and the entity holds its own copy, so kit constants are
-never aliased into the state. The `Effect` union is `damage { amount }`, `heal
-{ amount }`, `applyStatus { status }` (a status spec: the type, `ticks` and the
-strength field of that type, for `wound` the optional `stacks`), `shield { absorb, ticks }`, `knockback
-{ distance, ticks, direction: 'away' | 'toward' }` and `energyGain { amount }`
-(an integer from 1 to 100; only `landHit` reads it). A hit applies its effects
-in list order to each champion it lands on, with the owner as the source and
-the slot of the cast that made it, or no slot for a dev tool spawn. A
-projectile with `allyEffects` applies that list to a champion of the owner's team
-(never the owner while it flies; a cast aimed at the caster applies it to her, see
-Firing) and `effects` to a champion of the other team; both lists hold
-the `Effect` union, and a `damage` in `allyEffects` is allowed and earns no
-energy. `away`
-points from the hit origin (the projectile contact point, the area centre, the
-arc origin) to the target, `toward` from the target to the owner's current
-position, and a zero vector means no push.
+never aliased into the state. The `Effect` union is `damage { amount }`, `heal {
+amount }`, `applyStatus { status }` (a status spec: the type, `ticks` and the
+strength field of that type, for `wound` the optional `stacks`), `shield {
+absorb, ticks }`, `knockback { distance, ticks, direction: 'away' | 'toward' }`
+and `energyGain { amount }` (an integer from 1 to 100; only `landHit` reads it).
+A hit applies its effects in list order to each champion it lands on, with the
+owner as the source and the slot of the cast that made it, or no slot for a dev
+tool spawn. A projectile with `allyEffects` applies that list to a champion of
+the owner's team (never the owner while it flies; a cast aimed at the caster
+applies it to her, see Firing) and `effects` to a champion of the other team;
+both lists hold the `Effect` union, and a `damage` in `allyEffects` is allowed
+and earns no energy. `away` points from the hit origin (the projectile contact
+point, the area centre, the arc origin) to the target, `toward` from the target
+to the owner's current position, and a zero vector means no push.
 
 `Slot` (`M1`, `M2`, `SPACE`, `Q`, `E`, `R`, `F`) and `SLOTS` in `input.ts` list the
 slots in `Button` bit order.
@@ -432,9 +431,9 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
 ## Statuses
 
 Catalog: stun, root, silence, invulnerable, slow (percent), haste (percent),
-shield (absorb amount), damage over time (`dot`), heal over time (`hot`),
-wound (an anti-heal, #158) and knockback. The values and ranges that bind kits are in [rules](../design/rules.md)
-section 4; this section is what the sim does.
+shield (absorb amount), damage over time (`dot`), heal over time (`hot`), wound
+(an anti-heal, #158) and knockback. The values and ranges that bind kits are in
+[rules](../design/rules.md) section 4; this section is what the sim does.
 
 ### Record
 
@@ -513,29 +512,30 @@ kills the holder ends its upkeep.
 ### Wound
 
 A wound cuts the healing its holder receives: 10 percent per stack, up to 3
-stacks (`WOUND_PERCENT_PER_STACK`, `WOUND_MAX_STACKS`). A spec is `{ type: 'wound',
-ticks, stacks? }`; `stacks` is an integer from 1 to 3 and defaults to 1, and when
-it is absent the copy leaves the key out (a `stacks: undefined` would break
-`checksum` and the kit round trip). The 120 to 300 tick range is a catalog
-range, held by the roster tests, not by the validator.
+stacks (`WOUND_PERCENT_PER_STACK`, `WOUND_MAX_STACKS`). A spec is `{ type:
+'wound', ticks, stacks? }`; `stacks` is an integer from 1 to 3 and defaults to
+1, and when it is absent the copy leaves the key out (a `stacks: undefined`
+would break `checksum` and the kit round trip). The 120 to 300 tick range is a
+catalog range, held by the roster tests, not by the validator.
 
 An application adds its stacks to the holder's, up to 3, whoever applies it. The
-holder has one instance, with one stack count and one timer. The new timer is the
-longer of what is left and the new `ticks`, so a short application never cuts a
-long one. When neither the count nor the timer would change, the call returns
-false and emits nothing. Otherwise the old instance ends as `replaced` and the
-new one is appended, with the source of the application, so the events are
-`statusExpired` (`replaced`) then `statusApplied` with the merged timer. The
-timer counts down like any status, and all stacks fall together as one `expired`.
+holder has one instance, with one stack count and one timer. The new timer is
+the longer of what is left and the new `ticks`, so a short application never
+cuts a long one. When neither the count nor the timer would change, the call
+returns false and emits nothing. Otherwise the old instance ends as `replaced`
+and the new one is appended, with the source of the application, so the events
+are `statusExpired` (`replaced`) then `statusApplied` with the merged timer. The
+timer counts down like any status, and all stacks fall together as one
+`expired`.
 
-The cut is in `applyHeal`, when each heal lands, before the max-health clamp, so a
-hot pulse reads the stacks again on every pulse. The restored amount is `amount *
-(100 - 10 * stacks) / 100`: the multiplication, then the division, each a
-correctly rounded double operation, and not rounded to an integer, as health is
-fractional. Without a wound the amount is used as it is, with no arithmetic. The
-`heal` event and the return value carry the cut amount, so `landHit` sees what
-was restored and a cut heal that still restores health pays support energy as
-before. Shields are not healing and are not cut.
+The cut is in `applyHeal`, when each heal lands, before the max-health clamp, so
+a hot pulse reads the stacks again on every pulse. The restored amount is
+`amount * (100 - 10 * stacks) / 100`: the multiplication, then the division,
+each a correctly rounded double operation, and not rounded to an integer, as
+health is fractional. Without a wound the amount is used as it is, with no
+arithmetic. The `heal` event and the return value carry the cut amount, so
+`landHit` sees what was restored and a cut heal that still restores health pays
+support energy as before. Shields are not healing and are not cut.
 
 ### Knockback
 
