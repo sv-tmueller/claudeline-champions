@@ -21,25 +21,40 @@ function balance(...args: string[]) {
 }
 
 describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
-  it('writes the block of a 1-seed run to --out and prints the wall time to stdout only', { timeout: 60_000 }, () => {
+  it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 60_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), 'balance-'));
     try {
       const file = join(dir, 'report.md');
-      const run = balance('--seeds', '1', '--out', file);
+      const run = balance('--mode', '2v2', '--seeds', '1', '--out', file);
       expect(run.status, run.stderr).toBe(0);
-      expect(run.stdout).toMatch(/played 48 matches in \d+\.\d s/);
+      // Four kits: 6 pairings on 2 arenas, each with 2 fills and 1 seed.
+      expect(run.stdout).toMatch(/played 24 matches in \d+\.\d s/);
       const text = readFileSync(file, 'utf8');
       expect(text.startsWith(`${REPORT_START}\n`)).toBe(true);
       expect(text.endsWith(`${REPORT_END}\n`)).toBe(true);
-      expect(text.split('\n').filter((line) => /^\| [23]v[23] \|/.test(line))).toHaveLength(24);
+      expect(text.split('\n').filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(12);
+      expect(text.split('\n').filter((line) => /^\| 3v3 \|/.test(line))).toHaveLength(0);
+      expect(text).toContain('Seeds 1 to 1 for each config');
       expect(text).not.toMatch(/\d+\.\d s\b/);
     } finally {
       rmSync(dir, { recursive: true });
     }
   });
 
-  it('exits 1 with a message on an unknown flag, on a bad --seeds and on --check with --out', () => {
-    for (const args of [['--bogus'], ['--seeds', '0'], ['--seeds', 'x'], ['--check', '--out', 'x.md']]) {
+  it('exits 1 with a message on an unknown flag, a bad --seeds, a bad --mode, --check with --out and --mode alone', () => {
+    const bad = [
+      ['--bogus'],
+      ['--seeds', '0'],
+      ['--seeds', 'x'],
+      ['--check', '--out', 'x.md'],
+      ['--mode'],
+      ['--mode', '4v4'],
+      ['--mode', '2V2', '--out', 'x.md'],
+      // A single mode never writes the doc: it needs --out or --check.
+      ['--mode', '2v2'],
+      ['--mode', '3v3', '--seeds', '1'],
+    ];
+    for (const args of bad) {
       const run = balance(...args);
       expect(run.status, args.join(' ')).toBe(1);
       expect(run.stderr.length, args.join(' ')).toBeGreaterThan(0);

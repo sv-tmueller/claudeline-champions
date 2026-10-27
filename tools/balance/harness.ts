@@ -201,48 +201,115 @@ export interface RunInputs {
   arenas: readonly ArenaDef[];
 }
 
+/** The modes in report order. */
+export const MODES: readonly Mode[] = ['2v2', '3v3'];
+
 /**
- * Plays every cell: the modes, then the arenas, then the pairings; within a cell each fill in
- * turn with the seeds 1 to `seeds`. `onMatch` hears of each finished match, for progress only.
+ * The seeds each mode plays, 1 to the count; a mode left out is not played. A full run names both,
+ * a `--mode` run one.
  */
-export function playCells(
-  inputs: RunInputs,
-  seeds: number,
-  onMatch?: (done: number) => void,
-): Cell[] {
-  const kitIds = inputs.kits.map((kit) => kit.id);
+export type SeedSchedule = Partial<Record<Mode, number>>;
+
+/** What a cell plays: about this many matches (decision 3 of batch #193), whatever its fills. */
+export const CELL_TARGET = 200;
+
+/** The fills of a pairing over `kitCount` kits: each kit outside the pair in 2v2, each ordered pair of them in 3v3. */
+export function fillCount(mode: Mode, kitCount: number): number {
+  const others = kitCount - 2;
+  return mode === '2v2' ? others : others * (others - 1);
+}
+
+/**
+ * The seeds of each config of a cell with `fills` fills: the largest even number at or under the
+ * target over the fills, even so that both sides of X get the same seeds. A cell with more than 100
+ * fills would get none and throws.
+ */
+export function seedsPerConfig(fills: number): number {
+  const seeds = 2 * Math.floor(CELL_TARGET / fills / 2);
+  if (!Number.isSafeInteger(seeds) || seeds < 2) {
+    throw new Error(`a cell of ${fills} fills cannot hold ${CELL_TARGET} matches on an even seed count`);
+  }
+  return seeds;
+}
+
+/** The schedule of a run over `kitCount` kits: each mode's seeds from its fills, 100 and 100 at four kits. */
+export function seedSchedule(kitCount: number): Record<Mode, number> {
+  return {
+    '2v2': seedsPerConfig(fillCount('2v2', kitCount)),
+    '3v3': seedsPerConfig(fillCount('3v3', kitCount)),
+  };
+}
+
+/** A cell to play: its configs (the fills of the pairing in the mode) on seeds 1 to `seeds`. */
+export interface CellPlan extends Pairing {
+  mode: Mode;
+  arena: string;
+  configs: Config[];
+  seeds: number;
+}
+
+/**
+ * The cells of a run, in the order they are played and reported: the modes of the schedule, then
+ * the arenas, then the pairings. It plays nothing. It throws on fewer than two kits and on a
+ * pairing with no fill in a played mode (fewer than three kits in 2v2, four in 3v3), which would
+ * read as a cell of 0 matches.
+ */
+export function planCells(
+  kitIds: readonly string[],
+  arenaIds: readonly string[],
+  schedule: SeedSchedule,
+): CellPlan[] {
   const all = configs(kitIds);
   const allPairings = pairings(kitIds);
   // One kit (or none) has no pairing, so the loop below never runs and the run would play 0 matches.
   if (allPairings.length === 0) throw new Error('There is no pairing: a run needs at least two kits.');
-  // A pairing with no fill in a mode (fewer than three kits in 2v2, four in 3v3) would read as a cell
-  // of 0 matches, so refuse before the first match.
-  for (const mode of ['2v2', '3v3'] as const) {
+  const plan: CellPlan[] = [];
+  for (const mode of MODES) {
+    const seeds = schedule[mode];
+    if (seeds === undefined) continue;
     for (const pairing of allPairings) {
       if (!all.some((c) => c.mode === mode && c.x === pairing.x && c.y === pairing.y)) {
         throw new Error(`${pairing.x} v ${pairing.y} has no fill in ${mode}: it needs more kits.`);
       }
     }
-  }
-  const cells: Cell[] = [];
-  let done = 0;
-  for (const mode of ['2v2', '3v3'] as const) {
-    for (const arena of inputs.arenas) {
+    for (const arena of arenaIds) {
       for (const pairing of allPairings) {
-        const cell: Cell = { mode, arena: arena.id, x: pairing.x, y: pairing.y, played: [] };
         const mine = all.filter((c) => c.mode === mode && c.x === pairing.x && c.y === pairing.y);
-        for (const config of mine) {
-          for (let seed = 1; seed <= seeds; seed++) {
-            const record = playMatch(config, arena, inputs.kits, seed);
-            cell.played.push({ fill: config.fill.join('+'), seed, record });
-            onMatch?.(++done);
-          }
-        }
-        cells.push(cell);
+        plan.push({ mode, arena, x: pairing.x, y: pairing.y, configs: mine, seeds });
       }
     }
   }
-  return cells;
+  return plan;
+}
+
+/**
+ * Plays every cell of the plan: within a cell each fill in turn with the seeds 1 to the mode's
+ * count. `onMatch` hears of each finished match, for progress only.
+ */
+export function playCells(
+  inputs: RunInputs,
+  schedule: SeedSchedule,
+  onMatch?: (done: number) => void,
+): Cell[] {
+  const plan = planCells(
+    inputs.kits.map((kit) => kit.id),
+    inputs.arenas.map((arena) => arena.id),
+    schedule,
+  );
+  let done = 0;
+  return plan.map((planned) => {
+    const arena = inputs.arenas.find((a) => a.id === planned.arena);
+    if (arena === undefined) throw new Error(`no arena ${planned.arena}`);
+    const cell: Cell = { mode: planned.mode, arena: planned.arena, x: planned.x, y: planned.y, played: [] };
+    for (const config of planned.configs) {
+      for (let seed = 1; seed <= planned.seeds; seed++) {
+        const record = playMatch(config, arena, inputs.kits, seed);
+        cell.played.push({ fill: config.fill.join('+'), seed, record });
+        onMatch?.(++done);
+      }
+    }
+    return cell;
+  });
 }
 
 /** One played match of a cell: the fill it had and the seed, with its record. */
@@ -380,6 +447,18 @@ function mean(ticks: number, count: number): string {
   return count === 0 ? '-' : String(Math.round(ticks / count));
 }
 
+/** The head of the seed line: one count for each config when the played modes share it, else each mode's. */
+function seedsText(seeds: SeedSchedule): string {
+  const played = MODES.flatMap((mode) => {
+    const count = seeds[mode];
+    return count === undefined ? [] : [{ mode, count }];
+  });
+  const first = played[0];
+  if (first === undefined) throw new Error('no seeds: the schedule names no mode');
+  if (played.every((p) => p.count === first.count)) return `Seeds 1 to ${first.count} for each config`;
+  return `Seeds ${played.map((p) => `1 to ${p.count} for each ${p.mode} config`).join(' and ')}`;
+}
+
 function row(cells: readonly string[]): string {
   return `| ${cells.join(' | ')} |`;
 }
@@ -426,8 +505,8 @@ const CELL_HEADER = [
 export interface ReportInput {
   /** The short head the sources were read at; it goes into the head line only. */
   head: string;
-  /** The seeds played, 1 to `seeds`. */
-  seeds: number;
+  /** The seeds played, 1 to the count of each mode; a mode left out was not played. */
+  seeds: SeedSchedule;
   kitIds: readonly string[];
   cells: readonly Cell[];
 }
@@ -440,7 +519,7 @@ export function renderReport(input: ReportInput): string {
     REPORT_START,
     `${HEAD_PREFIX} from the sources at \`${input.head}\`.`,
     '',
-    `Seeds 1 to ${input.seeds} for each config, every bot at the normal tier. X's rate`,
+    `${seedsText(input.seeds)}, every bot at the normal tier. X's rate`,
     'is the share of the decided matches X won, in percent; the band is 40 to 60',
     'inclusive, on the exact rate.',
     `Cells in band: ${inside} of ${summaries.length}.`,
@@ -515,6 +594,25 @@ export function sameReport(a: string, b: string): boolean {
   const x = withoutHead(a);
   const y = withoutHead(b);
   return x.length === y.length && x.every((line, i) => line === y[i]);
+}
+
+/** The lines of a block that belong to one mode: its cell rows and its budget-hit lines. */
+export function modeLines(block: string, mode: Mode): string[] {
+  const rowStart = `| ${mode} |`;
+  const hit = new RegExp(`^- .+ v .+, ${mode}, [^,]+, with `);
+  return block.split('\n').filter((line) => line.startsWith(rowStart) || hit.test(line));
+}
+
+/**
+ * True when two blocks agree on the cell rows and the budget-hit lines of one mode (`--check
+ * --mode`); every other line is left out. A mode with no row in either block is not the same: an
+ * empty comparison proves nothing.
+ */
+export function sameModeReport(a: string, b: string, mode: Mode): boolean {
+  const x = modeLines(a, mode);
+  const y = modeLines(b, mode);
+  const hasRow = (lines: string[]) => lines.some((line) => line.startsWith(`| ${mode} |`));
+  return hasRow(x) && hasRow(y) && x.length === y.length && x.every((line, i) => line === y[i]);
 }
 
 /** A champion's matches in the cells it is X or Y in: X's wins for X, the rest for Y. */
