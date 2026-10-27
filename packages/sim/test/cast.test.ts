@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Button, SLOTS, createMatch, step } from '../src/index';
 import type {
   AbilityEffect,
+  Effect,
   GameState,
   KitDef,
   MatchConfig,
@@ -929,13 +930,13 @@ describe('a cast projectile with allyEffects', () => {
 });
 
 describe('the self-cast rule: an ally projectile aimed at the caster lands on her', () => {
-  const allyEffects: AbilityEffect[] = [
+  const allyEffects: Effect[] = [
     { type: 'heal', amount: 10 },
     { type: 'applyStatus', status: { type: 'hot', perPulse: 5, ticks: 120 } },
     { type: 'shield', absorb: 30, ticks: 180 },
     { type: 'applyStatus', status: { type: 'haste', percent: 20, ticks: 90 } },
   ];
-  const selfBolt: AbilityEffect = {
+  const selfBolt: Extract<AbilityEffect, { type: 'projectile' }> = {
     type: 'projectile',
     speed: 20,
     radius: 0.5,
@@ -946,7 +947,7 @@ describe('the self-cast rule: an ally projectile aimed at the caster lands on he
   };
 
   /** Champion 0 (a support, health 100, energy 10) at (-5, 0); the enemy 2 stands 1.5 m ahead of her. */
-  function selfSetup(bolt: AbilityEffect = selfBolt): GameState {
+  function selfSetup(bolt: typeof selfBolt = selfBolt): GameState {
     const state = setup([kitWith('k0', { M1: quiet({ effects: [bolt] }) }, { support: true })]);
     place(state, 2, -3.5, 0);
     champion(state, 0).health = 100;
