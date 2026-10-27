@@ -627,11 +627,11 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   from the target (see the landing above), so the hold never reaches it, and it
   has no band, so nothing else presses it. Reed Step is the second: on an escape
   think `chooseEscape` marks it tried the same way, so the walk skips it before
-  the hold; off one, its band of 1 m from its area lets the walk press it only at
-  a target that touches her. A dash escape
-  for another kit (Lunge away) is not built. A press the hold withholds leaves
-  the slot unpressed on that think: the walk goes on to the next slot, and a dash
-  with an EX variant that would be cast is not replaced by its base.
+  the hold; off one, its band of 1 m from its area lets the walk press it only
+  at a target that touches her. A dash escape for another kit (Lunge away) is
+  not built. A press the hold withholds leaves the slot unpressed on that think:
+  the walk goes on to the next slot, and a dash with an EX variant that would be
+  cast is not replaced by its base.
 - Smoke Pot (Brimwick R) is the second escape of her order, with no landing: its
   area slows every enemy within 3.5 m by 40 percent for 90 ticks, and she herself
   gains 40 percent haste for the same time, which is the way out that a Flare Step
@@ -1233,11 +1233,10 @@ match replays exactly from its input stream.
   the six (`balance.md` section 5.9, #189).
 - A lead for an area that is derived from the kit: the nominal lead stays, which
   for the Mire and Drowned Ground measured within a point of the best (see Aim).
-  The one-hit areas
-  (Firecracker, and Binding Sigil, which was not measured) read the other way:
-  Firecracker lands 93.5 percent of its pulses on an enemy with the nominal lead
-  and 98 and more with the offset capped at the radius (see Aim); a follow-up,
-  low priority.
+  The one-hit areas (Firecracker, and Binding Sigil, which was not measured)
+  read the other way: Firecracker lands 93.5 percent of its pulses on an enemy
+  with the nominal lead and 98 and more with the offset capped at the radius
+  (see Aim); a follow-up, low priority.
 - Local steering around champions (the dodge ignores them), and ally logic
   beyond Lumeth's ally slots (peeling for an ally).
   Dodging an area is not built either; the dodge is built for projectiles (see
