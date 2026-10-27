@@ -135,6 +135,16 @@ Silence, root, slow and knockback do not interrupt a windup. Root skips only the
 
 An interrupted cast fires no effects. Its cooldown stays running and its energy cost is not refunded.
 
+### 2.5 The self-cast rule
+
+When a cast fires a projectile that has ally effects, and the aim position of that tick lies within the caster's own circle (a distance of at most 0.5 m from the caster's centre, the boundary included), the projectile does not spawn. Its ally effects land on the caster instead `[spec]`.
+
+- A heal, and each pulse of a heal over time, restores 60 percent of its amount `[tuned]`. The other ally effects, such as a shield or a haste, land in full.
+- The effects meant for enemies do nothing, because no projectile exists to meet one.
+- Energy is unchanged: healing yourself gives nothing (section 3.1), and the cast pays no more than any other cast of that slot.
+- A wound status, which cuts healing, multiplies the reduced amount: the self-cast factor comes first, then the wound cut.
+- A player who holds the mouse on their own champion triggers the rule, as the aim position alone decides it.
+
 ## 3. Energy economy
 
 - Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.
