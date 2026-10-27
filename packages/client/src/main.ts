@@ -299,11 +299,16 @@ function writeCombatHooks(): void {
   }
 }
 
-/** Runs the sim. Never draws. One sampled input feeds every step of the frame. */
+/**
+ * Runs the sim. Never draws. The cursor is sampled once per frame, but the human's input is
+ * mapped before every step: while the self-cast key is held the aim is the champion's own
+ * position, and a cast reads it before she moves in that step, so a once-per-frame mapping
+ * would drift by every step of a long frame (client.md, Input).
+ */
 function stepSim(steps: number): void {
   sampleAim();
-  inputs[HUMAN_ID] = input.toPlayerInput(aimX, aimY);
   for (let i = 0; i < steps; i++) {
+    inputs[HUMAN_ID] = input.toPlayerInput(aimX, aimY, human);
     capturePoses(state.champions, previousPoses);
     projectileViews.capture(state.projectiles);
     areaViews.capture(state.areas);

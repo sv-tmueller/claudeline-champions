@@ -17,6 +17,7 @@ const ACTION_LABELS: Readonly<Record<Action, string>> = {
   E: 'E',
   R: 'R',
   F: 'Ultimate',
+  selfCast: 'Self-cast (hold)',
 };
 
 /** The things the menu listens to for a click. Elements in the page, event targets in a test. */

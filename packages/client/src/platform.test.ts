@@ -63,6 +63,15 @@ describe('readSettings', () => {
     expect(readSettings(text(1, rest))).toEqual(DEFAULTS);
   });
 
+  // Settings saved before #162 hold nine actions. They load as the defaults whole, the mute
+  // resets to false too, and there is no version bump (client.md, Platform).
+  it('reads the defaults, with the mute reset, for a set saved before the self-cast key existed', () => {
+    const nine = { up: 'KeyI', left: 'KeyJ', down: 'KeyK', right: 'KeyL', SPACE: 'Space', Q: 'KeyT', E: 'KeyE', R: 'KeyR', F: 'KeyF' };
+    expect(readSettings(text(2, nine, true))).toEqual(DEFAULTS);
+    expect(readSettings(text(1, nine))).toEqual(DEFAULTS);
+    expect(DEFAULTS.version).toBe(2);
+  });
+
   it('reads the defaults when the bindings are not an object', () => {
     for (const bad of [null, 'KeyW', 7, [], ['KeyW']]) expect(readSettings(text(2, bad, true)), JSON.stringify(bad)).toEqual(DEFAULTS);
     expect(readSettings(JSON.stringify({ version: 2, muted: true }))).toEqual(DEFAULTS);

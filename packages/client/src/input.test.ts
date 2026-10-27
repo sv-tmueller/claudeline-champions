@@ -134,6 +134,79 @@ describe('input core: aim', () => {
   });
 });
 
+describe('input core: the held self-cast key', () => {
+  const SELF = { x: -11.996, y: 2.004 };
+
+  it('sets no button bit and aims at the champion in whole centimetres', () => {
+    const core = createInputCore();
+    press(core, 'KeyC');
+    const input = core.toPlayerInput(1500, -300, SELF);
+    expect(input.buttons).toBe(0);
+    expect([input.aimX, input.aimY]).toEqual([-1200, 200]);
+  });
+
+  it('turns a rounded -0 into 0, as the sim does for aim', () => {
+    const core = createInputCore();
+    press(core, 'KeyC');
+    const input = core.toPlayerInput(1500, -300, { x: -0.004, y: -0.004 });
+    expect(Object.is(input.aimX, 0)).toBe(true);
+    expect(Object.is(input.aimY, 0)).toBe(true);
+  });
+
+  it('returns the aim to the cursor when the key is released', () => {
+    const core = createInputCore();
+    press(core, 'KeyC');
+    core.keyUp('KeyC', NO_MODS);
+    const input = core.toPlayerInput(1500, -300, SELF);
+    expect([input.aimX, input.aimY]).toEqual([1500, -300]);
+  });
+
+  it('keeps the cursor aim when no self position is given', () => {
+    const core = createInputCore();
+    press(core, 'KeyC');
+    const input = core.toPlayerInput(1500, -300);
+    expect([input.aimX, input.aimY]).toEqual([1500, -300]);
+  });
+
+  it('self-aims the EX with Shift and a slot button, and every bit stays', () => {
+    const core = createInputCore();
+    press(core, 'KeyC', 'ShiftLeft');
+    core.mouseDown(2);
+    const input = core.toPlayerInput(1500, -300, SELF);
+    expect(input.buttons).toBe(Button.SHIFT | Button.M2);
+    expect([input.aimX, input.aimY]).toEqual([-1200, 200]);
+  });
+
+  it('does not record Ctrl+C', () => {
+    const core = createInputCore();
+    expect(core.keyDown('KeyC', { ...NO_MODS, ctrlKey: true })).toBe(false);
+    const input = core.toPlayerInput(1500, -300, SELF);
+    expect([input.aimX, input.aimY]).toEqual([1500, -300]);
+  });
+
+  it('prevents keydown and keyup of C', () => {
+    const core = createInputCore();
+    expect(core.keyDown('KeyC', NO_MODS)).toBe(true);
+    expect(core.keyUp('KeyC', NO_MODS)).toBe(true);
+  });
+
+  it('follows a rebinding: the new key self-aims and the old one does not', () => {
+    const core = createInputCore();
+    core.setBindings({ ...DEFAULT_BINDINGS, selfCast: 'KeyV' });
+    press(core, 'KeyC');
+    expect(core.toPlayerInput(1500, -300, SELF).aimX).toBe(1500);
+    press(core, 'KeyV');
+    expect(core.toPlayerInput(1500, -300, SELF).aimX).toBe(-1200);
+  });
+
+  it('is cleared by releaseAll', () => {
+    const core = createInputCore();
+    press(core, 'KeyC');
+    core.releaseAll();
+    expect(core.toPlayerInput(1500, -300, SELF).aimX).toBe(1500);
+  });
+});
+
 describe('input core: preventing the browser default', () => {
   it.each(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'ShiftLeft', 'ShiftRight'])(
     'prevents keydown and keyup of %s',

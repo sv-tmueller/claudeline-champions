@@ -263,10 +263,12 @@ Default controls `[spec]`:
 | Q, E, R | Q, E and R slots |
 | F | Ultimate |
 | Shift (held) | EX variant of the slot that is cast |
+| C (held) | Self-cast |
 | Tab | Scoreboard |
 | Escape | Menu |
 
-- Rebinding arrives in milestone 5 `[spec]`. The nine keys of the movement and the slots can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R and F `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
+- Rebinding arrives in milestone 5 `[spec]`. The ten keys of the movement, the slots and the self-cast can be rebound in the menu's keys view: W, A, S, D, Space, Q, E, R, F and C `[tuned]`. The mouse buttons, Shift, Tab, Escape and the debug keys stay fixed `[tuned]`. A key that another action already uses is refused, and so is a reserved key (Escape, Tab, F3, F4, Shift, Control, Alt and Meta) `[tuned]`. Reset restores the table above `[tuned]`. The bindings are saved through the platform and read back on the next launch `[tuned]`.
+- Hold C to self-cast `[spec]`. Hold it and cast a slot: while C is held the aim is the champion's own position, so a projectile with ally effects lands on her at once (section 2.5). Releasing C before the cast fires returns the aim to the mouse. Shift, C and a slot self-cast the EX variant. The rule reaches every ally projectile that ships: Lumeth's Mend Bolt (M1), Soothing Surge (M2) and its EX; there is no exception. The ally effects of an area or on the caster already include her, so C changes nothing for Aegis Veil, Dawnbloom, Hargrim's haste circle or any shield or haste the champion puts on herself. Any other aimed ability cast with C lands at her feet, which is the player's choice. C sets no button bit.
 - Sound is generated in code, with no sound files and no music `[tuned]`. It
   plays a hit (a projectile that touches a champion, and a melee arc with at
   least one target), a cast (the local champion's casts only), a death
@@ -291,7 +293,7 @@ Default controls `[spec]`:
   ([batch #134 decision 1](https://github.com/sv-tmueller/claudeline-champions/issues/134#issuecomment-6232034441), designed in the
   [online design](../superpowers/specs/2026-10-17-online-design.md#9-client-rendering)).
 - The browser context menu is suppressed on the game canvas so the right mouse button can cast M2 `[tuned]`.
-- The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`.
+- The input mapper turns this into one `PlayerInput` per tick: `moveX` and `moveY` in -1, 0 or 1, the aim in whole centimeters, and a button bitmask for M1, M2, SPACE, Q, E, R, F and SHIFT `[spec]`. While C is held the aim is the champion's own position in whole centimeters, on every tick, and C sets no bit `[spec]`.
 - The debug overlay toggles with F3 `[tuned]`. It is a developer tool and not a gameplay control.
 
 ## 7. Camera
