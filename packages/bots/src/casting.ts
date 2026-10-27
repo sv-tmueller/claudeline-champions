@@ -727,7 +727,7 @@ export function updateRuns(
     }
     const ex = exFor(cache, i, me, cues);
     let inBand = false;
-    let melee = false;
+    let melee: boolean;
     if (ex) {
       melee = cache.exMelee[i] === 1;
       // `inReach` of the EX band, written out over the typed arrays.
