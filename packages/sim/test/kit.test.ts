@@ -201,17 +201,19 @@ describe('validateKit rejects, with the whole message', () => {
     ).toThrow('Invalid kit: test-striker.slots.M1.effects[0].amount: 10000000 is not a number above 0 and at most 1000000');
   });
 
-  it('a wound with stacks outside 1 to 3, naming the path', () => {
+  it.each([0, 1.5, 4, -1, Number.NaN, '2', null])('a wound with stacks %o, naming the path', (stacks) => {
     expect(() =>
       validateKit(
         broken(
           (k) =>
             void (k.slots.M1.effects = [
-              { type: 'applyStatus', status: { type: 'wound', ticks: 120, stacks: 4 } },
+              { type: 'applyStatus', status: { type: 'wound', ticks: 120, stacks: stacks as never } },
             ]),
         ),
       ),
-    ).toThrow('Invalid kit: test-striker.slots.M1.effects[0].status: stacks 4 is not an integer from 1 to 3');
+    ).toThrow(
+      `Invalid kit: test-striker.slots.M1.effects[0].status: stacks ${String(stacks)} is not an integer from 1 to 3`,
+    );
   });
 
   it('the wrong EX slots', () => {
