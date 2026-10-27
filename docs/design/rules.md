@@ -201,12 +201,12 @@ Note on the acceptance criterion "reaches its ultimate within two to three round
 
 ## 4. Statuses
 
-Every status has a remaining tick count `[spec]`. The catalog below is the full v1 list `[spec]`.
+Every status has a remaining tick count `[spec]`. The catalog below is the v1 list `[spec]` plus `wound`, added by the roster v3 design (section 4.1 there, #158).
 
 Stacking rules:
 
 - The source of a status is the pair (casting champion, ability slot) `[tuned]`. An EX variant has the same source as its normal slot.
-- Spec rule: the same status from the same source refreshes its duration rather than stacking `[spec]`. A refresh also replaces the strength (percent, amount or impulse) with the new value `[tuned]`.
+- Spec rule: the same status from the same source refreshes its duration rather than stacking, except `wound` (4.1) `[spec]`. A refresh also replaces the strength (percent, amount or impulse) with the new value `[tuned]`.
 - Spec rule: different sources stack unless this document says otherwise for that status `[spec]`. The table gives the rule per status.
 - No v1 ability removes statuses. A status ends when its time runs out, when the champion dies, or at a round reset `[tuned]`.
 
@@ -226,6 +226,7 @@ The ranges in the Duration range column bind kits. Every ability must pick its d
 | Heal over time | 2.0 to 5.0 s (120 to 300 ticks), one tick every 0.5 s (30 ticks) | Nothing. | Stacks. Each source ticks on its own. |
 | Knockback | 1 to 4 m of push over 6 to 15 ticks (0.1 to 0.25 s) | Nothing. It moves the champion. Root does not stop it. | Stacks. Impulses add. The total remaining push is capped at 6 m. |
 | Invulnerable | 0.5 to 2.0 s (30 to 120 ticks) | No actions; blocks incoming damage and hostile statuses, see below | Does not stack. The longest remaining time wins. |
+| Wound | 10 percent less healing per stack, up to 3 stacks, 2.0 to 5.0 s (120 to 300 ticks) | Nothing. It cuts the healing the holder receives. | Stacks from every source, the same source included, up to 3. One stack count and one timer per holder: the timer takes the longer of what is left and the new duration, and all stacks fall together. |
 
 Per-status details:
 
@@ -237,7 +238,8 @@ Per-status details:
 - Damage over time: the total damage of one application stays inside the 8 to 30 per hit range `[tuned]`. The range is from the spec, but applying it to the total of a damage over time is a choice made here. A refresh resets the remaining time and takes the new damage per tick. It keeps the current tick timer.
 - Heal over time: the total healing of one application also stays inside 8 to 30 `[tuned]`. Refresh works like damage over time.
 - Knockback: a champion moves along the push direction with a linearly decaying speed. An obstacle or the arena wall stops the push. Pushes deal no damage.
-- Invulnerable: blocks all damage, including ring damage. Blocks new stun, root, silence, slow, damage over time and knockback. Does not block healing, shields or haste. It does not remove statuses that are already running, but damage over time deals no damage while it lasts.
+- Invulnerable: blocks all damage, including ring damage. Blocks new stun, root, silence, slow, wound, damage over time and knockback. Does not block healing, shields or haste. It does not remove statuses that are already running (a wound that is already running stays and keeps cutting heals), but damage over time deals no damage while it lasts.
+- Wound `[tuned]`: every `heal` effect and every heal-over-time pulse that lands on the holder is cut when it lands, before the maximum-health clamp. The restored amount is `amount * (100 - 10 * stacks) / 100`: 10 percent per stack, so 30 percent at 3 stacks. The percent per stack is a catalog constant, not a kit field. An application carries `stacks` from 1 to 3 (default 1) and adds that many, whoever applies it, up to a total of 3. Shields are not healing and are not cut. A cut heal that still restores health pays support energy under 3.1 as before.
 
 ## 5. Health
 

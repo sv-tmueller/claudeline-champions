@@ -1,9 +1,9 @@
-import { MAX_ENERGY, STATUS_PULSE_TICKS } from './constants';
+import { MAX_ENERGY, STATUS_PULSE_TICKS, WOUND_PERCENT_PER_STACK } from './constants';
 import { direction } from './geometry';
 import type { Point } from './geometry';
 import type { Slot } from './input';
 import { endDash, interruptCast } from './state';
-import type { ChampionState, Effect, GameState } from './state';
+import type { ChampionState, Effect, GameState, StatusInstance } from './state';
 import {
   applyKnockback,
   applyShield,
@@ -98,9 +98,22 @@ export function applyDamage(
   return removed;
 }
 
+/** The wound stacks the champion holds, 0 without a wound. A plain loop: heals run in live matches. */
+function woundStacks(champion: ChampionState): number {
+  const { statuses } = champion;
+  for (let i = 0; i < statuses.length; i++) {
+    const status = statuses[i] as StatusInstance;
+    if (status.type === 'wound') return status.stacks;
+  }
+  return 0;
+}
+
 /**
- * Restores up to `amount` health and returns what was restored. A dead champion stays dead, and
- * an amount too small to change the health emits nothing. Invulnerable does not stop it.
+ * Restores up to `amount` health and returns what was restored. A wound on the target cuts the
+ * amount first, by 10 percent per stack as `amount * (100 - 10 * stacks) / 100`, and the
+ * max-health clamp comes after; the event and the return value carry the cut amount. A dead
+ * champion stays dead, and an amount too small to change the health emits nothing. Invulnerable
+ * does not stop it.
  */
 export function applyHeal(
   state: GameState,
@@ -111,8 +124,11 @@ export function applyHeal(
   const champion = target(state, 'heal', targetId);
   checkAmount('heal', amount);
   if (!champion.alive) return 0;
+  const stacks = woundStacks(champion);
+  // No wound: the amount stays as it is, as `amount * 100 / 100` is not always `amount`, 0.007 for one.
+  const cut = stacks === 0 ? amount : (amount * (100 - WOUND_PERCENT_PER_STACK * stacks)) / 100;
   const before = champion.health;
-  champion.health = before + Math.min(champion.maxHealth - before, amount);
+  champion.health = before + Math.min(champion.maxHealth - before, cut);
   const { health } = champion;
   const restored = health - before;
   if (restored === 0) return 0;

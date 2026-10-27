@@ -177,6 +177,7 @@ function catalogProblems(kit: KitDef): string[] {
           case 'invulnerable': ticks(30, 120); break;
           case 'slow': ticks(60, 180); percent(20, 60); break;
           case 'haste': ticks(60, 240); percent(20, 50); break;
+          case 'wound': ticks(120, 300); break;
           case 'dot':
           case 'hot': {
             if (status.type === 'dot') ticks(60, 240);
@@ -275,6 +276,19 @@ describe('the catalog ranges', () => {
     stun.status.ticks = 121;
     expect(catalogProblems(copy)).toEqual([
       'hargrim.slots.F.effects[0].then[0].effects[1].status.ticks: stun of 121 ticks is outside 30 to 120',
+    ]);
+  });
+
+  it('name the path of a wound outside 120 to 300 ticks', () => {
+    const copy = copyOf(quillon);
+    const bolt = copy.slots.M1.effects[0];
+    if (bolt?.type !== 'projectile') throw new Error('Quillon M1 is not a projectile');
+    bolt.effects.push({ type: 'applyStatus', status: { type: 'wound', ticks: 119 } });
+    bolt.effects.push({ type: 'applyStatus', status: { type: 'wound', ticks: 300, stacks: 2 } });
+    bolt.effects.push({ type: 'applyStatus', status: { type: 'wound', ticks: 301 } });
+    expect(catalogProblems(copy)).toEqual([
+      'quillon.slots.M1.effects[0].effects[1].status.ticks: wound of 119 ticks is outside 120 to 300',
+      'quillon.slots.M1.effects[0].effects[3].status.ticks: wound of 301 ticks is outside 120 to 300',
     ]);
   });
 
