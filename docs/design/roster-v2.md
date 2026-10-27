@@ -539,12 +539,15 @@ of roster v1 stand. These are the nine that include a new champion.
 
 ## 6. Balance notes
 
-Status: on paper. Nothing in this document is measured. Every number of
-sections 2 and 3 is a first value inside its range, and the web of section 1 is
-design intent. Batch 13 measures it with the six-champion report, by the method
-of [balance](balance.md): bot against bot at the normal tier over 100 seeds on
-both arenas. Any number that moves after that moves in this document, in the
-kit file and in the scripted fixture in the same change (roster-v1, section 0).
+Status: measured once, in the six-champion report of batch 15 (#189,
+[balance](balance.md) section 5.9), by the method of balance.md: bot against
+bot at the normal tier over about 200 matches a cell, on both arenas. Every
+number of sections 2 and 3 is still the first value inside its range (the
+report moved none), and the web of section 1 is design intent that the report
+reads: Ondrel's web holds, and Brimwick's measures as the inverse of it on four
+pairings of five (balance.md section 5.9, with the decision on #188). Any
+number that moves after that moves in this document, in the kit file and in the
+scripted fixture in the same change (roster-v1, section 0).
 
 Two limits of the bots will bias that first report. They are forecasts, with
 no numbers, and they are the reason not to move a number before the report is

@@ -27,9 +27,9 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # match-3v3-arena02.png, menu.png,
                                  # scoreboard.png, select.png, lingering.png
                                  # in test-results/*/
-npm run balance                  # bot-versus-bot win-rate report: plays 4800
-                                 # matches and writes the block of
-                                 # docs/design/balance.md, about 5.5 minutes on
+npm run balance                  # bot-versus-bot win-rate report: plays 11760
+                                 # matches (six kits) and writes the block of
+                                 # docs/design/balance.md, about 14 minutes on
                                  # Apple silicon. Flags after `--`: --check
                                  # compares a fresh run with the committed
                                  # block, --out <file> writes there instead,
@@ -38,9 +38,10 @@ npm run balance                  # bot-versus-bot win-rate report: plays 4800
                                  # --out or --check; --check then compares only
                                  # that mode's rows). Seeds per config: the
                                  # largest even number at or under 200 over the
-                                 # cell's fills. Needs Node 22.15. The manual
-                                 # workflow .github/workflows/balance.yml runs
-                                 # --check --mode on a runner, one job per mode.
+                                 # cell's fills (50 in 2v2, 16 in 3v3). Needs
+                                 # Node 22.15. The manual workflow
+                                 # .github/workflows/balance.yml runs --check
+                                 # --mode on a runner, one job per mode.
 npm run fixtures:search -- <kit>   # rebuild a kit's scripted roster fixture; Node 22.15+
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender

@@ -95,12 +95,12 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
   3.7 s on the runner (job 121633905207, 779e504), timeout 10 s.
 
-`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" has a
-150 s timeout (120 s before the dodge of #137), and it is the thinnest margin in
-the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on the runner before
-the dodge and 62.4 s after it (job 117369238607). By the rule, twice the
-slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s over it;
-the test sits at 42 percent of its timeout.
+`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
+v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
+thinnest margin in the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on
+the runner before the dodge and 62.4 s after it (job 117369238607). By the rule,
+twice the slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s
+over it; the test sits at 42 percent of its timeout.
 
 The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells) and
 `brimwick.test.ts` (eight) play each cell to matchEnd under the press oracle and
@@ -124,14 +124,21 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
   pairings, fills and the seed schedule, the cell plan (a six-name kit list
   gives 15 pairings and 60 cells with 4 and 12 fills, played by nothing),
   `playMatch` against a reference loop, the aggregation and the report text, the
-  one-mode `--check` on synthetic blocks, and the CLI's flags. They run in `npm
-  run test` with the other projects and play 1 or 2 seeds, not the full report;
-  no unit test plays six-kit cells. One `playMatch` row plays the match of #123
-  (Quillon v Skerrow, 3v3, arena01, seed 6) and asserts that it ends in a
-  decision, with no end tick. The same project holds the fixture search's tests
-  (`tools/fixtures/*.test.ts`): the format against the committed bytes, the pure
-  search cases, the reproduction of the six roster fixtures and the CLI (see
-  [Fixture search](#fixture-search)).
+  one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
+  `npm run test` with the other projects and play 1 or 2 seeds, not the full
+  report; only the CLI row plays six-kit cells (120 matches, one seed of the 2v2
+  mode, 6.6 s locally and 23.6 s on the runner, timeout 60 s, unit job
+  122091170207), the 3v3 success path is a 24-match row on the four v1 kits
+  (3.3 s locally and 8.2 s on the runner, timeout 20 s; the CLI's 3v3 row at six
+  kits is 360 matches, 34 s locally and projected at about 75 s on a runner, so
+  it was replaced, not given a longer timeout). The CLI's error rows pin the
+  message of each rule, so a parser that rejects `--mode 3v3` fails them. Two
+  smoke rows play Brimwick v Ondrel at seed 1, one match a mode, to a decision.
+  One `playMatch` row plays the match of #123 (Quillon v Skerrow, 3v3, arena01,
+  seed 6) and asserts that it ends in a decision, with no end tick. The same
+  project holds the fixture search's tests (`tools/fixtures/*.test.ts`): the
+  format against the committed bytes, the pure search cases, the reproduction of
+  the six roster fixtures and the CLI (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a
@@ -162,7 +169,7 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
 
 ## Balance reproduction
 
-`npm run balance` plays all 4800 matches of the report in
+`npm run balance` plays all 11 760 matches of the report in
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
@@ -172,19 +179,22 @@ under 200 over the cell's fills, per mode). `-- --mode 2v2|3v3` plays one mode;
 it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
 and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
-`engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in `npm
-run check`: a full run took about 5.5 minutes on Apple silicon. It plays the
-four v1 kits of `HARNESS_KITS` in `tools/balance/inputs.ts`, not every file of
-`data/kits`: Ondrel and Brimwick wait for the six-kit report of batch 13.
+`engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
+`npm run check`: a full run plays 11 760 matches and takes about 14 minutes on
+Apple silicon. It plays the six kits of `HARNESS_KITS` in
+`tools/balance/inputs.ts` (the six files of `data/kits`, so a kit added to the
+directory joins the report by being listed there).
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
-pull request or a push). It can be dispatched with `gh workflow run balance.yml
---ref <branch>` once the file is on the default branch. The whole run was 12 to
-16 minutes at four kits; the jobs have `timeout-minutes` of 30 (2v2) and 50
-(3v3), twice the projected six-kit check time (the failure step plays the mode
-again), to be adjusted when the six-kit run is measured. The runs on record are
-in [balance.md](../design/balance.md#7-how-to-regenerate).
+pull request or a push). It can be dispatched with
+`gh workflow run balance.yml --ref <branch>` once the file is on the default
+branch. The whole run was 12 to 16 minutes at four kits; at six kits it is about
+14 minutes locally (2v2 5.3, 3v3 8.9) and projects to about 16 (2v2) and 27
+(3v3) on a runner, so the jobs have `timeout-minutes` of 45 and 75, twice the
+projected check time (the failure step plays the mode again) and a margin. The
+seeds are never lowered to fit the runner. The runs on record are in
+[balance.md](../design/balance.md#7-how-to-regenerate).
 
 ## Fixture search
 

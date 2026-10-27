@@ -3,11 +3,11 @@ name: Balance reproduction
 # A manual run only: it plays the bot matches of docs/design/balance.md and checks that the block
 # reproduces on linux/amd64. Two jobs run side by side, one per mode (--mode 2v2 and --mode 3v3),
 # each comparing that mode's cell rows and budget-hit lines with the committed block: the whole run
-# was 12 to 16 minutes at four kits on a runner (5.5 on Apple silicon) and grows with the kits, so
-# one job per mode keeps each inside its timeout. A job that fails plays its mode again in a
+# is 14 minutes on Apple silicon at six kits (2v2 5.3, 3v3 8.9) and 2.9 to 3.1 times that on a runner,
+# so one job per mode keeps each inside its timeout. A job that fails plays its mode again in a
 # second step to print the differing rows, so each timeout-minutes is twice that job's check time
-# (starting values, until the six-kit run is measured on a runner: 2v2 30, 3v3 50). Trigger it on a
-# branch with
+# plus a margin (2v2 45, 3v3 75; the seeds are never lowered to fit, see balance.md section 7). Trigger
+# it on a branch with
 #   gh workflow run balance.yml --ref <branch>
 # It never runs on pull requests or pushes. A newer run on the same ref cancels the older one.
 on:
@@ -30,9 +30,9 @@ jobs:
       matrix:
         include:
           - mode: 2v2
-            timeout: 30
+            timeout: 45
           - mode: 3v3
-            timeout: 50
+            timeout: 75
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
