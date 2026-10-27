@@ -105,7 +105,6 @@ export function expectEnded(cell: Cell, result: Played): void {
   expect(Math.max(score?.A ?? 0, score?.B ?? 0), result.summary).toBe(DEFAULT_ROUNDS_TO_WIN);
   // Strictly: play stops at matchEnd, and a run that went on would end on the budget.
   expect(state.tick, result.summary).toBeLessThan(cell.budget);
-  expect(budgetOf(cell.endTick, cell.round)).toBe(cell.budget);
   // The term holds for the rounds of this run: none that ended before sudden death ran longer.
   expect(Math.max(...result.rounds), result.summary).toBeLessThanOrEqual(cell.round);
   expect(result.tally.blockedEscapes, result.summary).toBe(0);

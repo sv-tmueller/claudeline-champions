@@ -130,16 +130,26 @@ over it; the test sits at 42 percent of its timeout.
 
 The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells) and
 `brimwick.test.ts` (eight) play each cell to matchEnd under the press oracle and
-have their own timeouts too: 60 s a cell and 30 s for a start-edit run (the
-long-match precedent of `lumeth.test.ts`, which has 120 s). A cell takes 2 to 5 s
-locally (Apple M5 Pro, Node 22.23.2; a file alone 27 to 40 s) and 7.0 to 25.4 s
-(Ondrel) and 7.2 to 22.2 s (Brimwick) on the runner, ubuntu-latest, Node 22 (job
-121726022078 of 056def8, with the other long files running beside them); twice
-the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
-10.0 and 10.4 s (Grand Finale) there, inside 30 s. The two files take 161 s and
-120 s of that job, beside `lumeth.test.ts` (117 s) and `headless-kits.test.ts`
-(95 s), and the unit job went from 2 min 24 s on main (4cfe695) to 5 min 49 s
-(305 s of Vitest), inside its 10 minutes.
+have their own timeouts too: 60 s a cell and 30 s for each of the three long
+start-edit runs (the long-match precedent of `lumeth.test.ts`, which has 120 s;
+the two Reed Screen runs of 120 ticks take 0.5 s on the runner and have none). A
+cell takes 2 to 5 s locally (Apple M5 Pro, Node 22.23.2; a file alone 27 to 40
+s) and 7.0 to 25.4 s (Ondrel) and 7.2 to 22.2 s (Brimwick) on the runner,
+ubuntu-latest, Node 22 (job 121726022078 of 056def8, with the other long files
+running beside them); twice the slowest is 50.8 s, so 60 s. The long start edits
+read 7.1 s (Drowned Ground) and 10.0 and 10.4 s (Grand Finale) there, and 11.5,
+9.4 and 8.5 s in job 122125510999; twice the slowest is 23 s, above the 20 s top
+of the rule, so they keep the 30 s of the long-match precedent. The two files
+take 161 s and 120 s of job 121726022078, beside `lumeth.test.ts` (117 s) and
+`headless-kits.test.ts` (95 s), and the unit job went from 2 min 24 s on main
+(4cfe695) to 5 min 49 s (305 s of Vitest). On main it reads 6 min 4 s at bce9662
+(job 122194680307, 320 s of Vitest: `ondrel.test.ts` 154 s, `lumeth.test.ts` 125
+s, `brimwick.test.ts` 120 s, `tools/balance/harness.test.ts` 90 s,
+`headless-kits.test.ts` 90 s), 61 percent of `timeout-minutes: 10`. One test's
+runner time has spread 2x in a day (2.9 to 5.9 s, see Check suite), and a day
+that slow for the whole job would pass the 10 minutes from 5 minutes on, so the
+job keeps less than that margin. The trigger: once a unit job on main passes
+about 8 minutes, cut the cell count of these two files.
 
 ## Test types
 

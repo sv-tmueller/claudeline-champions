@@ -28,17 +28,23 @@ describe('a match of bots with Brimwick, played to matchEnd', () => {
 
   // What fires across the cells, as measured: every slot but the ultimate, which these matches
   // never reach with 100 energy (the declared start edits below do), and Flare Step as a teleport
-  // escape in every cell.
+  // escape in every cell. Flare Step has no band, no ally row and no EX, so the oracle passes each
+  // cast only as an escape (the first two pinned below), it has no windup, and `expectEnded` asserts that no
+  // escape is blocked: `slots['brimwick:SPACE']` is Brimwick's own escape count. `tally.escapes`
+  // is not, since it counts Quillon's Skip and Skerrow's Vanish Step too. One cell (against
+  // Quillon on arena02) holds by 1; a miss after a change to the bots is governed by batch #53
+  // decision 8.3.
   it('starts M1, M2, Flare Step, Flash Powder, Starshell and Smoke Pot, and escapes by teleporting', { timeout: 60_000 }, () => {
     const all = CELLS.map(playCell);
     const casts = (slot: string) => all.reduce((n, r) => n + (r.slots[`brimwick:${slot}`] ?? 0), 0);
     for (const slot of ['M1', 'M2', 'SPACE', 'Q', 'E', 'R']) {
       expect(casts(slot), `${slot} casts`).toBeGreaterThan(0);
     }
-    expect(
-      all.reduce((n, r) => n + r.tally.escapes, 0),
-      'teleport escapes',
-    ).toBeGreaterThan(0);
+    expect(SIX_SET.bands['brimwick:SPACE']).toBeUndefined();
+    expect(SIX_SET.allies['brimwick:SPACE']).toBeUndefined();
+    for (const [i, cell] of CELLS.entries()) {
+      expect(all[i]?.slots['brimwick:SPACE'] ?? 0, cell.name).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -68,6 +74,10 @@ describe('a free-play match with Brimwick and a start edit', () => {
   // on a real press. A miss after a change to the bots, the sim or the Node version is governed by
   // batch #53 decision 8.3; the fallback is Brimwick against a Quillon at 55 health, the other two
   // champions dead, 9 m apart.
+  // Runner times 10.0 s (55 health) and 10.4 s (56) in job 121726022078, and 9.4 and 8.5 s in job
+  // 122125510999; local 2.3 s (Apple M5 Pro, Node 22.23.2). Twice the slowest is 20.8 s, above the
+  // 20 s top of the rule (testing.md, Check suite), so the 30 s of the long-match precedent
+  // applies to both.
   it('starts Grand Finale at targets at 55 health', { timeout: 30_000 }, () => {
     const played = withEnemyHealth(55);
     expect(played.ultimates[0], played.summary).toBeGreaterThan(0);
