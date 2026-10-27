@@ -155,6 +155,13 @@ export const EXPECTED: Record<string, Expected> = {
     thens: [],
     statuses: ['stun', 'knockback', 'slow', 'haste'],
   },
+  // Bulwark Charge's push and Aegis Line's shield carry no damage, so neither gains energy.
+  durnhal: {
+    fired: ['M1/false', 'M2/false', 'M2/true', 'SPACE/false', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
+    gains: ['M1/false', 'M2/false', 'M2/true', 'Q/false', 'E/false', 'E/true', 'F/false'],
+    thens: ['SPACE/false'],
+    statuses: ['wound', 'slow', 'root', 'knockback', 'shield'],
+  },
 };
 
 /** Collects what the coverage test needs from the events of every step. */
@@ -229,6 +236,7 @@ export const SEEDS: Record<string, number> = {
   skerrow: 5558,
   ondrel: 5559,
   brimwick: 5560,
+  durnhal: 5561,
 };
 
 export interface Observer {

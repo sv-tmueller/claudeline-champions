@@ -69,12 +69,14 @@ Sources:
 
 - **Pairing.** An unordered pair X v Y of different kits of the harness
   roster, so 15 pairings with six kits. The roster is the fixed list
-  `HARNESS_KITS` in `tools/balance/inputs.ts`, the six kits of `data/kits` in
-  file order, and a listed kit with no file is an error. Ondrel and Brimwick
-  (#148) joined the four v1 kits in the six-kit report (#189; [decision 3 of
-  batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
+  `HARNESS_KITS` in `tools/balance/inputs.ts`, six of the seven kits of
+  `data/kits` in file order, and a listed kit with no file is an error. Ondrel
+  and Brimwick (#148) joined the four v1 kits in the six-kit report (#189;
+  [decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
   so the 60 cells, the 11 760 matches and the block of section 4 are those of
-  six kits. "Pairing" is read as the matchup of two champions, as decision 6
+  six kits. Durnhal's kit is in `data/kits` since #204 and is not in the
+  harness roster until step 1.3 of roadmap #176, so the block does not move.
+  "Pairing" is read as the matchup of two champions, as decision 6
   words it, and not as the duo of roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
   In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: four fills
