@@ -33,13 +33,14 @@ first.
 
 ## Status on main
 
-- `sim`: the 60 Hz step with movement and collision; the effects toolkit
+- - `sim`: the 60 Hz step with movement and collision; the effects toolkit
   (projectiles, areas, melee arcs, statuses, forced motion), with projectile
-  ally effects since #69 and the self-cast rule (an ally projectile aimed at
-  its caster lands on her at 60 percent heal) since #191; kits with casting, cooldowns, windups and energy;
-  match flow with rounds and the sudden-death ring, opt-in through
-  `roundsToWin`; angles through `dmath.ts`; the sweep's heap check in
-  `packages/sim/test/allocation.test.ts`.
+  ally effects since #69, the self-cast rule (an ally projectile aimed at its
+  caster lands on her at 60 percent heal) since #191 and the `wound` status (10
+  percent less healing per stack, up to 3 stacks) since #158; kits with casting,
+  cooldowns, windups and energy; match flow with rounds and the sudden-death
+  ring, opt-in through `roundsToWin`; angles through `dmath.ts`; the sweep's
+  heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot
   test; casting from kit data with range profiles for all six roster ids; the
@@ -58,30 +59,30 @@ first.
   health or less or a cornered one (#165). One escape streak gates the whole
   escape order, and the areas lead at the nominal 20 m/s (measured, see
   [bots](bots.md), Aim).
-- `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
-  arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks
-  any champion with a kit, `?difficulty=` picks the tier and `?arena=` picks
-  the arena. The HUD has the ring warning and the kill feed, and the result
-  screen has the champion, arena, team size and difficulty select. Escape
-  opens a menu that pauses the match (Resume, Restart, the select again, a
-  keys view that rebinds the nine movement and slot keys and the held
-  self-cast key C, and a sound toggle). The first-pass sound is generated in code (a hit, a cast, a death,
-  a round start and a round end) and is counted by the heap probe. The
-  `Platform` interface has its two settings methods, asynchronous, and a
-  `sound` sub-object; the browser platform keeps the bindings and the mute in
-  `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and
-  the `__runProbeFrames` hook. The heap probe measures two scenes, the
-  sandbox and the live match with a moving pointer, and bounds the bots' bytes
-  in the live match. No raw double crosses a call in the aim sampling, the
-  champion placing, the entity drawing, the overlay circles, the ring records,
-  the animation state machine or the clip sampler, and a heal bolt's ring takes
-  the projectile colour of its team. The six clips play: a state machine per
-  champion (Idle and Run, an Attack, Cast or Hit over the upper body, Death
-  held) and a sampler of our own on the clip data, with `data-anim0` to
-  `data-animN` hooks, both counted by the heap probe. A bare address opens the
-  pre-match select (champion, arena, team size and difficulty), and any launch
-  key plays a match as before. Not built: music, the other three `Platform`
-  methods (`identity`, `unlockAchievement`, `openUrl`).
+- - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
+  arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
+  champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
+  arena. The HUD has the ring warning and the kill feed, and the result screen
+  has the champion, arena, team size and difficulty select. Escape opens a menu
+  that pauses the match (Resume, Restart, the select again, a keys view that
+  rebinds the nine movement and slot keys and the held self-cast key C, and a
+  sound toggle). The first-pass sound is generated in code (a hit, a cast, a
+  death, a round start and a round end) and is counted by the heap probe. The
+  `Platform` interface has its two settings methods, asynchronous, and a `sound`
+  sub-object; the browser platform keeps the bindings and the mute in
+  `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and the
+  `__runProbeFrames` hook. The heap probe measures two scenes, the sandbox and
+  the live match with a moving pointer, and bounds the bots' bytes in the live
+  match. No raw double crosses a call in the aim sampling, the champion placing,
+  the entity drawing, the overlay circles, the ring records, the animation state
+  machine or the clip sampler, and a heal bolt's ring takes the projectile
+  colour of its team. The six clips play: a state machine per champion (Idle and
+  Run, an Attack, Cast or Hit over the upper body, Death held) and a sampler of
+  our own on the clip data, with `data-anim0` to `data-animN` hooks, both
+  counted by the heap probe. A bare address opens the pre-match select
+  (champion, arena, team size and difficulty), and any launch key plays a match
+  as before. Not built: music, the other three `Platform` methods (`identity`,
+  `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
   profiles since #165); models for the six roster ids and the placeholder, each
