@@ -36,8 +36,9 @@ export type AbilityEffect =
       /** Lands on the other team; may be empty when `allyEffects` is given. */
       effects: Effect[];
       /**
-       * Lands on the owner's team, never the owner. When present it is not empty, and an empty
-       * `effects` makes the projectile pass enemies. The key is left out when there is none.
+       * Lands on the owner's team, never the owner in flight; a self-aimed cast applies them to
+       * the caster (cast.ts). When present it is not empty, and an empty `effects` makes the
+       * projectile pass enemies. The key is left out when there is none.
        */
       allyEffects?: Effect[];
     }

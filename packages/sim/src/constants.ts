@@ -49,6 +49,11 @@ export const EX_ENERGY_COST = 25;
 export const ULTIMATE_ENERGY_COST = 100;
 /** Multiplies walking speed, after slow and haste, during a `slowed` windup. */
 export const SLOWED_WINDUP_FACTOR = 0.5;
+/**
+ * The share of a heal, and of each heal over time pulse, that a projectile aimed at its own
+ * caster restores. Applied as `amount * SELF_CAST_HEAL_PERCENT / 100`.
+ */
+export const SELF_CAST_HEAL_PERCENT = 60;
 /** What a hit on an enemy, or a heal on an ally, gives, by the slot that cast it. */
 export const ENERGY_GAIN_M1 = 5;
 export const ENERGY_GAIN_SKILL = 10;

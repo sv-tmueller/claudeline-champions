@@ -1,7 +1,12 @@
 import { spawnArea } from './area';
-import { EX_ENERGY_COST, ULTIMATE_ENERGY_COST } from './constants';
+import {
+  CHAMPION_RADIUS,
+  EX_ENERGY_COST,
+  SELF_CAST_HEAL_PERCENT,
+  ULTIMATE_ENERGY_COST,
+} from './constants';
 import { direction } from './geometry';
-import { applyHeal } from './health';
+import { applyEffects, applyHeal } from './health';
 import { Button, SLOTS } from './input';
 import type { Slot } from './input';
 import type { AbilityEffect, AbilitySpec, AreaPlacement, KitDef } from './kit';
@@ -14,6 +19,7 @@ import type {
   CastRecord,
   ChampionState,
   DashState,
+  Effect,
   GameState,
   ProjectileState,
 } from './state';
@@ -89,6 +95,16 @@ function placeArea(placement: AreaPlacement, fire: Fire): { x: number; y: number
   return { x: fire.x + fire.dirX * reach + 0, y: fire.y + fire.dirY * reach + 0 };
 }
 
+/**
+ * Whether the aim stored this tick lies within the caster's own circle, the boundary included,
+ * measured from where she stands now. Squared distances, so no square root.
+ */
+function aimsAtSelf(champion: ChampionState): boolean {
+  const dx = champion.aimX / 100 - champion.x;
+  const dy = champion.aimY / 100 - champion.y;
+  return dx * dx + dy * dy <= CHAMPION_RADIUS * CHAMPION_RADIUS;
+}
+
 interface CastRef {
   castId: number;
   slot: Slot;
@@ -99,7 +115,10 @@ interface CastRef {
  * where it ends: they take the dash direction, and a dash cannot appear among them. A top-level
  * dash only starts the dash, which moves the caster in step 3f, so the effects listed after it
  * still act where the caster stands now; `then` is how an effect acts at the dash end. A rooted
- * caster skips the dash and fires its `then` effects at once.
+ * caster skips the dash and fires its `then` effects at once. A projectile with `allyEffects`
+ * whose aim lies within the caster's own circle (inclusive) spawns nothing: its ally effects land
+ * on her instead, a heal and each heal over time pulse at 60 percent (the self-cast rule, rules.md
+ * section 2.5). No energy is paid and no hit is credited; a `then` projectile follows the rule too.
  */
 function runEffects(
   state: GameState,
@@ -112,6 +131,23 @@ function runEffects(
   for (const effect of effects) {
     switch (effect.type) {
       case 'projectile': {
+        if (effect.allyEffects !== undefined && aimsAtSelf(champion)) {
+          // Self-cast: nothing is spawned; the ally effects land on the caster at once. The heal
+          // and each heal over time pulse give SELF_CAST_HEAL_PERCENT of their amount.
+          const list: Effect[] = [];
+          for (const ally of effect.allyEffects) {
+            if (ally.type === 'heal') {
+              list.push({ type: 'heal', amount: (ally.amount * SELF_CAST_HEAL_PERCENT) / 100 });
+            } else if (ally.type === 'applyStatus' && ally.status.type === 'hot') {
+              const perPulse = (ally.status.perPulse * SELF_CAST_HEAL_PERCENT) / 100;
+              list.push({ type: 'applyStatus', status: { ...ally.status, perPulse } });
+            } else {
+              list.push(ally);
+            }
+          }
+          applyEffects(state, champion.id, champion.id, list, { x: champion.x, y: champion.y }, cast.slot);
+          break;
+        }
         const fire = fireFrom(champion, then);
         spawnProjectile(
           state,

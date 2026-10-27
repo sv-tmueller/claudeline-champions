@@ -12,9 +12,11 @@ import type {
 } from '../src/index';
 import { resetAbilityState } from '../src/cast';
 import { applyDamage } from '../src/health';
+import { validateKit } from '../src/kit';
 import { startDash } from '../src/motion';
 import { applyKnockback, applyStatus } from '../src/status';
 import { champion, checkInvariants, input, openArena, place } from './helpers';
+import lumethJson from '../../../data/kits/lumeth.json';
 import { kitWith, quiet, quietEx } from './kits';
 
 // Champions 0 and 1 are team A, 2 and 3 team B. Champion 0 has the kit 'k0', 1 has 'k1', 2 has
@@ -923,5 +925,126 @@ describe('a cast projectile with allyEffects', () => {
     expect(of(log, 'projectileHit').map((l) => l.event.targetId)).toEqual([1]);
     expect(champion(state, 0).energy).toBe(5);
     expect(champion(state, 2).health).toBe(120);
+  });
+});
+
+describe('the self-cast rule: an ally projectile aimed at the caster lands on her', () => {
+  const allyEffects: AbilityEffect[] = [
+    { type: 'heal', amount: 10 },
+    { type: 'applyStatus', status: { type: 'hot', perPulse: 5, ticks: 120 } },
+    { type: 'shield', absorb: 30, ticks: 180 },
+    { type: 'applyStatus', status: { type: 'haste', percent: 20, ticks: 90 } },
+  ];
+  const selfBolt: AbilityEffect = {
+    type: 'projectile',
+    speed: 20,
+    radius: 0.5,
+    lifetimeTicks: 60,
+    pierce: false,
+    effects: [{ type: 'damage', amount: 10 }],
+    allyEffects,
+  };
+
+  /** Champion 0 (a support, health 100, energy 10) at (-5, 0); the enemy 2 stands 1.5 m ahead of her. */
+  function selfSetup(bolt: AbilityEffect = selfBolt): GameState {
+    const state = setup([kitWith('k0', { M1: quiet({ effects: [bolt] }) }, { support: true })]);
+    place(state, 2, -3.5, 0);
+    champion(state, 0).health = 100;
+    champion(state, 0).energy = 10;
+    return state;
+  }
+
+  it('spawns nothing and heals, hots, shields and hastes her at 60 percent, shield and haste in full', () => {
+    const state = selfSetup();
+    const log = run(state, 61, (tick) => (tick === 0 ? [input(0, 0, -500, 0, M1)] : []));
+    expect(of(log, 'castFired').map((l) => l.tick)).toEqual([0]);
+    expect(of(log, 'projectileSpawned')).toEqual([]);
+    expect(state.projectiles).toEqual([]);
+    expect(state.casts).toEqual([]);
+    expect(of(log, 'heal').map((l) => [l.tick, l.event])).toEqual([
+      [0, { type: 'heal', targetId: 0, sourceId: 0, amount: 6, health: 106 }],
+      [29, { type: 'heal', targetId: 0, sourceId: 0, amount: 3, health: 109 }],
+      [59, { type: 'heal', targetId: 0, sourceId: 0, amount: 3, health: 112 }],
+    ]);
+    const statuses = champion(state, 0).statuses;
+    expect(statuses.find((s) => s.type === 'hot')).toMatchObject({ perPulse: 3, sourceId: 0, slot: 'M1' });
+    expect(statuses.find((s) => s.type === 'shield')).toMatchObject({ absorb: 30, sourceId: 0, slot: 'M1' });
+    expect(statuses.find((s) => s.type === 'haste')).toMatchObject({ percent: 20, sourceId: 0, slot: 'M1' });
+    expect(of(log, 'energyGained')).toEqual([]);
+    expect(champion(state, 0).energy).toBe(10);
+    expect(champion(state, 2).health).toBe(120);
+  });
+
+  it('lands a damage in allyEffects on her, with no energy paid', () => {
+    const state = selfSetup({ ...selfBolt, allyEffects: [{ type: 'damage', amount: 4 }] });
+    run(state, 1, hold(M1, -500, 0));
+    expect(champion(state, 0).health).toBe(96);
+    expect(champion(state, 0).energy).toBe(10);
+    expect(champion(state, 2).health).toBe(120);
+  });
+
+  it('applies a knockback in allyEffects as a zero vector: she does not move', () => {
+    const state = selfSetup({
+      ...selfBolt,
+      allyEffects: [{ type: 'knockback', distance: 2, ticks: 8, direction: 'away' }],
+    });
+    run(state, 5, (tick) => (tick === 0 ? [input(0, 0, -500, 0, M1)] : []));
+    expect(champion(state, 0).x).toBe(-5);
+    expect(champion(state, 0).y).toBe(0);
+  });
+
+  it('self-casts on the circle of the caster: 0.5 m away, the boundary included', () => {
+    const state = selfSetup();
+    const log = run(state, 1, hold(M1, -450, 0));
+    expect(of(log, 'projectileSpawned')).toEqual([]);
+    expect(of(log, 'heal')).toHaveLength(1);
+  });
+
+  it('fires the projectile as before when the aim is just outside the circle', () => {
+    const state = selfSetup();
+    const log = run(state, 10, (tick) => (tick === 0 ? [input(0, 0, -449, 0, M1)] : []));
+    expect(of(log, 'projectileSpawned')).toHaveLength(1);
+    expect(of(log, 'projectileHit').map((l) => l.event.targetId)).toEqual([2]);
+    expect(champion(state, 2).health).toBe(110);
+    expect(champion(state, 0).health).toBe(100);
+  });
+
+  it('leaves a projectile without allyEffects alone even when aimed at the caster', () => {
+    const state = selfSetup({ ...selfBolt, allyEffects: undefined });
+    const log = run(state, 1, hold(M1, -500, 0));
+    expect(of(log, 'projectileSpawned')).toHaveLength(1);
+    expect(of(log, 'heal')).toEqual([]);
+  });
+
+  it('measures from where she stands when a dash ends, for a projectile in its then', () => {
+    const state = selfSetup();
+    // Off the line, so that nothing blocks the dash.
+    place(state, 2, -3, 3);
+    state.kits[0] = kitWith(
+      'k0',
+      { SPACE: quiet({ effects: [{ type: 'dash', distance: 2, ticks: 6, then: [selfBolt] }] }) },
+      { support: true },
+    );
+    const log = run(state, 20, (tick) => (tick === 0 ? [input(0, 0, -300, 0, SPACE)] : []));
+    expect(of(log, 'projectileSpawned')).toEqual([]);
+    const [first] = of(log, 'heal');
+    expect(first?.tick).toBeGreaterThan(0);
+    expect(first?.event).toMatchObject({ targetId: 0, sourceId: 0, amount: 6 });
+    expect(champion(state, 0).x).toBeCloseTo(-3, 6);
+  });
+});
+
+describe("the self-cast rule on a shipped kit: Lumeth's Soothing Surge", () => {
+  it('heals 14 and pulses 2 at 60 percent on her own aim', () => {
+    const lumeth = { ...validateKit(lumethJson), id: 'k0' };
+    const state = setup([lumeth]);
+    champion(state, 0).health = 100;
+    const log = run(state, 25, (tick) => (tick === 0 ? [input(0, 0, -500, 0, M2)] : []));
+    expect(of(log, 'castFired')).toHaveLength(1);
+    expect(of(log, 'projectileSpawned')).toEqual([]);
+    expect(champion(state, 0).health).toBe(100 + (14 * 60) / 100);
+    expect(champion(state, 0).statuses.find((s) => s.type === 'hot')).toMatchObject({
+      perPulse: (2 * 60) / 100,
+    });
   });
 });
