@@ -1048,4 +1048,23 @@ describe("the self-cast rule on a shipped kit: Lumeth's Soothing Surge", () => {
       perPulse: (2 * 60) / 100,
     });
   });
+
+  it('cuts the self-cast amounts again by 10 percent per wound stack: the self cut first, then the wound cut', () => {
+    for (const stacks of [1, 3]) {
+      const lumeth = { ...validateKit(lumethJson), id: 'k0' };
+      const state = setup([lumeth]);
+      champion(state, 0).health = 0;
+      applyStatus(state, 0, { type: 'wound', ticks: 300, stacks }, NONE);
+      const log = run(state, 100, (tick) => (tick === 0 ? [input(0, 0, -500, 0, M2)] : []));
+      const factor = 100 - 10 * stacks;
+      const first = ((14 * 60) / 100 * factor) / 100;
+      const pulse = ((2 * 60) / 100 * factor) / 100;
+      const heals = of(log, 'heal').map((l) => l.event.amount);
+      expect(heals[0], `stacks ${stacks}`).toBe(first);
+      expect(heals[1], `stacks ${stacks}`).toBeCloseTo(pulse, 12);
+      expect(champion(state, 0).statuses.find((s) => s.type === 'hot')).toMatchObject({
+        perPulse: (2 * 60) / 100,
+      });
+    }
+  });
 });
