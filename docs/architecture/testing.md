@@ -94,8 +94,9 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
 - `packages/server/test/room.test.ts`, "frees the seats of humans who were
   disconnected, moves the host, and calls empty() at the end": 1.6 s locally,
   3.7 s on the runner (job 121633905207, 779e504), 2.1 s on main before #204
-  (job 122125510999), then 4.2 and 5.0 s with Durnhal's file (jobs 122175440820
-  and 122182006132); past half of 10 s, so the timeout is 15 s.
+  (job 122125510999), then 4.2, 5.05 (5049 ms) and 4.3 s with Durnhal's file
+  (jobs 122175440820, 122182006132 and 122189679246); twice 5.05 s is 10.1 s,
+  so the timeout is 15 s.
 
 Durnhal's file (#204) makes the server field a Durnhal bot on the default range
 profile in these matches and in both loopback specs, until step 1.3 of roadmap
@@ -108,11 +109,16 @@ for the 3v3 hook. The runner was slower: the file took 17.0 s in job
 timed out in 15000ms" (job 122175440820, the file 28.7 s with the 3v3 rows
 skipped); and with a 20 s timeout on 0d986a7 the file took 24.3 s and its two
 rows 5.9 s (job 122182006132), so the two hooks took 18.4 s and, by the local
-split of 1.6 s to 5.0 s, the 3v3 hook about 14 s. The log has no time for a
-`beforeAll`. Twice that is above the 20 s top of the rule, so the hook takes the
-60 s of the long-match precedent below and its work is not cut (decision 4 on
-issue #203). The room row "frees the seats" is the other one that moved, in the
-list above; "keeps the settings and the choices" took 0.44 s locally and 0.95 to
+split of 1.6 s to 5.0 s, the 3v3 hook about 14 s; on 1019df2 the file took
+32.6 s (job 122189679246), so the hooks took about 24 s and the 3v3 hook about
+18 s. The log has no time for a `beforeAll`. Twice that is above the 20 s top
+of the rule, so the hook takes the 60 s of the long-match precedent below and
+its work is not cut (decision 4 on issue #203). The same job read 5.74 s for
+the 3v3 row "matches a local sim of the same seed, kits and inputs at every
+tick" (2.19 s for the 2v2 one; main read 3.2 s and 1.5 s), past half of its
+10 s, so the loopback rows take 15 s, set on the `describe.each` for both
+specs. The room row "frees the seats" is the other one that moved, in the list
+above; "keeps the settings and the choices" took 0.44 s locally and 0.95 to
 1.4 s on those runners, inside its mark.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
@@ -178,8 +184,9 @@ the slowest is 50.8 s, so 60 s. The start edits read 7.1 s (Drowned Ground) and
   champion list. It plays to two rounds won, not three, and took about 5.5 s
   locally and 11.5 s on the runner (job 121656797139, de0ef18) before
   Durnhal's file; with it the file takes 8.8 to 9.1 s locally (5.1 to 5.6 s on
-  the same machine without it) and 17.0 to 28.7 s on the runner (jobs
-  122173425469, 122175440820 and 122182006132, see the timeouts above); at
+  the same machine without it) and 17.0 to 32.6 s on the runner (jobs
+  122173425469, 122175440820, 122182006132 and 122189679246, see the timeouts
+  above); at
   three rounds it took 14 s locally and 29 s on the runner (job 121633905207).
   See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena

@@ -446,9 +446,10 @@ describe('the end of a match', () => {
   });
 
   // Runner (ubuntu-latest, Node 22): 3.7 s on 779e504 (job 121633905207); 2.1 s on main before #204
-  // (job 122125510999); 4.2 and 5.0 s with Durnhal's file in the seats' bot fill (jobs 122175440820
-  // and 122182006132 of #204); 1.6 s locally (Apple M5 Pro, full npm run test). Timeout: the smallest
-  // of 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite), so 15 s.
+  // (job 122125510999); 4.2, 5.05 (5049 ms) and 4.3 s with Durnhal's file in the seats' bot fill
+  // (jobs 122175440820, 122182006132 and 122189679246 of #204); 1.6 s locally (Apple M5 Pro, full npm
+  // run test). Timeout: the smallest of 10, 15 and 20 s at least twice the slowest runner time
+  // (testing.md, Check suite): twice 5.05 s is 10.1 s, past 10 s, so 15 s.
   it('frees the seats of humans who were disconnected, moves the host, and calls empty() at the end', { timeout: 15_000 }, () => {
     const harness = new Harness({ roundsToWin: 1 });
     const host = create(harness);

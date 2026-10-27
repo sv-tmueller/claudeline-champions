@@ -104,8 +104,9 @@ function firstDivergence(played: Played, arenaId: string, difficulty: Difficulty
 // times split evenly (2.9 s and 2.7 s for a describe with its rows). Locally, on an Apple M5 Pro
 // with Node 22.23.2, the file takes 5.5 s: 4.7 s for the beforeAlls, 0.7 s and 0.5 s for the rows.
 // At three rounds, on 779e504 (job 121633905207), the runner took 28.7 s for the file. Timeouts
-// (testing.md, Check suite): 10 s for the rows, the smallest the rule allows; 15 s for the
-// beforeAll, which the rule allowed for a runner time up to 7.5 s, 3 s over the 4.5 s estimate.
+// (testing.md, Check suite): 10 s for the rows, the smallest the rule allows (15 s since #204, below);
+// 15 s for the beforeAll, which the rule allowed for a runner time up to 7.5 s, 3 s over the 4.5 s
+// estimate (60 s since #204, below).
 //
 // Durnhal's file (#204) puts a Durnhal bot on the default range profile into both specs (the server
 // seats every kit of data/kits, sorted), so the hooks got slower. Timed around the hook body on one
@@ -114,11 +115,16 @@ function firstDivergence(played: Played, arenaId: string, difficulty: Difficulty
 // job 122173425469 took the file 17.0 s with its rows about 4.1 s; on f07e9df (job 122175440820) the
 // 3v3 hook failed with "Hook timed out in 15000ms" and the file took 28.7 s with the 3v3 rows
 // skipped; on 0d986a7 (job 122182006132, timeout 20 s) the file took 24.3 s and the two rows 5.9 s,
-// so the two hooks took 18.4 s, and by the local split of 1.6 s to 5.0 s the 3v3 hook about 14 s.
-// Twice the slowest runner time is 40 s or more, above the 20 s top of the rule, so the timeout
-// takes the 60 s of the long-match precedent (testing.md, Check suite) and the hook's work is not
-// cut, as decision 4 on #203 says. Rescan when a runner log times a beforeAll.
-describe.each(SPECS)('loopback: $name', { timeout: 10_000 }, (spec) => {
+// so the two hooks took 18.4 s, and by the local split of 1.6 s to 5.0 s the 3v3 hook about 14 s; on
+// 1019df2 (job 122189679246) the file took 32.6 s, the 2v2 row 2.2 s and the 3v3 row 5.7 s, so the
+// hooks took about 24 s and by the same split the 3v3 hook about 18 s. Twice the slowest runner time
+// is 30 s or more (the f07e9df hook was cut at 15 s, and about 37 s at 18 s), above the 20 s top of
+// the rule, so the beforeAll takes the 60 s of the long-match precedent (testing.md, Check suite),
+// which also covers twice the upper bound of f07e9df, 28.7 - 2.4 = 26.3 s, and the hook's work is
+// not cut, as decision 4 on #203 says. The 3v3 row read 5.7 s, past half of its 10 s, and twice
+// that is 11.5 s, so by the rule the rows take 15 s, set once on the describe.each for both specs.
+// Rescan when a runner log times a beforeAll.
+describe.each(SPECS)('loopback: $name', { timeout: 15_000 }, (spec) => {
   let first: Played;
   let second: Played;
 
