@@ -161,7 +161,7 @@ phase, never spliced during iteration.
 An effect is plain data and the entity holds its own copy, so kit constants are
 never aliased into the state. The `Effect` union is `damage { amount }`, `heal
 { amount }`, `applyStatus { status }` (a status spec: the type, `ticks` and the
-strength field of that type), `shield { absorb, ticks }`, `knockback
+strength field of that type, for `wound` the optional `stacks`), `shield { absorb, ticks }`, `knockback
 { distance, ticks, direction: 'away' | 'toward' }` and `energyGain { amount }`
 (an integer from 1 to 100; only `landHit` reads it). A hit applies its effects
 in list order to each champion it lands on, with the owner as the source and
@@ -330,7 +330,10 @@ matter because the arena is convex.
 - Healing restores up to `maxHealth`, emits `heal` with the amount actually
   restored (health after minus health before), and emits nothing when that
   amount is 0, also when the amount is too small to change the health. A dead
-  champion is not revived.
+  champion is not revived. A wound on the target cuts the amount first, then
+  the clamp applies; see [Wound](#wound). Every heal goes through `applyHeal`:
+  the `heal` hit effect, each heal-over-time pulse and the caster-level `heal`
+  ability effect.
 - A non-finite or negative amount throws; 0 does nothing. An unknown target id
   throws `Error('Invalid damage: ...')` or `Error('Invalid heal: ...')`.
 - A dead champion is skipped in the movement loop (no input, aim, facing or
@@ -427,8 +430,8 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
 ## Statuses
 
 Catalog: stun, root, silence, invulnerable, slow (percent), haste (percent),
-shield (absorb amount), damage over time (`dot`), heal over time (`hot`) and
-knockback. The values and ranges that bind kits are in [rules](../design/rules.md)
+shield (absorb amount), damage over time (`dot`), heal over time (`hot`),
+wound (an anti-heal, #158) and knockback. The values and ranges that bind kits are in [rules](../design/rules.md)
 section 4; this section is what the sim does.
 
 ### Record
@@ -443,6 +446,7 @@ section 4; this section is what the sim does.
 | `slow`, `haste` | `percent` (integer 1 to 100) |
 | `shield` | `absorb` (above 0) |
 | `dot`, `hot` | `perPulse`, `ticksToNextPulse` (1 to 30) |
+| `wound` | `stacks` (integer 1 to 3) |
 | `knockback` | `dirX`, `dirY` (unit), `distance` (D after the cap trim), `totalTicks` (N) |
 
 The source of a status is the pair (`sourceId`, `slot`). An EX variant shares the
@@ -459,6 +463,7 @@ first emits `statusExpired` with reason `replaced` for the instance it removes.
 | slow, haste | one per (type, source) | removes the old instance of the same source and appends the new one, with the new percent and ticks |
 | shield | one per source | removes the old shield of the same source and appends the new one, so the newest is last |
 | dot, hot | one per source | sets the new ticks and `perPulse`, keeps `ticksToNextPulse` and moves the instance to the end |
+| wound | one per holder | adds the stacks, from any source and the same one too, see [Wound](#wound); the merged source is the latest one that changed the instance |
 | knockback | one per source | replaces the instance of the same source, see below |
 
 Remaining stun is capped at 120 ticks when it is applied (`STUN_CAP_TICKS`).
@@ -503,6 +508,33 @@ the source's id. While the holder is invulnerable a damage pulse does nothing
 because the damage is blocked, and the timer keeps running. A damage pulse that
 kills the holder ends its upkeep.
 
+### Wound
+
+A wound cuts the healing its holder receives: 10 percent per stack, up to 3
+stacks (`WOUND_PERCENT_PER_STACK`, `WOUND_MAX_STACKS`). A spec is `{ type: 'wound',
+ticks, stacks? }`; `stacks` is an integer from 1 to 3 and defaults to 1, and when
+it is absent the copy leaves the key out (a `stacks: undefined` would break
+`checksum` and the kit round trip). The 120 to 300 tick range is a catalog
+range, held by the roster tests, not by the validator.
+
+An application adds its stacks to the holder's, up to 3, whoever applies it. The
+holder has one instance, with one stack count and one timer. The new timer is the
+longer of what is left and the new `ticks`, so a short application never cuts a
+long one. When neither the count nor the timer would change, the call returns
+false and emits nothing. Otherwise the old instance ends as `replaced` and the
+new one is appended, with the source of the application, so the events are
+`statusExpired` (`replaced`) then `statusApplied` with the merged timer. The
+timer counts down like any status, and all stacks fall together as one `expired`.
+
+The cut is in `applyHeal`, when each heal lands, before the max-health clamp, so a
+hot pulse reads the stacks again on every pulse. The restored amount is `amount *
+(100 - 10 * stacks) / 100`: the multiplication, then the division, each a
+correctly rounded double operation, and not rounded to an integer, as health is
+fractional. Without a wound the amount is used as it is, with no arithmetic. The
+`heal` event and the return value carry the cut amount, so `landHit` sees what
+was restored and a cut heal that still restores health pays support energy as
+before. Shields are not healing and are not cut.
+
 ### Knockback
 
 A knockback of `D` meters over `N` ticks leaves `D n (n + 1) / (N (N + 1))`
@@ -518,10 +550,11 @@ tick for a cast of a lower-numbered champion, from the next tick otherwise.
 
 ### Invulnerable
 
-Invulnerable blocks the application of stun, root, silence, slow, damage over
-time and knockback (the call returns false and emits nothing), and blocks
+Invulnerable blocks the application of stun, root, silence, slow, wound, damage
+over time and knockback (the call returns false and emits nothing), and blocks
 damage. It does not block heal, shield, haste, heal over time or another
-invulnerable, and it does not end statuses that are already running. Rules.md
+invulnerable, and it does not end statuses that are already running: a wound
+that is already running stays and keeps cutting heals. Rules.md
 says invulnerable blocks "No actions"; the sim reads that as blocking none of
 the holder's own actions.
 
@@ -609,6 +642,10 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
 - A status a cast lands carries the slot of the cast (its EX variant shares the
   slot); a status from a dev tool spawn or a direct call carries none.
 - A pulse due on the last tick of a status lands before the status ends.
+- A wound application that changes neither the stacks nor the timer returns
+  false with no event, as the stun family does for an application that does not
+  outlast the running one. One that changes either ends the old instance as
+  `replaced` and appends a new one; the instance is never changed in place.
 - `teleport` reports the end position, and a teleport that cannot be resolved
   reports `blocked: false` with the start as the end position.
 - Invulnerable blocks none of the holder's own actions (rules.md says "No
