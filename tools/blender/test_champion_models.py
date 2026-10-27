@@ -30,8 +30,8 @@ ARENA_GLBS = {
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
-IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick"}
-ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick")
+IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal"}
+ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal")
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
 MAX_TOP = 1.90
@@ -670,6 +670,11 @@ def rounded(position):
 CUE_BOXES = {
     "ondrel": (("Spine", (-0.16, 0.0, 1.56), (0.08, 0.16, 0.52)),),
     "brimwick": (("Spine", (-0.02, 0.0, 1.74), (0.22, 0.22, 0.16)),),
+    "durnhal": (
+        ("Arm_L", (0.0, 0.44, 1.04), (0.30, 0.04, 0.60)),
+        ("Arm_R", (0.0, -0.41, 0.60), (0.05, 0.05, 0.40)),
+        ("Arm_R", (0.0, -0.41, 0.33), (0.22, 0.14, 0.14)),
+    ),
 }
 CUE_TOLERANCE = 1e-4
 

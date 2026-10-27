@@ -4,7 +4,7 @@ Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
     --champion placeholder --out assets/models/champions/placeholder.glb
 
 The ids are placeholder (the generic model), hargrim, quillon, lumeth, skerrow,
-ondrel and brimwick. They share the placeholder's body and accent and differ
+ondrel, brimwick and durnhal. They share the placeholder's body and accent and differ
 only in the body colour and one silhouette cue, listed in
 tools/blender/README.md.
 
@@ -40,6 +40,7 @@ BODY_COLOURS = {
     "skerrow": (0.03, 0.03, 0.03),  # charcoal
     "ondrel": (0.03, 0.30, 0.03),  # moss green
     "brimwick": (0.74, 0.12, 0.00),  # burnt orange
+    "durnhal": (0.19, 0.18, 0.00),  # olive brass
 }
 
 # The shared rig in Blender coordinates: (name, parent, head, tail). Every part
@@ -317,6 +318,15 @@ def add_fuse_cap(bm):  # brimwick, burst caster, on top of the head
     carry(bm, "Spine", common.add_box, (-0.02, 0, 1.74), (0.22, 0.22, 0.16), BODY)
 
 
+def add_shield_and_hammer(bm):  # durnhal, guardian tank, a shield and a hammer on the arms
+    # The shield is a plate 2 cm off the left arm, below the shoulder. The hammer
+    # hangs from the right fist, its head 0.22 m long (a longer head sinks under
+    # the floor at Death key 30) and 7 cm outside the arm so it shows from above.
+    carry(bm, "Arm_L", common.add_box, (0, 0.44, 1.04), (0.30, 0.04, 0.60), BODY)
+    carry(bm, "Arm_R", common.add_box, (0, -0.41, 0.60), (0.05, 0.05, 0.40), BODY)  # haft
+    carry(bm, "Arm_R", common.add_box, (0, -0.41, 0.33), (0.22, 0.14, 0.14), BODY)  # head
+
+
 CUES = {
     "placeholder": None,
     "hargrim": add_shoulder_blocks,
@@ -325,6 +335,7 @@ CUES = {
     "skerrow": add_blade,
     "ondrel": add_reed_bundle,
     "brimwick": add_fuse_cap,
+    "durnhal": add_shield_and_hammer,
 }
 
 
