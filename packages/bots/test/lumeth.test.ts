@@ -21,8 +21,9 @@ const SEEDS_3V3 = [101, 102, 103, 104, 105, 106];
  * The tick budget of a match, by the formula of the client's match-setup.test.ts and the e2e rows:
  * the end tick when the budget was set, plus two rounds of `round` ticks and one sudden-death
  * round of 7000, rounded up to 1000. The round term is the longest round that did not go to sudden
- * death, rounded up to 100: 1619 ticks in the 2v2 runs here (1700), and 2801 in the client's 3v3 of
- * the same roster (2900; the 3v3 runs here have 2722 at most, with other seeds). The bots dodge
+ * death, rounded up to 100: 2265 ticks in the 2v2 runs here on the bots of #213 (2300; 1619 and 1700
+ * before), and 2801 in the client's 3v3 of the same roster (2900; the 3v3 runs here have 2554 at most,
+ * with other seeds). The bots dodge
  * since #137, which lengthens the 3v3 rounds (2000 before). A run whose longest
  * round passes its term fails, so the term follows the rounds and not the old figures.
  */

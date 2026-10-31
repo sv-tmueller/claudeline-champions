@@ -76,7 +76,8 @@ const WARM_UP_BUDGET_TICKS = 15_000;
 // live at the reads to the end of the 17 windows (tick 4799). The first death of the round
 // is read at tick 4859 (3419 on 57dd52f). On the bots of #213 (a melee champion stands
 // inside its reach) the first two rounds run until tick 7529, not 4289, and round 3 is no longer a measured round: with the lead 2 or 3 its windows read 2.4 to 3.8 KB of
-// counted code (`writeHooks` 1.7 to 2.8 KB), over the limit of 780 B; with the lead 4 to 6 the
+// counted code each (`writeHooks` 1.7 to 2.8 KB; the median asserted against the limit of 780 B is
+// 2448 to 3456 B); with the lead 4 to 6 the
 // bots read a median of 42 to 46 KB (`splitPath`), over the limit of 18 000 B; with the lead 10
 // no projectile is live. The spec waits for round 4, begun by tick 8969 in 3 runs out of 3 (a
 // projectile spawns by tick 9059), where the counted code reads

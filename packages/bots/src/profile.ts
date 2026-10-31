@@ -20,7 +20,9 @@ export interface BotProfile {
  * The share of `rangeMax` at which a champion with rangeMin 0 stands to engage (#213). Below 1 the
  * stand has slack: a target that steps back a little is still in reach and the champion does not
  * walk in again from outside it. Above 1 m for both melee kits (1.6 and 1.2 m) so that the walk
- * ends before the bodies touch.
+ * ends before the bodies touch. That bound holds for the shipped kits only: an unshipped rangeMin-0
+ * kit whose derived rangeMax lies in (1, 1.25] would get a stand reach under the 1 m touching
+ * distance (there is no guard).
  */
 export const STAND_FRACTION = 0.8;
 
