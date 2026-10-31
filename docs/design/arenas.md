@@ -94,3 +94,13 @@ Layouts are in `data/arenas/<id>.json`, and both use the ring values of section 
 `arena01` breaks two rules of this document, and it is grandfathered. Six of its blocking obstacles are 1.5 m high, where section 5 asks for at least 1.8 m. Its corners are 10.7 m from the nearest blocking obstacle, where section 6 asks for at most 8 m. It cannot change, because every sim fixture checksums `state.arena`, so a new height or a new obstacle would move every checksum. No other arena may break a rule.
 
 `tools/blender/test_arena_principles.py` checks sections 3 to 7 against every file in `data/arenas`, so a new arena is checked without an edit to the test. It expects no problem from any arena except `arena01`, for which it pins exactly these two, so a third deviation, or a repair of one of these, fails the test.
+
+## 9. The energy orb point
+
+Added 2026-10-31 by #218 (v3 design section 6). Each arena has at most one orb point, the place of the energy orb of rules.md section 3.3.
+
+- The points live in `data/orbs.json`, a table keyed by arena id: `{ "arena01": { "x": 0, "y": 2.5 }, "arena02": { "x": 0, "y": 0 } }`. They are kept out of the arena files because every sim fixture checksums `state.arena` and arena01 cannot change (section 8). The table sits beside `data/arenas`, not in it, because the client, the server, the balance tool and the Blender test parse every file in `data/arenas` as an arena.
+- An arena with no row has no orb.
+- A point lies on the mirror axis (x = 0), so neither team is closer. A disc of 0.5 m around it lies inside the ring's end circle (|y| + 0.5 at most `endRadius`), so the orb stays contested in sudden death, and inside the arena boundary. It overlaps no obstacle, whatever the obstacle's `blocksProjectiles`, because every obstacle blocks walking. Touching an obstacle is allowed.
+- arena01 uses (0, 2.5). The pillar (radius 1.5 at the origin) needs |y| of at least 2.0 and the end circle needs |y| of at most 2.5, so 2.5 is the far edge of the band beside the pillar and 2.0 the near edge. arena02 uses the centre (0, 0), which is open floor.
+- The switch is the match's. `MatchConfig.energyOrb` is the point itself, and having the key turns the orb on. A caller reads the point with `orbPointFor(table, arena)` from the sim, which throws on a row that breaks the rules above and gives undefined for an arena with no row. `createMatch` runs the same check and throws `Invalid match: energyOrb ...`. The committed replay fixtures and the existing tests leave the key out, so they keep their checksums.

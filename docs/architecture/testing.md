@@ -155,6 +155,14 @@ about 8 minutes, cut the cell count of these two files.
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
   replay fixtures with checksums. See [simulation](simulation.md).
+- The sim's scripted fixtures: `scripted-arena01-2v2.json` (combat),
+  `scripted-abilities-arena01-2v2.json`, `scripted-rounds-arena01-2v2.json`
+  (match flow, orb off), `scripted-orb-arena01-2v2.json` (#218, the only one
+  with `energyOrb`, played by `orb-fixture.test.ts` and covered by its own
+  coverage test; the other fixtures leave the key out, so they keep their
+  checksums) and the seven roster fixtures. `orb.test.ts` holds the unit rows
+  of the orb: the switch, the warning and pickup ticks, the cap, the draw for a
+  tie across seeds 1 to 32 and the point's validation.
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
   pairings, fills and the seed schedule, the cell plan (a six-name kit list

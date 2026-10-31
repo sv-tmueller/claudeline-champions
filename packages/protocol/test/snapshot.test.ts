@@ -1,8 +1,9 @@
 import arena02Json from '../../../data/arenas/arena02.json';
+import orbsJson from '../../../data/orbs.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import lumethJson from '../../../data/kits/lumeth.json';
 import quillonJson from '../../../data/kits/quillon.json';
-import { Button, checksum, createMatch, debug, parseArenaDef, step } from '@claudeline/sim';
+import { Button, checksum, createMatch, debug, orbPointFor, parseArenaDef, step } from '@claudeline/sim';
 import type { GameState, KitDef, MatchConfig, MoveAxis, PlayerInput } from '@claudeline/sim';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -86,19 +87,25 @@ interface Coverage {
   projectile: boolean;
   area: boolean;
   status: boolean;
+  /** A snapshot holds `match.orb`, and an `orbSpawn` event came through a batch. */
+  orb: boolean;
+  orbSpawn: boolean;
   withBatch: number;
   withoutBatch: number;
   batchTicks: number[];
   batchesSeen: number[];
 }
 
-function play(rebuildEvents: (batches: EventBatch[], tick: number) => GameState['events']): Coverage {
-  const live = createMatch(config, arena, SEED, kits);
+function play(
+  rebuildEvents: (batches: EventBatch[], tick: number) => GameState['events'],
+  matchConfig: MatchConfig = config,
+): Coverage {
+  const live = createMatch(matchConfig, arena, SEED, kits);
   const start = decodeServerMessage(
     encodeServerMessage({
       t: 'matchStart',
       you: 0,
-      config,
+      config: matchConfig,
       arena: live.arena,
       kits: live.kits,
       snapshotEvery: 3,
@@ -106,6 +113,7 @@ function play(rebuildEvents: (batches: EventBatch[], tick: number) => GameState[
     }),
   );
   if (!start.ok || start.message.t !== 'matchStart') throw new Error('matchStart did not decode');
+  expect(start.message.config).toEqual(matchConfig);
   expect(start.message.arena).toEqual(live.arena);
   expect(start.message.kits).toEqual(live.kits);
 
@@ -115,6 +123,8 @@ function play(rebuildEvents: (batches: EventBatch[], tick: number) => GameState[
     projectile: false,
     area: false,
     status: false,
+    orb: false,
+    orbSpawn: false,
     withBatch: 0,
     withoutBatch: 0,
     batchTicks: [],
@@ -162,7 +172,11 @@ function play(rebuildEvents: (batches: EventBatch[], tick: number) => GameState[
     const msg = decoded.message;
     expect(msg.tick).toBe(live.tick);
     expect(msg.ack).toBe(ack);
-    for (const batch of msg.events) cover.batchesSeen.push(batch.tick);
+    for (const batch of msg.events) {
+      cover.batchesSeen.push(batch.tick);
+      if (batch.events.some((e) => e.type === 'orbSpawn')) cover.orbSpawn = true;
+    }
+    if (msg.state.match?.orb !== undefined) cover.orb = true;
 
     const rebuilt: GameState = {
       ...msg.state,
@@ -220,6 +234,33 @@ describe('a real 3v3 on arena02 through the codec', () => {
     // The mutation of the sub-plan, run in the test itself: without the tick's events the
     // checksum cannot match, which is what makes the check above meaningful.
     expect(() => play(() => [])).toThrow(/checksum at tick/);
+  });
+});
+
+describe('the same 3v3 with the energy orb on', () => {
+  // The point is read from the table, as a caller would. Round 1 starts at tick 180, so the
+  // warning comes at tick 1201, inside the 1800 ticks of the run.
+  const orbConfig: MatchConfig = { ...config, energyOrb: orbPointFor(orbsJson, arena) };
+
+  it('has the point of arena02 from the table', () => {
+    expect(orbConfig.energyOrb).toEqual({ x: 0, y: 0 });
+  });
+
+  it('rebuilds to the live checksum at every snapshot, with match.orb and an orbSpawn in them', () => {
+    const cover = play(eventsOfTick, orbConfig);
+    expect(cover.snapshots).toBeGreaterThan(300);
+    expect(cover.orb).toBe(true);
+    expect(cover.orbSpawn).toBe(true);
+  });
+
+  it('turns red when the batch of the snapshot tick is dropped from the rebuild', () => {
+    expect(() => play(() => [], orbConfig)).toThrow(/checksum at tick/);
+  });
+
+  it('has no orb and no orbSpawn without the key', () => {
+    const cover = play(eventsOfTick);
+    expect(cover.orb).toBe(false);
+    expect(cover.orbSpawn).toBe(false);
   });
 });
 

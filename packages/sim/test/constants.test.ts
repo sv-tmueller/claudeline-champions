@@ -15,6 +15,10 @@ import {
   MAX_TELEPORT_METERS,
   MIN_DASH_DISTANCE,
   MOTION_SUBSTEP_METERS,
+  ORB_COLLECTIBLE_TICKS,
+  ORB_ENERGY,
+  ORB_RADIUS,
+  ORB_WARNING_TICKS,
   RING_SOURCE_ID,
   ROUND_END_TICKS,
   ROUND_TICKS,
@@ -80,5 +84,14 @@ describe('match flow constants', () => {
   it('holds the standard rounds to win and the ring damage source id', () => {
     expect(DEFAULT_ROUNDS_TO_WIN).toBe(3);
     expect(RING_SOURCE_ID).toBe(-1);
+  });
+});
+
+describe('energy orb constants', () => {
+  it('holds the rules.md section 3.3 numbers: 17 s warning, 20 s pickup, 0.5 m, 25 energy', () => {
+    expect(ORB_WARNING_TICKS).toBe(1020);
+    expect(ORB_COLLECTIBLE_TICKS).toBe(1200);
+    expect(ORB_RADIUS).toBe(0.5);
+    expect(ORB_ENERGY).toBe(25);
   });
 });

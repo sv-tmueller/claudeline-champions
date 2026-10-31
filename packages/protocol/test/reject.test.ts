@@ -296,6 +296,17 @@ bad('matchStart: player championId missing', 'server', edit(matchStart, ['config
 for (const rounds of [0, -1, 1.5, '3', null]) {
   bad(`matchStart: roundsToWin ${JSON.stringify(rounds)}`, 'server', edit(matchStart, ['config.roundsToWin', rounds]), 'badMessage', 'config.roundsToWin');
 }
+for (const orb of [null, [], 5, 'orb']) {
+  bad(`matchStart: energyOrb ${JSON.stringify(orb)}`, 'server', edit(matchStart, ['config.energyOrb', orb]), 'badMessage', 'config.energyOrb');
+}
+for (const x of [undefined, '0', null, true]) {
+  bad(`matchStart: energyOrb.x ${JSON.stringify(x)}`, 'server', edit(matchStart, ['config.energyOrb', { x: 0, y: 2.5 }], ['config.energyOrb.x', x]), 'badMessage', 'config.energyOrb.x');
+}
+for (const y of [undefined, '2.5', null, [2.5]]) {
+  bad(`matchStart: energyOrb.y ${JSON.stringify(y)}`, 'server', edit(matchStart, ['config.energyOrb', { x: 0, y: 2.5 }], ['config.energyOrb.y', y]), 'badMessage', 'config.energyOrb.y');
+}
+// JSON has no NaN or Infinity, but 1e999 parses to Infinity.
+bad('matchStart: energyOrb.y 1e999', 'server', edit(matchStart, ['config.energyOrb', { x: 0, y: 2.5 }]).replace('"y":2.5', '"y":1e999'), 'badMessage', 'config.energyOrb.y');
 bad('matchStart: roundsToWin 2^53', 'server', edit(matchStart, ['config.roundsToWin', 2 ** 53]), 'badMessage', 'config.roundsToWin');
 for (const arena of [null, [], 'arena02', 5, undefined]) {
   bad(`matchStart: arena ${JSON.stringify(arena)}`, 'server', edit(matchStart, ['arena', arena]), 'badMessage', 'arena');
