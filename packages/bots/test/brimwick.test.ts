@@ -13,12 +13,12 @@ import { NORMAL_2V2, SEEDS_2V2, cellOf, expectEnded, playCell } from './six-cell
 const CELLS = [
   cellOf('brimwick', 'hargrim', 'arena01', 4046, 1412),
   cellOf('brimwick', 'hargrim', 'arena02', 4347, 1039),
-  cellOf('brimwick', 'quillon', 'arena01', 4802, 1028),
-  cellOf('brimwick', 'quillon', 'arena02', 3787, 800),
+  cellOf('brimwick', 'quillon', 'arena01', 6303, 1266),
+  cellOf('brimwick', 'quillon', 'arena02', 4499, 999),
   cellOf('brimwick', 'lumeth', 'arena01', 6551, 1710),
   cellOf('brimwick', 'lumeth', 'arena02', 6159, 2325),
   cellOf('brimwick', 'skerrow', 'arena01', 4057, 1226),
-  cellOf('brimwick', 'skerrow', 'arena02', 2323, 552),
+  cellOf('brimwick', 'skerrow', 'arena02', 3056, 836),
 ];
 
 describe('a match of bots with Brimwick, played to matchEnd', () => {

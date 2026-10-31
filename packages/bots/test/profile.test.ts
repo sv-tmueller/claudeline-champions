@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor, rulesFor } from '../src/profile';
-import { jsonKits, rosterKits, sixKits } from './helpers';
+import { jsonKits, profileOf, rosterKits, sixKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -19,75 +19,60 @@ function arcSlot(radius: number): SlotSpec {
 
 describe('profileFor with a kit', () => {
   it('reads Hargrim and Quillon from the base M1 band minus the margin', () => {
-    expect(profileFor('hargrim', hargrimKit())).toEqual({ rangeMin: 0, rangeMax: 2 });
-    expect(profileFor('quillon', quillonKit())).toEqual({ rangeMin: 6, rangeMax: 13 });
+    expect(profileFor('hargrim', hargrimKit())).toEqual(profileOf(0, 2));
+    expect(profileFor('quillon', quillonKit())).toEqual(profileOf(6, 13));
   });
 
   it('derives rangeMax instead of hard-coding it', () => {
     // Quillon M1 of 21 m/s for 45 ticks reaches 15.75 m, so rangeMax is 14.75.
-    expect(profileFor('quillon', withM1(quillonKit(), boltSlot(21, 45)))).toEqual({
-      rangeMin: 6,
-      rangeMax: 14.75,
-    });
+    expect(profileFor('quillon', withM1(quillonKit(), boltSlot(21, 45)))).toEqual(profileOf(6, 14.75));
     // Hargrim M1 arc of 3 m reaches 3.5 m, so rangeMax is 2.5.
-    expect(profileFor('hargrim', withM1(hargrimKit(), arcSlot(3)))).toEqual({
-      rangeMin: 0,
-      rangeMax: 2.5,
-    });
+    expect(profileFor('hargrim', withM1(hargrimKit(), arcSlot(3)))).toEqual(profileOf(0, 2.5));
   });
 
   it('falls back to the table when the derived rangeMax is at most 1 m', () => {
     // An arc of 1 m reaches 1.5 m: rangeMax 0.5.
-    expect(profileFor('hargrim', withM1(hargrimKit(), arcSlot(1)))).toEqual({ rangeMin: 0, rangeMax: 3 });
+    expect(profileFor('hargrim', withM1(hargrimKit(), arcSlot(1)))).toEqual(profileOf(0, 3));
   });
 
   it('falls back to the table when the derived rangeMax is at most rangeMin', () => {
     // 21 m/s for 20 ticks reaches 7 m: rangeMax 6, not above rangeMin 6.
-    expect(profileFor('quillon', withM1(quillonKit(), boltSlot(21, 20)))).toEqual({
-      rangeMin: 6,
-      rangeMax: 13,
-    });
+    expect(profileFor('quillon', withM1(quillonKit(), boltSlot(21, 20)))).toEqual(profileOf(6, 13));
   });
 
   it('falls back to the table when M1 has no band', () => {
-    expect(profileFor('hargrim', quietKit('hargrim'))).toEqual({ rangeMin: 0, rangeMax: 3 });
-    expect(profileFor('quillon', quietKit('quillon'))).toEqual({ rangeMin: 6, rangeMax: 13 });
+    expect(profileFor('hargrim', quietKit('hargrim'))).toEqual(profileOf(0, 3));
+    expect(profileFor('quillon', quietKit('quillon'))).toEqual(profileOf(6, 13));
   });
 
   it('ignores a kit whose id differs from the champion id', () => {
-    expect(profileFor('hargrim', quillonKit())).toEqual({ rangeMin: 0, rangeMax: 3 });
-    expect(profileFor('quillon', hargrimKit())).toEqual({ rangeMin: 6, rangeMax: 13 });
+    expect(profileFor('hargrim', quillonKit())).toEqual(profileOf(0, 3));
+    expect(profileFor('quillon', hargrimKit())).toEqual(profileOf(6, 13));
   });
 
   it('keeps the table for a champion with no rule, whatever its kit', () => {
     // No champion of the roster is left without a rule; one that is not on it keeps the table.
-    expect(profileFor('dummy', quietKit('dummy'))).toEqual({ rangeMin: 4, rangeMax: 8 });
-    expect(profileFor('dummy', withM1(quietKit('dummy'), boltSlot(21, 40)))).toEqual({
-      rangeMin: 4,
-      rangeMax: 8,
-    });
+    expect(profileFor('dummy', quietKit('dummy'))).toEqual(profileOf(4, 8));
+    expect(profileFor('dummy', withM1(quietKit('dummy'), boltSlot(21, 40)))).toEqual(profileOf(4, 8));
   });
 
   it('reads Lumeth from the base M1 band too: 20 m/s for 36 ticks reaches 12 m, so rangeMax is 11', () => {
     const lumeth = rosterKits().find((kit) => kit.id === 'lumeth') as KitDef;
-    expect(profileFor('lumeth', lumeth)).toEqual({ rangeMin: 6, rangeMax: 11 });
+    expect(profileFor('lumeth', lumeth)).toEqual(profileOf(6, 11));
     // Derived, not hard-coded: 21 m/s for 40 ticks reaches 14 m.
-    expect(profileFor('lumeth', withM1(quietKit('lumeth'), boltSlot(21, 40)))).toEqual({
-      rangeMin: 6,
-      rangeMax: 13,
-    });
+    expect(profileFor('lumeth', withM1(quietKit('lumeth'), boltSlot(21, 40)))).toEqual(profileOf(6, 13));
     // With no M1 band, no kit or a kit of another id she keeps the table: 6 to 10 m.
-    expect(profileFor('lumeth', quietKit('lumeth'))).toEqual({ rangeMin: 6, rangeMax: 10 });
-    expect(profileFor('lumeth')).toEqual({ rangeMin: 6, rangeMax: 10 });
-    expect(profileFor('lumeth', quietKit('hargrim'))).toEqual({ rangeMin: 6, rangeMax: 10 });
+    expect(profileFor('lumeth', quietKit('lumeth'))).toEqual(profileOf(6, 10));
+    expect(profileFor('lumeth')).toEqual(profileOf(6, 10));
+    expect(profileFor('lumeth', quietKit('hargrim'))).toEqual(profileOf(6, 10));
   });
 
   it('reads Skerrow from the base M1 band too: the arc of 2.5 m less the margin is 1.5 m', () => {
     const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
-    expect(profileFor('skerrow', skerrow)).toEqual({ rangeMin: 0, rangeMax: 1.5 });
+    expect(profileFor('skerrow', skerrow)).toEqual(profileOf(0, 1.5));
     // Without a kit, or with a kit of another id, she keeps the table: 2.5 m.
-    expect(profileFor('skerrow')).toEqual({ rangeMin: 0, rangeMax: 2.5 });
-    expect(profileFor('skerrow', quietKit('hargrim'))).toEqual({ rangeMin: 0, rangeMax: 2.5 });
+    expect(profileFor('skerrow')).toEqual(profileOf(0, 2.5));
+    expect(profileFor('skerrow', quietKit('hargrim'))).toEqual(profileOf(0, 2.5));
   });
 
   it('reads Ondrel and Brimwick from the base M1 band: 20 m/s for 30 and 33 ticks, less the margin', () => {
@@ -95,37 +80,28 @@ describe('profileFor with a kit', () => {
     const ondrel = six.find((kit) => kit.id === 'ondrel') as KitDef;
     const brimwick = six.find((kit) => kit.id === 'brimwick') as KitDef;
     // Ondrel's M1 reaches 10 m, so rangeMax is 9; Brimwick's reaches 11 m, so 10.
-    expect(profileFor('ondrel', ondrel)).toEqual({ rangeMin: 5, rangeMax: 9 });
-    expect(profileFor('brimwick', brimwick)).toEqual({ rangeMin: 7, rangeMax: 10 });
+    expect(profileFor('ondrel', ondrel)).toEqual(profileOf(5, 9));
+    expect(profileFor('brimwick', brimwick)).toEqual(profileOf(7, 10));
   });
 
   it('derives the Ondrel and Brimwick rangeMax instead of hard-coding it', () => {
     // 21 m/s for 30 ticks reaches 10.5 m: 9.5. 22 m/s for 33 ticks reaches 12.1 m: 11.1.
-    expect(profileFor('ondrel', withM1(quietKit('ondrel'), boltSlot(21, 30)))).toEqual({
-      rangeMin: 5,
-      rangeMax: 9.5,
-    });
-    expect(profileFor('brimwick', withM1(quietKit('brimwick'), boltSlot(22, 33)))).toEqual({
-      rangeMin: 7,
-      rangeMax: 11.1,
-    });
+    expect(profileFor('ondrel', withM1(quietKit('ondrel'), boltSlot(21, 30)))).toEqual(profileOf(5, 9.5));
+    expect(profileFor('brimwick', withM1(quietKit('brimwick'), boltSlot(22, 33)))).toEqual(profileOf(7, 11.1));
   });
 
   it('keeps the Ondrel and Brimwick table with no kit, no M1 band or a kit of another id', () => {
-    expect(profileFor('ondrel')).toEqual({ rangeMin: 5, rangeMax: 9 });
-    expect(profileFor('brimwick')).toEqual({ rangeMin: 7, rangeMax: 10 });
-    expect(profileFor('ondrel', quietKit('ondrel'))).toEqual({ rangeMin: 5, rangeMax: 9 });
-    expect(profileFor('brimwick', quietKit('brimwick'))).toEqual({ rangeMin: 7, rangeMax: 10 });
-    expect(profileFor('ondrel', quietKit('hargrim'))).toEqual({ rangeMin: 5, rangeMax: 9 });
-    expect(profileFor('brimwick', quietKit('hargrim'))).toEqual({ rangeMin: 7, rangeMax: 10 });
+    expect(profileFor('ondrel')).toEqual(profileOf(5, 9));
+    expect(profileFor('brimwick')).toEqual(profileOf(7, 10));
+    expect(profileFor('ondrel', quietKit('ondrel'))).toEqual(profileOf(5, 9));
+    expect(profileFor('brimwick', quietKit('brimwick'))).toEqual(profileOf(7, 10));
+    expect(profileFor('ondrel', quietKit('hargrim'))).toEqual(profileOf(5, 9));
+    expect(profileFor('brimwick', quietKit('hargrim'))).toEqual(profileOf(7, 10));
   });
 
   it('falls back to the table when the derived Ondrel rangeMax is at most rangeMin', () => {
     // 20 m/s for 18 ticks reaches 6 m: rangeMax 5, not above rangeMin 5.
-    expect(profileFor('ondrel', withM1(quietKit('ondrel'), boltSlot(20, 18)))).toEqual({
-      rangeMin: 5,
-      rangeMax: 9,
-    });
+    expect(profileFor('ondrel', withM1(quietKit('ondrel'), boltSlot(20, 18)))).toEqual(profileOf(5, 9));
   });
 
   it('returns a fresh object every call', () => {
@@ -136,9 +112,9 @@ describe('profileFor with a kit', () => {
 
 describe('profileFor without a kit', () => {
   it('keeps the table', () => {
-    expect(profileFor('hargrim')).toEqual({ rangeMin: 0, rangeMax: 3 });
-    expect(profileFor('quillon')).toEqual({ rangeMin: 6, rangeMax: 13 });
-    expect(profileFor('constructor')).toEqual({ rangeMin: 4, rangeMax: 8 });
+    expect(profileFor('hargrim')).toEqual(profileOf(0, 3));
+    expect(profileFor('quillon')).toEqual(profileOf(6, 13));
+    expect(profileFor('constructor')).toEqual(profileOf(4, 8));
   });
 });
 
@@ -253,6 +229,41 @@ describe('rulesFor Ondrel and Brimwick', () => {
     for (const id of ['ondrel', 'brimwick']) {
       expect(rulesFor(id), id).toEqual(none);
       expect(rulesFor(id, kit('hargrim')), id).toEqual(none);
+    }
+  });
+});
+
+describe('the stand reach (#213)', () => {
+  const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
+
+  it('is 0.8 of rangeMax for the two champions that never kite, with a kit and without', () => {
+    expect(profileFor('hargrim', hargrimKit()).standReach).toBe(2 * 0.8);
+    expect(profileFor('skerrow', skerrow).standReach).toBe(1.5 * 0.8);
+    expect(profileFor('hargrim').standReach).toBe(3 * 0.8);
+    expect(profileFor('skerrow').standReach).toBe(2.5 * 0.8);
+    // The table applies for a kit of another id or with no M1 band, and its stand reach with it.
+    expect(profileFor('hargrim', quillonKit()).standReach).toBe(3 * 0.8);
+    expect(profileFor('skerrow', quietKit('skerrow')).standReach).toBe(2.5 * 0.8);
+  });
+
+  it('is rangeMax for every champion that keeps its range, with a kit and without', () => {
+    const roster = sixKits();
+    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick']) {
+      const kit = roster.find((k) => k.id === id) as KitDef;
+      expect(profileFor(id, kit).standReach, id).toBe(profileFor(id, kit).rangeMax);
+      expect(profileFor(id).standReach, `${id} without a kit`).toBe(profileFor(id).rangeMax);
+    }
+    expect(profileFor('dummy').standReach).toBe(8);
+  });
+
+  it('stays above 1.1 m, so a walk to it ends before the bodies touch, and below rangeMax', () => {
+    const roster = sixKits();
+    for (const id of ['hargrim', 'skerrow']) {
+      for (const kit of [roster.find((k) => k.id === id), undefined]) {
+        const profile = profileFor(id, kit);
+        expect(profile.standReach).toBeGreaterThan(1.1);
+        expect(profile.standReach).toBeLessThan(profile.rangeMax);
+      }
     }
   });
 });

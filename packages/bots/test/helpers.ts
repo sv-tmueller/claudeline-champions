@@ -38,6 +38,17 @@ export const arena01: ArenaDef = parseArenaDef(arena01Json);
 export const arena02: ArenaDef = parseArenaDef(arena02Json);
 
 /**
+ * The share of rangeMax at which a champion with rangeMin 0 stands to engage (#213), literal: the
+ * pin of `STAND_FRACTION` in profile.ts.
+ */
+export const MELEE_STAND_FRACTION = 0.8;
+
+/** The profile `profileFor` returns for these two ranges: the stand reach is rangeMax for a ranged champion. */
+export function profileOf(rangeMin: number, rangeMax: number): { rangeMin: number; rangeMax: number; standReach: number } {
+  return { rangeMin, rangeMax, standReach: rangeMin === 0 ? rangeMax * MELEE_STAND_FRACTION : rangeMax };
+}
+
+/**
  * The shipped Hargrim, Quillon and Skerrow kits from `data/kits`, for `createMatch`, which
  * validates them and keeps only the kits the players use, so a match without a Skerrow has the
  * same state as before. The JSON is a plain object tree, so the cast is the one the sim's roster

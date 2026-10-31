@@ -342,7 +342,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     const g = navGrid(state);
     switch (acted.intent) {
       case 'engage':
-        if (d <= profile.rangeMax && standShot(state, me, target)) {
+        if (d <= profile.standReach && standShot(state, me, target)) {
           return stand();
         }
         // The wait of a champion for its opener to come off cooldown (Skerrow's Lunge).
