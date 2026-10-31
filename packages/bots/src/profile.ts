@@ -6,18 +6,39 @@ export interface BotProfile {
   rangeMin: number;
   /** Farther than this, the champion walks toward its target. Always above 1 m. */
   rangeMax: number;
+  /**
+   * An engaging champion stands once its target is within this and has a clear shot, and walks in
+   * while it is not. Never above `rangeMax`: it is `rangeMax` for a champion that keeps its range,
+   * and `STAND_FRACTION` of it for one that never kites (rangeMin 0), so a melee champion stops a
+   * step inside its reach, not on the edge of it. The finisher, the deadlock rule and the sight
+   * logic keep `rangeMax`.
+   */
+  standReach: number;
 }
 
-const DEFAULT_PROFILE: BotProfile = { rangeMin: 4, rangeMax: 8 };
+/**
+ * The share of `rangeMax` at which a champion with rangeMin 0 stands to engage (#213). Below 1 the
+ * stand has slack: a target that steps back a little is still in reach and the champion does not
+ * walk in again from outside it. Above 1 m for both melee kits (1.6 and 1.2 m) so that the walk
+ * ends before the bodies touch.
+ */
+export const STAND_FRACTION = 0.8;
+
+/** A profile: the stand reach follows from the range. */
+function profileOf(rangeMin: number, rangeMax: number): BotProfile {
+  return { rangeMin, rangeMax, standReach: rangeMin === 0 ? rangeMax * STAND_FRACTION : rangeMax };
+}
+
+const DEFAULT_PROFILE: BotProfile = profileOf(4, 8);
 
 // Keyed by champion id. A Map, so an id such as 'constructor' cannot reach the prototype.
 const PROFILES = new Map<string, BotProfile>([
-  ['hargrim', { rangeMin: 0, rangeMax: 3 }],
-  ['quillon', { rangeMin: 6, rangeMax: 13 }],
-  ['lumeth', { rangeMin: 6, rangeMax: 10 }],
-  ['skerrow', { rangeMin: 0, rangeMax: 2.5 }],
-  ['ondrel', { rangeMin: 5, rangeMax: 9 }],
-  ['brimwick', { rangeMin: 7, rangeMax: 10 }],
+  ['hargrim', profileOf(0, 3)],
+  ['quillon', profileOf(6, 13)],
+  ['lumeth', profileOf(6, 10)],
+  ['skerrow', profileOf(0, 2.5)],
+  ['ondrel', profileOf(5, 9)],
+  ['brimwick', profileOf(7, 10)],
 ]);
 
 /**
@@ -46,10 +67,10 @@ export function profileFor(championId: string, kit?: KitDef): BotProfile {
     const band = abilityReach(kit.slots.M1);
     if (band !== null) {
       const rangeMax = band.max - RANGE_MARGIN;
-      if (rangeMax > 1 && rangeMax > rangeMin) return { rangeMin, rangeMax };
+      if (rangeMax > 1 && rangeMax > rangeMin) return profileOf(rangeMin, rangeMax);
     }
   }
-  return { rangeMin: table.rangeMin, rangeMax: table.rangeMax };
+  return { rangeMin: table.rangeMin, rangeMax: table.rangeMax, standReach: table.standReach };
 }
 
 /** What a target must be doing for an opener: walking away from the bot, or toward it. */

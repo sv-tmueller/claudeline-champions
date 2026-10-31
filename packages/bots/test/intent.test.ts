@@ -10,6 +10,7 @@ import {
 } from '../src/intent';
 import type { ScoredIntent } from '../src/intent';
 import { profileFor } from '../src/profile';
+import { profileOf } from './helpers';
 
 const RANGE_MIN = 6;
 
@@ -123,14 +124,14 @@ describe('chooseIntent thresholds', () => {
 
 describe('profileFor', () => {
   it('returns the ranges per champion', () => {
-    expect(profileFor('hargrim')).toEqual({ rangeMin: 0, rangeMax: 3 });
-    expect(profileFor('quillon')).toEqual({ rangeMin: 6, rangeMax: 13 });
-    expect(profileFor('lumeth')).toEqual({ rangeMin: 6, rangeMax: 10 });
-    expect(profileFor('skerrow')).toEqual({ rangeMin: 0, rangeMax: 2.5 });
+    expect(profileFor('hargrim')).toEqual(profileOf(0, 3));
+    expect(profileFor('quillon')).toEqual(profileOf(6, 13));
+    expect(profileFor('lumeth')).toEqual(profileOf(6, 10));
+    expect(profileFor('skerrow')).toEqual(profileOf(0, 2.5));
   });
 
   it('returns the default for an unknown id, including names on the prototype', () => {
-    const fallback = { rangeMin: 4, rangeMax: 8 };
+    const fallback = profileOf(4, 8);
     expect(profileFor('nobody')).toEqual(fallback);
     expect(profileFor('constructor')).toEqual(fallback);
     expect(profileFor('__proto__')).toEqual(fallback);

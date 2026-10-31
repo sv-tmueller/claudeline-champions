@@ -285,20 +285,21 @@ describe('engage', () => {
     ['hargrim', 0, 'hard'],
     ['quillon', 1, 'hard'],
   ] as const) {
-    it(`${name} stops at its maximum range in the clear lane and stays still`, () => {
+    it(`${name} stops at its stand reach in the clear lane and stays still`, () => {
       const state = setup(arena01);
       kill(state, id === 0 ? 1 : 0, 3);
       const me = put(state, id, -12, 3);
       const target = put(state, 2, 4, 3);
-      const rangeMax = profileFor(me.championId).rangeMax;
+      // The stand reach: rangeMax for Quillon, 0.8 of it for Hargrim (#213).
+      const { standReach } = profileFor(me.championId);
       const bots = new Map([[id, createBot(id, tier, 5)]]);
       let still = 0;
       for (let i = 0; i < 700; i++) {
         tick(state, bots);
         still = me.vx === 0 && me.vy === 0 ? still + 1 : 0;
       }
-      expect(dist(me, target)).toBeGreaterThan(rangeMax - 0.2);
-      expect(dist(me, target)).toBeLessThanOrEqual(rangeMax);
+      expect(dist(me, target)).toBeGreaterThan(standReach - 0.2);
+      expect(dist(me, target)).toBeLessThanOrEqual(standReach);
       expect(still).toBeGreaterThanOrEqual(60);
     });
   }
