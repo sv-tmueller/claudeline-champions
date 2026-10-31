@@ -9,7 +9,8 @@ describe('champion display names', () => {
     ['skerrow', 'Skerrow'],
     ['ondrel', 'Ondrel'],
     ['brimwick', 'Brimwick'],
-  ])('names %s %s, as docs/design/roster-v1.md and roster-v2.md do', (id, name) => {
+    ['durnhal', 'Durnhal'],
+  ])('names %s %s, as docs/design/roster-v1.md, roster-v2.md and roster-v3.md do', (id, name) => {
     expect(championName(id)).toBe(name);
   });
 
@@ -25,8 +26,8 @@ describe('champion display names', () => {
 });
 
 describe('roster ids', () => {
-  it('lists the six champions in the order of docs/design/roster-v1.md, then roster-v2.md', () => {
-    expect(ROSTER_IDS).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick']);
+  it('lists the seven champions in the order of docs/design/roster-v1.md, roster-v2.md, then roster-v3.md', () => {
+    expect(ROSTER_IDS).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal']);
   });
 
   it('has a name for every id', () => {
