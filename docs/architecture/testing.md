@@ -62,7 +62,11 @@ the second. The three clip-sampler green ranges are over the seven-model unit
 jobs of the three green runs of PR #179 (40334583804, 40336071398,
 40336850393); their red ranges are still from 5820f16. The local figures are
 over eight models since #212 (Durnhal's joins), the runner ones over seven
-until a green run of #212's unit job replaces them.
+until a green run of #212's unit job replaces them. The eight-model local
+figures were measured at a load average of about 240 on 18 CPUs with other
+jobs running, so they are not idle figures: the seven-model idle baseline was
+1.1 to 1.8 s for the Run test, 0.34 to 0.47 s and 0.41 to 0.54 s for the two
+others.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
@@ -376,8 +380,8 @@ other spec.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard` (ten links:
-  six champions, two arenas, two team sizes), and `/?difficulty=brutal` reads
+  and every link of the other three rows carrying `difficulty=hard` (eleven links:
+  seven champions, two arenas, two team sizes), and `/?difficulty=brutal` reads
   normal as current. The default test lists eight `data-hud` elements (the
   eighth is `scoreboard`, hidden and not displayed) and reads
   `data-silenced="false"` on all seven slots, while only F reads
