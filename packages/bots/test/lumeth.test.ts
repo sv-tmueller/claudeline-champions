@@ -49,9 +49,9 @@ const ROWS: Row[] = [
     arena: arena01,
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
-    endTick: 5081,
-    round: 1700,
-    budget: 16_000,
+    endTick: 8254,
+    round: 2300,
+    budget: 20_000,
   },
   {
     name: 'a 2v2 on arena02',
@@ -59,8 +59,8 @@ const ROWS: Row[] = [
     arena: arena02,
     seeds: SEEDS_2V2,
     tiers: NORMAL_2V2,
-    endTick: 7521,
-    round: 1700,
+    endTick: 5698,
+    round: 2300,
     budget: 18_000,
   },
   {
@@ -69,9 +69,9 @@ const ROWS: Row[] = [
     arena: arena01,
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
-    endTick: 6773,
+    endTick: 9357,
     round: 2900,
-    budget: 20_000,
+    budget: 23_000,
   },
   {
     name: 'a 3v3 on arena02',
@@ -79,9 +79,9 @@ const ROWS: Row[] = [
     arena: arena02,
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
-    endTick: 10934,
+    endTick: 6442,
     round: 2900,
-    budget: 24_000,
+    budget: 20_000,
   },
 ];
 
