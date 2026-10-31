@@ -497,8 +497,8 @@ const WALKS: { speed: number; facing: number; name: string }[] = [
 ];
 
 describe('the floor and the top through every transition', () => {
-  // Eight cases, one per model; the lumeth case is the slowest. Runner (ubuntu-latest, Node 22):
-  // 3.6 to 8.3 s green on PR #179 (runs 40334583804, 40336071398, 40336850393), 3.3 to 7.9,
+  // Eight cases, one per model; no case is the slowest in every run. Runner (ubuntu-latest,
+  // Node 22): 3.3 to 7.2 s green on PR #219 (runs 41207597802, 41210693459, 41211772728), 3.3 to 7.9,
   // 4.2 to 8.0 and 3.7 to 7.6 s red on 5820f16 (runs 39001711657, 39008413462, 39009180211 x3);
   // 2.5 to 4.0 s locally (Apple M5 Pro, Node 22.23.2, full npm run test, eight models, at a
   // load average of about 240 on 18 CPUs; the seven-model idle baseline was 1.1 to 1.8 s). Timeout: the smallest
@@ -530,8 +530,8 @@ describe('the floor and the top through every transition', () => {
     expect(w.figures().low).toBeGreaterThanOrEqual(FLOOR);
   });
 
-  // Eight cases, one per model. Runner (ubuntu-latest, Node 22): 1.0 to 2.4 s green on PR #179
-  // (runs 40334583804, 40336071398, 40336850393), 1.9 to 2.6, 1.1 to 2.2 and 1.9 to 2.6 s red on
+  // Eight cases, one per model. Runner (ubuntu-latest, Node 22): 1.0 to 2.7 s green on PR #219
+  // (runs 41207597802, 41210693459, 41211772728), 1.9 to 2.6, 1.1 to 2.2 and 1.9 to 2.6 s red on
   // 5820f16 (runs 39001711657, 39008413462, 39009180211 x3); 0.79 to 1.16 s locally (Apple M5
   // Pro, Node 22.23.2, full npm run test, eight models, at a load average of about 240; the
   // seven-model idle baseline was 0.34 to 0.47 s). Timeout: the smallest of 10, 15 and 20 s at least
@@ -593,8 +593,8 @@ describe('the floor and the top through every transition', () => {
     }
   });
 
-  // Eight cases, one per model. Runner (ubuntu-latest, Node 22): 1.2 to 2.5 s green on PR #179
-  // (runs 40334583804, 40336071398, 40336850393), 1.2 to 2.9, 1.1 to 1.5 and 1.1 to 3.0 s red on
+  // Eight cases, one per model. Runner (ubuntu-latest, Node 22): 1.3 to 3.0 s green on PR #219
+  // (runs 41207597802, 41210693459, 41211772728), 1.2 to 2.9, 1.1 to 1.5 and 1.1 to 3.0 s red on
   // 5820f16 (runs 39001711657, 39008413462, 39009180211 x3); 0.91 to 1.25 s locally (Apple M5
   // Pro, Node 22.23.2, full npm run test, eight models, at a load average of about 240; the
   // seven-model idle baseline was 0.41 to 0.54 s). Timeout: the smallest of 10, 15 and 20 s at least
