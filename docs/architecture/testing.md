@@ -642,8 +642,8 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   of round 3) the counted code of the windows reads 3252 to 3456 B (`writeHooks`
   about 2.5 KB, `hud.ts:updateHealth` 0.3 KB), over the limit of 780 B, in two
   runs; main's bots on the same machine read a median of 456 B in round 3 at tick
-  4289. Moving the lead inside round 3 does not help: leads 2 and 3 read 2448 to
-  3456 B of counted code, leads 4, 5 and 6 read a bots median of 42 284, 45 920
+  4289. Moving the lead inside round 3 does not help: leads 2 and 3 read a median of
+  2448 to 3456 B of counted code (the windows read 2.4 to 3.8 KB each), leads 4, 5 and 6 read a bots median of 42 284, 45 920
   and 46 152 B (the follower's `splitPath`, over the limit of 18 000 B), and with
   lead 10 no projectile is live. Round 4 (begun by tick 8969, after a warm-up to
   tick 8000, budget 15 000) is clean from its first window: lead 4, windows 4 to

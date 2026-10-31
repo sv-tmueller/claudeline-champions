@@ -1870,7 +1870,8 @@ Hargrim and Skerrow of the table).
 
 The seeded runs that move (re-recorded each by its own formula, the cascade the
 sub-plan lists): the four Lumeth runs end at ticks 8254 (2v2 arena01, was 5081;
-round term 2300, budget 20 000), 5698 (2v2 arena02, was 7521; 2300, 18 000), 9357
+round term 2300, the longest 2v2 round being 2265 (2229 on arena01, 2265 on arena02),
+budget 20 000), 5698 (2v2 arena02, was 7521; 2300, 18 000), 9357
 (3v3 arena01, was 6773; 2900, 23 000) and 6442 (3v3 arena02, was 10934; 2900,
 20 000), in `lumeth.test.ts` and the harness rows of `tools/balance/harness.test.ts`;
 the cells of `brimwick.test.ts` and `ondrel.test.ts` that passed their term (6 of
@@ -1897,8 +1898,8 @@ before side reproduces the 36 committed rows):
 
 | Kit | Closing damage taken per alive s, before | after | Closing time share % | Closing runs | Re-close share of runs % | Mean rate over 20 cells |
 | --- | --- | --- | --- | --- | --- | --- |
-| Hargrim | 6.07 | 5.71 | 42.7 to 41.8 | 126 216 to 92 023 | 80.9 to 57.7 | 11.77 to 12.64 |
-| Skerrow | 7.00 | 6.32 | 50.7 to 48.3 | 136 187 to 91 014 | 79.9 to 53.2 | 13.89 to 16.55 |
+| Hargrim | 6.07 | 5.71 | 42.7 to 41.8 | 126 216 to 58 357 | 80.9 to 57.7 | 11.77 to 12.64 |
+| Skerrow | 7.00 | 6.32 | 50.7 to 48.3 | 136 187 to 59 394 | 79.9 to 53.2 | 13.89 to 16.55 |
 
 The closing damage per alive second falls for both kits and the means rise, so
 none of the stop conditions fires. Pooled over both melee kits: inReach 25.3 to
@@ -1923,13 +1924,13 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (5081, 7521, 6773 and 10934: the first moved from
-6623 with #186, the others stand on the bots of #137), plus two rounds of the
-longest round that did not go to sudden death, rounded up to 100 (1700 in the
-2v2 runs, whose longest is 1619, and 2900 in the 3v3 runs, the client's longest
-for the same roster, 2801), and one of 7000, rounded up to 1000 (16000, 18000,
-20000 and 24000; the first was 18000 before #186); a run whose longest round
-passes its term fails. Every run has a Lumeth heal an ally; across the four,
+tick when the budget was set (8254, 5698, 9357 and 6442 since #213; 5081, 7521,
+6773 and 10934 before, the first moved from 6623 with #186), plus two rounds of the
+longest round that did not go to sudden death, rounded up to 100 (2300 in the 2v2
+runs, whose longest is 2265 since #213 and was 1619 before, and 2900 in the 3v3
+runs, the client's longest for the same roster, 2801), and one of 7000, rounded up
+to 1000 (20000, 18000, 23000 and 20000; 16000, 18000, 20000 and 24000 before #213,
+the first 18000 before #186); a run whose longest round passes its term fails. Every run has a Lumeth heal an ally; across the four,
 Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy, and
 Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
 start-edit runs of headless-kits.test.ts stay as their declared fallback (a miss
