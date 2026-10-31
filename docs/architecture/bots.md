@@ -1691,6 +1691,68 @@ retreat of the 0.3 and 0.36 health thresholds, see Decisions) before any kit
 change or roster-v2 rewrite. This is a reading of one scratch diagnostic: no
 share of any cell is stated as the cause, and the decision stays with the lead.
 
+The approach and retreat of #213: the measurement before any rule (main at
+1a2dc35, no bots or sim source touched). The same 36 cells and schedule as the
+rider of #186 (seeds 1 to 50 per 2v2 config and 1 to 16 per 3v3 config, normal
+tier, 7 056 matches), played by a scratch script that is not in the repository
+(its text is in the body of the PR of #213). The before side reproduces the
+committed rates of all 36 cells (the gate). Each alive round think of a champion
+gets one phase from what `think` returned, `inspect()` and the state: inReach (the
+acted target within the profile's rangeMax, the base M1 band top less 1 m, with a
+0.5 m clear shot), closing (engage, not in reach), wait (Skerrow engaging, still,
+6 to 8 m), retreatSpawn (retreat, not in reach, not moving toward the target),
+retreatAdvance (retreat, moving toward it: the latch of the deadlock rule, read
+from the sign of the move) and kite or other (no acted target). An enemy
+`damage` event of a step goes to the victim's phase on that tick, a death too;
+the ring dealt 0.00 to the melee kits (the Lumeth row reads 0.01), so the ring
+column is empty. A closing run is a maximal run of closing thinks and it is a
+re-close when it begins within 60 ticks after an inReach run ended.
+
+| Kit | Phase | Time share % | Taken per alive s | Share of damage taken % | Taken per second in the phase | Dealt per alive s (dealer's phase) | Deaths |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Hargrim | inReach | 29.2 | 8.44 | 50.9 | 28.9 | 6.39 | 6 324 |
+| Hargrim | closing | 42.7 | 6.07 | 36.6 | 14.2 | 0.84 | 87 |
+| Hargrim | retreatSpawn | 11.4 | 0.55 | 3.3 | 4.8 | 0.14 | 2 936 |
+| Hargrim | retreatAdvance | 15.5 | 1.45 | 8.7 | 9.3 | 0.49 | 8 997 |
+| Hargrim | other | 1.1 | 0.09 | 0.5 | 7.7 | 0.00 | 249 |
+| Hargrim | all | 100 | 16.59 | 100 | 16.6 | 7.87 | 18 593 |
+| Skerrow | inReach | 20.8 | 6.49 | 41.0 | 31.2 | 6.19 | 4 598 |
+| Skerrow | closing | 50.7 | 7.00 | 44.2 | 13.8 | 3.15 | 266 |
+| Skerrow | wait | 0.5 | 0.04 | 0.3 | 8.8 | 0.02 | 1 |
+| Skerrow | retreatSpawn | 9.9 | 0.69 | 4.3 | 6.9 | 0.31 | 3 898 |
+| Skerrow | retreatAdvance | 16.9 | 1.52 | 9.6 | 9.0 | 0.57 | 10 417 |
+| Skerrow | other | 1.1 | 0.10 | 0.6 | 8.5 | 0.01 | 225 |
+| Skerrow | all | 100 | 15.83 | 100 | 15.8 | 10.38 | 19 405 |
+
+Both melee kits pooled: inReach 25.3% of the time, 46.4% of the damage taken and
+28.7% of the deaths; closing 46.4%, 40.0% and 0.9%; retreatSpawn 10.7%, 3.8% and
+18.0%; retreatAdvance 16.2%, 9.1% and 51.1%. The ranged kits (alive round
+thinks, the same cells) spend 65 to 75 percent of their time inReach and take
+84 to 88 percent of their damage there, 5.2 to 7.9 per alive second in all
+against 15.8 and 16.6 for the melee kits; the closing phase of the four takes 0.3
+to 0.7 per alive second against 6.1 and 7.0. Retreat is 33.4 and 29.1 percent of
+the alive thinks of Hargrim and Skerrow against 8.9 to 10.4. Closing runs: Hargrim
+has 126 216, of which 80.9 percent are re-closes (they last 25 ticks on average,
+against 153 for a first approach, and carry 855 077 of the 1 471 449 damage
+taken while closing); Skerrow 136 187 and 79.9 percent (805 224 of 1 445 878).
+The ranged kits' re-close shares are 83 to 89 percent, so the share is no mark of
+the melee kits. The target is within rangeMax on 29.6 and 21.1 percent of the
+melee acting thinks.
+
+The choice. The rule fixed in the sub-plan reads the phase that carries the
+most damage taken or deaths over both melee kits. The reading names none of its
+three rules: inReach carries the most damage taken (46.4% of the pooled damage,
+7.54 per alive second against 6.50 in closing; and the most per second spent in
+the phase, 28.9 and 31.2 against 14.2 and 13.8), and retreatAdvance, the latch of
+the deadlock rule, carries the most deaths (51.1%, against 18.0% in
+retreatSpawn), which is a rule outside the three. Both are stop conditions of the
+sub-plan, so no rule is built in this package yet and the decision is the
+lead's. What the table adds: in reach the melee kits trade about even (Hargrim
+takes 8.44 and deals 6.39 per alive second there, Skerrow 6.49 and 6.19), while
+outside it they take 8.2 and 9.3 per alive second and deal 1.5 and 4.2, and the
+part they do not return sits in closing first (5.2 and 3.9 per alive second net
+of what they deal while closing, against 1.4 and 1.3 in the two retreat phases).
+
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
 `configLumeth3v3`), to matchEnd with 3 rounds to win on arena01 and arena02:
