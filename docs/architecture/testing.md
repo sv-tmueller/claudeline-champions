@@ -473,10 +473,12 @@ other spec.
   window, no picture (see the heap probe below). It also reads the clips of the
   match: `data-anim0` starts with Run at every measured read (the human walks,
   with M1 held), a bot reads Cast and a champion reads Hit in some read, and the
-  victim of round 3's first death reads Death. The reads are the same on every
-  attempt, since the bots are deterministic and the hook paces the windows: a
-  bot reads Cast from the first read (tick 4349), Attack from 4439, and Hit
-  comes at 4469 (Idle+Hit).
+  victim of the measured round's first death reads Death. The reads are the same on
+  every attempt, since the bots are deterministic and the hook paces the windows
+  (on the bots of #213, round 4 at ticks 9089 to 9239): a bot reads Attack from the
+  first read (tick 9089), Cast from 9119, and Hit comes at 9239 (Idle+Hit); on the
+  bots of #137, round 3 at 4349 to 4499: Cast from the first read, Attack from
+  4439 and Hit at 4469.
 - `match.spec.ts`: the first round of the default match against bots, once per
   arena and team size (`match.png`, and `match-arena02.png` for
   `/?arena=arena02`; `match-3v3.png` and `match-3v3-arena02.png` for the same
@@ -493,19 +495,21 @@ other spec.
   96 ticks each, read every 5 frames at 320x180. One plays the default match
   with an idle human to its result screen (`result.png`), once per arena
   (`/?arena=arena02&timescale=100` for arena02) and team size (`teamsize=3` for
-  the 3v3 rows), within a budget of ticks and frames per row: 14 000 and 171 on
-  arena01 (`ceil(14000 / 96) + 25`; it ends at tick 5184 in the e2e and 4936 in
-  a headless run, on the bots of #137), 22 000 and 255 on arena02 (tick 12 191
-  headless and 12 384 in the e2e, a Defeat 2 : 3), and 19 000 and 223 on the
-  3v3 of arena01 (it ends at tick 5774 headless and 6144 in the e2e, a Defeat
-  0 : 3) and 29 000 and 328 on the 3v3 of arena02 (tick 15 773 headless and
-  16 224 in the e2e, a Defeat 2 : 3). A headless run through the client's setup
+  the 3v3 rows), within a budget of ticks and frames per row: 15 000 and 182 on
+  arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5664 in the e2e and 5476 in
+  a headless run, a Defeat 1 : 3, on the bots of #213), 15 000 and 182 on arena02
+  (tick 5381 headless and 5664 in the e2e, a Defeat 1 : 3), and 24 000 and 275 on the
+  3v3 of arena01 (it ends at tick 10 470 headless and 10 944 in the e2e, a Victory
+  3 : 2) and 25 000 and 286 on the 3v3 of arena02 (tick 11 903 headless and
+  11 904 in the e2e, a Defeat 2 : 3). On the bots of #137 the rows were 14 000 and
+  171 (5184 in the e2e, 4936 headless), 22 000 and 255 (12 384 and 12 191), 19 000
+  and 223 (6144 and 5774, a Defeat 0 : 3) and 29 000 and 328 (16 224 and 15 773). A headless run through the client's setup
   and driver gives each row's tick, in `match-setup.test.ts`. The budget is
   that tick plus two rounds of about 1000 and one round to sudden death of about
   7000, rounded up to 1000, and the frames are ceil(ticks / 96) + 25. The 3v3
   rounds run longer, so their rows use 2900 for a round (the longest measured is
-  2801, with a Lumeth on each team and the dodge; it was 1954 before the dodge
-  and 1557 with two Quillons a side). Each row logs its wall time, and a row
+  2801, with a Lumeth on each team and the dodge, not measured again at #213; it was
+  1954 before the dodge and 1557 with two Quillons a side). Each row logs its wall time, and a row
   over 40 s gets its own timeout. The test follows the Quillon link of the
   result panel, which keeps the arena and the team size. The arena01 2v2 row
   also holds Tab at the match end: the scoreboard shows over the result panel,
@@ -627,9 +631,13 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   with real changes. The clock is paused before the page loads and never runs a
   frame, so the first read is tick 0 and every tick is the hook's. The warm-up
   is plain windows with no profiler from tick 0 to the first round that begins
-  after tick 2100 (round 3, begun by tick 4289 on the bots of #137 on every run
-  so far: the bots are deterministic), then 2 plain windows of the round (the
-  lead, 60 ticks), then the next 5 windows are measured, ticks 4349 to 4499. The
+  after tick 8000 (round 4, begun by tick 8969 on the bots of #213 on every run
+  so far: the bots are deterministic; it was tick 2100 and round 3, begun by tick
+  4289, on the bots of #137), then 4 plain windows of the round (the lead, 120
+  ticks), then the next 5 windows are measured, ticks 9089 to 9239. The figures
+  that follow are those of round 3 on the bots of #137 (the warm-up and the
+  lead of 2 windows, ticks 4349 to 4499), kept as the derivation of the lead; the
+  #213 paragraph below says what moved them. The
   lead is derived from three 17-window runs of round 3 with the pointer on the
   bots of #137, all three identical: the first projectile spawns in window 2
   (ticks 4349 to 4379), the first hits land in window 4 (three at once), and
@@ -640,9 +648,30 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   in window 4 before the dodge (round 3 begun by tick 2609, windows 2729 to
   2879, first death at 3419) and 5 before the dash hold of #98 (round 3 by tick
   2879, first death at 3539). The margin after the last measured window is 360
-  ticks (the floor is 60). The human walks W and D in the first window, then A
+  ticks (the floor is 60; 300 on the bots of #213). The human walks W and D in the first window, then A
   and D in turn at y of about 3.9 m, west of the block at x = -8, with M1 held;
   Hargrim's M1 windup is `slowed`, so the walk goes on under the cast.
+- The live scene on the bots of #213 (a melee champion stands inside its reach).
+  The first two rounds now run until tick 7529, not 4289, so round 3 is no longer
+  the measured round: on the old constants (warm-up 2100, lead 2, windows 2 to 6
+  of round 3) the counted code of the windows reads 3252 to 3456 B (`writeHooks`
+  about 2.5 KB, `hud.ts:updateHealth` 0.3 KB), over the limit of 780 B, in two
+  runs; main's bots on the same machine read a median of 456 B in round 3 at tick
+  4289. Moving the lead inside round 3 does not help: leads 2 and 3 read a median of
+  2448 to 3456 B of counted code (the windows read 2.4 to 3.8 KB each), leads 4, 5 and 6 read a bots median of 42 284, 45 920
+  and 46 152 B (the follower's `splitPath`, over the limit of 18 000 B), and with
+  lead 10 no projectile is live. Round 4 (begun by tick 8969, after a warm-up to
+  tick 8000, budget 15 000) is clean from its first window: lead 4, windows 4 to
+  8, ticks 9089 to 9239, counted code 276 to 660 B in every window and the bots
+  2.5 to 10.5 KB (the same in 3 of 3 attempts to within a few bytes), a projectile live in every window, the first death
+  read at tick 9539 (margin 300). Leads 1, 2 and 3 pass the byte limits but fail
+  the assertion that a champion is staggered by a hit in a measured read, so the
+  lead is 4. A live attempt is about 9600 frames, so the test timeout went from
+  180 s to 360 s (it was about 2x the runner's time at 4900 frames; it would be
+  about 1.05x at 9600). Scratch measurements on 3 runs of the final constants
+  with `--repeat-each=3` (2.2 min locally with other jobs running), and the
+  variants above in a scratch copy of the tree; the match-end rows moved with
+  the rest of the cascade (see match-end.spec.ts above).
 - The live scene's pointer. Before every window of the run, from the first read
   (the warm-up, the lead, the measured windows and the run-on), a synthetic
   `mousemove` is dispatched on `window` through `page.evaluate`. The page runs
@@ -1054,7 +1083,8 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   and the live probe is `DEFAULT_MATCH` on `ENEMY_ROSTER`, so neither plays an
   Ondrel and no area outlives its tick in a measured window. Neither scene
   changed with the roster at six (batch #177, package C): the live round 3 still
-  begins by tick 4289 and the windows stay at 4349 to 4499. A live area slot
+  begins by tick 4289 and the windows stay at 4349 to 4499 (until #213: the measured round
+  is round 4, windows 9089 to 9239, see the live scene on the bots of #213 above). A live area slot
   runs the capture, sync, find and draw code the projectile views run in both
   scenes (`entity-views.ts:draw` and `find` read 0 B there), and the pool grows
   only past 16 slots, which Ondrel's at most five areas never reach. `roster.ts`

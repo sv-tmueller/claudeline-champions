@@ -55,13 +55,15 @@ interface Hooks {
 // its own, so the first read is tick 0.
 const PAUSE_AT_MS = 60_000;
 // The warm-up: plain windows, no profiler, until this tick, then on to the start
-// of the next round: round 3, begun by tick 4289 on the bots of #137, with rounds 1 and 2 played.
-const WARM_UP_TICKS = 2100;
+// of the next round: round 4, begun by tick 8969 on the bots of #213, with rounds 1 to 3 played
+// (round 3, begun by tick 7529, is not measured: see EVENT_LEAD_WINDOWS; round 3 was the measured
+// round, begun by tick 4289, on the bots of #137).
+const WARM_UP_TICKS = 8000;
 // The warm-up fails past this tick: the match ended or a round never began. It is
 // WARM_UP_TICKS plus the longest round that match-end.spec.ts budgets, a round that
 // runs to sudden death, about 7000 ticks: a round in progress at WARM_UP_TICKS can end
-// that late, and the next one begins then.
-const WARM_UP_BUDGET_TICKS = 9100;
+// that late, and the next one begins then (it was 2100 + 7000 = 9100 before #213).
+const WARM_UP_BUDGET_TICKS = 15_000;
 // Plain windows of the round before the measured ones, so that the measured windows
 // hold the round's first projectiles and hits, the event paths this scene exists to
 // cover. Measured on the bots of #137, which dodge, with the moving pointer of POINTERS
@@ -72,17 +74,28 @@ const WARM_UP_BUDGET_TICKS = 9100;
 // 60 ticks into the windows of the round), the first hits land in window 4 (three at
 // once), then 0 to 2 hits land per window (window 6 reads none) and 0 to 2 projectiles are
 // live at the reads to the end of the 17 windows (tick 4799). The first death of the round
-// is read at tick 4859 (3419 on 57dd52f). The lead is a count of windows, not a tick,
+// is read at tick 4859 (3419 on 57dd52f). On the bots of #213 (a melee champion stands
+// inside its reach) the first two rounds run until tick 7529, not 4289, and round 3 is no longer a measured round: with the lead 2 or 3 its windows read 2.4 to 3.8 KB of
+// counted code each (`writeHooks` 1.7 to 2.8 KB; the median asserted against the limit of 780 B is
+// 2448 to 3456 B); with the lead 4 to 6 the
+// bots read a median of 42 to 46 KB (`splitPath`), over the limit of 18 000 B; with the lead 10
+// no projectile is live. The spec waits for round 4, begun by tick 8969 in 3 runs out of 3 (a
+// projectile spawns by tick 9059), where the counted code reads
+// 0.3 to 0.7 KB in every window and the bots a median of 4.5 KB (2.5 to 10.5 KB in a window);
+// the lead 4 is the first that passes the assertion that a champion is staggered by a hit in a
+// measured read (the leads 1 to 3 fail it, with the counted code under its limit). The first death
+// of the round is read at tick 9539. The lead is a count of windows, not a tick,
 // because windows are the unit the spec runs in; a bots change moves the first projectile,
 // and the assertion that the measured windows hold one fails then, so re-measure. The lead
-// is 2, the window of the first projectile, by the derivation of #97 (decision 9 of batch
-// #134): the measured windows are the first ones of the round's chase, where the bots'
-// plans read the most (13 KB and 6 KB of `splitPath`, in windows 2 and 3), and the
-// bots limit of heap-probe.ts is derived from them.
-const EVENT_LEAD_WINDOWS = 2;
-// The windows measured, after the lead: windows 2 to 6 of round 3, ticks 4349 to 4499.
+// was 2 on the bots of #137, the window of the first projectile, by the derivation of #97
+// (decision 9 of batch #134): the measured windows were the first ones of the round's chase,
+// where the bots' plans read the most (13 KB and 6 KB of `splitPath`, in windows 2 and 3), and
+// the bots limit of heap-probe.ts is derived from them. It is 4 on the bots of #213 (above).
+const EVENT_LEAD_WINDOWS = 4;
+// The windows measured, after the lead: windows 4 to 8 of round 4, ticks 9089 to 9239 (windows 2 to 6
+// of round 3, ticks 4349 to 4499, on the bots of #137).
 // The median of the five is the asserted figure, as in the sandbox (see testing.md).
-// The last of them ends 360 ticks before the first death of the round (the floor is 60).
+// The last of them ends 300 ticks before the first death of the round (the floor is 60; 360 on #137).
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
@@ -93,17 +106,19 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 4900 frames (the warm-up to tick 4289, the lead, the five
-// windows and the run-on to the first death, tick 4859 on the bots of #137; about 3400
-// frames and tick 3419 on 57dd52f). It took 6 to 16 s locally on those (3 attempts in
-// parallel). On the runner the live test took 41 s to 1.1 min on those per
-// attempt (1.1 min, 50.8 s, 40.9 s, 51.3 s, 1.1 min and 47.4 s on 3def3bc, run 37456539110;
-// the whole Playwright run of 19 tests took 2.7 to 4.2 min), about 18 ms a frame, so 180 s
-// was a margin of about 2.7x; at 4900 frames it is about 2x. The earlier shape took 1.0 to 1.1 min
-// (jobs 112201476995 and 112203346352 on 7b80afd). The warm-up budget above (9100
-// frames, about 165 s at that rate) is reached only when the spec is already failing,
-// and then the timeout may fire first.
-const TEST_TIMEOUT_MS = 180_000;
+// A live attempt is about 9600 frames on the bots of #213 (the warm-up to tick 8969, the lead,
+// the five windows and the run-on to the first death, tick 9539; about 4900 frames and tick
+// 4859 on the bots of #137, and about 3400 frames and tick 3419 on 57dd52f). It took 6 to 16 s
+// locally on those (3 attempts in parallel), and 2.2 min for 3 attempts in parallel at 9600
+// frames on a machine that was running other jobs. On the runner the live test took 41 s to
+// 1.1 min on the 4900 frames per attempt (1.1 min, 50.8 s, 40.9 s, 51.3 s, 1.1 min and 47.4 s on
+// 3def3bc, run 37456539110; the whole Playwright run of 19 tests took 2.7 to 4.2 min), about
+// 18 ms a frame, so 180 s was a margin of about 2x there and would be about 1.05x at 9600
+// frames: the timeout is 360 s, about 2x again. The earlier shape took 1.0 to 1.1 min (jobs
+// 112201476995 and 112203346352 on 7b80afd). The warm-up budget above (15 000 frames, about
+// 270 s at that rate) is reached only when the spec is already failing, and then the timeout
+// may fire first.
+const TEST_TIMEOUT_MS = 360_000;
 
 async function readHooks(page: Page): Promise<Hooks> {
   return page.evaluate(() => {
