@@ -207,6 +207,8 @@ describe('the server decoder', () => {
       ['no batches', edit(snapshot, ['events', []])],
       ['no roundsToWin', edit(matchStart, ['config.roundsToWin', undefined])],
       ['roundsToWin 1', edit(matchStart, ['config.roundsToWin', 1])],
+      ['energyOrb on the axis', edit(matchStart, ['config.energyOrb', { x: 0, y: 2.5 }])],
+      ['energyOrb off the axis, which the sim and not the codec rejects', edit(matchStart, ['config.energyOrb', { x: 3, y: -9.5 }])],
       ['you 5', edit(matchStart, ['you', 5])],
       ['no kits', edit(matchStart, ['kits', []])],
     ];

@@ -14,6 +14,9 @@ const PAUSE = 180;
 const ROUND = 5400;
 const SHRINK = 1800;
 const NEAR = 1e-9;
+/** The orb disc radius, and the first phaseTicks at which a taken orb can show (20 s plus the step). */
+const ORB_RADIUS = 0.5;
+const ORB_FIRST = 1201;
 
 /** The ring radius `e` ticks after sudden death started, by the formula of rules.md 1.1. */
 export function ringRadius(state: GameState, e: number): number {
@@ -48,7 +51,15 @@ export function checkMatchInvariants(state: GameState): string[] {
   if (!isCount(m.score.A) || !isCount(m.score.B)) bad(`score ${JSON.stringify(m.score)}`);
   if (m.score.A + m.score.B > m.round) bad(`score ${m.score.A} : ${m.score.B} after round ${m.round}`);
   if (m.score.A > m.roundsToWin || m.score.B > m.roundsToWin) bad('score above roundsToWin');
-  if (Object.keys(m).length !== 6) bad(`match keys ${Object.keys(m).join()}`);
+  if (Object.keys(m).length !== (m.orb === undefined ? 6 : 7)) bad(`match keys ${Object.keys(m).join()}`);
+  if (m.orb !== undefined) {
+    const { x, y, taken } = m.orb;
+    if (Object.keys(m.orb).sort().join() !== 'taken,x,y') bad(`orb keys ${Object.keys(m.orb).join()}`);
+    if (x !== 0 || !Number.isFinite(y) || Math.abs(y) + ORB_RADIUS > state.arena.ring.endRadius) bad(`orb point ${x}, ${y}`);
+    if (typeof taken !== 'boolean') bad(`orb taken ${String(taken)}`);
+    // Taken in the step that sees phaseTicks 1200 at the earliest, which leaves phaseTicks 1201.
+    if (taken && (m.phase === 'warmup' || (m.phase === 'round' && m.phaseTicks < ORB_FIRST))) bad(`orb taken at ${m.phase} ${m.phaseTicks}`);
+  }
 
   if (m.phase === 'warmup') {
     if (m.round !== 0) bad(`round ${m.round} in warmup`);
@@ -242,9 +253,58 @@ export class RoundWatcher {
     }
     if (next.roundsToWin !== prev.roundsToWin) this.problems.push(`tick ${state.tick}: roundsToWin changed`);
 
+    this.checkOrb(state, before);
     if (reset) this.afterReset(state, before);
     else if (lockedBefore) this.afterLockedStep(state, before);
     else this.afterRoundStep(state, before);
+  }
+
+  /**
+   * The orb rules, with the numbers written out again: the warning at phaseTicks 1020 while the
+   * orb is up, a pickup only from phaseTicks 1200 and once per round, with the energy added
+   * capped at 100, and the reset to untaken when a round starts.
+   */
+  private checkOrb(state: GameState, before: Before): void {
+    const next = state.match as MatchState;
+    const prev = before.match;
+    const spawns = state.events.filter((e) => e.type === 'orbSpawn');
+    const takes = state.events.filter((e) => e.type === 'orbTaken');
+    if (next.orb === undefined) {
+      this.check(prev.orb === undefined && spawns.length === 0 && takes.length === 0, 'orb events or state with the orb off', state);
+      return;
+    }
+    this.check(prev.orb !== undefined, 'the orb appeared mid-match', state);
+    if (prev.phase !== 'round') {
+      this.check(spawns.length === 0 && takes.length === 0, `orb event in a ${prev.phase} step`, state);
+      if (next.phase === 'round') this.check(next.orb.taken === false, 'the orb is not up in a new round', state);
+      else this.check(next.orb.taken === (prev.orb?.taken ?? false), `orb taken changed in a ${prev.phase} step`, state);
+      return;
+    }
+    const wasTaken = prev.orb?.taken ?? false;
+    this.check(spawns.length === (prev.phaseTicks === 1020 && !wasTaken ? 1 : 0), `${spawns.length} orbSpawn at phaseTicks ${prev.phaseTicks}`, state);
+    const spawn = spawns[0];
+    if (spawn?.type === 'orbSpawn') {
+      this.check(spawn.round === prev.round && spawn.x === next.orb.x && spawn.y === next.orb.y, 'orbSpawn fields', state);
+    }
+    this.check(takes.length <= 1, `${takes.length} orbTaken in one step`, state);
+    const take = takes[0];
+    if (take?.type !== 'orbTaken') {
+      this.check(next.orb.taken === wasTaken, 'orb taken without an orbTaken', state);
+      return;
+    }
+    this.check(!wasTaken && prev.phaseTicks >= 1200 && next.orb.taken, `orbTaken at phaseTicks ${prev.phaseTicks}, was taken ${wasTaken}`, state);
+    const was = before.champions[take.championId];
+    const now = state.champions[take.championId];
+    if (!was || !now) {
+      this.check(false, `orbTaken by champion ${take.championId}`, state);
+      return;
+    }
+    const amount = Math.min(25, 100 - was.energy);
+    this.check(take.round === prev.round && take.amount === amount && take.energy === was.energy + amount && now.energy === take.energy, `orbTaken fields ${JSON.stringify(take)}, energy before ${was.energy}`, state);
+    // Nothing moves a champion after the orb is read, so where it stands afterwards is where it touched.
+    const ex = now.x - next.orb.x;
+    const ey = now.y - next.orb.y;
+    this.check(was.alive && ex * ex + ey * ey <= 1, `orb taker ${take.championId} was dead or not touching it`, state);
   }
 
   /** A locked step changes no position, health, energy, cooldown, status, dash or windup. */

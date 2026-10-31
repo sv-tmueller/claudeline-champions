@@ -47,7 +47,7 @@ function endEntities(state: GameState): void {
 /**
  * Starts a round, the first after the warmup and every later one: leftover entities end, every
  * champion returns to its spawn at full health and alive, the ability state resets, the ring goes
- * and `roundStarted` follows last. The score, the entity ids, the aim and the facing carry over.
+ * the orb is up again and `roundStarted` follows last. The score, the entity ids, the aim and the facing carry over.
  */
 function startRound(state: GameState, match: MatchState): void {
   endEntities(state);
@@ -69,6 +69,7 @@ function startRound(state: GameState, match: MatchState): void {
   }
   resetAbilityState(state);
   match.ring = null;
+  if (match.orb !== undefined) match.orb.taken = false;
   match.round += 1;
   match.phase = 'round';
   match.phaseTicks = 0;

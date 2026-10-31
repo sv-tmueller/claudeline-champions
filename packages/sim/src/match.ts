@@ -3,6 +3,7 @@ import { DEFAULT_MAX_HEALTH } from './constants';
 import { SLOTS } from './input';
 import { validateKit } from './kit';
 import type { KitDef } from './kit';
+import { checkOrbPoint } from './orb';
 import type { ChampionState, GameState, MatchConfig, TeamId } from './state';
 
 function fail(problem: string): never {
@@ -15,7 +16,7 @@ function fail(problem: string): never {
  * default health and base speed. Every kit given is validated and an id may appear once; the state
  * keeps a copy of the kits the players use, in the order they were given. With `roundsToWin` the
  * match starts in its warmup (see `flow.ts`); without it the match is free play and the state has
- * no `match` key.
+ * no `match` key. With `energyOrb` the point is validated, and a match with flow gets the orb.
  */
 export function createMatch(
   config: MatchConfig,
@@ -23,7 +24,7 @@ export function createMatch(
   seed: number,
   kits: readonly KitDef[] = [],
 ): GameState {
-  const { teamSize, players, roundsToWin } = config;
+  const { teamSize, players, roundsToWin, energyOrb } = config;
   if (teamSize !== 2 && teamSize !== 3) fail('teamSize must be 2 or 3');
   if (players.length !== 2 * teamSize) {
     fail(`expected ${2 * teamSize} players, got ${players.length}`);
@@ -31,6 +32,10 @@ export function createMatch(
   if (!Number.isInteger(seed)) fail('seed must be an integer');
   if (roundsToWin !== undefined && !(Number.isSafeInteger(roundsToWin) && roundsToWin >= 1)) {
     fail('roundsToWin must be a positive integer');
+  }
+  if (energyOrb !== undefined) {
+    const problem = checkOrbPoint(energyOrb, arena);
+    if (problem !== undefined) fail(`energyOrb ${problem}`);
   }
 
   const checked = kits.map((kit) => validateKit(kit));
@@ -103,6 +108,10 @@ export function createMatch(
       score: { A: 0, B: 0 },
       ring: null,
     };
+    // Copies plus 0, never the config object, and never a -0.
+    if (energyOrb !== undefined) {
+      state.match.orb = { x: energyOrb.x + 0, y: energyOrb.y + 0, taken: false };
+    }
   }
   return state;
 }

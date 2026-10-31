@@ -244,6 +244,22 @@ export type SimEvent =
       /** The caster's energy afterwards. */
       energy: number;
     }
+  | {
+      type: 'orbSpawn';
+      round: number;
+      /** The orb point: the warning that the orb becomes collectible in 3 s. */
+      x: number;
+      y: number;
+    }
+  | {
+      type: 'orbTaken';
+      round: number;
+      championId: number;
+      /** Energy added after the cap trimmed it; unlike `energyGained` it may be 0. */
+      amount: number;
+      /** The champion's energy afterwards. */
+      energy: number;
+    }
   | { type: 'roundStarted'; round: number }
   | {
       type: 'suddenDeathStarted';
@@ -341,6 +357,14 @@ export interface RingState {
   damagePerTick: number;
 }
 
+/** The energy orb of a match with `MatchConfig.energyOrb`: where it is and whether it is gone. */
+export interface OrbState {
+  x: number;
+  y: number;
+  /** True from the pickup until the next round starts. */
+  taken: boolean;
+}
+
 /** Match flow, present only for a match created with `roundsToWin`; free play has no such key. */
 export interface MatchState {
   phase: MatchPhase;
@@ -352,6 +376,8 @@ export interface MatchState {
   score: { A: number; B: number };
   /** From the first sudden death step until the next round starts. */
   ring: RingState | null;
+  /** Present only when the config had `energyOrb`; the key is missing otherwise, never undefined. */
+  orb?: OrbState;
 }
 
 export interface GameState {
@@ -383,6 +409,12 @@ export interface PlayerConfig {
   team: TeamId;
 }
 
+/** A point on the arena floor, in meters, for the energy orb. */
+export interface OrbPoint {
+  x: number;
+  y: number;
+}
+
 export interface MatchConfig {
   teamSize: 2 | 3;
   /** players[i] becomes champion id i. */
@@ -392,6 +424,12 @@ export interface MatchConfig {
    * no round clock, no ring and no round end.
    */
   roundsToWin?: number;
+  /**
+   * The energy orb's point; having the key turns the orb on (rules.md 3.3). `createMatch` throws
+   * unless it is on the mirror axis, inside the ring's end circle and on free floor. Free play
+   * validates it but gets no orb. Callers read the point from `data/orbs.json` with `orbPointFor`.
+   */
+  energyOrb?: OrbPoint;
 }
 
 export function nextId(state: GameState): number {

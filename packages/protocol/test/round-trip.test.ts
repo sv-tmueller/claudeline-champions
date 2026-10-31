@@ -45,6 +45,42 @@ describe('round trips', () => {
     }
   });
 
+  it('round trips matchStart with an energyOrb after roundsToWin, and keeps the golden text without it', () => {
+    const start = serverMessages.find((m) => m.t === 'matchStart');
+    if (start === undefined || start.t !== 'matchStart') throw new Error('sample missing');
+    const withOrb = { ...start, config: { ...start.config, energyOrb: { x: 0, y: 2.5 } } };
+    const text = encodeServerMessage(withOrb);
+    expect(text).toContain('"roundsToWin":3,"energyOrb":{"x":0,"y":2.5}}');
+    const decoded = decodeServerMessage(text);
+    expect(decoded).toEqual({ ok: true, message: withOrb });
+    if (decoded.ok && decoded.message.t === 'matchStart') {
+      expect(Object.keys(decoded.message.config)).toEqual(['teamSize', 'players', 'roundsToWin', 'energyOrb']);
+    }
+    // Without the key the text is the committed golden and the key stays absent.
+    const plain = encodeServerMessage(start);
+    expect(plain).toBe(goldens.matchStart);
+    expect(plain).not.toContain('energyOrb');
+    const back = decodeServerMessage(plain);
+    if (back.ok && back.message.t === 'matchStart') {
+      expect(Object.hasOwn(back.message.config, 'energyOrb')).toBe(false);
+    }
+  });
+
+  it('keeps energyOrb without roundsToWin, and writes a -0 coordinate as 0', () => {
+    const start = serverMessages.find((m) => m.t === 'matchStart');
+    if (start === undefined || start.t !== 'matchStart') throw new Error('sample missing');
+    const config = { teamSize: start.config.teamSize, players: start.config.players, energyOrb: { x: -0, y: -2.5 } };
+    const text = encodeServerMessage({ ...start, config });
+    const decoded = decodeServerMessage(text);
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok && decoded.message.t === 'matchStart') {
+      const orb = decoded.message.config.energyOrb;
+      expect(Object.is(orb?.x, 0)).toBe(true);
+      expect(orb?.y).toBe(-2.5);
+      expect(Object.hasOwn(decoded.message.config, 'roundsToWin')).toBe(false);
+    }
+  });
+
   it('round trips every error code', () => {
     for (const code of [
       'version',

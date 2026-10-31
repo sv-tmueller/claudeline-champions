@@ -209,10 +209,11 @@ export function legacyState(state: GameState): GameState {
 /**
  * Which scripted fixture has to produce each event type. `combat` is the committed combat
  * fixture; `ability` is the ability fixture that arrives with the kit contract; `match` is the
- * rounds fixture, the only one with match flow. Typing it as a record makes a new event type a
+ * rounds fixture, the only one with match flow and the orb off; `orb` is the orb fixture, the
+ * only one with the orb on. Typing it as a record makes a new event type a
  * compile error until it is classified.
  */
-export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability' | 'match'> = {
+export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability' | 'match' | 'orb'> = {
   projectileSpawned: 'combat',
   projectileHit: 'combat',
   projectileExpired: 'combat',
@@ -233,6 +234,8 @@ export const EVENT_FIXTURE: Record<SimEvent['type'], 'combat' | 'ability' | 'mat
   castFired: 'ability',
   castInterrupted: 'ability',
   energyGained: 'ability',
+  orbSpawn: 'orb',
+  orbTaken: 'orb',
   roundStarted: 'match',
   suddenDeathStarted: 'match',
   roundEnded: 'match',

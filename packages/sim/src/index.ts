@@ -18,6 +18,10 @@ export {
   MAX_TELEPORT_METERS,
   MIN_DASH_DISTANCE,
   MOTION_SUBSTEP_METERS,
+  ORB_COLLECTIBLE_TICKS,
+  ORB_ENERGY,
+  ORB_RADIUS,
+  ORB_WARNING_TICKS,
   RING_SOURCE_ID,
   ROUND_END_TICKS,
   ROUND_TICKS,
@@ -66,6 +70,8 @@ export type {
   MatchConfig,
   MatchPhase,
   MatchState,
+  OrbPoint,
+  OrbState,
   PlayerConfig,
   ProjectileEndReason,
   ProjectileState,
@@ -79,6 +85,7 @@ export type {
   TeamId,
 } from './state';
 export { createMatch } from './match';
+export { orbPointFor } from './orb';
 export { checksum } from './checksum';
 export { cloneState } from './state';
 export { step } from './step';

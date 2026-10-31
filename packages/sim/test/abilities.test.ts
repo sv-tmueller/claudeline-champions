@@ -213,9 +213,10 @@ describe('scripted ability fixture', () => {
     });
     expect(coverage.missing(KITS, ABILITY_EVENTS)).toEqual([]);
     // Every event type of the union appears, the combat ones included: kits fire real projectiles.
-    // The match events are the rounds fixture's: this one is free play.
+    // The match events are the rounds fixture's and the orb events the orb fixture's: this one
+    // is free play.
     const all = (Object.keys(EVENT_FIXTURE) as SimEvent['type'][]).filter(
-      (type) => EVENT_FIXTURE[type] !== 'match',
+      (type) => EVENT_FIXTURE[type] !== 'match' && EVENT_FIXTURE[type] !== 'orb',
     );
     expect(all.filter((type) => !coverage.eventTypes.has(type))).toEqual([]);
   });

@@ -72,7 +72,15 @@ Iteration order is always id order. This gives:
   positive integer`) the match runs the rounds of [Match flow](#match-flow) and
   `state.match` is set. Without it the match is free play and the `match` key is
   missing from the state, never `undefined`. The standard value is
-  `DEFAULT_ROUNDS_TO_WIN = 3`.
+  `DEFAULT_ROUNDS_TO_WIN = 3`. The optional `energyOrb: { x, y }` is the orb
+  point and the switch itself (#218): the key turns the orb on, and `createMatch`
+  throws `Invalid match: energyOrb ...` for a point that is not on the mirror
+  axis, whose 0.5 m disc leaves the ring's end circle or the boundary, or that
+  overlaps an obstacle; free play validates it but gets no orb. The sim does no
+  I/O, so callers read the point from `data/orbs.json` with the export
+  `orbPointFor(table, arena)` (undefined for an arena with no row, a throw for a
+  bad row) and put it in the config; see [Match flow](#match-flow) and
+  [arenas.md](../design/arenas.md) section 9.
 - `step(state: GameState, inputs: readonly (PlayerInput | undefined)[]): void`
   advances one tick in place. `inputs[i]` belongs to champion id `i`; an
   `undefined` or absent entry is a missing input.
@@ -108,12 +116,15 @@ Iteration order is always id order. This gives:
   | `castFired` | `championId`, `castId`, `slot`, `ex` |
   | `castInterrupted` | `championId`, `castId`, `slot`, `ex`, `reason` (`stun`, `death`, `roundEnd`) |
   | `energyGained` | `championId` (the caster), `castId`, `targetId`, `amount` (what was added, after the cap trimmed it, always above 0), `energy` (the caster's after) |
+  | `orbSpawn` | `round`, `x`, `y` (the warning, 17 s into the round) |
+  | `orbTaken` | `round`, `championId`, `amount` (energy added, after the cap; unlike `energyGained` it may be 0), `energy` (after) |
   | `roundStarted` | `round` (counting from 1) |
   | `suddenDeathStarted` | `round`, `radius` (the ring's start radius) |
   | `roundEnded` | `round`, `winner` (`A`, `B`, or `null` for a draw), `scoreA`, `scoreB` (after this round counted) |
   | `matchEnded` | `winner`, `scoreA`, `scoreB` |
 
-  The four match events come only from a match with match flow. Ring `damage`
+  The four match events come only from a match with match flow, and the two orb
+  events only from a match with the orb on. Ring `damage`
   and `death` events carry `sourceId` -1 (`RING_SOURCE_ID`). The clocks
   (`phaseTicks`, the ring radius) advance without events, as `tick` and the
   positions do; every discrete change has an event. Hit and expired positions
@@ -220,6 +231,20 @@ slots in `Button` bit order.
 6. Expiries: each projectile in id order loses a tick of lifetime and ends with
    `lifetime` at 0; then each area loses a tick of duration and ends with
    `areaExpired` at 0.
+   - 6a. The energy orb (round phase, orb on, not yet taken; `orb.ts`, before 6b).
+     At `phaseTicks` 1020 (`ORB_WARNING_TICKS`) `orbSpawn` is emitted. From
+     `phaseTicks` 1200 (`ORB_COLLECTIBLE_TICKS`) the alive champions whose centre
+     is within 1.0 m (`CHAMPION_RADIUS + ORB_RADIUS`, touching counts) of the
+     orb compete. One toucher takes it with no draw. Two or more, of any teams,
+     cost one `nextRandom(state)` draw `r`: with n touchers, k is the number of
+     j in 1..n-1 with `r * n >= j` (no `Math.floor`) and the k-th toucher in id
+     order takes it. This is the first gameplay use of `state.rng`. The taker
+     gains `min(ORB_ENERGY, MAX_ENERGY - energy)` (`ORB_ENERGY` 25), `orb.taken`
+     becomes true and `orbTaken` is emitted, with an amount that may be 0. In
+     round 1 the warning is in the step that makes `state.tick` 1201 and the
+     first collectible step makes it 1381. The warning and the pickup are clocks
+     on `phaseTicks`, like the ring, not stored phases. A pickup on the deciding
+     step stands, because 6c comes after.
    - 6b. Sudden death (match flow only, when `phaseTicks` is at least 5400,
      `ROUND_TICKS`). With `e = phaseTicks - 5400`: at `e = 0` the ring is
      created with the arena's start radius and `damagePerSecond / TICK_RATE`
@@ -881,6 +906,10 @@ gain, cut to the room under 100; `energyGained` is emitted when the amount is
 above 0. Damage over time and heal over time pulses give nothing, and neither
 does a hit with no cast id, which a dev tool spawn makes.
 
+The energy orb is the one other source (rules.md section 3.3, step 6a above): it
+adds `ORB_ENERGY` to one champion, cut to the room under 100, and emits
+`orbTaken` instead of `energyGained`.
+
 Cast records are dropped in step 7 once no windup, projectile, area or dash of
 the cast refers to them.
 
@@ -906,6 +935,7 @@ interface MatchState {
   roundsToWin: number;
   score: { A: number; B: number };
   ring: { x: number; y: number; radius: number; damagePerTick: number } | null;
+  orb?: { x: number; y: number; taken: boolean };  // only with MatchConfig.energyOrb
 }
 ```
 
@@ -914,7 +944,11 @@ It starts as warmup, `phaseTicks` 0, round 0, score 0 : 0 and no ring. Without
 does what it did before match flow existed: no warmup, no round clock, no ring
 and no round end. A missing key keeps every free-play state and checksum bit for
 bit what it was, so the committed fixtures, the bots tests and the client's
-walk spec need no change.
+walk spec need no change. The `orb` key follows the same rule: it is missing,
+never `undefined`, unless the config had `energyOrb`, so every committed
+fixture, whose config has no point, keeps its checksum. `orb.x` and `orb.y` are
+copies of the point plus 0, never the config object, and the orb takes no
+entity id.
 
 **Phases.**
 
@@ -957,7 +991,7 @@ tool spawn made between steps in a locked phase can leave one), each champion
 goes back to its spawn in the team slot order of `createMatch` with velocity
 `+0`, `health = maxHealth` and `alive = true`, `resetAbilityState` runs (energy
 0, cooldowns 0, no status, dash or cast, `casts` empty), the ring is dropped,
-`round` counts up, the phase is `round`, and `roundStarted` is emitted last. The
+the orb, when there is one, is untaken again, `round` counts up, the phase is `round`, and `roundStarted` is emitted last. The
 score and `nextEntityId` carry over, and so do the aim and the facing.
 
 `createMatch` rejects a bad `roundsToWin` (see [State and

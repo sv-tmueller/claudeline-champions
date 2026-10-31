@@ -114,6 +114,12 @@ function nat(v: unknown, path: string): number {
   return int(v, path, 0, MAX_SAFE);
 }
 
+/** A finite number. JSON `-0` becomes 0, and `1e999`, which parses to Infinity, is refused. */
+function finite(v: unknown, path: string): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return bad(path, 'a finite number');
+  return v === 0 ? 0 : v;
+}
+
 function seatIndex(v: unknown, path: string): number {
   return int(v, path, 0, MAX_SEAT_INDEX);
 }
@@ -298,6 +304,12 @@ function readConfig(v: unknown, path: string): MatchConfig {
   const config: MatchConfig = { teamSize: teamSize(get(o, 'teamSize'), at(path, 'teamSize')), players };
   if (Object.hasOwn(o, 'roundsToWin')) {
     config.roundsToWin = int(get(o, 'roundsToWin'), at(path, 'roundsToWin'), 1, MAX_SAFE);
+  }
+  if (Object.hasOwn(o, 'energyOrb')) {
+    const orbPath = at(path, 'energyOrb');
+    const orb = record(get(o, 'energyOrb'), orbPath);
+    // The point's rules (axis, end circle, free floor) are the sim's: `createMatch` throws on one.
+    config.energyOrb = { x: finite(get(orb, 'x'), at(orbPath, 'x')), y: finite(get(orb, 'y'), at(orbPath, 'y')) };
   }
   return config;
 }
@@ -514,6 +526,9 @@ export function encodeServerMessage(m: ServerMessage): string {
         players: m.config.players.map((p) => ({ championId: p.championId, team: p.team })),
       };
       if (m.config.roundsToWin !== undefined) config.roundsToWin = m.config.roundsToWin;
+      if (m.config.energyOrb !== undefined) {
+        config.energyOrb = { x: m.config.energyOrb.x, y: m.config.energyOrb.y };
+      }
       return JSON.stringify({
         t: m.t,
         you: m.you,
