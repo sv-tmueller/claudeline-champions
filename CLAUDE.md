@@ -22,7 +22,7 @@ npm run typecheck                # tsc for sim, bots, protocol, server, client a
 npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # arena.png, arena-overlay.png, walk.png,
                                  # combat.png, death.png, match.png, result.png,
-                                 # ring.png, scene-arena02.png,
+                                 # ring.png, scene-arena02.png, scene-durnhal.png,
                                  # match-arena02.png, match-3v3.png,
                                  # match-3v3-arena02.png, menu.png,
                                  # scoreboard.png, select.png, lingering.png

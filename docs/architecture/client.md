@@ -209,14 +209,15 @@ must not reach a production file (the dist grep).
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`. A later kit file joins the match without a client change, reached
 by `?champion=<id>` on the placeholder model, if it has no roster entry. The
-client registers six champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
+client registers seven champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
 Lumeth and Skerrow in the order of roster-v1.md, then Ondrel and Brimwick of
-roster-v2.md, each with a name and a model, so `?champion=ondrel` and
-`?champion=brimwick` play their own model, health and name (batch #177, package
-C). The select shows those six, each available once its kit file exists, so a
-kit without a roster entry is not on it until the client registers it (batch
-#147 decision 3, part 3). `ENEMY_ROSTER` and the sandbox roster hold neither, so
-no bot team and no probe scene plays an Ondrel or a Brimwick. `createMatch`
+roster-v2.md, then Durnhal of roster-v3.md, each with a name and a model, so
+`?champion=ondrel`, `?champion=brimwick` and `?champion=durnhal` play their own
+model, health and name (batch #177, package C; Durnhal in #212). The select
+shows those seven, each available once its kit file exists, so a kit without a
+roster entry is not on it until the client registers it (batch #147 decision 3,
+part 3). `ENEMY_ROSTER` and the sandbox roster hold none of the three, so no
+bot team and no probe scene plays an Ondrel, a Brimwick or a Durnhal. `createMatch`
 validates the kits, and a bad kit file shows up as a page error. The arenas work
 the same way: every file under `data/arenas/` goes through `parseArenaDef` (a
 bad file is a page error too), sorted by id, and `arenaById` in `arenas.ts`
@@ -393,7 +394,7 @@ averages the clips that play where an upper-body strike must replace the arms
 and leave the legs alone
 ([batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811)).
 The mixer is the test oracle: `clip-sampler.test.ts` compares the sampler to it
-with `Object.is` per component, for every clip of all seven models at 60 times
+with `Object.is` per component, for every clip of all eight models at 60 times
 per clip, with `action.time` and `update(0)`. Two counted modules, both on the
 frame path rules above:
 
@@ -473,10 +474,11 @@ to its next passing key, holds there while the weight fades, and the feet stay
 at or above the floor. `clip-sampler.test.ts` samples every transition (every
 stop phase of Run at four speeds and both directions, every overlay at every
 offset over Idle and Run, interrupts, Death from every state, a dash, the snap)
-for all seven models, and the lowest skinned vertex stays at or above -1e-4 m
+for all eight models, and the lowest skinned vertex stays at or above -1e-4 m
 (the lowest figure is -9e-15 m). The highest stays under 1.91 m: every
 transition reaches 1.735 m on the three plain models, 1.8695 m on Lumeth,
-1.8758 m on Ondrel and 1.8641 m on Brimwick,
+1.8758 m on Ondrel, 1.8641 m on Brimwick and
+1.735 m on Durnhal (his clips alone top out at 1.7228 m),
 but an overlay over Run adds the bounce of Run's Hips (up to 35 mm) to
 Quillon's staff at the strike, 1.9051 m in the sweep and 1.9078 m at the worst
 phase, 6 cm under the health bar at 1.97 m. Entering Run at its split, leaving
@@ -628,8 +630,8 @@ result panel and the menu (`buildSelect` in `result-dom.ts`, so there is no
 third copy of the rows, with the label "Play as") and a Start link
 (`data-action="start"`). The first choice is `parseLaunch('', ...)`: Hargrim,
 normal, arena01, 2v2. The champion row is `selectEntries`, that is the roster
-ids in roster order, each available once its kit file loads; with six kit files
-it lists all six, and a kit file the client has not registered is not on it.
+ids in roster order, each available once its kit file loads; with seven kit files
+it lists all seven, and a kit file the client has not registered is not on it.
 
 A pick is a plain click on a row entry, handled by one listener on the panel. An
 entry's href already is the next whole setup, so the click reads it back with

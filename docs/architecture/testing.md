@@ -60,7 +60,9 @@ ubuntu-latest, Node 22, over the five logs of 5e0bf3d, #127 and 5820f16 (two
 green, three red attempts of identical code); green is the first range, red
 the second. The three clip-sampler green ranges are over the seven-model unit
 jobs of the three green runs of PR #179 (40334583804, 40336071398,
-40336850393); their red ranges are still from 5820f16.
+40336850393); their red ranges are still from 5820f16. The local figures are
+over eight models since #212 (Durnhal's joins), the runner ones over seven
+until a green run of #212's unit job replaces them.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
@@ -68,7 +70,7 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   to 6.9 s over the three attempts of PR #184, the heap jobs 3.6 to 5.3 s, the
   timeout stays 15 s (twice 6.9 s is 13.8 s).
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
-  every phase" (seven models, lumeth slowest): 1.1 to 1.8 s locally, 3.6 to
+  every phase" (eight models, lumeth slowest): 2.5 to 4.0 s locally, 3.6 to
   8.3 s green, 3.3 to 8.0 s red, timeout 20 s.
 - `packages/sim/test/toolkit-stress.test.ts`, "gives the same checksum when
   run twice": 1.05 s locally, 2.0 to 2.5 s green, 3.6 to 3.8 s red, timeout
@@ -83,10 +85,10 @@ jobs of the three green runs of PR #179 (40334583804, 40336071398,
   across arena01: the follower's whole plan step": 0.75 s locally, 1.6 to
   1.7 s green, 2.3 to 2.7 s red, timeout 10 s.
 - `packages/client/src/clip-sampler.test.ts`, "with Attack, Cast and Hit over
-  Idle and over Run" (seven models): 0.34 to 0.47 s locally, 1.0 to 2.4 s
+  Idle and over Run" (eight models): 0.79 to 1.16 s locally, 1.0 to 2.4 s
   green, 1.1 to 2.6 s red, timeout 10 s.
 - `packages/client/src/clip-sampler.test.ts`, "through Death from every
-  state, and the snap back" (seven models): 0.41 to 0.54 s locally, 1.2 to 2.5
+  state, and the snap back" (eight models): 0.91 to 1.25 s locally, 1.2 to 2.5
   s green, 1.1 to 3.0 s red, timeout 10 s.
 - `packages/server/test/room.test.ts`, "keeps the settings and the choices,
   and lets the room play again": 1.8 s locally, 3.7 s on the runner (job
@@ -341,7 +343,7 @@ enters on a bare `/`, through a constant, so a grep for `goto('/')` finds no
 other spec.
 
 - `select.spec.ts`: the pre-match select (`select.png`, at 1280x720). On `/` the
-  panel shows and no canvas exists; the champion row is the six roster ids in
+  panel shows and no canvas exists; the champion row is the seven roster ids in
   order, all available, with Hargrim, arena01, 2v2 and normal current and the
   Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
   each `data-current`, leaves the address search empty and makes the Start href
@@ -359,13 +361,14 @@ other spec.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
   timer against the tick, the hidden result panel with its champion, arena and
   team select (every href writes `teamsize`, with 2v2 current), and the launch
-  address `?champion=quillon`. Two rows next to it, `?champion=ondrel` and
-  `?champion=brimwick`, read health 130 / 130 and 120 / 120, the scoreboard's
-  row 0 name (built hidden at startup, so readable without Tab) as Ondrel and
-  Brimwick, and the champion glbs the page requests (collected with
+  address `?champion=quillon`. Three rows next to it, `?champion=ondrel`,
+  `?champion=brimwick` and `?champion=durnhal`, read health 130 / 130, 120 / 120
+  and 160 / 160, the scoreboard's row 0 name (built hidden at startup, so
+  readable without Tab) as Ondrel, Brimwick and Durnhal, and the champion glbs the page requests (collected with
   `page.on('request')` before `goto`) as the pick's own, Quillon's and
   Hargrim's, with no `placeholder.glb`; they are red when the roster has no
-  such id, and a missing clip is a page error at load. A row on `/?arena=arena02` (`scene-arena02.png`)
+  such id, and a missing clip is a page error at load. Durnhal's row also
+  writes `scene-durnhal.png` (1280x720), the one in-game look at his model. A row on `/?arena=arena02` (`scene-arena02.png`)
   checks `data-arena` and the human's position, (-1100, 200), which proves the
   sim got arena02 and not only the hook, and the arena links. A row on
   `/?teamsize=3` reads `data-bar0` to `data-bar5` at 100 and no `data-bar6`, the
