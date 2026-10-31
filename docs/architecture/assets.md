@@ -98,8 +98,8 @@ The commands and file list are in `tools/blender/README.md`.
 - Each of the seven roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
   in body colour and one cue that stays below 1.9 m, Durnhal's in parts on
-  both arms. The client registers and loads six of them (batch #177, package
-  C); Durnhal's file waits for step 1.3 of the roster v3 build order.
+  both arms. The client registers and loads all seven (batch #177, package
+  C, then #212 for Durnhal).
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours and cues are in
   [`tools/blender/README.md`](../../tools/blender/README.md).

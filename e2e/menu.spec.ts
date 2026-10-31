@@ -216,7 +216,7 @@ test('goes back to the select from the menu and relaunches on another arena', as
         entry.textContent,
       ]),
     }));
-    expect(links.champions.map(([id]) => id)).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick']);
+    expect(links.champions.map(([id]) => id)).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal']);
     expect(links.champions.find(([id]) => id === 'quillon')?.[1]).toBe('?champion=quillon&difficulty=normal&arena=arena01&teamsize=2');
     expect(links.arenas).toEqual([
       ['arena01', 'true', '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2'],
