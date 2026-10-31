@@ -166,10 +166,12 @@ picked where the spec leaves them open:
   IPC message that carries it is P3, and the close of a match nobody watches
   after 3600 ticks is P5, so until then a match whose humans are all gone plays
   on to its end.
-- **Not built.** The energy orb: roster v3 says the online server sets
-  `MatchConfig.energyOrb`, which does not exist yet, and the protocol's
-  `matchStart` encoder copies only `teamSize`, `players` and `roundsToWin`. The
-  orb package owns both.
+- **Not built.** The server's energy orb: roster v3 says the online server sets
+  `MatchConfig.energyOrb`. The sim has the key since #218 and the protocol's
+  `matchStart` reads and writes it (a finite `x` and `y` after `roundsToWin`,
+  an absent key staying absent; the sim checks the point, the codec only the
+  numbers, and `PROTOCOL_VERSION` stays 1). The server does not read
+  `data/orbs.json` or pass the point yet, so its matches have no orb (step 2.2).
 
 ## Tests
 

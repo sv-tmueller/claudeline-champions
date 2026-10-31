@@ -74,3 +74,11 @@ export const ROUND_END_TICKS = 180;
 export const DEFAULT_ROUNDS_TO_WIN = 3;
 /** The `sourceId` of the ring's damage and deaths: no champion has a negative id. */
 export const RING_SOURCE_ID = -1;
+
+/** The energy orb, rules.md section 3.3: the warning, then the pickup, both on the round clock. */
+export const ORB_WARNING_TICKS = 1020;
+/** The orb can be taken from this many steps into the round (20 s). */
+export const ORB_COLLECTIBLE_TICKS = 1200;
+export const ORB_RADIUS = 0.5;
+/** What the orb gives, cut to the room under `MAX_ENERGY`. */
+export const ORB_ENERGY = 25;

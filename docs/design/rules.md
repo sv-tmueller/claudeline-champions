@@ -60,6 +60,7 @@ The sim also does this `[tuned]`:
 - Every status is removed.
 - A cast in progress is dropped.
 - The round timer is set to 90 s and the ring is removed.
+- With the energy orb on, the orb is up again, untaken (section 3.3).
 
 Round wins are the only thing that carries over.
 
@@ -148,10 +149,10 @@ When a cast fires a projectile that has ally effects, and the aim position of th
 ## 3. Energy economy
 
 - Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.
-- Energy is earned only by landing abilities on enemies and, for support kits, by healing allies `[spec]`.
+- Energy is earned only by landing abilities on enemies and, for support kits, by healing allies `[spec]`. The energy orb (section 3.3) is the one other source, amended 2026-10-31 by #218.
 - Energy resets to 0 at the start of each round `[spec]`.
 - The sim applies the table in section 3.1 on its own whenever an ability lands. Kits do not carry `energyGain` for these standard hits `[tuned]`.
-- A kit uses the `energyGain` effect only for an extra grant on top of the table. Kits add no other energy sources `[tuned]`.
+- A kit uses the `energyGain` effect only for an extra grant on top of the table. Kits add no other energy sources `[tuned]`; the orb is an arena source, named as the one exception.
 
 ### 3.1 Gain values `[tuned]`
 
@@ -198,6 +199,18 @@ Each EX cast costs 25 energy and delays the ultimate by about 12 s of active com
 A support kit lands the same total: 2 M1 heals on hurt allies (10) plus 1 skill heal (10) per 10 s of active combat.
 
 Note on the acceptance criterion "reaches its ultimate within two to three rounds of landed hits": the spec resets energy to 0 every round (sections 4.6 and 4.7), so energy cannot carry over between rounds. The spec governs. This document reads the criterion as follows. A typical kit reaches 100 energy in a round that holds about 50 s of active combat. The ultimate is available in roughly one round out of every two to three. Rounds that end early do not reach it.
+
+### 3.3 The energy orb `[tuned]`
+
+One contested pickup per round charges the ultimate. It rewards map control without deciding the round. It exists only in a match with flow whose config has `energyOrb` (amended 2026-10-31 by #218); free play and a config without it have no orb.
+
+- **Where:** one point per arena, in `data/orbs.json` and not in the arena file (arenas.md section 9). The point lies on the mirror axis (x = 0), a disc of 0.5 m around it lies inside the ring's end circle and the arena boundary and overlaps no obstacle.
+- **Warning:** on the step with the round clock at 17 s (1020 ticks) the sim emits `orbSpawn` with the round and the point, once per round.
+- **Collectible:** from the step with the round clock at 20 s (1200 ticks). Before that nobody can take it, whoever stands on the point.
+- **Pickup:** a living champion whose circle touches the orb (centre distance at most 0.5 m plus 0.5 m, touching counts) takes it. The champion gains 25 energy, capped at 100, and the orb is gone for the rest of the round. A champion at 100 still takes it and gains nothing. `orbTaken` carries the champion, the amount (it may be 0) and the energy afterwards.
+- **Ties:** with two or more touchers on the same step, of any teams (a tie inside one team too), the match's seeded RNG draws once and picks one of them, with no bias by id. One toucher takes it with no draw.
+- **Unclaimed:** an orb nobody takes stays until the round ends. A pickup on the step that decides the round stands.
+- **Reset:** the next round starts with the orb up and untaken (section 1.2).
 
 ## 4. Statuses
 

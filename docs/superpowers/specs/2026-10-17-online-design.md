@@ -462,7 +462,10 @@ Server to client:
 will accept, so the lobby choices come from the server (section 5, Lists).
 `MatchConfig`
 (`packages/sim/src/state.ts`) is `{ teamSize: 2 | 3, players: PlayerConfig[],
-roundsToWin?: number }`, and the server sends `roundsToWin: 3`. `ack` is the
+roundsToWin?: number, energyOrb?: { x: number, y: number } }`, and the server sends `roundsToWin: 3`
+(amended 2026-10-31 by [#218](https://github.com/sv-tmueller/claudeline-champions/issues/218): and,
+from the server package's step 2.2, the orb point of the arena, so `matchStart.config` carries it
+and the server stays the authority on data; an absent key stays absent). `ack` is the
 last input `tick` the server applied for that client, -1 before the first
 (section 7). `pong.tick`
 is the server's `state.tick`, 0 in the lobby.

@@ -190,6 +190,9 @@ Each kit defines exactly two EX variants.
 - EX variants cost 25 energy. The ultimate costs 100 energy. Energy is earned
   only by landing abilities on enemies and, for support kits, by healing
   allies. Energy resets to 0 at the start of each round.
+  Amended 2026-10-31 by [#218](https://github.com/sv-tmueller/claudeline-champions/issues/218):
+  energy also comes from the energy orb, one contested pickup per round (rules.md section 3.3);
+  the orb is an arena source, and kits add no other.
 - Every ability has: cooldown ticks, windup ticks (0 for instant), movement
   rule during windup (free, slowed, locked), and a list of effects.
 - Effects toolkit (the only primitives kits may use): `projectile`, `dash`,
@@ -220,6 +223,10 @@ State machine: `warmup -> round -> roundEnd -> (round | matchEnd)`.
   Amended 2026-10-05 by [batch #53 decision 3](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5954853203): rounds to win is the optional
   `MatchConfig.roundsToWin`; a config without it is free play, with no warmup, round clock, ring or
   round end, and the standard match passes `DEFAULT_ROUNDS_TO_WIN = 3`.
+  Amended 2026-10-31 by [#218](https://github.com/sv-tmueller/claudeline-champions/issues/218): the
+  optional `MatchConfig.energyOrb`, an orb point `{ x, y }`, turns the energy orb on; a config
+  without it has no orb. The points live in `data/orbs.json`, and the callers read them with
+  `orbPointFor`.
 
 ### 4.8 Determinism rules (enforced by review and tests)
 

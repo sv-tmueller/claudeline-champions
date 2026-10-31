@@ -14,6 +14,7 @@ import { atan2 } from './dmath';
 import { stepLocked, stepSuddenDeathAndDecision } from './flow';
 import { length } from './geometry';
 import { upkeepStatuses } from './health';
+import { stepOrb } from './orb';
 import { stepForcedMotion } from './motion';
 import { resolveInput } from './input';
 import type { PlayerInput } from './input';
@@ -85,7 +86,10 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
   stepAreas(state);
   expireProjectiles(state);
   expireAreas(state);
-  if (state.match !== undefined) stepSuddenDeathAndDecision(state, state.match);
+  if (state.match !== undefined) {
+    stepOrb(state, state.match);
+    stepSuddenDeathAndDecision(state, state.match);
+  }
   dropUnusedCasts(state);
   if (state.match !== undefined) state.match.phaseTicks += 1;
 

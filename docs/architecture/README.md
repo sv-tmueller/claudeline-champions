@@ -39,7 +39,8 @@ first.
   caster lands on her at 60 percent heal) since #191 and the `wound` status (10
   percent less healing per stack, up to 3 stacks) since #158; kits with casting,
   cooldowns, windups and energy; match flow with rounds and the sudden-death
-  ring, opt-in through `roundsToWin`; angles through `dmath.ts`; the sweep's
+  ring, opt-in through `roundsToWin`; the energy orb, opt-in through
+  `energyOrb` (the point from `data/orbs.json`, #218); angles through `dmath.ts`; the sweep's
   heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot test
