@@ -26,7 +26,8 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # match-arena02.png, match-3v3.png,
                                  # match-3v3-arena02.png, menu.png,
                                  # scoreboard.png, select.png, lingering.png,
-                                 # orb.png in test-results/*/
+                                 # orb.png, fuse.png
+                                 # in test-results/*/
 npm run balance                  # bot-versus-bot win-rate report: plays 11760
                                  # matches (six kits) and writes the block of
                                  # docs/design/balance.md, about 14 minutes on

@@ -491,6 +491,23 @@ other spec.
   (320x180) and 2 at 105 to 210 ms, about 50 reads at 32 to 75 ms, so the body
   takes about 9 to 13 s and the test about 15 s with the load; the 45 s
   timeout is more than twice that. It does not use `__runProbeFrames`.
+- `fuse.spec.ts`: the armed look of a fused area (`fuse.png`, at 1280x720), on
+  the dev-only sandbox with a paused clock and tick budgets, like
+  `lingering.spec.ts`. No shipped kit has a fuse, so Shift+F4 spawns one at the
+  aim through `debug.spawnArea` (fuse 90 ticks, radius 2.5 m, one hit of 30
+  damage to the enemy team; client.md, Input). After the warmup the cursor goes
+  to the pixel of champion 2 (12, 2) at the probe viewport, one frame samples
+  it, and Shift+F4 reads `debugAreas` 1 and `debugShots` 0. `data-areas` then
+  reads 1 within 3 ticks, at 30 ticks and at 60, with `data-bar2` 100 each time;
+  the picture is one frame at 1280x720 while it is armed, no pixel counts; and
+  `data-areas` reads 0 within 90 ticks of the spawn, give or take a frame, with
+  `data-bar2` 75 (30 of 120 health). The units behind it are
+  `entity-views-fuse.test.ts` and `area.test.ts`. About 300 frames at 17 to 24
+  ms (320x180) and 2 at 105 to 210 ms, so the body takes about 6 to 9 s and the
+  test about 12 s with the load; the 45 s timeout is more than twice that. It
+  does not use `__runProbeFrames`, and the heap probe plays no fused area, so
+  the armed path of `entity-views.ts:follow` (which reads and writes fields and
+  allocates nothing) is not in a probe window.
 - `self-cast.spec.ts`: the held C key (no screenshot), on
   `?champion=lumeth&difficulty=normal&arena=arena01&teamsize=2` with a paused
   clock and tick budgets, like `lingering.spec.ts`. With the cursor at the

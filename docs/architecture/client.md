@@ -130,16 +130,19 @@ listener does nothing and leaves the default alone, so Tab keeps moving focus
 in the menu. The listener is event code, not frame path.
 
 Two keys are not game input. F3 toggles the debug overlay. F4 fires a debug
-shot from the local champion towards the aim point; it is a dev-only key.
+shot from the local champion towards the aim point, and Shift+F4 spawns a fused
+one-hit area at the aim point (fuse 90 ticks, radius 2.5 m, 30 damage to the
+enemy team, through `debug.spawnArea`): no shipped kit has a fuse, so this is
+how `e2e/fuse.spec.ts` shows the armed look. Both are dev-only keys.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
-`grep -rE 'debugShots|spawnProjectile|runProbeFrames|performance\.now|timescale' packages/client/dist`,
+`grep -rE 'debugShots|debugAreas|spawnProjectile|spawnArea|runProbeFrames|performance\.now|timescale' packages/client/dist`,
 which must print nothing. The pattern has no `"F4"` and no `fireDebugShot`: a
 build minifies function names, and the key code `F4` also ships in the reserved
 list of `bindings.ts`, so neither tells the debug shot from the rest. The terms
 that survive minification in any quote style are the property names `debugShots`
-and `spawnProjectile`. The same guard hides the dev-only probe hook,
+`debugAreas`, `spawnProjectile` and `spawnArea`. The same guard hides the dev-only probe hook,
 `window.__runProbeFrames`, which `combat.spec.ts` and `live-probe.spec.ts` use
 to run their heap-probe windows (see [testing](testing.md)), and the time scale
 of `dev-launch.ts` (`timescale` is the string that survives minification: the
@@ -307,12 +310,20 @@ sim steps first and the views read its state afterwards.
   (`durationTicks` 1), so it is made in step 3 and removed in step 6 of the same
   tick ([simulation.md, Tick order](simulation.md#tick-order)) and never reaches
   `sync`, while Ondrel's lingering areas last 120 to 300 ticks and a sync sees
-  each for one tick fewer. A one-hit area never gets a view, so Reed Fence (Q),
-  a one-hit circle and a 120 tick one, shows one disc and not two. The disc is
-  the translucent team colour of the area for its whole life and is static
-  between pulses: there is no pulse cue, and the pulses are the sim's (batch
-  #177 decision 2). It is released at its expiry, or in the frame of a round
-  decision, which clears the areas. The pool of 16 covers the most Ondrel has
+  each for one tick fewer. An unfused one-hit area never gets a view, so Reed
+  Fence (Q), a one-hit circle and a 120 tick one, shows one disc and not two. The
+  disc is the translucent team colour of the area for its whole life and is
+  static between pulses: there is no pulse cue, and the pulses are the sim's
+  (batch #177 decision 2). It is released at its expiry, or in the frame of a
+  round decision, which clears the areas. A fused area (rules 2.6) is armed
+  while `fuseTicks > 0` on the area entity, with no event and no new DOM hook:
+  the disc takes a fainter fill, a ring outlines it and a child disc grows from
+  nothing to the full area as `1 - ticksToNextApply / fuseTicks`, all pooled
+  meshes and materials made at startup, so the frame path allocates nothing. The
+  armed look ends in the step of the first `areaTick`, and a fused one-hit area,
+  which pulses and expires in that step, is released from the armed look to
+  nothing. No shipped kit has a fuse; `entity-views-fuse.test.ts` plays the
+  armed look on the real sim and `e2e/fuse.spec.ts` (`fuse.png`) in the browser. The pool of 16 covers the most Ondrel has
   alive, five, since each lingering duration is shorter than its slot's cooldown
   (roster-v2.md section 0), so a slot never has two of its own areas alive.
   `entity-views-lingering.test.ts` plays each path of Ondrel on the real sim and
@@ -346,7 +357,7 @@ sim steps first and the views read its state afterwards.
   the orb view's mode;
   `champion-look` swaps a champion's materials between its own, the white flash
   and the faded dead grey.
-- `debug-shot.ts`: the dev-only F4 shot above.
+- `debug-shot.ts`: the dev-only F4 shot and Shift+F4 fused area above.
 - `champion-anim.ts` and `clip-sampler.ts`: which clip of each champion plays,
   and the sampler that poses its bones; see Animation.
 - `bot-driver.ts`, `match-setup.ts` and `launch.ts`: see Launch and match.

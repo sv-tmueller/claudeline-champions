@@ -159,7 +159,9 @@ and the same input stream, `checksum` after N ticks is identical on every run.
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
   the next application, an inline `effects` list and `castId` as for a
-  projectile.
+  projectile. An area spawned with a fuse (rules 2.6) also has `fuseTicks`: the
+  fuse length while armed, 0 from the first pulse on. The key is left out of an
+  area without a fuse and is never `undefined`.
 - Kits and casts: `state.kits` holds the kits of the match, plain data, and
   `state.casts` the records of casts that something still refers to, in
   ascending id order (see [Abilities](#abilities-and-the-effects-toolkit)).
@@ -233,7 +235,9 @@ slots in `Button` bit order.
    it ends.
 5. For each area in id order: if `ticksToNextApply` is 0, emit `areaTick`,
    apply the effects to the targets in id order and set `ticksToNextApply` to
-   the interval; then decrement it.
+   the interval (and `fuseTicks`, when the area has the key, to 0); then
+   decrement it. An armed area counts its fuse down in `ticksToNextApply` and
+   emits nothing.
 6. Expiries: each projectile in id order loses a tick of lifetime and ends with
    `lifetime` at 0; then each area loses a tick of duration and ends with
    `areaExpired` at 0.
@@ -283,7 +287,11 @@ slots in `Button` bit order.
 
 A projectile with lifetime L makes exactly L sweeps. An area with duration D
 and interval I applies `ceil(D / I)` times, on its ticks 0, I, 2I and so on;
-with D = 1 and I = 1 it applies once and expires in the same step. Entities
+with D = 1 and I = 1 it applies once and expires in the same step. A fused
+area (fuse F, rules 2.6) spawns with `ticksToNextApply` F and `remainingTicks`
+F + D, so its pulses fall F steps later (the first on the tick F after the cast
+tick, or the step F + 1 after a dev spawn between steps), at F + kI, and a one-hit
+fused area pulses and expires in the same step. Entities
 spawned between steps act from the next step on.
 
 A status lasting D ticks affects exactly D turns of its holder, whether it was
@@ -341,6 +349,18 @@ champion is inside when its body overlaps the circle, `dist <= radius + 0.5`,
 inclusive (a tuning choice that may become a `[tuned]` rule later). Areas ignore
 obstacles. The target list in `areaTick` is built before any effect applies.
 
+A fused area (`fuseTicks`, rules 2.6; roster-v2 section 0 holds a kit to 15 to
+120 ticks) is armed from its spawn until its first pulse: inert, in
+`state.areas`, drawn by the client, applying nothing. `ticksToNextApply` is the
+fuse and the pulse clock in one: it starts at F, not 0, so the first `areaTick`
+is F steps after the spawn step, and `fuseTicks` goes from F to 0 in that step.
+An area is armed when `fuseTicks > 0`, and `1 - ticksToNextApply / fuseTicks` is
+how far the fuse has burnt. The first `areaTick` is the end of the fuse, so the
+change has an event and no new event kind or `areaSpawned` field exists. The
+locked phases freeze the fuse with every other area clock, and round end ends an
+armed area with `areaExpired` and no pulse. A caster who dies keeps his armed
+area, as for any area. The area stays where it was placed.
+
 ## Line of sight
 
 `hasLineOfSight(state, from, to)` is false when the segment touches an obstacle
@@ -395,7 +415,7 @@ them from inside the sim, through `cast.ts`.
 | Module | Export | Returns |
 | --- | --- | --- |
 | `projectile.ts` | `spawnProjectile(state, spec, castId = null)` | the new entity id |
-| `area.ts` | `spawnArea(state, spec, castId = null)` | the new entity id |
+| `area.ts` | `spawnArea(state, spec, castId = null)`, with an optional `fuseTicks` in the spec (rules 2.6) | the new entity id |
 | `melee.ts` | `meleeArc(state, spec)`, with an optional `castId` in the spec | the target ids |
 | `status.ts` | `applyStatus(state, targetId, spec, source)` | whether anything changed |
 | `status.ts` | `applyShield(state, targetId, { absorb, ticks }, source)` | whether a shield was added |
@@ -427,7 +447,8 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
   1e-150 in magnitude but not both zero, since the squares inside the length
   turn subnormal below about 1.5e-154; a component of exactly 1e-150 is
   accepted), a speed or radius at or below 0, a lifetime, duration or interval
-  that is not a positive integer, a projectile `pierce` that is not a boolean,
+  that is not a positive integer, an area `fuseTicks` that is given and is not a
+  positive integer, a projectile `pierce` that is not a boolean,
   `effects` that is not an array, a projectile `allyEffects` that is given but
   is not a non-empty array, an effect (in either list) of an unknown type or
   with a bad field (an amount at or below 0, a status spec that `applyStatus`
@@ -799,7 +820,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 | Effect | Fields | What it does |
 | --- | --- | --- |
 | `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner in flight; aimed within the caster's own circle, nothing spawns and they land on her at 60 percent heal, see Firing), `effects` on the other team |
-| `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects` | spawns an area; `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
+| `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects`, optional `fuseTicks` | spawns an area, armed for `fuseTicks` ticks first when it has one (rules 2.6); `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
 | `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
 | `teleport` | `range`, `fixed` | goes exactly `range` m along the fire direction, or only as far as the aim when not `fixed` |
@@ -826,7 +847,7 @@ fixtures press buttons with roster ids and the client and bots tests call
 
 `validateKit` keeps every number inside what the primitive that receives it
 accepts: cooldown 1 to 36000 ticks, windup 0 to 36000, lifetime, duration,
-interval, dash ticks and status ticks 1 to 36000; projectile speed and radius,
+interval, fuse, dash ticks and status ticks 1 to 36000; projectile speed and radius,
 area radius, placement distance and range, arc radius, teleport range, shield
 absorb, heal amount, `maxHealth` and `moveSpeed` above 0 and at most 1e6; dash
 distance 0.000001 to 1000; `cosHalfAngle` from -1 to 1; `energyGain` an integer
@@ -840,7 +861,8 @@ integer from 1 to 5 (`COUNTER_MAX_CAP`) and whose `windowTicks` is an integer fr
 60 to 600 (`COUNTER_MIN_WINDOW_TICKS`, `COUNTER_MAX_WINDOW_TICKS`); unknown keys
 inside it are dropped, and a `counter` key inside a slot is a stray key like any
 other. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
-not checked here; roster tests do that. The bounds keep `step` from throwing, not
+not checked here; roster tests do that, and so is the fuse range of 15 to 120
+ticks, the fuse-aware linger rule and the one-hit control exception (`catalogProblems`). The bounds keep `step` from throwing, not
 cheap: the live entities of a kit grow with lifetime over cooldown, step 7
 (`dropUnusedCasts`) is quadratic in them, and the catalog ranges keep them small.
 
