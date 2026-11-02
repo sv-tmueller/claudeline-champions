@@ -74,7 +74,7 @@ first.
   arena. The standard match has the energy orb on, at the arena's point of
   `data/orbs.json` (#224): a warning ring from `orbSpawn`, the orb while it is
   collectible, a kill-feed line naming the taker and a warning sound; the bots
-  do not go for it yet. The HUD has the ring warning and the kill feed, and the result screen
+  contest it (#225). The HUD has the ring warning and the kill feed, and the result screen
   has the champion, arena, team size and difficulty select. Escape opens a menu
   that pauses the match (Resume, Restart, the select again, a keys view that
   rebinds the nine movement and slot keys and the held self-cast key C, and a

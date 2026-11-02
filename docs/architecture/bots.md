@@ -932,6 +932,15 @@ sidestep lands in `follow.ts` too, so the dodge may add to them. The old lead
 of 4 skipped them (at 4 the median read 3428 to 4068 B). `dodge.ts` is in no
 window's list of functions.
 
+The orb contest of #225: `orb.ts` and the orb branch of `think` are in no
+window's list of functions either, since the windows fall 330 to 480 ticks into a
+round and the orb is collectible from tick 1200. What the package moved is the
+match itself: the bots contest the orb that the page's match has on since #224,
+which shortens the match to tick 4619, so the live probe's warm-up (tick 2100, round
+3 begun by tick 3149) and lead (11 windows) were re-measured, and read bots medians
+of 6644, 6936 and 7196 B and counted-code medians of 396, 432 and 456 B, under the
+unchanged limits (testing.md, the live scene on the bots of #225).
+
 The live scene bounds the bots: the median of its five windows' own bots figures
 must be at most 18 000 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
 is 50 percent above the largest median of any clean attempt, 11 980 B (17 970,
