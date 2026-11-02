@@ -17,8 +17,8 @@ import type { Cell } from './six-cells';
 // press oracle and `think` leaves the state alone (play checks the last two on every tick).
 //
 // Why this pair and not the Hargrim and Quillon mirror of the product's match: the mirror's rounds
-// end before tick 1200 but for one of its 20 rounds (the mirrors of the two kits, both arenas), so
-// it has 0 and 1 orb rounds on the two arenas and nothing to assert; the pair with Lumeth, whose
+// end before tick 1200 but for one of its 6 rounds (both arenas), so it has 0 and 1 orb rounds on
+// the two arenas and nothing to assert; the pair with Lumeth, whose
 // rounds last 1000 to 1800 ticks, has 4 and 3 (bots.md, The energy orb, has the scan of all 42
 // pairings). The two cells
 // are the only committed matches of the batch (testing.md, Check suite: the unit job is near its

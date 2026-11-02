@@ -373,10 +373,18 @@ round when it reaches tick 1200, and most do not: normal bots end a round at
 tick 1000 for most pairings, so the orb is up in 20 of 78 rounds on arena 1 and 16
 of 82 on arena 2. The bots took it in 14 of the 20 and 9 of the 16 (70 and 56
 percent); with the contest switched off, the same scan has 3 of 18 and 1 of 18,
-which are the champions that stood on it by chance. The orb flag flips 117 times in
-those 20 orb rounds and 70 times in the 16 (four bots each; one contest is a flip
-to true and a flip to false at its end or at the next round), so it does not
-dither. The committed matches (`orb-match.test.ts`) are the pair that has orb
+which are the champions that stood on it by chance. The orb flag (the decision's, before
+the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
+each (one contest is a flip to true and one to false at its end or at the next round).
+The flips are not spread evenly: a cell with orb rounds reads 2 to 12 flips, but for the
+cells with Lumeth, which read 0 to 46 (Lumeth against Brimwick on arena 1: 46 flips in 2 orb
+rounds of the 4 bots, about one flip every 74 bot-ticks; the Lumeth mirror 26 and 22; Quillon
+against Lumeth 28 and 8). A ranged kit's reach is 9 to 13 m, and a champion that kites in and
+out of the reach of an enemy flips the threat test with it, so the contest starts and stops
+as the distance crosses `rangeMax`; this is reading A at work (an enemy in reach ends the
+contest) and not a bug, and no hysteresis is built (see Not built yet).
+
+The committed matches (`orb-match.test.ts`) are the pair that has orb
 rounds: a Quillon and a Hargrim against a Lumeth and a Hargrim, played to matchEnd
 with the orb of `data/orbs.json`.
 
@@ -385,8 +393,8 @@ with the orb of `data/orbs.json`.
 | arena01 | 8176  | 1823                   | 4          | 3     | A 2, B 1   | 17          |
 | arena02 | 7329  | 1666                   | 3          | 2     | A 0, B 2   | 21          |
 
-The mirrors of Hargrim and Quillon are not that pair: their rounds end before tick
-1200 but for one of 20, so they have 0 and 1 orb rounds on the two arenas. A cell
+The mirror of the product's match (Hargrim and Quillon a side) is not that pair: its
+rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds on the two arenas. A cell
 takes 3.7 s locally (a Linux x86 host, Node 24.22), and the two cells are the
 only committed matches of #225, for the unit job's time (see Testing).
 
@@ -1366,9 +1374,10 @@ match replays exactly from its input stream.
   unpressed on an escape think. Glide is built, see Openers and escapes.
 - More of the orb than the contest of #225 (see The energy orb): no
   pre-positioning at the warning (tick 1020; a bot walks only once the orb is
-  collectible), no per-champion or per-profile orb rule (the rule is generic), and
-  no path length for "closer" (the centre distance to the orb point decides, not the
-  distance a bot would walk around a pillar).
+  collectible), no per-champion or per-profile orb rule (the rule is generic), no
+  hysteresis on the threat test (a ranged bot that kites across its reach flips the
+  contest on and off, measured there), and no path length for "closer" (the centre
+  distance to the orb point decides, not the distance a bot would walk around a pillar).
 
 ## Testing
 

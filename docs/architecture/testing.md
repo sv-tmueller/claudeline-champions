@@ -70,7 +70,10 @@ others.
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
   timeout 15 s. With the settle of #133 (one window a scene on the runner): 4.8
   to 6.9 s over the three attempts of PR #184, the heap jobs 3.6 to 5.3 s, the
-  timeout stays 15 s (twice 6.9 s is 13.8 s).
+  timeout stays 15 s (twice 6.9 s is 13.8 s). With the two orb scenes of #225 (21
+  scenes) the unit job reads 8.2 s (job 125568510485, 8152 ms), twice which is 16.3 s,
+  so the timeout is 20 s; on a loaded machine (load average 25 on 6 CPUs) it read 16.4 s
+  and failed the old 15 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (eight models): 2.5 to 4.0 s locally, 3.3 to
   7.2 s green, 3.3 to 8.0 s red, timeout 20 s.
@@ -196,6 +199,17 @@ on a slow runner (`ondrel.test.ts` 147 s against 99 and 104 s) and stays under
 the trigger of about 8 minutes (480 s), at 94 percent of it. The two pushes before
 it, without and with the file, took 230 and 254 s (the second one red on a
 melee-key list that this package then extended).
+
+The seeded orb matches of `packages/bots/test/orb-match.test.ts` (#225: two cells, a
+Quillon and a Hargrim against a Lumeth and a Hargrim on each arena, with the energy orb
+on, 3 rounds to win) have the timeout of the cells above, 60 s a cell. A cell takes 3.7 s
+locally (a Linux x86 host, Node 24.22, with little else running) and 23.5 s (arena01) and
+21.0 s (arena02) on the runner (job 125568510485 of run 41530318344, the file 44.5 s beside
+the other long files), so twice the slowest is 47 s and the timeout stays 60 s. The unit job
+of the draft pull request read 7 min 11 s (347.8 s of Vitest over 146 files) with them. They
+are the only matches the package commits (the optional orb-on determinism row was left out
+for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
+unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.
 
 ## Test types
 
