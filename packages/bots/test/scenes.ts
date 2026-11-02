@@ -1,4 +1,4 @@
-import { Button, SLOTS, cloneState, createMatch, debug, step } from '@claudeline/sim';
+import { Button, ORB_COLLECTIBLE_TICKS, SLOTS, cloneState, createMatch, debug, step } from '@claudeline/sim';
 import type {
   ArenaDef,
   ChampionState,
@@ -6,6 +6,7 @@ import type {
   GameState,
   KitDef,
   MatchConfig,
+  MatchPhase,
   ProjectileState,
   Slot,
 } from '@claudeline/sim';
@@ -59,6 +60,23 @@ export interface Options {
   /** Health of the champion under test and of the enemy, as fractions of the maximum. */
   health?: number;
   enemyHealth?: number;
+  /**
+   * The match flow with the energy orb on (rules.md 3.3), in round 1 of the phase `phase` at
+   * `phaseTicks` (default: the round at tick 1200, from which the orb is collectible). Without it
+   * the scene is free play, as it always was.
+   */
+  orb?: OrbOptions;
+}
+
+export interface OrbOptions {
+  /** The orb's y; its x is 0, the mirror axis. Default: 2.5, on `OPEN` and on arena 01. */
+  y?: number;
+  /** Default: 1200, `ORB_COLLECTIBLE_TICKS`. */
+  phaseTicks?: number;
+  /** Default: 'round'. */
+  phase?: MatchPhase;
+  /** The orb is gone. Default: false. */
+  taken?: boolean;
 }
 
 export function sceneOf(championId: string, distance: number, options: Options = {}): GameState {
@@ -70,8 +88,17 @@ export function sceneOf(championId: string, distance: number, options: Options =
       { championId: options.enemyId ?? 'dummy', team: 'B' },
       { championId: 'dummy', team: 'B' },
     ],
+    ...(options.orb !== undefined
+      ? { roundsToWin: 3, energyOrb: { x: 0, y: options.orb.y ?? 2.5 } }
+      : {}),
   };
   const state = createMatch(config, options.arena ?? OPEN, 1, options.kits ?? jsonKits());
+  if (options.orb !== undefined && state.match?.orb !== undefined) {
+    state.match.phase = options.orb.phase ?? 'round';
+    state.match.round = 1;
+    state.match.phaseTicks = options.orb.phaseTicks ?? ORB_COLLECTIBLE_TICKS;
+    state.match.orb.taken = options.orb.taken ?? false;
+  }
   for (const id of [1, 3]) (state.champions[id] as ChampionState).alive = false;
   if (options.ally !== undefined) {
     const ally = state.champions[1] as ChampionState;
