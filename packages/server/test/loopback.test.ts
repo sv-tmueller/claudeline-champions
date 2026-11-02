@@ -129,8 +129,10 @@ describe.each(SPECS)('loopback: $name', { timeout: 15_000 }, (spec) => {
   let second: Played;
 
   beforeAll(() => {
+    const t0 = performance.now();
     first = play(spec, 1);
     second = play(spec, 1);
+    console.log(`HOOK ${spec.name} ${((performance.now() - t0) / 1000).toFixed(2)} s`);
   }, 60_000);
 
   it('plays to a result: a final snapshot, matchEnd, then the lobby', () => {
