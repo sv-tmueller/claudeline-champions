@@ -203,10 +203,12 @@ melee-key list that this package then extended).
 The seeded orb matches of `packages/bots/test/orb-match.test.ts` (#225: two cells, a
 Quillon and a Hargrim against a Lumeth and a Hargrim on each arena, with the energy orb
 on, 3 rounds to win) have the timeout of the cells above, 60 s a cell. A cell takes 3.7 s
-locally (a Linux x86 host, Node 24.22, with little else running) and 23.5 s (arena01) and
-21.0 s (arena02) on the runner (job 125568510485 of run 41530318344, the file 44.5 s beside
-the other long files), so twice the slowest is 47 s and the timeout stays 60 s. The unit job
-of the draft pull request read 7 min 11 s (347.8 s of Vitest over 146 files) with them. They
+locally (a Linux x86 host, Node 24.22, with little else running) and 23.5 and 23.7 s (arena01)
+and 21.0 and 26.6 s (arena02) on the runner (jobs 125568510485 and 125574546646 of runs
+41530318344 and 41532073021, the file 44.5 and 50.3 s beside the other long files), so
+twice the slowest is 53.2 s and the timeout stays 60 s. The unit job of the draft pull
+request read 7 min 11 s and 7 min 24 s (347.8 and 353.0 s of Vitest over 146 files) with
+them. They
 are the only matches the package commits (the optional orb-on determinism row was left out
 for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
 unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.
