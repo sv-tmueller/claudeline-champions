@@ -3,11 +3,11 @@ import { DEFAULT_ROUNDS_TO_WIN } from '@claudeline/sim';
 import type { ArenaDef, MatchConfig } from '@claudeline/sim';
 import { arena01, arena02, createRun } from './helpers';
 import { SIX_SET, expectNoStall, play } from './press-oracle';
-import type { Played } from './press-oracle';
+import type { KitSet, Played } from './press-oracle';
 
-// The seeded matches of ondrel.test.ts and brimwick.test.ts: a bot of the new kit and a filler
+// The seeded matches of ondrel.test.ts, brimwick.test.ts and durnhal.test.ts: a bot of the new kit and a filler
 // against a bot of one of the shipped kits and a filler, on both arenas, played to matchEnd (3
-// rounds to win) on the six shipped kits. Every press of every tick passes the press oracle, the
+// rounds to win) on the six shipped kits (the seven for Durnhal's). Every press of every tick passes the press oracle, the
 // invariants hold, the bots leave the state alone and no bot stalls for more than 120 ticks. The
 // seeds are pinned: a miss after a change to the bots, the sim or the Node version is governed by
 // batch #53 decision 8.3.
@@ -83,18 +83,29 @@ export function configOf(mine: string, other: string): MatchConfig {
 
 const played = new Map<string, Played>();
 
-/** Plays a cell once; the tests of a file share it. */
-export function playCell(cell: Cell): Played {
-  const known = played.get(cell.name);
+/**
+ * Plays a cell once on the kit set `set`; the tests of a file share it. The six-kit cells of Ondrel
+ * and Brimwick go through `playCell`, the seven-kit cells of Durnhal (#211) through `playCellOn`
+ * with `SEVEN_SET`. Two functions and not a default parameter: `CELLS.map(playCell)` would hand the
+ * index of the cell in as the set.
+ */
+export function playCellOn(cell: Cell, set: KitSet): Played {
+  const key = `${set.name}: ${cell.name}`;
+  const known = played.get(key);
   if (known !== undefined) return known;
   const run = createRun(SEEDS_2V2, NORMAL_2V2, 7, {
     config: configOf(cell.mine, cell.other),
-    kits: SIX_SET.kits(),
+    kits: set.kits(),
     arena: cell.arena,
   });
-  const result = play(SIX_SET, run, cell.budget);
-  played.set(cell.name, result);
+  const result = play(set, run, cell.budget);
+  played.set(key, result);
   return result;
+}
+
+/** Plays a cell once on the six shipped kits. */
+export function playCell(cell: Cell): Played {
+  return playCellOn(cell, SIX_SET);
 }
 
 /** The asserts every cell shares: a winner on 3 rounds inside the budget, no stall, no blocked escape. */

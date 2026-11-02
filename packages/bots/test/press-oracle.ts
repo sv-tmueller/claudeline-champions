@@ -18,6 +18,7 @@ import {
   jsonKits,
   kitOf,
   rosterKits,
+  sevenKits,
   sixKits,
   stallMessage,
   tallyTeleports,
@@ -103,6 +104,11 @@ export const ESCAPES: Record<string, EscapeRow> = {
   // Flare Step: a 6 m teleport that is not fixed, the first escape of Brimwick; Smoke Pot follows.
   'brimwick:SPACE': { slot: 'SPACE', teleport: 6, after: null },
   'brimwick:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: 6 } },
+  // Bulwark Charge: a 5 m dash with a landing of its own, the first escape of Durnhal and an escape
+  // only (no band below, so a press off the trigger fails the run); Aegis Line follows it, pressed
+  // only when Bulwark Charge is not ready, rooted or without a landing.
+  'durnhal:SPACE': { slot: 'SPACE', teleport: null, dash: 5, after: null },
+  'durnhal:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: null, dash: 5 } },
 };
 
 /**
@@ -266,6 +272,31 @@ const BRIMWICK_CLEARANCES: Record<string, number> = {
   'brimwick:F': 0.5,
 };
 
+// data/kits/durnhal.json, in the seven-kit set only: the M1 arc is its radius plus 0.5; Shield Bash
+// (M2) is an area ahead of him (2 m ahead, radius 2) plus 0.5; the Q area is around him (radius 2.5)
+// plus 0.5; Breaker Throw is a bolt of 18 m/s for 30 ticks, an opener at a target walking away, its
+// EX variant without the condition; Last Bastion is the area around him (radius 4.5) plus 0.5 and is
+// not held. Bulwark Charge has no band here (it is an escape only, a flag of its rule, and the row
+// in `ESCAPES`), and Aegis Line reaches no enemy (its area is on allies), so neither has a band.
+const DURNHAL_BANDS: Record<string, Band> = {
+  'durnhal:M1': { min: 0, max: 3.5 + 0.5 },
+  'durnhal:M2': { min: 0, max: 2 + 2 + 0.5 },
+  'durnhal:M2:ex': { min: 0, max: 2 + 2 + 0.5 },
+  'durnhal:Q': { min: 0, max: 2.5 + 0.5 },
+  'durnhal:E': { min: 0, max: (18 * 30) / 60, motion: 'away' },
+  'durnhal:E:ex': { min: 0, max: (18 * 30) / 60 },
+  'durnhal:F': { min: 0, max: 4.5 + 0.5 },
+};
+const DURNHAL_CLEARANCES: Record<string, number> = {
+  'durnhal:M1': 0.5,
+  'durnhal:M2': 0.5,
+  'durnhal:M2:ex': 0.5,
+  'durnhal:Q': 0.5,
+  'durnhal:E': 0.4,
+  'durnhal:E:ex': 0.4,
+  'durnhal:F': 0.5,
+};
+
 export const KIT_SETS: KitSet[] = [
   {
     // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal
@@ -341,6 +372,15 @@ export const SIX_SET: KitSet = {
   },
 };
 
+/** The seven shipped kits: the six and Durnhal's, for the runs of #211. */
+export const SEVEN_SET: KitSet = {
+  ...SIX_SET,
+  name: 'the seven shipped kits',
+  kits: sevenKits,
+  bands: { ...SIX_SET.bands, ...DURNHAL_BANDS },
+  clearances: { ...SIX_SET.clearances, ...DURNHAL_CLEARANCES },
+};
+
 /** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
@@ -350,16 +390,17 @@ const DASHES = new Set([
   'skerrow:SPACE:ex',
   'lumeth:SPACE',
   'ondrel:SPACE',
+  'durnhal:SPACE',
 ]);
 
 /**
  * The pressed abilities whose first top-level effect is a melee arc, written from the kit files
- * (data/kits/hargrim.json and skerrow.json; the test kits' Hargrim M1 is one too). The sim's arc
+ * (data/kits/hargrim.json, skerrow.json and durnhal.json; the test kits' Hargrim M1 is one too). The sim's arc
  * ignores obstacles (melee.ts), so a press of one needs neither a line of sight nor a clear shot
  * (bots.md, Clear shot). An arc after a dash or a teleport (the EX Lunge, Reaper's Dance) is not
  * one: the dash stops at an obstacle and the teleport needs a line of sight.
  */
-export const MELEE = new Set(['hargrim:M1', 'skerrow:M1', 'skerrow:E', 'skerrow:E:ex']);
+export const MELEE = new Set(['hargrim:M1', 'skerrow:M1', 'skerrow:E', 'skerrow:E:ex', 'durnhal:M1']);
 const MARGIN = 1;
 const EX_COST = 25;
 const ULTIMATE_COST = 100;

@@ -3,7 +3,7 @@ import type { ChampionState, GameState, PlayerInput } from '@claudeline/sim';
 import { createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
-import { arena01, clearShotOracle, jsonKits, profileOf } from './helpers';
+import { arena01, clearShotOracle, jsonKits, profileOf, sevenKits } from './helpers';
 import { sceneOf } from './scenes';
 import type { Options } from './scenes';
 
@@ -114,6 +114,41 @@ describe('a Hargrim with no kit (the table: rangeMax 3, stands within 2.4 m)', (
     const botOutside = createBot(0, 'hard', 1);
     expect(think(botOutside, outside).moveX).toBeGreaterThan(0);
     const inside = duel('hargrim', TABLE_STAND - 0.1, { kits: [] });
+    expect(stands(think(createBot(0, 'hard', 1), inside))).toBe(true);
+  });
+});
+
+describe('Durnhal (kit: rangeMax 3, stands within 2.4 m; kitless: rangeMax 3.5, stands within 2.8 m)', () => {
+  const KIT_STAND = profileOf(0, 3).standReach; // the shipped Durnhal: rangeMax 3, stands at 2.4
+  const TABLE_STAND = profileOf(0, 3.5).standReach; // the table: rangeMax 3.5, stands at 2.8
+  const kits = sevenKits();
+
+  it('walks toward a target between the stand reach and rangeMax', () => {
+    for (const distance of [KIT_STAND + 0.05, 2.9]) {
+      const state = duel('durnhal', distance, { kits });
+      const bot = createBot(0, 'hard', 1);
+      const input = think(bot, state);
+      expect(bot.inspect(), `${distance} m`).toEqual({ intent: 'engage', targetId: 2 });
+      expect(input.moveX, `${distance} m`).toBeGreaterThan(0);
+    }
+  });
+
+  it('stands with a target inside the stand reach, outside the touching distance of 1 m', () => {
+    expect(KIT_STAND).toBeGreaterThan(1.1);
+    for (const distance of [KIT_STAND - 0.05, 1.5]) {
+      const state = duel('durnhal', distance, { kits });
+      const bot = createBot(0, 'hard', 1);
+      const input = think(bot, state);
+      expect(bot.inspect(), `${distance} m`).toEqual({ intent: 'engage', targetId: 2 });
+      expect(stands(input), `${distance} m`).toBe(true);
+    }
+  });
+
+  it('with no kit keeps the table: walks at 2.9 m and stands at 2.7 m', () => {
+    expect(TABLE_STAND).toBeCloseTo(2.8, 12);
+    const outside = duel('durnhal', 2.9, { kits: [] });
+    expect(think(createBot(0, 'hard', 1), outside).moveX).toBeGreaterThan(0);
+    const inside = duel('durnhal', 2.7, { kits: [] });
     expect(stands(think(createBot(0, 'hard', 1), inside))).toBe(true);
   });
 });

@@ -20,7 +20,7 @@ import { createSightScratch } from '../src/sight';
 import { TIERS } from '../src/difficulty';
 import { createLanding, landingInto, teleportEndInto } from '../src/escape';
 import { createRng } from '../src/rng';
-import { arena01, copyInput, jsonKits, rosterKits, sixKits } from './helpers';
+import { arena01, copyInput, jsonKits, rosterKits, sevenKits, sixKits } from './helpers';
 import { quietKit } from './kits';
 import { THINKS, firstPress, labelOf, pressOf, sceneOf, walks } from './scenes';
 
@@ -939,5 +939,103 @@ describe('the escape streak starts again', () => {
     }
     expect(switchThink).toBeGreaterThanOrEqual(0);
     expect(pressThink - switchThink).toBe(TIERS.hard.castDelay);
+  });
+});
+
+// Bulwark Charge, the dash escape of Durnhal, is a dash of 5 m with a knock-away area at its start: its
+// landing is the end of the dash, found over the five directions like Reed Step's. Aegis Line (R)
+// comes second. The trigger is the common one with rangeMin 0: he never kites, so it is a retreat
+// with the target within 6 m. Bulwark Charge is an escape only (the `escapeOnly` flag of his rule,
+// decision 8 of batch #223): the walk never presses it on its band.
+describe('Bulwark Charge and Aegis Line, the escapes of Durnhal', () => {
+  const kits = sevenKits();
+  const durnhal = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('durnhal', d, { kits, ready: ['SPACE'], ...options });
+  const corner = (ready: Parameters<typeof sceneOf>[2] = {}) =>
+    durnhal(0, { arena: arena01, me: [14.4, 9.4], enemy: [12.4, 7.4], ...ready });
+
+  it('presses Bulwark Charge on a retreat with the target within 6 m, aimed 5 m straight away, with no aim error', () => {
+    expect(firstPress(durnhal(6, { health: 0.2 }))).toEqual({ label: 'SPACE', aimX: -1100, aimY: 0 });
+    expect(firstPress(durnhal(6, { health: 0.2 }), 'easy', 7)).toEqual({
+      label: 'SPACE',
+      aimX: -1100,
+      aimY: 0,
+    });
+    expect(firstPress(durnhal(2, { health: 0.2 }))).toEqual({ label: 'SPACE', aimX: -1100, aimY: 0 });
+  });
+
+  it('does not press it on a retreat with the target at 6.05 m, which is no escape think', () => {
+    expect(pressOf(durnhal(6.05, { health: 0.2 }))).toBeNull();
+  });
+
+  it('does not press it on an engage, at 5 m or at 1 m: it is an escape only, and has no band of the walk', () => {
+    for (const d of [1, 2, 5, 6]) expect(pressOf(durnhal(d)), `at ${d} m`).toBeNull();
+  });
+
+  it('comes before Aegis Line: with both ready SPACE is pressed, with only R ready R is', () => {
+    expect(pressOf(durnhal(4, { health: 0.2, ready: ['SPACE', 'R'] }))).toBe('SPACE');
+    expect(pressOf(durnhal(4, { health: 0.2, ready: ['R'] }))).toBe('R');
+  });
+
+  it('presses Aegis Line alone when boxed in at the north-east corner, and walks on without it', () => {
+    expect(pressOf(corner({ health: 0.2, ready: ['SPACE', 'R'] }))).toBe('R');
+    expect(pressOf(corner({ health: 0.2 }))).toBeNull();
+    expect(walks(corner({ health: 0.2 }))).toBe(true);
+  });
+
+  it('presses Aegis Line, not the dash, while rooted', () => {
+    const state = durnhal(3, { health: 0.2, ready: ['SPACE', 'R'] });
+    (state.champions[0] as ChampionState).statuses.push({
+      type: 'root',
+      sourceId: 2,
+      slot: null,
+      remainingTicks: 600,
+    });
+    expect(pressOf(state)).toBe('R');
+  });
+
+  it('is a dash with a knock-away area at its start, in the kit data the pins above read', () => {
+    const slot = (kits.find((k) => k.id === 'durnhal') as KitDef).slots.SPACE;
+    const dash = slot.effects[0];
+    expect(dash?.type === 'dash' && dash.distance).toBe(5);
+    const area = dash?.type === 'dash' ? dash.then[0] : undefined;
+    expect(area?.type === 'area' && area.radius).toBe(1.5);
+  });
+
+  it('leaves the target: the sim starts the dash away and ends it 5 m off', () => {
+    const state = durnhal(3, { health: 0.2 });
+    const me = state.champions[0] as ChampionState;
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('SPACE');
+    const [x, y] = [me.x, me.y];
+    stepWith(state, input as PlayerInput);
+    const started = state.events.find((e) => e.type === 'dashStarted');
+    if (started?.type !== 'dashStarted') throw new Error('no dash started');
+    expect([started.dirX, started.dirY]).toEqual([-1, 0]);
+    for (let i = 0; i < 20; i++) step(state, []);
+    expect(me.x).toBeCloseTo(x - 5, 6);
+    expect(me.y).toBeCloseTo(y, 6);
+  });
+
+  it('is the only slot the flag silences: the kit cache has no band for it, and Ondrel keeps hers', () => {
+    const cacheOf = (id: string) => {
+      const cache = createKitCache();
+      refreshKitCache(cache, kits.find((k) => k.id === id), id);
+      return cache;
+    };
+    const space = SLOTS.indexOf('SPACE');
+    expect(cacheOf('durnhal').hasBase[space]).toBe(0);
+    expect(cacheOf('durnhal').isEscape[space]).toBe(1);
+    // The same dash with a self area is a band for Ondrel's Reed Step (control: the flag is Durnhal's).
+    expect(cacheOf('ondrel').hasBase[space]).toBe(1);
+    // Durnhal's other slots keep their bands.
+    for (const slot of ['M1', 'M2', 'Q', 'E', 'F'] as const) {
+      expect(cacheOf('durnhal').hasBase[SLOTS.indexOf(slot)], slot).toBe(1);
+    }
   });
 });
