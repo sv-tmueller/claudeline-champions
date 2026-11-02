@@ -189,17 +189,20 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
 
 Profiles live in `packages/bots/src/profile.ts`, keyed by champion id:
 `profileFor(championId, kit?)`. Without a kit the table applies. Hargrim, Quillon,
-Skerrow, Lumeth, Ondrel and Brimwick have a rule: with a kit whose id equals the
+Skerrow, Lumeth, Ondrel, Brimwick and Durnhal have a rule: with a kit whose id equals the
 champion id, `rangeMax` is the top of the base M1 reach band minus the 1 m range
 margin (see Casting), and `rangeMin` is the rule's literal, because no kit field
 holds it: roster-v1 words it as backing away from an enemy inside 6 m (Hargrim
-and Skerrow never kite, 0), and roster-v2 as 5 m for Ondrel and 7 m for Brimwick.
+and Skerrow never kite, 0), roster-v2 as 5 m for Ondrel and 7 m for Brimwick, and
+roster-v3 as an intended range of 0 to 3.5 m for Durnhal (he never kites, 0).
 The table applies instead when the champion has no rule, there is no kit or the
 kit id differs, M1 has no band, or the derived `rangeMax` is at most 1 or at most
 `rangeMin`. Other ids keep the table even with a kit. Lumeth's M1 reaches 12 m,
 so her `rangeMax` with her kit is 11; Ondrel's reaches 10 m (20 m/s for 30
 ticks), so hers is 9, and Brimwick's 11 m (33 ticks), so hers is 10, the
-roster's 9 and 10. `KitDef` has no profile field and `createMatch` copies only
+roster's 9 and 10; Durnhal's arc reaches 4 m (3.5 plus 0.5), so his is 3, and the
+table's 3.5 is the roster's intended range. His thrown hammer reaches 9 m, which is
+the band of his E opener (see Openers and escapes) and no part of the profile. `KitDef` has no profile field and `createMatch` copies only
 the kit contract, so profiles stay in bots; the kit JSON must carry no bot
 fields.
 
@@ -211,6 +214,7 @@ fields.
 | skerrow  | 0        | 2.5      | M1 band top minus 1 m | assassin, closes in and never kites |
 | ondrel   | 5        | 9        | M1 band top minus 1 m | zone controller, kites inside 5 m   |
 | brimwick | 7        | 10       | M1 band top minus 1 m | burst caster, kites inside 7 m      |
+| durnhal  | 0        | 3.5      | M1 band top minus 1 m | guardian, closes in and never kites |
 | default  | 4        | 8        | the table             | any other champion id               |
 
 Every `rangeMax` exceeds 1 m, so a bot never needs to stand inside another
@@ -220,10 +224,10 @@ of the shipped kit (an arc of 2 m, band top 2.5 m) is 1.5 m.
 The stand reach (#213). A profile also has `standReach`, the distance at which an
 engaging champion stops walking in: it stands once its target is within it and in
 clear shot, and walks while it is not. It is `rangeMax` for every champion that
-keeps its range (rangeMin above 0) and 0.8 of `rangeMax` for the two with
-rangeMin 0, Hargrim and Skerrow, with their kit and without (`STAND_FRACTION` in
-profile.ts): 1.6 m and 1.2 m with the shipped kits, 2.4 m and 2.0 m from the
-table. Both stay above 1.1 m, so the walk ends before the bodies touch (they
+keeps its range (rangeMin above 0) and 0.8 of `rangeMax` for the champions with
+rangeMin 0, Hargrim, Skerrow and (since #211) Durnhal, with their kit and without
+(`STAND_FRACTION` in profile.ts): 1.6 m, 1.2 m and 2.4 m with the shipped kits,
+2.4 m, 2.0 m and 2.8 m from the table. All of them stay above 1.1 m, so the walk ends before the bodies touch (they
 touch at 1 m). The melee champion thus stops a step inside its reach and no
 longer on the edge of it, where a target that stepped back a little put it out
 of reach and made it walk in again (a re-close, see Testing, the approach and
@@ -238,9 +242,11 @@ condition as `KIT_RULES`: a kit of the champion's own id) adds what no kit field
 holds. Roster-v1's bot profile sketches are its source, and for Ondrel and
 Brimwick roster-v2's (sections 2 and 3); see Openers and escapes for what each
 row means. A row also has `escapeWithin`: null for Hargrim, Quillon, Skerrow,
-Ondrel and Brimwick, who keep the common escape trigger, and 3 for Lumeth, whose
-trigger is her own; and `allies`, the slots the champion presses at an ally
-(Lumeth's F, R, M2 and M1, the others none: see Ally slots under Casting).
+Ondrel, Brimwick and Durnhal, who keep the common escape trigger, and 3 for Lumeth, whose
+trigger is her own; `allies`, the slots the champion presses at an ally
+(Lumeth's F, R, M2 and M1, the others none: see Ally slots under Casting); and
+`escapeOnly`, the escape slots the walk never presses on their own band (Durnhal's
+SPACE, the others none: see Openers and escapes, and Testing, the rules of #211).
 
 | Champion | Openers                                                                                                                                               | Escapes                                                 | Ultimate F                        |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------- |
@@ -250,6 +256,7 @@ trigger is her own; and `allies`, the slots the champion presses at an ally
 | lumeth   | Q (Binding Sigil), kit band, target within 6 m of an ally                                                                                             | E (Lantern Burst), then SPACE (Glide), on a 3 m trigger | allies only, see Ally slots       |
 | ondrel   | E (Undertow), kit band, target walking away                                                                                                           | SPACE (Reed Step), then R (Reed Screen)                 | pressed in reach                  |
 | brimwick | Q (Flash Powder), kit band, target walking toward her                                                                                                 | SPACE (Flare Step), then R (Smoke Pot)                  | held for a low or cornered target |
+| durnhal  | E (Breaker Throw), kit band, target walking away                                                                                                      | SPACE (Bulwark Charge, escape only), then R (Aegis Line) | pressed in reach                  |
 | other    | none                                                                                                                                                  | none                                                    | pressed in reach                  |
 
 ### Dodge
@@ -492,14 +499,19 @@ rule lists: Hargrim Q, and the EX variants of Lumeth's M2 and R), and any slot
 of a champion without a kit. The rules press three kinds of slot that have no
 band: the base dash opener (Hargrim SPACE, Skerrow SPACE: its band is derived
 from the dash), the escape slots (Hargrim R, Quillon SPACE and R, Skerrow R,
-Lumeth E and SPACE, Ondrel SPACE and R, Brimwick SPACE and R, on an escape think
-only), and the ally slots (Lumeth M2, R and F, at an ally that needs them). On
+Lumeth E and SPACE, Ondrel SPACE and R, Brimwick SPACE and R, Durnhal SPACE and R, on an
+escape think only), and the ally slots (Lumeth M2, R and F, at an ally that needs them). On
 an escape think the dash openers are not pressed either (see the dash hold under
 Openers and escapes). Not every escape slot is without a band: Lumeth's E,
 Ondrel's SPACE and R and Brimwick's R reach an enemy with an area around them
 (Reed Step's 1 m, Reed Screen's 2.5 m and Smoke Pot's 3 m, each the kit band less
 the margin), so the walk presses them on that band too, and on an escape think
 the escape choice comes first. Flare Step has no band: a teleport reaches nobody.
+Durnhal's Bulwark Charge reaches an enemy too (its knock-away area at the end of the
+dash, 1.5 m plus 0.5 m, 7 m less the margin from the start), but the `escapeOnly` flag of
+his rule drops that band from the kit cache (`refreshKitCache` zeroes `hasBase` for the
+slot, as it does for an area on allies), so only an escape think presses it; his Aegis
+Line is an area on allies and has no band.
 
 ## Openers and escapes
 
@@ -552,6 +564,12 @@ Openers: a slot with an opener rule is pressed on a condition narrower than its 
   for 25 ticks reaches 10 m) and needs a target walking toward her, the one it
   stuns as it walks in (roster-v2, section 3); at a target that walks away or
   stands she goes on to M2 (Firecracker).
+- Breaker Throw (Durnhal E) keeps its kit band less the margin (0 to 8 m: a bolt of 18
+  m/s for 30 ticks reaches 9 m, the "thrown hammer that reaches 9 m" of roster-v3,
+  section 1) and needs a target walking away, like Undertow and Chain Hook: the throw
+  slows the target and puts a wound on it as it leaves. The EX variant keeps its band
+  and has no condition. At a target that stands or closes in he walks on to melee
+  (the opener is his reach past the 2.4 m stand, not a replacement for it).
 - The condition is part of the cast-delay run, so the delay counts from the moment it holds, as it
   does for reach, and the run restarts when it stops holding.
 - With the reserve holding the EX variants, an opener is the base ability: Hargrim at 80 energy
@@ -576,9 +594,10 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 
 - An escape think is a think whose acted intent is retreat with the acted target within
   `ESCAPE_RANGE` = 6 m, inclusive, or kite with the acted target closer than `rangeMin`. One
-  trigger serves Hargrim, Quillon, Skerrow, Ondrel and Brimwick (their `rangeMin`
-  is 0, 6, 0, 5 and 7; roster-v2 words the trigger of the last two as the common
-  one). For Skerrow it is decision 6 of batch #80: the roster words her escape as
+  trigger serves Hargrim, Quillon, Skerrow, Ondrel, Brimwick and Durnhal (their `rangeMin`
+  is 0, 6, 0, 5, 7 and 0; roster-v2 words the trigger of Ondrel and Brimwick as the
+  common one). With rangeMin 0 a melee champion never kites, so for Skerrow, Hargrim
+  and Durnhal it is a retreat with the target within 6 m that is the trigger. For Skerrow it is decision 6 of batch #80: the roster words her escape as
   "health below 50 percent", which would vanish her in the middle of an engage and walk her
   straight back in; a retreat starts below 30 percent health, unless a finisher qualifies (then
   the acted intent is engage or kite, and no escape think starts from the retreat).
@@ -592,7 +611,7 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 - On an escape think the escape slots count the trigger, with no band and no shot test, and
   `chooseEscape` (escape.ts) tries the slots of the rule in order before the usual order: Hargrim
   R; Quillon SPACE, then R; Skerrow R; Lumeth E, then SPACE; Ondrel SPACE, then R; Brimwick
-  SPACE, then R. "SPACE, then R" is a priority order, not a sequence: the
+  SPACE, then R; Durnhal SPACE, then R. "SPACE, then R" is a priority order, not a sequence: the
   first slot that passes the gates is pressed, and Hush Ward is pressed only when Skip is on
   cooldown, has no landing or is otherwise refused. The gates are the cast gates of Casting
   (windup, cooldown at most 1, stun or silence, root with a dash, the run over the cast delay). The
@@ -637,7 +656,9 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   dash early and the search ignores champions. Boxed in, Glide is skipped and
   the walk goes on. A root skips it, as every dash. The kit cache flags it per
   slot (`escapeDash`). It comes after Lantern Burst: Glide is pressed only when
-  E is refused. Reed Step comes first in Ondrel's order, ahead of Reed Screen.
+  E is refused. Reed Step comes first in Ondrel's order, ahead of Reed Screen. Bulwark Charge
+  (Durnhal SPACE, a dash of 5 m with a knock-away area of 1.5 m at the point he leaves) is the
+  third dash escape, and the first escape of his order, ahead of Aegis Line.
 - The dash hold: on an escape think no slot whose ability starts with a dash is
   pressed, base or EX variant (the one that would be cast), for every kit:
   Hargrim's Rush, EX Rush and ultimate, and Skerrow's Lunge and EX Lunge. A dash
@@ -647,7 +668,7 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   (`baseDash`, `exDash`), and the gate is in `chooseCast`. Glide is an escape
   slot that starts with a dash: `chooseEscape` marks it tried and aims it away
   from the target (see the landing above), so the hold never reaches it, and it
-  has no band, so nothing else presses it. Reed Step is the second: on an escape
+  has no band, so nothing else presses it. Reed Step is the second (and Bulwark Charge the third): on an escape
   think `chooseEscape` marks it tried the same way, so the walk skips it before
   the hold; off one, its band of 1 m from its area lets the walk press it only
   at a target that touches her. A dash escape for another kit (Lunge away) is
@@ -682,7 +703,10 @@ presses nothing and keeps the energy for F. Ondrel's Drowned Ground is not held 
 her row): the sum of the damage read from the kit is 10, one pulse of its five, so the reading
 would hold it for a target at 10 health or less and so wait for one the zone does not finish, and
 roster-v2 has it pressed on its band with 100 energy. The reading `damageIn` gives for it is left
-unused on purpose (`lowHealth` is 0 for a row that does not hold F).
+unused on purpose (`lowHealth` is 0 for a row that does not hold F). Durnhal's Last Bastion is
+not held either (`holdF` false): the damage read from the kit is the 30 of its one area, so the
+hold would wait for a target at 30 health or in a corner, and roster-v3 has it pressed on its
+band of 4.5 m (4 m less the margin) with 100 energy.
 
 ## Allocation
 
