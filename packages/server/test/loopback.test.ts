@@ -124,15 +124,23 @@ function firstDivergence(played: Played, arenaId: string, difficulty: Difficulty
 // not cut, as decision 4 on #203 says. The 3v3 row read 5.7 s, past half of its 10 s, and twice
 // that is 11.5 s, so by the rule the rows take 15 s, set once on the describe.each for both specs.
 // Rescan when a runner log times a beforeAll.
+//
+// Durnhal's profile (#211) replaced the default one for his bot in these specs. Re-read from three
+// attempts of the unit job of 07464a5 (run 41517296595: jobs 125524240852, 125528394943 and
+// 125531597608), with the hook bodies timed by a console line that was removed again: the 2v2
+// hook took 5.27, 3.91 and 3.70 s and the 3v3 hook 18.23, 13.57 and 13.39 s (the file 30.8, 23.0
+// and 22.1 s; the rows 1.68, 1.25 and 1.27 s for the 2v2 one, 5.39, 4.07 and 3.59 s for the 3v3
+// one). Twice the slowest hook, 36.5 s, is above the 20 s top of the rule, so the beforeAll keeps
+// 60 s; twice the slowest 3v3 row, 10.8 s, is above 10 s, so the rows keep 15 s. Locally (Linux
+// x64, Node 22.23.4, load about 5) the hooks took 3.7 and 10.9 s with his profile and 3.5 and 8.9 s
+// with the default one (his three profile rows left out).
 describe.each(SPECS)('loopback: $name', { timeout: 15_000 }, (spec) => {
   let first: Played;
   let second: Played;
 
   beforeAll(() => {
-    const t0 = performance.now();
     first = play(spec, 1);
     second = play(spec, 1);
-    console.log(`HOOK ${spec.name} ${((performance.now() - t0) / 1000).toFixed(2)} s`);
   }, 60_000);
 
   it('plays to a result: a final snapshot, matchEnd, then the lobby', () => {

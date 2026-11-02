@@ -1274,8 +1274,8 @@ match replays exactly from its input stream.
 ## Not built yet
 
 - A full match to matchEnd in the headless runs of the first three kits: they run
-  a fixed 3600 ticks of free play, and only Lumeth's four seeded runs and the 18
-  cells of Ondrel and Brimwick play to the end (see Testing). A 3v3 with the six
+  a fixed 3600 ticks of free play, and only Lumeth's four seeded runs, the 18
+  cells of Ondrel and Brimwick and the 12 of Durnhal play to the end (see Testing). A 3v3 with the six
   kits is not played in a bots test either; the balance report plays 3v3s over
   the six (`balance.md` section 5.9, #189).
 - A lead for an area that is derived from the kit: the nominal lead stays, which
@@ -2104,6 +2104,110 @@ unchanged by the profiles and the streak: none of its 16 rows has an Ondrel or a
 Brimwick, and for the four kits the streak reads the same as the slot's run.
 Hashes before and after are the same for every row, and so are the input streams
 (`cmp` on `hashes-*.txt` and `streams-*.json`).
+
+The rules of #211 (Durnhal's profile, roadmap #176 step 1.3), pinned on frozen states
+of arena01 with the seven shipped kits and a hard bot, each red under its mutation
+(`profile.test.ts`, `openers.test.ts`, `escapes.test.ts`, `grand-finale.test.ts`,
+`stand.test.ts`). The profile: `PROFILES` has `profileOf(0, 3.5)` (stand reach 2.8 m,
+the roster's intended 0 to 3.5 m), `KIT_RULES` has rangeMin 0, so with his kit
+rangeMax is 3 (the M1 arc of 3.5 m plus 0.5, less the margin) and the stand reach
+2.4 m; the 9 m of Breaker Throw is the band of his E opener, not his rangeMax. The
+rules row: E (Breaker Throw) on its kit band less the margin (0 to 8 m) at a target
+walking away, the EX press with no condition; SPACE (Bulwark Charge), then R (Aegis
+Line) as escapes on the common trigger; `holdF` false (Last Bastion is pressed within
+4 m with 100 energy, and the reserve holds the EX variants at 75 energy or more with
+the target within 4 m); no wait, no `escapeWithin`, no allies, no Q opener.
+
+Bulwark Charge is an escape only (decision 8 of batch #223). A new field of the row,
+`escapeOnly: ['SPACE']`, a subset of `escapes` (pinned in `profile.test.ts`), makes
+`refreshKitCache` zero `hasBase` for the slot, as it already does for an area on
+allies (`allyKind` 2). The dash has a band of its own, the knock-away area at its end
+(1.5 m plus 0.5 m, so 7 m less the margin), and with rangeMin 0 that band would cover
+every engage: the walk would press it at 1 to 6 m, and the knock-away of 2 m would push
+the target out of the 2.4 m stand reach and start the re-close that #213 reduced. The
+field is read on the kit-cache rebuild only, so no think path changed (the heap check
+reads 0 B and `bot.ts` is untouched). The other champions have an empty list. Q
+(Grounding Slam) has an in-reach of 2.0 m (2.5 m plus 0.5, less the margin) while he
+stands at 2.4 m, so a target that stays at the stand reach is outside Q's reach and Q
+starts only when it is closer (it starts in all 12 cells below); that is recorded and
+not changed.
+
+Pins, each alone (restored after): the `PROFILES` row, the `KIT_RULES` row or the `RULES`
+row dropped, rangeMin moved to 1 in either table; the motion of Breaker Throw dropped or
+inverted, its band set to a literal 0 to 7, the opener dropped; the escape order reversed,
+SPACE or R dropped from `escapes`, the `escapeOnly` loop ignored (the engage at 5 m
+with only SPACE ready presses it), the flag applied to Ondrel (a kit-cache pin: her
+`hasBase` for SPACE stays 1; a scene with Reed Step pressed on its band at 0.9 m was not
+found, since a kite inside rangeMin 5 is an escape think); `holdF` flipped. The scenes: E
+from 4 to 8 m at a target walking away and not at 8.05 m, not at a target that stands or
+closes in, the EX press at 25 energy at a standing target and the base E at 24 only
+with the motion; SPACE aimed 5 m straight away (-1100 from -6 m, on easy with no aim
+error either) on a retreat with the target at 6 m and not at 6.05 m, ahead of R, R
+alone while rooted or boxed in at the north-east corner (where the walk goes on), the
+sim starting the dash away and ending it 5 m off; F at 4.0 m and not at 4.05 m, at a
+target with 56 health too, and the reserve withholding the EX Breaker Throw at 80 energy at
+3 m and letting it through at 4.5 m; the stand: he walks at 2.45 and 2.9 m and stands at
+2.35 m, and kitless walks at 2.9 m and stands at 2.7 m.
+
+The seeded matches (`durnhal.test.ts`, over `six-cells.ts`, played on `SEVEN_SET`): Durnhal
+and a filler of Hargrim (Quillon against Hargrim) against each of the six other kits with the
+same filler, on both arenas, 12 cells, seeds 101 to 104, match seed 7, normal tier, to matchEnd.
+Each passes the oracle, no escape is blocked, no bot stalls for more than 120 ticks (the worst
+is 27 in the 12 cells), each match ends before its budget and no ordinary round passes its
+term. The end ticks and the longest ordinary round, which set the budgets: Hargrim 3291 and
+1069 (arena01), 4764 and 1193; Quillon 2732 and 696, 3301 and 899; Lumeth 3937 and 1140, 4647
+and 1217; Skerrow 2390 and 558, 2523 and 706; Ondrel 5132 and 1493, 3971 and 1706; Brimwick
+5103 and 1674, 3889 and 1202. Across the cells every slot but F is started, and Bulwark
+Charge, which only an escape presses, dashes away in each of the 8 cells without another
+dash escaper (his own `glides`; Lumeth's Glide and Ondrel's Reed Step count in the others, and
+every `durnhal:SPACE` press passes the escape row of the oracle, which fails a press off the
+trigger). Three declared start edits (the precedent of Drowned Ground) run the whole play
+loop: Durnhal at 100 energy starts Last Bastion; at 20 percent health, rooted with an enemy
+2 m off, or boxed in at the north-east corner, with Bulwark Charge ready, he presses Aegis
+Line (and in the rooted run no SPACE). The oracle got `SEVEN_SET` (the bands of the seven
+kits: M1 4, M2 and its EX 4.5, Q 3, E and its EX 9 with E `motion: 'away'`, F 5; the
+clearances 0.4 for E and 0.5 for the rest), the two escape rows (`durnhal:SPACE` is
+`{ teleport: null, dash: 5, after: null }`, `durnhal:R` follows it), `durnhal:SPACE` in the
+dash set and `durnhal:M1` in the melee set, a literal rangeMin 0, and a table test that works
+every literal out again from `durnhal.json`; `playCellOn` takes the kit set (`playCell`
+keeps the six for the Ondrel and Brimwick cells, since `CELLS.map(playCell)` would pass the
+index as the set).
+
+What moved. Nothing outside Durnhal. The identity harness (the 16 rows of PR #142's harness,
+main 88b5603 against the branch, `cmp` on the hash and the stream files): all 16 hashes and
+streams are the same, the rows of #213's table (none has a Durnhal). Every Ondrel, Brimwick,
+Lumeth, headless and tools run is unchanged. The heap check reads 0 B per think in every scene
+(Node 22.23.4 `--project bots-heap`, 3 tests and 6 skipped; Node 26.7.0 both projects, 12 and
+6 skipped, Maglev included); no scene was added, as the rows add no think-path code.
+
+The win rates, from a scratch test that is not committed (the design of #155's check, with a
+stall tracker): Durnhal as the first kit against each of the six others, every other kit as the
+filler of both teams (5), both arenas, seeds 1 to 10 (the match seed, the bots' seeds 100 times it
+plus the id), normal tier, the teams alternating by parity: 600 matches a column. Durnhal's wins
+out of 100 on main (the default profile, no rules), on the branch (the profile, Bulwark Charge an
+escape only: B) and on the branch with `escapeOnly` dropped (the comparison row of decision 8:
+A), and the longest match:
+
+| Pairing (Durnhal first) | main | B (branch) | A (flag dropped) | Longest match, main, B, A |
+| ----------------------- | ---- | ---------- | ---------------- | ------------------------- |
+| durnhal v hargrim       | 78   | 56         | 55               | 24116, 16267, 15329       |
+| durnhal v quillon       | 0    | 0          | 0                | 17352, 6252, 11282        |
+| durnhal v lumeth        | 0    | 0          | 2                | 7316, 11016, 6686         |
+| durnhal v skerrow       | 81   | 37         | 36               | 30688, 14683, 10457       |
+| durnhal v ondrel        | 1    | 1          | 0                | 11955, 6998, 11658        |
+| durnhal v brimwick      | 0    | 6          | 9                | 21587, 10397, 9552        |
+| all 600                 | 160  | 100        | 102              | 30688, 16267, 15329       |
+
+No budget hit in any column, and the worst stall is 34 ticks on main, 34 on B and 38 on A, far
+under the bound of 120. Against roster-v3's counter web (beats
+Lumeth, Skerrow and Hargrim; loses to Quillon and Brimwick) the profiled Durnhal matches it
+against Hargrim (56), Quillon (0) and Brimwick (6), and inverts it against Lumeth (0 of 100,
+and 0 on main too) and Skerrow (37, 81 on main): a matter of the kits and of the seven-kit
+balance block that follows this package, not of the profile (the 0 of 100 against Lumeth is the
+same on main). The profile costs him 60 wins of the 600 against the default one, all against
+Hargrim (78 to 56) and Skerrow (81 to 37), and shortens his longest match from 30 688 to 16 267
+ticks. Dropping the flag changes nothing that the sample can see: 102 against 100 wins, no
+pairing apart by more than 3 (the binomial spread of a 50 percent cell of 100 matches is 5).
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
 section. It builds nineteen frozen scenes on arena 1 with the six shipped kits (a

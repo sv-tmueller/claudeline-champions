@@ -102,8 +102,10 @@ precedent of a kit that has the same shape:
 The effects are listed in the order the table names them: damage first, then
 the statuses (wound, then slow). F lists the area first and then the shield on
 him. A number changes in the file, here and in the scripted fixture in the same
-change. Durnhal is not in the balance harness roster until step 1.3, and the
-server fields a bot of his on the default range profile until then.
+change. Durnhal is not in the balance harness roster until step 1.3. His bot
+profile is built (#211): the server fields a bot of his that stands at 2.4 m,
+throws Breaker Throw at a target walking away and has Bulwark Charge, then
+Aegis Line, as escapes (see [bots](../architecture/bots.md)).
 
 **Model.** Cue: a shield and a hammer, three boxes in the body material, so the
 accent still marks only the front. The shield is a plate of 0.30 m by 0.04 m by

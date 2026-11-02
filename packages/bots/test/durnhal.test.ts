@@ -6,8 +6,11 @@ import { NORMAL_2V2, SEEDS_2V2, cellOf, configOf, expectEnded, playCellOn } from
 
 // Seeded matches of bots with Durnhal on the seven shipped kits (#211), played to matchEnd on both
 // arenas against each of the six other shipped kits. The cells are in six-cells.ts, played on
-// `SEVEN_SET`. The timeout of a cell is 60 s, the long-match precedent of ondrel.test.ts, until it
-// is re-read against the runner (testing.md, Check suite).
+// `SEVEN_SET`. A cell takes 4.3 to 10.3 s locally (Linux x64, Node 22.23.4, load about 4; the file
+// alone 66 s) and 5.2 to 17.1 s on the runner (ubuntu-latest, Node 22: the three attempts of run
+// 41517296595 of 07464a5, the file 155, 107 and 113 s beside the other long matches; 3.3 to 7.3 s
+// in an earlier run, job 125520587212): the timeout of 60 s is at least twice the slowest cell
+// (testing.md, Check suite, with the long-match precedent of ondrel.test.ts).
 const CELLS = [
   cellOf('durnhal', 'hargrim', 'arena01', 3291, 1069),
   cellOf('durnhal', 'hargrim', 'arena02', 4764, 1193),
@@ -70,6 +73,9 @@ describe('a free-play match with Durnhal and a start edit', () => {
   // energy, so that Last Bastion is reachable. It is not held, so a healthy target gets it. A miss
   // after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3;
   // the fallback is Durnhal against a Hargrim, the other two champions dead, 3 m apart.
+  // Runner time 10.9, 6.1 and 8.5 s (the three attempts of run 41517296595), local 6.0 s (Linux
+  // x64, Node 22.23.4). Twice the slowest is 21.7 s, above the 20 s top of the rule (testing.md,
+  // Check suite), so the 30 s of the long-match precedent applies.
   it('starts Last Bastion at 100 energy against healthy targets', { timeout: 30_000 }, () => {
     const run = createRun(SEEDS_2V2, NORMAL_2V2, 7, { config: config(), kits: SEVEN_SET.kits() });
     (run.state.champions[0] as ChampionState).energy = 100;
@@ -88,7 +94,8 @@ describe('a free-play match with Durnhal, his escape and a start edit', () => {
   // trigger is a retreat with the target within 6 m). In both runs Bulwark Charge is ready, so the
   // oracle's check of "Bulwark Charge ready and with a landing" is what lets the press of Aegis
   // Line through. A miss after a change to the bots, the sim or the Node version is governed by
-  // batch #53 decision 8.3.
+  // batch #53 decision 8.3. Each run takes 0.34 to 0.46 s on the runner (120 ticks) and has no
+  // timeout of its own.
   function weak() {
     const run = createRun(SEEDS_2V2, NORMAL_2V2, 7, { config: config(), kits: SEVEN_SET.kits() });
     const durnhal = run.state.champions[0] as ChampionState;
