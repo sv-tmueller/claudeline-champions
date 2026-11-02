@@ -452,9 +452,15 @@ scoreboard.update(state);
 result.update(state);
 if (import.meta.env.DEV) {
   // Dev builds only: Vite replaces the flag with false in a build and drops the
-  // branch and the chunk, so F4 and the probe hook never ship.
-  const { bindDebugShot, fireDebugShot } = await import('./debug-shot');
-  bindDebugShot(window, renderer.domElement, () => fireDebugShot(state, HUMAN_ID, aimX, aimY));
+  // branch and the chunk, so F4, Shift+F4 and the probe hook never ship.
+  const { bindDebugShot, fireDebugArea, fireDebugShot } = await import('./debug-shot');
+  bindDebugShot(
+    window,
+    renderer.domElement,
+    () => fireDebugShot(state, HUMAN_ID, aimX, aimY),
+    // Shift+F4: a fused one-hit area at the aim, for the armed look of e2e/fuse.spec.ts.
+    () => fireDebugArea(state, HUMAN_ID, aimX, aimY),
+  );
   // The heap probe of e2e/combat.spec.ts runs frames through this hook instead of
   // the animation loop, see frameMany. The hook only forwards a frame count.
   (window as unknown as { __runProbeFrames: (frames: number) => void }).__runProbeFrames = (frames) => {
