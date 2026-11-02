@@ -166,7 +166,12 @@ about 8 minutes, cut the cell count of these two files.
   coverage test; the other fixtures leave the key out, so they keep their
   checksums) and the seven roster fixtures. `orb.test.ts` holds the unit rows
   of the orb: the switch, the warning and pickup ticks, the cap, the draw for a
-  tie across seeds 1 to 32 and the point's validation.
+  tie across seeds 1 to 32 and the point's validation. `counter.test.ts` (#227)
+  holds the unit rows of the on-hit counter with test kits, since no shipped kit
+  declares one: the build per hit and its cap, each pinned reading (EX, shield,
+  invulnerable, pulses, dead caster, no cast), the decay boundary, the frozen
+  pause, the round reset and a run that equals the same run without the
+  declaration, counter keys stripped.
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
   pairings, fills and the seed schedule, the cell plan (a six-name kit list
