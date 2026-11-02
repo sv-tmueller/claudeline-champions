@@ -134,6 +134,25 @@ describe('checksum of combat state', () => {
     }
   });
 
+  it('changes with the fuseTicks of an armed area, and with a fused area against an unfused one', () => {
+    const fusedArea = (fuseTicks: number): GameState => {
+      const state = fresh();
+      spawnArea(state, {
+        ownerId: 2, x: 3, y: 4, radius: 2, durationTicks: 60, intervalTicks: 30,
+        targets: 'all', effects: [{ type: 'heal', amount: 5 }], fuseTicks,
+      });
+      return state;
+    };
+    const base = checksum(fusedArea(45));
+    expect(checksum(fusedArea(45))).toBe(base);
+    expect(checksum(fusedArea(46))).not.toBe(base);
+    const zeroed = fusedArea(45);
+    zeroed.areas[0]!.fuseTicks = 0;
+    expect(checksum(zeroed)).not.toBe(base);
+    expect(checksum(cloneState(fusedArea(45)))).toBe(base);
+    expect(checksum(armed())).not.toBe(checksum(fusedArea(45)));
+  });
+
   it('throws on a NaN projectile coordinate', () => {
     const state = armed();
     state.projectiles[0]!.y = NaN;

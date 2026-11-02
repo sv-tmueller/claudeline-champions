@@ -15,6 +15,11 @@ export interface AreaSpec {
   intervalTicks: number;
   targets: AreaTargets;
   effects: readonly Effect[];
+  /**
+   * Rules 2.6: ticks from the spawn to the first pulse, a positive integer. The area is inert
+   * until then. The key is left out of the entity when this is undefined.
+   */
+  fuseTicks?: number | undefined;
 }
 
 function fail(problem: string): never {
@@ -42,6 +47,9 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
   }
   if (!isPositiveInteger(spec.intervalTicks)) {
     return fail('intervalTicks must be a positive integer');
+  }
+  if (spec.fuseTicks !== undefined && !isPositiveInteger(spec.fuseTicks)) {
+    return fail('fuseTicks must be a positive integer');
   }
   if (spec.targets !== 'enemies' && spec.targets !== 'allies' && spec.targets !== 'all') {
     return fail(`unknown targets ${String(spec.targets)}`);
@@ -74,6 +82,13 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
     effects,
     castId,
   };
+  if (spec.fuseTicks !== undefined) {
+    // The fuse and the pulse clock: the first pulse is `fuseTicks` steps away and the area lives on
+    // for its duration after it (rules 2.6).
+    area.fuseTicks = spec.fuseTicks;
+    area.ticksToNextApply = spec.fuseTicks;
+    area.remainingTicks = spec.fuseTicks + spec.durationTicks;
+  }
   state.areas.push(area);
   state.events.push({
     type: 'areaSpawned',
@@ -103,6 +118,8 @@ export function stepAreas(state: GameState): void {
             c.alive && affects(area, c.team) && length(c.x - area.x, c.y - area.y) <= reach,
         )
         .map((c) => c.id);
+      // The first pulse of a fused area ends its fuse; the key stays, at 0.
+      if (area.fuseTicks !== undefined) area.fuseTicks = 0;
       state.events.push({ type: 'areaTick', areaId: area.id, targetIds });
       for (const targetId of targetIds) {
         landHit(state, area, targetId, area.effects, area);

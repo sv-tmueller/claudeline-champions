@@ -525,3 +525,45 @@ describe('validateKit and a projectile with allyEffects', () => {
     ).toThrow('Invalid kit: k.slots.M1.effects[0].effects: effects must be an array');
   });
 });
+
+describe('validateKit and the fuse of an area (rules 2.6)', () => {
+  const withFuse = (fuseTicks: unknown): Mutate => (k) => void ((slam(k) as { fuseTicks?: unknown }).fuseTicks = fuseTicks);
+
+  it.each([1, 15, 120, 36000])('accepts a fuseTicks of %i and copies it', (fuseTicks) => {
+    const kit = broken(withFuse(fuseTicks)) as KitDef;
+    const copy = validateKit(kit);
+    expect(slam(copy).fuseTicks).toBe(fuseTicks);
+    expect(copy).toStrictEqual(kit);
+  });
+
+  it.each([
+    ['a fractional fuseTicks', 1.5],
+    ['a zero fuseTicks', 0],
+    ['a negative fuseTicks', -3],
+    ['a fuseTicks over the tick bound', 36001],
+    ['a fuseTicks that is a string', '30'],
+    ['a NaN fuseTicks', NaN],
+  ])('rejects %s with its path', (_name, value) => {
+    expect(() => validateKit(broken(withFuse(value)))).toThrow(
+      `Invalid kit: test-striker.slots.M2.effects[0].fuseTicks: ${String(value)} is not an integer from 1 to 36000`,
+    );
+  });
+
+  it('leaves the key out of an area without a fuse', () => {
+    const copy = validateKit(testStriker());
+    expect('fuseTicks' in slam(copy)).toBe(false);
+    expect(validateKit(copy)).toStrictEqual(testStriker());
+  });
+
+  it('reads the fuse of an area inside a dash then', () => {
+    const kit = broken((k) => {
+      dash(k).then = [{ ...slam(k), fuseTicks: 45 }];
+    }) as KitDef;
+    const copy = validateKit(kit);
+    const [end] = dash(copy).then;
+    expect(end).toMatchObject({ type: 'area', fuseTicks: 45 });
+    expect(() =>
+      validateKit(broken((k) => void (dash(k).then = [{ ...slam(k), fuseTicks: 0 }]))),
+    ).toThrow('Invalid kit: test-striker.slots.SPACE.effects[0].then[0].fuseTicks: 0 is not an integer from 1 to 36000');
+  });
+});

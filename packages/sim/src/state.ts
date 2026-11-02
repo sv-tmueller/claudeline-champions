@@ -116,8 +116,14 @@ export interface AreaState {
   targets: AreaTargets;
   remainingTicks: number;
   intervalTicks: number;
-  /** 0 means the area applies this tick. */
+  /** 0 means the area applies this tick. A fused area counts down its fuse here (rules 2.6). */
   ticksToNextApply: number;
+  /**
+   * Only on an area spawned with a fuse (rules 2.6): the fuse length while it is armed, 0 from the
+   * first pulse on. The key is never deleted and never undefined. The area is armed, inert, while
+   * this is above 0; `1 - ticksToNextApply / fuseTicks` is how far the fuse has burnt.
+   */
+  fuseTicks?: number;
   effects: Effect[];
   /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;

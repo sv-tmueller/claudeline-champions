@@ -146,7 +146,8 @@ function visitKit(kit: KitDef): Visit[] {
 /**
  * Every number the kit has outside the ranges of rules.md section 4.1 and spec section 10, and
  * every lingering area that breaks one of the three rules of roster-v2.md section 0 (the damage or
- * heal total over its pulses, no stun, root or silence on a pulse, a duration under the slot cooldown).
+ * heal total over its pulses, no stun, root or silence on a pulse, a duration under the slot cooldown),
+ * and every fused area outside the fuse range of 15 to 120 ticks or whose fuse plus duration reaches the cooldown.
  */
 function catalogProblems(kit: KitDef): string[] {
   const problems: string[] = [];
@@ -207,9 +208,16 @@ function catalogProblems(kit: KitDef): string[] {
         bad(path, 'no v1 kit lists energyGain');
         break;
       case 'area': {
-        // The three lingering-area rules of roster-v2 section 0; a one-hit area is outside them.
-        if (effect.durationTicks <= 1) break;
-        // An area acts in the step it spawns and then every intervalTicks: ceil(D / I) pulses (area.ts).
+        // The three lingering-area rules of roster-v2 section 0 and the fuse rules of rules 2.6. An
+        // unfused one-hit area is outside all of them; a fused one-hit area is held to the fuse range,
+        // the damage total and the cooldown, and keeps the one-hit exception for stun, root and silence.
+        const { fuseTicks } = effect;
+        if (fuseTicks === undefined && effect.durationTicks <= 1) break;
+        if (fuseTicks !== undefined && !within(fuseTicks, 15, 120)) {
+          bad(`${path}.fuseTicks`, `fuse of ${fuseTicks} ticks is not 15 to 120`);
+        }
+        // The first pulse comes `fuseTicks` after the spawn (0 without a fuse), then every intervalTicks:
+        // ceil(D / I) pulses (area.ts).
         const pulses = Math.ceil(effect.durationTicks / effect.intervalTicks);
         const top = slot === 'F' ? 60 : 30;
         for (const type of ['damage', 'heal']) {
@@ -229,8 +237,13 @@ function catalogProblems(kit: KitDef): string[] {
         }
         // The EX variant shares the cooldown of its slot (SlotSpec), so one lookup serves both.
         const cooldown = kit.slots[slot].cooldownTicks;
-        if (effect.durationTicks >= cooldown) {
-          bad(`${path}.durationTicks`, `${effect.durationTicks} ticks is not under the ${slot} cooldown of ${cooldown}`);
+        if ((fuseTicks ?? 0) + effect.durationTicks >= cooldown) {
+          bad(
+            `${path}.durationTicks`,
+            fuseTicks === undefined
+              ? `${effect.durationTicks} ticks is not under the ${slot} cooldown of ${cooldown}`
+              : `fuse of ${fuseTicks} + ${effect.durationTicks} ticks is not under the ${slot} cooldown of ${cooldown}`,
+          );
         }
         break;
       }
@@ -657,6 +670,108 @@ describe('the lingering area rules', () => {
 
   it('keeps the four v1 kits free of lingering areas', () => {
     for (const kit of [hargrim, quillon, skerrow, lumeth]) expect(lingeringPaths(kit)).toEqual([]);
+  });
+});
+
+describe('the fuse rules', () => {
+  // Rules 2.6 and roster-v2 section 0: no shipped kit has a fuse, so each row fuses an area of a
+  // copy of Hargrim, whose M2 is a one-hit area with a slow and whose cooldown is 360 ticks.
+  const M2 = 'hargrim.slots.M2.effects[0]';
+  const fused = (fuseTicks: number, durationTicks = 1, intervalTicks = 1): KitDef => {
+    const copy = copyOf(hargrim);
+    const area = areaOf(copy, 'M2');
+    area.fuseTicks = fuseTicks;
+    area.durationTicks = durationTicks;
+    area.intervalTicks = intervalTicks;
+    // One slow and a damage that fits the total of 8 to 30 over three pulses.
+    const hit = area.effects[0];
+    if (hit?.type !== 'damage') throw new Error('Hargrim M2 does not start with a damage');
+    hit.amount = durationTicks > 1 ? 10 : hit.amount;
+    return copy;
+  };
+
+  it.each([14, 121, 0])('F1 refuses a fuse of %i ticks, a one-hit area included', (fuseTicks) => {
+    expect(catalogProblems(fused(fuseTicks))).toEqual([`${M2}.fuseTicks: fuse of ${fuseTicks} ticks is not 15 to 120`]);
+  });
+
+  it.each([15, 16, 119, 120])('F1 accepts a fuse of %i ticks', (fuseTicks) => {
+    expect(catalogProblems(fused(fuseTicks))).toEqual([]);
+  });
+
+  it('F1 holds a fused pulsing area to the range too', () => {
+    const copy = fused(121, 90, 30);
+    areaOf(copy, 'M2').effects.splice(1);
+    expect(catalogProblems(copy)).toEqual([`${M2}.fuseTicks: fuse of 121 ticks is not 15 to 120`]);
+  });
+
+  it.each(['stun', 'root', 'silence'] as const)('F2 allows %s on a fused one-hit area and refuses it on a fused pulsing one', (type) => {
+    const oneHit = fused(60);
+    areaOf(oneHit, 'M2').effects.push({ type: 'applyStatus', status: { type, ticks: 90 } });
+    expect(catalogProblems(oneHit)).toEqual([]);
+
+    const pulsing = fused(60, 90, 30);
+    areaOf(pulsing, 'M2').effects.splice(1);
+    areaOf(pulsing, 'M2').effects.push({ type: 'applyStatus', status: { type, ticks: 90 } });
+    expect(catalogProblems(pulsing)).toEqual([`${M2}.effects[1].status: a pulsing area carries ${type}`]);
+  });
+
+  it('F3 sums the damage of a fused area over its pulses, and of a fused one-hit area once', () => {
+    const copy = fused(60);
+    const hit = areaOf(copy, 'M2').effects[0];
+    if (hit?.type !== 'damage') throw new Error('Hargrim M2 does not start with a damage');
+    hit.amount = 16;
+    areaOf(copy, 'M2').effects.push({ type: 'damage', amount: 16 });
+    expect(catalogProblems(copy)).toEqual([`${M2}: damage total 32 over 1 pulses is not 8 to 30`]);
+    const pulsing = fused(60, 90, 30);
+    areaOf(pulsing, 'M2').effects.splice(1);
+    const each = areaOf(pulsing, 'M2').effects[0];
+    if (each?.type !== 'damage') throw new Error('Hargrim M2 does not start with a damage');
+    each.amount = 11;
+    expect(catalogProblems(pulsing)).toEqual([`${M2}: damage total 33 over 3 pulses is not 8 to 30`]);
+  });
+
+  it('F4 wants the fuse plus the duration under the cooldown, a one-hit area included', () => {
+    const copy = fused(120);
+    copy.slots.M2.cooldownTicks = 121;
+    expect(catalogProblems(copy)).toEqual([
+      `${M2}.durationTicks: fuse of 120 + 1 ticks is not under the M2 cooldown of 121`,
+    ]);
+    copy.slots.M2.cooldownTicks = 122;
+    expect(catalogProblems(copy)).toEqual([]);
+  });
+
+  it('F4 holds the EX variant of a slot to the cooldown it shares', () => {
+    const copy = copyOf(hargrim);
+    const ex = areaOf(copy, 'M2', { ex: true });
+    ex.fuseTicks = 100;
+    ex.durationTicks = 260;
+    ex.intervalTicks = 260;
+    ex.effects.splice(1);
+    const hit = ex.effects[0];
+    if (hit?.type !== 'damage') throw new Error('Hargrim M2 EX does not start with a damage');
+    hit.amount = 10;
+    expect(catalogProblems(copy)).toEqual([
+      'hargrim.slots.M2.ex.effects[0].durationTicks: fuse of 100 + 260 ticks is not under the M2 cooldown of 360',
+    ]);
+  });
+
+  it('F5 fires the first pulse of a cast area `fuseTicks` steps after the cast step, and never has two areas of a slot', () => {
+    const copy = fused(40);
+    const rig = new Rig(copy, { 2: [X0 + 4, 0] });
+    let live = 0;
+    // Three cooldowns of M2 (360 ticks) and a fourth cast, the key held down all the time.
+    for (let n = 0; n < 1200; n++) {
+      rig.step(press('M2'));
+      live = Math.max(live, rig.state.areas.filter((a) => a.ownerId === 0).length);
+    }
+    expect(live).toBe(1);
+    const spawned = rig.events('areaSpawned').map(({ step }) => step);
+    const ticks = rig.events('areaTick').map(({ step }) => step);
+    expect(spawned).toHaveLength(4);
+    expect(ticks).toEqual(spawned.map((at) => at + 40));
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual(ticks);
+    expect(rig.events('damage').map(({ e }) => e.targetId)).toEqual([2, 2, 2, 2]);
+    rig.clean();
   });
 });
 

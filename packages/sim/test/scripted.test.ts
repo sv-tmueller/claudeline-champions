@@ -286,7 +286,8 @@ class InvariantWatcher {
     for (const a of state.areas) {
       this.check(a.remainingTicks >= 1, `area ${a.id} remainingTicks ${a.remainingTicks}`, state);
       this.check(
-        a.ticksToNextApply >= 0 && a.ticksToNextApply < a.intervalTicks,
+        a.ticksToNextApply >= 0 &&
+          a.ticksToNextApply < (a.fuseTicks !== undefined && a.fuseTicks > 0 ? a.fuseTicks : a.intervalTicks),
         `area ${a.id} ticksToNextApply ${a.ticksToNextApply}`,
         state,
       );
