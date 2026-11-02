@@ -134,7 +134,7 @@ describe('checksum of combat state', () => {
     }
   });
 
-  it('changes with the fuseTicks of an armed area, and with a fused area against an unfused one', () => {
+  it('changes with the fuseTicks of an armed area, and with the key alone', () => {
     const fusedArea = (fuseTicks: number): GameState => {
       const state = fresh();
       spawnArea(state, {
@@ -149,8 +149,12 @@ describe('checksum of combat state', () => {
     const zeroed = fusedArea(45);
     zeroed.areas[0]!.fuseTicks = 0;
     expect(checksum(zeroed)).not.toBe(base);
+    // The same state with only the key gone: nothing else differs, so the key is what the checksum sees.
+    const keyless = cloneState(fusedArea(45));
+    delete keyless.areas[0]!.fuseTicks;
+    expect(keyless.areas[0]).not.toHaveProperty('fuseTicks');
+    expect(checksum(keyless)).not.toBe(base);
     expect(checksum(cloneState(fusedArea(45)))).toBe(base);
-    expect(checksum(armed())).not.toBe(checksum(fusedArea(45)));
   });
 
   it('throws on a NaN projectile coordinate', () => {

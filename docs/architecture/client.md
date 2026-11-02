@@ -141,7 +141,7 @@ that; it is a review step: run `npm run build`, then
 which must print nothing. The pattern has no `"F4"` and no `fireDebugShot`: a
 build minifies function names, and the key code `F4` also ships in the reserved
 list of `bindings.ts`, so neither tells the debug shot from the rest. The terms
-that survive minification in any quote style are the property names `debugShots`
+that survive minification in any quote style are the property names `debugShots`,
 `debugAreas`, `spawnProjectile` and `spawnArea`. The same guard hides the dev-only probe hook,
 `window.__runProbeFrames`, which `combat.spec.ts` and `live-probe.spec.ts` use
 to run their heap-probe windows (see [testing](testing.md)), and the time scale
@@ -319,7 +319,8 @@ sim steps first and the views read its state afterwards.
   while `fuseTicks > 0` on the area entity, with no event and no new DOM hook:
   the disc takes a fainter fill, a ring outlines it and a child disc grows from
   nothing to the full area as `1 - ticksToNextApply / fuseTicks`, all pooled
-  meshes and materials made at startup, so the frame path allocates nothing. The
+  meshes and materials made at startup, so the frame path creates no object; no
+  heap-probe window plays a fused area, so that path is not measured. The
   armed look ends in the step of the first `areaTick`, and a fused one-hit area,
   which pulses and expires in that step, is released from the armed look to
   nothing. No shipped kit has a fuse; `entity-views-fuse.test.ts` plays the

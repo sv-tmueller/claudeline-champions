@@ -773,6 +773,58 @@ describe('the fuse rules', () => {
     expect(rig.events('damage').map(({ e }) => e.targetId)).toEqual([2, 2, 2, 2]);
     rig.clean();
   });
+
+  it('F5 keeps a fused pulsing area of the longest legal life to one live area of the slot, over several cooldowns', () => {
+    // 60 + 299 = 359 under the cooldown of 360: three pulses of 10, 60, 160 and 260 steps after the spawn step, and the area is gone 358 steps after it.
+    const copy = fused(60, 299, 100);
+    areaOf(copy, 'M2').effects.splice(1);
+    expect(catalogProblems(copy)).toEqual([]);
+    const rig = new Rig(copy, { 2: [X0 + 4, 0] });
+    let live = 0;
+    // The key held down for four casts, until the fourth area has expired.
+    for (let n = 0; n < 1464; n++) {
+      rig.step(press('M2'));
+      live = Math.max(live, rig.state.areas.filter((a) => a.ownerId === 0).length);
+    }
+    expect(live).toBe(1);
+    const spawned = rig.events('areaSpawned').map(({ step }) => step);
+    expect(spawned).toHaveLength(4);
+    expect(rig.events('areaTick').map(({ step }) => step)).toEqual(spawned.flatMap((at) => [at + 60, at + 160, at + 260]));
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual(spawned.map((at) => at + 358));
+    expect(rig.events('damage').map(({ e }) => e.targetId)).toEqual(Array<number>(12).fill(2));
+    rig.clean();
+  });
+
+  it('F6 places a fused area where the aim is on the fire step, and leaves it there while the aim moves', () => {
+    const copy = fused(40);
+    areaOf(copy, 'M2').placement = { type: 'aim', range: 8 };
+    // Enemy 2 stands at the aim of the fire step (6 m ahead), enemy 3 where the aim goes during the fuse (6 m to the side).
+    const there: Spot = [X0 + 6, 0];
+    const later: Spot = [X0, 6];
+    const rig = new Rig(copy, { 2: there, 3: later });
+    // Windup 24: the aim wanders during it, rests on `there` for the fire step, and then moves to `later` for the fuse.
+    rig.step(press('M2', { aim: later }));
+    rig.run(23, press('M2', { aim: [X0 + 3, 3] }));
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.step(press('M2', { aim: there }));
+    const spawned = rig.events('areaSpawned');
+    expect(spawned).toHaveLength(1);
+    const fireStep = spawned[0]?.step ?? -1;
+    expect(spawned[0]?.e).toMatchObject({ x: there[0], y: there[1] });
+    const [area] = rig.state.areas;
+    for (let n = 0; n < 40; n++) {
+      rig.step(press('M2', { aim: later }));
+      // The area never moves, and never pulses before the fuse is out.
+      expect(rig.state.areas).toHaveLength(n < 39 ? 1 : 0);
+      if (n < 39) expect(rig.state.areas[0]).toMatchObject({ x: there[0], y: there[1] });
+      expect(rig.events('areaTick')).toHaveLength(n < 39 ? 0 : 1);
+    }
+    expect(area).toMatchObject({ x: there[0], y: there[1] });
+    expect(rig.events('areaTick').map(({ step }) => step)).toEqual([fireStep + 40]);
+    // The pulse hit the champion at the fire-step aim, and not the one at the later aim.
+    expect(rig.events('damage').map(({ e }) => e.targetId)).toEqual([2]);
+    rig.clean();
+  });
 });
 
 describe('every slot of the seven kits', () => {

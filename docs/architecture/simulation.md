@@ -860,9 +860,10 @@ kit has one counter, not a list`) whose `from` is a known slot, whose `cap` is a
 integer from 1 to 5 (`COUNTER_MAX_CAP`) and whose `windowTicks` is an integer from
 60 to 600 (`COUNTER_MIN_WINDOW_TICKS`, `COUNTER_MAX_WINDOW_TICKS`); unknown keys
 inside it are dropped, and a `counter` key inside a slot is a stray key like any
-other. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
-not checked here; roster tests do that, and so is the fuse range of 15 to 120
-ticks, the fuse-aware linger rule and the one-hit control exception (`catalogProblems`). The bounds keep `step` from throwing, not
+other. Only the bounds above are checked here. Catalog ranges (a
+stun of 30 to 120 ticks, 8 to 30 damage), the fuse range of 15 to 120 ticks among
+them, the fuse-aware linger rule and the one-hit control exception are checked by
+the roster tests (`catalogProblems`). The bounds keep `step` from throwing, not
 cheap: the live entities of a kit grow with lifetime over cooldown, step 7
 (`dropUnusedCasts`) is quadratic in them, and the catalog ranges keep them small.
 

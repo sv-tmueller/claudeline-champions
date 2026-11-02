@@ -117,7 +117,6 @@ export class EntityViews {
       const slot = this.find(entity.id) ?? this.acquire(entity);
       slot.prevX = entity.x;
       slot.prevY = entity.y;
-      if (this.options.armed) this.follow(slot, entity);
     }
   }
 
@@ -132,7 +131,7 @@ export class EntityViews {
       slot.x = entity.x;
       slot.y = entity.y;
       slot.seen = true;
-      if (this.options.armed) this.follow(slot, entity);
+      this.follow(slot, entity);
     }
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i] as Slot;
@@ -244,9 +243,8 @@ export class EntityViews {
     if (armed) {
       const left = entity.ticksToNextApply ?? 0;
       const burnt = 1 - left / (fuse as number);
-      const grown = burnt < 0 ? 0 : burnt > 1 ? 1 : burnt;
-      progress.scale.x = grown;
-      progress.scale.y = grown;
+      progress.scale.x = burnt;
+      progress.scale.y = burnt;
     }
   }
 

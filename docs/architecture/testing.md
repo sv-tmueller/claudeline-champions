@@ -507,7 +507,7 @@ other spec.
   test about 12 s with the load; the 45 s timeout is more than twice that. It
   does not use `__runProbeFrames`, and the heap probe plays no fused area, so
   the armed path of `entity-views.ts:follow` (which reads and writes fields and
-  allocates nothing) is not in a probe window.
+  creates no object by construction) is not measured by a probe window.
 - `self-cast.spec.ts`: the held C key (no screenshot), on
   `?champion=lumeth&difficulty=normal&arena=arena01&teamsize=2` with a paused
   clock and tick budgets, like `lingering.spec.ts`. With the cursor at the
