@@ -64,7 +64,7 @@ export function createMatch(
     const ahead = player.team === 'A' ? 100 : -100;
     const kit = used.find((k) => k.id === player.championId);
     const maxHealth = kit ? kit.maxHealth : DEFAULT_MAX_HEALTH;
-    return {
+    const built: ChampionState = {
       id,
       team: player.team,
       championId: player.championId,
@@ -84,6 +84,9 @@ export function createMatch(
       cooldowns: SLOTS.map(() => 0),
       cast: null,
     };
+    // The key is left out, never undefined, for a kit with no counter (`checksum` throws on it).
+    if (kit?.counter !== undefined) built.counter = { count: 0, lastHitTick: 0 };
+    return built;
   });
 
   const state: GameState = {

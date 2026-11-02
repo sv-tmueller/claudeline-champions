@@ -97,6 +97,85 @@ describe('validateKit accepts', () => {
   });
 });
 
+describe('validateKit and the on-hit counter', () => {
+  const counter = { from: 'Q', cap: 3, windowTicks: 180 };
+  const withCounter = (value: unknown): unknown => ({ ...testStriker(), counter: value });
+
+  it('copies a declared counter exactly, through a JSON round trip, and aliases nothing', () => {
+    const given = withCounter(counter) as KitDef & { counter: object };
+    const copy = validateKit(given);
+    expect(copy).toStrictEqual(given);
+    expect(copy.counter).toStrictEqual({ from: 'Q', cap: 3, windowTicks: 180 });
+    expect(copy.counter).not.toBe(given.counter);
+    expect(JSON.parse(JSON.stringify(copy))).toStrictEqual(copy);
+  });
+
+  it('takes the bounds exactly, and every slot as the source', () => {
+    for (const [cap, windowTicks] of [[1, 60], [5, 600]] as const) {
+      expect(() => validateKit(withCounter({ from: 'M1', cap, windowTicks })), `${cap} ${windowTicks}`).not.toThrow();
+    }
+    for (const from of ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F']) {
+      expect(validateKit(withCounter({ ...counter, from })).counter?.from).toBe(from);
+    }
+  });
+
+  it('leaves no counter key on a kit that declares none, and drops unknown keys inside', () => {
+    const plain = validateKit(testStriker());
+    expect('counter' in plain).toBe(false);
+    expect(Object.keys(validateKit(withCounter({ ...counter, spend: 1 })).counter ?? {}).sort()).toEqual([
+      'cap',
+      'from',
+      'windowTicks',
+    ]);
+  });
+
+  it('drops a counter key inside a slot like any stray key', () => {
+    const kit = testStriker() as KitDef & { slots: Record<string, object> };
+    Object.assign(kit.slots['M1'] as object, { counter });
+    const copy = validateKit(kit);
+    expect('counter' in copy).toBe(false);
+    expect('counter' in copy.slots.M1).toBe(false);
+  });
+
+  it('rejects a cap outside 1 to 5, whole numbers only', () => {
+    for (const cap of [0, 6, 2.5, '3', null, NaN, undefined, -1]) {
+      expect(() => validateKit(withCounter({ ...counter, cap })), String(cap)).toThrow(
+        `Invalid kit: test-striker.counter.cap: ${String(cap)} is not an integer from 1 to 5`,
+      );
+    }
+  });
+
+  it('rejects a window outside 60 to 600, whole numbers only', () => {
+    for (const windowTicks of [59, 601, 120.5, '120', null, NaN, undefined, 0]) {
+      expect(() => validateKit(withCounter({ ...counter, windowTicks })), String(windowTicks)).toThrow(
+        `Invalid kit: test-striker.counter.windowTicks: ${String(windowTicks)} is not an integer from 60 to 600`,
+      );
+    }
+  });
+
+  it('rejects an unknown source slot', () => {
+    for (const from of ['X', 'm1', 3, null, undefined]) {
+      expect(() => validateKit(withCounter({ ...counter, from })), String(from)).toThrow(
+        `Invalid kit: test-striker.counter.from: unknown slot ${String(from)}`,
+      );
+    }
+  });
+
+  it('rejects a list of counters and anything that is not an object', () => {
+    expect(() => validateKit(withCounter([counter]))).toThrow(
+      'Invalid kit: test-striker.counter: a kit has one counter, not a list',
+    );
+    expect(() => validateKit(withCounter([]))).toThrow(
+      'Invalid kit: test-striker.counter: a kit has one counter, not a list',
+    );
+    for (const value of [null, 3, 'Q', true]) {
+      expect(() => validateKit(withCounter(value)), String(value)).toThrow(
+        'Invalid kit: test-striker.counter: expected an object',
+      );
+    }
+  });
+});
+
 describe('validateKit rejects, with the whole message', () => {
   it('a value that is not an object, or has a bad id or flag', () => {
     expect(() => validateKit(null)).toThrow('Invalid kit: (root): expected an object');
