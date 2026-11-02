@@ -56,6 +56,8 @@ function recorder(): { handlers: FeedbackHandlers; calls: Call[]; records: SimEv
       records.push(event);
     },
     death: (tick, targetId, sourceId) => calls.push({ kind: 'death', args: [tick, targetId, sourceId] }),
+    orbSpawn: (tick) => calls.push({ kind: 'orbSpawn', args: [tick] }),
+    orbTaken: (tick, championId) => calls.push({ kind: 'orbTaken', args: [tick, championId] }),
   };
   return { handlers, calls, records };
 }
@@ -83,6 +85,21 @@ describe('routeEvents', () => {
       { kind: 'hit', args: [40, 5, 6] },
       { kind: 'damage', args: [40, 2, 0] },
       { kind: 'death', args: [40, 2, 0] },
+    ]);
+  });
+
+  it('routes orbSpawn with the tick, and orbTaken with the tick and the taker id only', () => {
+    const { handlers, calls } = recorder();
+    routeEvents(
+      fakeState(1021, [
+        { type: 'orbSpawn', round: 1, x: 0, y: 2.5 },
+        { type: 'orbTaken', round: 1, championId: 3, amount: 25, energy: 40 },
+      ]),
+      handlers,
+    );
+    expect(calls).toEqual([
+      { kind: 'orbSpawn', args: [1021] },
+      { kind: 'orbTaken', args: [1021, 3] },
     ]);
   });
 
@@ -207,7 +224,28 @@ describe('combat feedback', () => {
     const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), feed, createAnims(4));
     feedback.death(40, 2, 0);
     expect(feed.count).toBe(1);
-    expect(feed.line(0)).toEqual({ tick: 40, killerId: 0, victimId: 2 });
+    expect(feed.line(0)).toEqual({ tick: 40, killerId: 0, victimId: 2, kind: 0 });
+  });
+
+  it('pushes an orb pickup onto the kill feed with the taker as the killer, and leaves the tallies alone', () => {
+    const feed = createKillFeed();
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), feed, createAnims(4));
+    feedback.orbTaken(60, 3);
+    expect(feed.count).toBe(1);
+    expect(feed.line(0)).toEqual({ tick: 60, killerId: 3, victimId: -1, kind: 1 });
+    expect([feedback.deaths, feedback.tallyChanges, ...feedback.killCounts, ...feedback.deathCounts]).toEqual([
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+  });
+
+  it('takes an orb event with no orb view, as the other tests build it', () => {
+    const feedback = new CombatFeedback(TEAMS_2V2, 'A', createImpactRings(), createKillFeed(), createAnims(4));
+    expect(() => {
+      feedback.orbSpawn();
+      feedback.orbTaken(2, 0);
+      feedback.roundEnded();
+      feedback.roundStarted();
+    }).not.toThrow();
   });
 
   it('lists flashing ids as a mask and as text', () => {
