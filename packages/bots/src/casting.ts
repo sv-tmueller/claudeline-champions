@@ -378,6 +378,11 @@ export function refreshKitCache(
   cache.escapeWithin[0] = kit !== undefined && rules.escapeWithin !== null ? rules.escapeWithin : -1;
   cache.holdF = kit !== undefined && rules.holdF;
   cache.lowHealth = kit !== undefined && rules.holdF ? damageIn(kit.slots.F.effects) : 0;
+  // An escape-only slot has no band of the walk: it is pressed through `chooseEscape` alone (#211).
+  for (const slot of rules.escapeOnly) {
+    if (kit === undefined) break;
+    cache.hasBase[SLOTS.indexOf(slot)] = 0;
+  }
   cache.escapeOrder.fill(-1);
   let n = 0;
   for (const slot of rules.escapes) {
