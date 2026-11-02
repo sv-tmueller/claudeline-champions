@@ -1,5 +1,5 @@
 import { expect } from 'vitest';
-import { Button, SLOTS, checksum, cloneState, hasLineOfSight, step } from '@claudeline/sim';
+import { Button, ORB_COLLECTIBLE_TICKS, SLOTS, checksum, cloneState, hasLineOfSight, step } from '@claudeline/sim';
 import type { ChampionState, GameState, KitDef, PlayerInput, SimEvent, Slot } from '@claudeline/sim';
 import {
   oracleCornered,
@@ -672,6 +672,12 @@ export interface Played {
   presses: number[];
   /** The ticks from roundStarted to roundEnded of the rounds that were not sudden death, in order. */
   rounds: number[];
+  /**
+   * The energy orb of a match with `energyOrb` (all zero without it): the rounds in which it became
+   * collectible (a round that ended before tick 1200 is not one), the `orbTaken` events, and the
+   * takes by the team of the champion that took it.
+   */
+  orb: { rounds: number; taken: number; byTeam: { A: number; B: number } };
   summary: string;
 }
 
@@ -702,6 +708,8 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
   const rounds: number[] = [];
   let roundStartedAt = 0;
   let suddenDeath = false;
+  const orb = { rounds: 0, taken: 0, byTeam: { A: 0, B: 0 } };
+  let orbCounted = false;
   const allyHeals = state.champions.map(() => 0);
   /** The `champion:SLOT` of the cast that fired each projectile still to be heard of. */
   const projectileSlot = new Map<number, string>();
@@ -824,6 +832,11 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       } else if (e.type === 'roundStarted') {
         roundStartedAt = state.tick;
         suddenDeath = false;
+        orbCounted = false;
+      } else if (e.type === 'orbTaken') {
+        orb.taken++;
+        const taker = state.champions[e.championId];
+        if (taker !== undefined) orb.byTeam[taker.team]++;
       } else if (e.type === 'suddenDeathStarted') {
         suddenDeath = true;
       } else if (e.type === 'roundEnded') {
@@ -859,6 +872,17 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       const alive = (team: string) => state.champions.some((c) => c.alive && c.team === team);
       if (!alive('A') || !alive('B')) eliminatedAt = state.tick;
     }
+    // A round counts for the orb once the match has reached tick 1200 of it with the orb in the
+    // match (taken or not): the tick from which a champion can take it.
+    if (
+      !orbCounted &&
+      state.match?.orb !== undefined &&
+      state.match.phase === 'round' &&
+      state.match.phaseTicks >= ORB_COLLECTIBLE_TICKS
+    ) {
+      orbCounted = true;
+      orb.rounds++;
+    }
     expect(checkInvariants(state)).toEqual([]);
     expect(Number.isFinite(checksum(state))).toBe(true);
     if (state.match?.phase === 'matchEnd') break;
@@ -883,6 +907,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
     allyHeals,
     presses,
     rounds,
+    orb,
     summary,
   };
 }
