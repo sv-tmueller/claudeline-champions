@@ -63,12 +63,15 @@ first.
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
   champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
-  arena. The HUD has the ring warning and the kill feed, and the result screen
+  arena. The standard match has the energy orb on, at the arena's point of
+  `data/orbs.json` (#224): a warning ring from `orbSpawn`, the orb while it is
+  collectible, a kill-feed line naming the taker and a warning sound; the bots
+  do not go for it yet. The HUD has the ring warning and the kill feed, and the result screen
   has the champion, arena, team size and difficulty select. Escape opens a menu
   that pauses the match (Resume, Restart, the select again, a keys view that
   rebinds the nine movement and slot keys and the held self-cast key C, and a
   sound toggle). The first-pass sound is generated in code (a hit, a cast, a
-  death, a round start and a round end) and is counted by the heap probe. The
+  death, a round start, a round end and the orb warning) and is counted by the heap probe. The
   `Platform` interface has its two settings methods, asynchronous, and a `sound`
   sub-object; the browser platform keeps the bindings and the mute in
   `localStorage`. Dev only: `?scene=sandbox`, `?timescale=` and the
@@ -120,8 +123,10 @@ first.
   fill, a 60 Hz accumulator loop on an injected clock, the input queue, the
   snapshot cadence and event batches, the 20-bad-messages close, the two-way
   `Difficulty` check, and a loopback test that plays a 2v2 and a 3v3 to a
-  result through the codec. No transport, no process and no timer yet, and no
-  `ws` dependency: they come with P3 (see [Online](online.md)).
+  result through the codec. Its matches have the energy orb on: `RoomData`
+  carries the arena's point from `data/orbs.json` and `Room` sets `energyOrb`
+  (#224). No transport, no process and no timer yet, and no `ws` dependency:
+  they come with P3 (see [Online](online.md)).
 - `desktop`: not started (milestone 8).
 
 ## Index

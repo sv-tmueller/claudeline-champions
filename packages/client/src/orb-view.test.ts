@@ -110,6 +110,12 @@ describe('the orb view in a match with the orb on', () => {
     expect(s.view.sphere.position.y).toBeCloseTo(ORB_RADIUS, 9);
   });
 
+  it('gives the ring the reach of a champion circle touching the orb', () => {
+    const s = scene();
+    const geometry = s.view.ring.geometry as unknown as { parameters: { outerRadius: number } };
+    expect(geometry.parameters.outerRadius).toBeCloseTo(ORB_RADIUS + CHAMPION_RADIUS, 9);
+  });
+
   it('marks the warning on the step of orbSpawn, where the state reads 1021 ticks of the phase', () => {
     const s = scene();
     until(s, false, () => s.state.events.some((e) => e.type === 'orbSpawn'));
@@ -194,11 +200,5 @@ describe('the orb view in a match without the orb', () => {
     expect(shown(s.view)).toEqual({ ring: false, sphere: false });
     expect(s.feed.count).toBe(0);
     expect(s.plays.includes(SOUNDS.orbWarning)).toBe(false);
-  });
-
-  it('gives the ring the reach of a champion circle touching the orb', () => {
-    const s = scene();
-    const geometry = s.view.ring.geometry as unknown as { parameters: { outerRadius: number } };
-    expect(geometry.parameters.outerRadius).toBeCloseTo(ORB_RADIUS + CHAMPION_RADIUS, 9);
   });
 });

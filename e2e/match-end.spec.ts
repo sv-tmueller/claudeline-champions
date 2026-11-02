@@ -23,7 +23,8 @@ const RING_START_M = 18;
 const RING_END_M = 3;
 // The match: this test's own run ended at tick 5184 on the bots of #137 (read in frames of
 // 96 ticks, with an idle human; 4936 in the headless run of match-setup.test.ts; on 57dd52f
-// it read 5184 too, with 5053 headless; 5476 headless on the bots of #213). Bot output moves with
+// it read 5184 too, with 5053 headless; 5476 headless on the bots of #213, and the same in the e2e with
+// the energy orb on since #224: the bots do not go for it). Bot output moves with
 // the bots package, so re-measure it when the bots change. The budget is 15 000 ticks. Its base is
 // the headless 5476, the convention of every other row: 5476 plus two more rounds of about 1000
 // each and one round to sudden death of about 7000 is 14 476 (13 936 on the 4936 of #137). Passing

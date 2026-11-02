@@ -125,6 +125,16 @@ specs. The room row "frees the seats" is the other one that moved, in the list
 above; "keeps the settings and the choices" took 0.44 s locally and 0.95 to
 1.4 s on those runners, inside its mark.
 
+The energy orb (#224) is on in these matches too, since the Room sets `energyOrb`
+for every arena with a point. It moved no hook: `loopback.test.ts` took 10.2 and
+10.6 s with the orb on and 10.5 and 11.3 s with the line out, in two runs each
+on one machine (this one is slower than the 8.8 to 9.1 s of the author's), so
+the 60 s hook and the 15 s rows stay. The orb adds one comparison per step; a
+round that reaches 17 s emits two events. `loopback-orb.test.ts` plays up to
+the first pickup in a `beforeAll` (20 s, the top of the rule; 2.4 s for the file
+locally, the runner being 3 to 4 times slower), and its non-vacuous row, which
+plays a whole match with no orb, has a 15 s timeout.
+
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
 v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
 thinnest margin in the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on
@@ -168,6 +178,22 @@ about 8 minutes, cut the cell count of these two files.
   of the orb: the switch, the warning and pickup ticks, the cap, the draw for a
   tie across seeds 1 to 32 and the point's validation.
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
+- The client's energy orb tests (#224): `orb-view.test.ts` plays the standard 2v2
+  with the orb on, on the real sim and the real feedback and sound routing, in
+  the order of one frame of `main.ts`. It pins the modes against the events and
+  the off-by-one of the round clock (the state that emits `orbSpawn` reads 1021,
+  the view shows the orb from the state that reads 1200, one step before the
+  first that can take it), the feed line of kind orb that names champion 0, the
+  warning sound once a round and none for the pickup, and an orb nobody takes
+  hidden at `roundEnded` and shown again in the next round. The rows of
+  `kill-feed.test.ts`, `hud.test.ts` (the line, and its rewrite when a slot
+  changes kind), `feedback.test.ts` (the routing, integers only, no tallies)
+  and `audio.test.ts` (six voices) are its units. `match-setup.test.ts` pins
+  that the standard match gets the orb (and the sandbox does not), and its
+  `playToTheEnd` plays with it, so the `*_END_TICK` rows are the match the page
+  plays: they did not move with the orb on (5476, 5381, 10 470 and 11 903), since
+  the bots do not go for the orb and nobody takes it, so each match logs the
+  warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
   pairings, fills and the seed schedule, the cell plan (a six-name kit list
   gives 15 pairings and 60 cells with 4 and 12 fills, played by nothing),
@@ -210,7 +236,18 @@ about 8 minutes, cut the cell count of these two files.
   122173425469, 122175440820, 122182006132 and 122189679246, see the timeouts
   above); at
   three rounds it took 14 s locally and 29 s on the runner (job 121633905207).
-  See [online](online.md).
+  Since #224 the Room's matches have the orb on, as the product does (the
+  local reference run reads `energyOrb` from the observed config, so the
+  comparison covers it), and `loopback-orb.test.ts` walks a human on team A to
+  the orb point of arena01 with a human on team B standing still and two
+  bots: both clients' `matchStart` carries the table's point, `orbSpawn` and
+  `orbTaken` arrive once each in the round of the pickup at the server's tick
+  and equal to the server's copies, the state rebuilt at the first snapshot
+  after the pickup has the orb taken and the taker's energy of the event, every
+  snapshot rebuilds the server's checksum, and a data set with no row for the
+  arena (the non-vacuous row) gives no `energyOrb` key and no orb events. The
+  data test has the shipped points, the empty table for a directory without
+  `orbs.json` and the `Invalid orb table` throw. See [online](online.md).
 - E2e tests (Playwright, `e2e/*.spec.ts`): the client loads, renders the arena
   and responds to input; each spec writes its screenshots to the test output
   for human review (the live probe spec has no picture).
@@ -419,6 +456,22 @@ other spec.
   read one by one) and 105 to 210 ms at 1280x720 (about 6), and a read costs 32
   to 75 ms, so the body takes about 17 s and the page load and the screenshot
   make it about 22 s. The timeout is more than twice that, as the rule asks.
+- `orb.spec.ts`: the energy orb in the browser (`orb.png`, at 1280x720), on
+  `?champion=hargrim&difficulty=easy&arena=arena01&teamsize=2&timescale=10`
+  with a paused clock in frames of 16 ms (about 10 ticks each) and a read after
+  every frame at 320x180. The easy bots leave the human alive, where the normal
+  ones kill it before the orb. The first test reads `data-orb` hidden through
+  the warmup, then `warning`, then `up`, then `hidden`, in that order, with no
+  orb-coloured pixel (`#2f4bff`, tolerance 24) in a 1280x720 picture before the
+  warning and more than 100 in `orb.png`, taken while the orb is up (379 in the
+  last run, the sphere and its ring); the idle human takes nothing and the bots
+  do not go for the orb, so it ends hidden at the round's end with no orb line.
+  The second walks the human right (KeyD) from the warning to a touch of the
+  orb at (0, 2.5) and waits for the pickup: a feed line `data-kind="orb"` that
+  names a champion (any taker; Hargrim in the last run) with an ally or enemy
+  `data-team`, and an orb part "Energy orb". No tick is pinned. The units behind
+  it are the client's orb tests above and the server's loopback orb spec. It is
+  not in the heap probe: the probe's windows fall before the warning.
 - `lingering.spec.ts`: the first lingering area a match draws
   (`lingering.png`, at 1280x720), on `?champion=ondrel&difficulty=normal&arena=arena01&teamsize=2`
   with a paused clock and tick budgets, like `hud.spec.ts`. After the warmup,
@@ -501,7 +554,7 @@ other spec.
   (tick 5381 headless and 5664 in the e2e, a Defeat 1 : 3), and 24 000 and 275 on the
   3v3 of arena01 (it ends at tick 10 470 headless and 10 944 in the e2e, a Victory
   3 : 2) and 25 000 and 286 on the 3v3 of arena02 (tick 11 903 headless and
-  11 904 in the e2e, a Defeat 2 : 3). On the bots of #137 the rows were 14 000 and
+  11 904 in the e2e, a Defeat 2 : 3). The energy orb has been on in these matches since #224 and moved none of these ticks (re-measured: the bots do not go for it, and an idle human takes nothing). On the bots of #137 the rows were 14 000 and
   171 (5184 in the e2e, 4936 headless), 22 000 and 255 (12 384 and 12 191), 19 000
   and 223 (6144 and 5774, a Defeat 0 : 3) and 29 000 and 328 (16 224 and 15 773). A headless run through the client's setup
   and driver gives each row's tick, in `match-setup.test.ts`. The budget is
@@ -754,7 +807,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   gesture before the first measured window, so the counted calls reach real
   Web Audio), the champions' clips (`champion-anim.ts`, the state machine, and
   `clip-sampler.ts`, which poses the bones: both run for every champion in every
-  frame) and everything in `main.ts`, including the hook's `frameMany` and the
+  frame), the orb view (`orb-view.ts`, whose `sync` runs after every step; it is
+  hidden in the windows, which fall before the warning, and reads 0 B) and
+  everything in `main.ts`, including the hook's `frameMany` and the
   one `opensSelect` call of its module evaluation. The pre-match select
   (`select-dom.ts`, with `launch.ts` and `result-dom.ts`, uncounted builders
   like `hud-dom.ts`) never runs in a frame and never runs in either probe, since
@@ -1124,7 +1179,15 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   widened from b44efbd's 456 to 468 B and 11 344 to 11 776 B to main's
   measured spread, live 408 to 564 B and bots 8992 to 11 776 B, the local
   medians of the #150 runs on 97a12af (live 468 to 528 B, bots 9208 to
-  11 676 B) and on e036f5a (live 408 to 564 B, bots 8992 to 11 672 B).
+  11 676 B) and on e036f5a (live 408 to 564 B, bots 8992 to 11 672 B). With the
+  energy orb on (#224; `--repeat-each=3`, local, Node 24, on the bots of #213)
+  the three live attempts read medians of 432, 516 and 372 B (limit 780) and
+  the bots 6444, 6788 and 6580 B (limit 18 000), with the same ticks as before
+  (windows at 9119 to 9239 in round 4, the first death at 9539): the windows
+  fall 150 to 270 ticks into a round, before the warning, so `orb-view.ts` is
+  hidden and reads 0 B, and the event paths of the windows are the old ones
+  (`entity-views.ts:acquire`, `feedback.ts:routeEvents` at 24 B in 3 of 15
+  windows). The limits did not move.
 - The history, which is why the windows use a hook: with the windows on the fake
   clock, `onAnimationFrame` had two modes. Playwright's fake clock hands out ids
   of 1e12 and up, so each `requestAnimationFrame` call boxes about three heap

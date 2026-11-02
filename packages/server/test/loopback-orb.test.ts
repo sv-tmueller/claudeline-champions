@@ -1,6 +1,6 @@
 import { SNAPSHOT_EVERY } from '@claudeline/protocol';
 import type { SimEvent } from '@claudeline/sim';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { loadRoomData } from '../src/data';
 import type { RoomData } from '../src/data';
 import { Harness, roomData } from './loopback';
@@ -62,12 +62,21 @@ function playToThePickup(played: Played, walkTo: { x: number; y: number } | unde
   }
 }
 
-describe('loopback: the energy orb', { timeout: 60_000 }, () => {
+// The play is one hook, 2.4 s locally with the non-vacuous row; the runner is 3 to 4 times slower (the
+// loopback files of this folder), so the hook takes the 20 s top of the rule (testing.md, Check suite).
+describe('loopback: the energy orb', () => {
   const data = roomData();
   const point = data.orbs.get(ARENA_ID);
-  const played = setUp(data);
-  playToThePickup(played, point);
-  const { harness, host, guest } = played;
+  let played: Played;
+  let harness: Harness;
+  let host: TestClient;
+  let guest: TestClient;
+
+  beforeAll(() => {
+    played = setUp(data);
+    playToThePickup(played, point);
+    ({ harness, host, guest } = played);
+  }, 20_000);
 
   it('is set up with the arena01 point from the table', () => {
     expect(point).toEqual({ x: 0, y: 2.5 });
@@ -121,7 +130,7 @@ describe('loopback: the energy orb', { timeout: 60_000 }, () => {
     }
   });
 
-  it('is not vacuous: data with no row for the arena gives no energyOrb key and no orb events', () => {
+  it('is not vacuous: data with no row for the arena gives no energyOrb key and no orb events', { timeout: 15_000 }, () => {
     const bare: RoomData = { ...loadRoomData(), orbs: new Map() };
     const off = setUp(bare);
     playToThePickup(off, { x: 0, y: 2.5 });

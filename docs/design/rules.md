@@ -211,6 +211,7 @@ One contested pickup per round charges the ultimate. It rewards map control with
 - **Ties:** with two or more touchers on the same step, of any teams (a tie inside one team too), the match's seeded RNG draws once and picks one of them, with no bias by id. One toucher takes it with no draw.
 - **Unclaimed:** an orb nobody takes stays until the round ends. A pickup on the step that decides the round stands.
 - **Reset:** the next round starts with the orb up and untaken (section 1.2).
+- **Shown:** the standard local match and the online server's match turn the orb on with the arena's point from `data/orbs.json`; free play has none (amended 2026-11-02 by #224). The client draws a warning ring at the point from `orbSpawn`, the orb itself while it is collectible, and removes both on `orbTaken` and at the round's end. The warning plays a sound, and the pickup adds a kill-feed line that names the taker.
 
 ## 4. Statuses
 
@@ -285,8 +286,9 @@ Default controls `[spec]`:
 - Sound is generated in code, with no sound files and no music `[tuned]`. It
   plays a hit (a projectile that touches a champion, and a melee arc with at
   least one target), a cast (the local champion's casts only), a death
-  (every death), a round start and a round end, and nothing for the match
-  end `[tuned]`. The browser starts it on the first key press or mouse press
+  (every death), a round start, a round end and the energy orb's warning,
+  and nothing for the match end or the orb's pickup `[tuned]` (amended
+  2026-11-02 by #224). The browser starts it on the first key press or mouse press
   `[tuned]`. The menu's sound toggle mutes all of it, and the mute is saved
   through the platform with the bindings and read back on the next launch
   `[tuned]`.
@@ -329,7 +331,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Round score | Round wins of both teams, with the 3 needed to win the match. |
 | Round timer | Time left in the round. After it reaches 0 it shows sudden death. |
 | Ring warning | A countdown from 10 s before sudden death starts `[tuned]`. During sudden death a red edge warning shows when the local champion is outside the ring. |
-| Kill feed | A line per death, showing the killer (or "ring") and the victim. Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
+| Kill feed | A line per death, showing the killer (or "ring") and the victim, and a line per orb pickup, showing the taker and "Energy orb" (amended 2026-11-02 by #224). Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
 | Debug overlay | Draws collision circles, obstacles, projectiles and line of sight `[spec]`. Off by default. |
 
 Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. The HUD health bar is the detailed view of the local champion only.
