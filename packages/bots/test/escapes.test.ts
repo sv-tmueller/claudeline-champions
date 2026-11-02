@@ -942,11 +942,11 @@ describe('the escape streak starts again', () => {
   });
 });
 
-// Bulwark Charge, the dash escape of Durnhal, is a dash of 5 m with a knock-away area at its start: its
-// landing is the end of the dash, found over the five directions like Reed Step's. Aegis Line (R)
-// comes second. The trigger is the common one with rangeMin 0: he never kites, so it is a retreat
-// with the target within 6 m. Bulwark Charge is an escape only (the `escapeOnly` flag of his rule,
-// decision 8 of batch #223): the walk never presses it on its band.
+// Bulwark Charge, the dash escape of Durnhal, is a dash of 5 m with a knock-away area at its end:
+// its landing is the end of the dash, found over the five directions like Reed Step's. Aegis Line
+// (R) comes second. The trigger is the common one with rangeMin 0: he never kites, so it is a
+// retreat with the target within 6 m. Bulwark Charge is an escape only (the `escapeOnly` flag of
+// his rule, decision 8 of batch #223): the walk never presses it on its band.
 describe('Bulwark Charge and Aegis Line, the escapes of Durnhal', () => {
   const kits = sevenKits();
   const durnhal = (d: number, options: Parameters<typeof sceneOf>[2] = {}) =>
@@ -994,7 +994,7 @@ describe('Bulwark Charge and Aegis Line, the escapes of Durnhal', () => {
     expect(pressOf(state)).toBe('R');
   });
 
-  it('is a dash with a knock-away area at its start, in the kit data the pins above read', () => {
+  it('is a dash with a knock-away area at its end, in the kit data the pins above read', () => {
     const slot = (kits.find((k) => k.id === 'durnhal') as KitDef).slots.SPACE;
     const dash = slot.effects[0];
     expect(dash?.type === 'dash' && dash.distance).toBe(5);

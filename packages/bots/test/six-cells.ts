@@ -5,12 +5,12 @@ import { arena01, arena02, createRun } from './helpers';
 import { SIX_SET, expectNoStall, play } from './press-oracle';
 import type { KitSet, Played } from './press-oracle';
 
-// The seeded matches of ondrel.test.ts, brimwick.test.ts and durnhal.test.ts: a bot of the new kit and a filler
-// against a bot of one of the shipped kits and a filler, on both arenas, played to matchEnd (3
-// rounds to win) on the six shipped kits (the seven for Durnhal's). Every press of every tick passes the press oracle, the
-// invariants hold, the bots leave the state alone and no bot stalls for more than 120 ticks. The
-// seeds are pinned: a miss after a change to the bots, the sim or the Node version is governed by
-// batch #53 decision 8.3.
+// The seeded matches of ondrel.test.ts, brimwick.test.ts and durnhal.test.ts: a bot of the new kit
+// and a filler against a bot of one of the shipped kits and a filler, on both arenas, played to
+// matchEnd (3 rounds to win) on the six shipped kits (the seven for Durnhal's). Every press of
+// every tick passes the press oracle, the invariants hold, the bots leave the state alone and no
+// bot stalls for more than 120 ticks. The seeds are pinned: a miss after a change to the bots, the
+// sim or the Node version is governed by batch #53 decision 8.3.
 
 export const NORMAL_2V2 = ['normal', 'normal', 'normal', 'normal'] as const;
 export const SEEDS_2V2 = [101, 102, 103, 104];

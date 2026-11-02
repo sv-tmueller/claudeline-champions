@@ -19,10 +19,10 @@ export interface BotProfile {
 /**
  * The share of `rangeMax` at which a champion with rangeMin 0 stands to engage (#213). Below 1 the
  * stand has slack: a target that steps back a little is still in reach and the champion does not
- * walk in again from outside it. Above 1 m for both melee kits (1.6 and 1.2 m) so that the walk
- * ends before the bodies touch. That bound holds for the shipped kits only: an unshipped rangeMin-0
- * kit whose derived rangeMax lies in (1, 1.25] would get a stand reach under the 1 m touching
- * distance (there is no guard).
+ * walk in again from outside it. Above 1 m for the three melee kits (1.6, 1.2 and 2.4 m) so that
+ * the walk ends before the bodies touch. That bound holds for the shipped kits only: an unshipped
+ * rangeMin-0 kit whose derived rangeMax lies in (1, 1.25] would get a stand reach under the 1 m
+ * touching distance (there is no guard).
  */
 export const STAND_FRACTION = 0.8;
 
@@ -148,9 +148,9 @@ export interface ChampionRules {
    */
   readonly allies: readonly Slot[];
   /**
-   * The escape slots that are pressed as an escape and in no other way: a subset of `escapes`
-   * (pinned in profile.test.ts). The kit cache zeroes the band of these slots, so the walk never
-   * presses one on its own band and only `chooseEscape` does (see `refreshKitCache`). Durnhal's
+   * The escape slots whose base band the walk never presses: a subset of `escapes` (pinned in
+   * profile.test.ts). The kit cache zeroes the base band of these slots, so the walk does not press
+   * one on it and only `chooseEscape` does (see `refreshKitCache`). Durnhal's
    * Bulwark Charge (#211): with rangeMin 0 its band would cover every engage, and its knock-away
    * would push a target out of the stand reach. Empty for the other six.
    */

@@ -3,7 +3,7 @@ import type { ChampionState, MatchConfig, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import { SLOTS } from '@claudeline/sim';
 import { RANGE_MIN, WITHIN } from './escape-oracle';
-import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sevenKits } from './helpers';
+import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sevenKits, sixKits } from './helpers';
 import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SEVEN_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
 import type { AllyRow, KitSet } from './press-oracle';
 
@@ -410,7 +410,7 @@ describe('the band and clearance tables of the shipped kits', () => {
 // aim its range plus its radius plus 0.5, an area around the champion its radius plus 0.5, and the
 // first effect that reaches an enemy sets the band (the shield of Reed Screen reaches nobody).
 describe('the band and clearance tables of Ondrel and Brimwick', () => {
-  const kits = sevenKits();
+  const kits = sixKits();
   const slotOf = (id: string, key: string): AbilitySpec => {
     const kit = kits.find((k) => k.id === id) as KitDef;
     const [slot, variant] = key.split(':') as [Slot, string | undefined];

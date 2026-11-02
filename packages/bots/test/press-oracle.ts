@@ -395,10 +395,10 @@ const DASHES = new Set([
 
 /**
  * The pressed abilities whose first top-level effect is a melee arc, written from the kit files
- * (data/kits/hargrim.json, skerrow.json and durnhal.json; the test kits' Hargrim M1 is one too). The sim's arc
- * ignores obstacles (melee.ts), so a press of one needs neither a line of sight nor a clear shot
- * (bots.md, Clear shot). An arc after a dash or a teleport (the EX Lunge, Reaper's Dance) is not
- * one: the dash stops at an obstacle and the teleport needs a line of sight.
+ * (data/kits/hargrim.json, skerrow.json and durnhal.json; the test kits' Hargrim M1 is one too).
+ * The sim's arc ignores obstacles (melee.ts), so a press of one needs neither a line of sight nor
+ * a clear shot (bots.md, Clear shot). An arc after a dash or a teleport (the EX Lunge, Reaper's
+ * Dance) is not one: the dash stops at an obstacle and the teleport needs a line of sight.
  */
 export const MELEE = new Set(['hargrim:M1', 'skerrow:M1', 'skerrow:E', 'skerrow:E:ex', 'durnhal:M1']);
 const MARGIN = 1;
