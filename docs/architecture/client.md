@@ -239,8 +239,8 @@ sim's `orbPointFor` (a static JSON import, so a bad row is a page error, and an
 arena without a row plays without the orb): the standard match plays with the
 energy orb on (rules.md section 3.3, #224), the config gets the `energyOrb` key
 only when there is a point (never `undefined`), and the sandbox ignores it.
-Free play does not exist in the client. The bots ignore the orb until they are
-taught it. The headless tests of the standard match (`playToTheEnd` in
+Free play does not exist in the client. The bots contest the orb since #225 (see
+[bots](bots.md), The energy orb), so the standard match is the one in which the bots contest the orb. The headless tests of the standard match (`playToTheEnd` in
 `match-setup.test.ts`) pass the point too, so the four `*_END_TICK` rows
 measure the match the page plays; every other client unit test is orb-off. The
 orb's view is `orb-view.ts` (see Scene):

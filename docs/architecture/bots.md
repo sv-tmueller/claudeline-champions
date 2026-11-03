@@ -88,8 +88,8 @@ finisher is the rule under Finisher below; per-slot finishers are not built.
 
 Built so far: engage, kite, retreat, plus idle, casting (see Casting), the
 openers, escapes, dash hold and wait of a profile (see Openers and escapes) and
-the advance of a retreating bot (see Deadlock) and the dodge (see Dodge). Idle
-means no enemy is alive:
+the advance of a retreating bot (see Deadlock), the dodge (see Dodge) and the
+contest of the energy orb (see The energy orb). Idle means no enemy is alive:
 the bot stands and keeps its aim.
 
 Target: the bot keeps its current target while it is alive, unless another
@@ -319,6 +319,85 @@ draw in `aim` is (see Allocation). Nothing else draws.
 What it does not do: it does not look at champions (a dodge may walk into one;
 local avoidance stays unbuilt), it does not weigh the cost of leaving a stand,
 and it does not dodge areas.
+
+### The energy orb
+
+`packages/bots/src/orb.ts` and the contest in `bot.ts` (#225). Spec section 6 of
+roster v3: a bot contests the orb when it is up, no enemy is in its threat
+range and it is closer to it than any enemy; otherwise it ignores it. The rule
+is generic: no profile or kit field has an orb entry. It needs the match flow
+with `energyOrb`; in free play, and in a match without the orb, `state.match.orb`
+is missing and the bot plays as it always did. The readings, the lead's calls
+for #225 (batch #223 decision 12), with a dated amendment line under the spec:
+
+- **Up** means collectible: the phase is `round`, `match.orb` is there and not
+  taken, and `phaseTicks` is 1200 or more (`ORB_COLLECTIBLE_TICKS`), the tick the
+  sim's next step lets a champion take it. The warning at 1020 is no reason to
+  walk: there is no pre-positioning.
+- **Threat range** is the bot's own reach: an enemy counts when it is alive,
+  within the profile's `rangeMax` (inclusive) of the bot and in a clear shot of
+  0.5 m, which is `enemyInReach`, the test the finisher and the deadlock rule
+  already use. Why: it needs no new tuned constant and no new scan, it stays
+  generic through the profiles, and bots.md already words it as "in reach". A
+  melee champion (rangeMin 0, so a short reach) therefore contests whenever no
+  enemy is within its 2 to 3 m; a ranged one (Quillon 12.9 m, Lumeth 11 m) seldom
+  contests in mid-fight, since an enemy in a clear shot within its range ends it.
+  The alternatives that were weighed and not built: a fixed 6 m danger radius, the
+  roster's escape range (B, recorded for the owner's veto), and the enemy's reach
+  covering the bot (C), which needs the profile of every enemy on every think and
+  would stop nearly every contest on these arenas.
+- **Closer than any enemy** is strict, by centre distance to the orb point
+  (compared squared): the bot's is less than that of every alive enemy. A mirror
+  tie is not closer. Allies and the dead do not count.
+
+Mechanics. `decide()` sets a flag `orb` in the decision on every path (the
+idle path of a match with no enemy alive included), and the flag goes through
+the delay ring with the intent and the target, so the contest is as late as any
+decision: 30, 15 or 6 thinks by tier. At act time the bot walks only if the orb
+is still up (`orbUpInto` again), so an orb that was taken inside the delay is
+never walked to. Only the move is replaced: when the acted flag holds and the
+orb is up, the move is the path follower toward the orb point (the goal kind
+`orb`, a fresh follower on a change of kind, like the others) and the intent's
+move is skipped. The intent, the target, the cast gates, the aim, the escapes,
+the dodge and `inspect()` stand as decided, so a bot on its way to the orb still
+presses what its intent and its kit say, and a dodge still sidesteps. The orb
+point is a bot-owned record made in `createBot` that starts as doubles (0.5), as
+the sim's geometry does, so an x of 0 (a small integer) on arena 2 does not box
+the field. The rule draws no random number.
+
+Measured, on the six shipped kits with the orb on: every one of the 21 pairings
+(15 two-kit pairs and the 6 mirrors, with a filler of Hargrim or Quillon as
+six-cells.ts has it), both arenas, seeds 101 to 104, match seed 7, normal tier,
+played to matchEnd (a scratch, not committed, 42 matches; Durnhal of #211, the seventh kit, was
+not in it). A round is an orb
+round when it reaches tick 1200, and most do not: normal bots end a round at
+tick 1000 for most pairings, so the orb is up in 20 of 78 rounds on arena 1 and 16
+of 82 on arena 2. The bots took it in 14 of the 20 and 9 of the 16 (70 and 56
+percent); with the contest switched off, the same scan has 3 of 18 and 1 of 18,
+which are the champions that stood on it by chance. The orb flag (the decision's, before
+the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
+each (one contest is a flip to true and one to false at its end or at the next round).
+The flips are not spread evenly: a cell with orb rounds reads 2 to 12 flips, but for the
+cells with Lumeth, which read 0 to 46 (Lumeth against Brimwick on arena 1: 46 flips in 2 orb
+rounds of the 4 bots, about one flip every 74 bot-ticks; the Lumeth mirror 26 and 22; Quillon
+against Lumeth 28 and 8). A ranged kit's reach is 9 to 13 m, and a champion that kites in and
+out of the reach of an enemy flips the threat test with it, so the contest starts and stops
+as the distance crosses `rangeMax`; this is reading A at work (an enemy in reach ends the
+contest) and not a bug, and no hysteresis is built (see Not built yet).
+
+The committed matches (`orb-match.test.ts`) are the pair that has orb
+rounds: a Quillon and a Hargrim against a Lumeth and a Hargrim, played to matchEnd
+with the orb of `data/orbs.json`.
+
+| Arena   | Ended | Longest ordinary round | Orb rounds | Taken | Taker team | Worst stall |
+| ------- | ----- | ---------------------- | ---------- | ----- | ---------- | ----------- |
+| arena01 | 8176  | 1823                   | 4          | 3     | A 2, B 1   | 17          |
+| arena02 | 7329  | 1666                   | 3          | 2     | A 0, B 2   | 21          |
+
+The mirror of the product's match (Hargrim and Quillon a side) is not that pair: its
+rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds on the two arenas. A cell
+takes 3.7 s locally (a Linux x86 host, Node 24.22), and the two cells are the
+only committed matches of #225, for the unit job's time (see Testing).
 
 ## Clear shot
 
@@ -734,6 +813,11 @@ makes that true, and what stays outside it:
   coins, all made in `createBot`; `dodgeInto` takes objects only, keeps every
   double in a local, passes no double to a call, writes the coin as mulberry32
   over the bot's `Uint32Array` state and uses `sqrt` and `ceil`.
+  The orb contest (#225) is the same kind: the flag `orb` is a boolean field of
+  every decision record (the ring entries, `decided`, `acted` and `lastActed`),
+  the orb point is a `Vec2` made in `createBot` that starts as doubles, and
+  `orbUpInto` and `nearerThanEnemies` take objects, keep every double in a local
+  and pass none to a call.
 - `hypot2` is V8's algorithm for `Math.hypot` of two numbers, which allocates
   32 B per call, so a bot that measures a dozen distances allocated 400 B for
   them. A test compares it, bit for bit, with `Math.hypot`. That test pins the
@@ -856,6 +940,15 @@ is a different match, with round 3 begun by tick 2609, and a replan after a
 sidestep lands in `follow.ts` too, so the dodge may add to them. The old lead
 of 4 skipped them (at 4 the median read 3428 to 4068 B). `dodge.ts` is in no
 window's list of functions.
+
+The orb contest of #225: `orb.ts` and the orb branch of `think` are in no
+window's list of functions either, since the windows fall 330 to 480 ticks into a
+round and the orb is collectible from tick 1200. What the package moved is the
+match itself: the bots contest the orb that the page's match has on since #224,
+which shortens the match to tick 4619, so the live probe's warm-up (tick 2100, round
+3 begun by tick 3149) and lead (11 windows) were re-measured, and read bots medians
+of 6644, 6936 and 7196 B and counted-code medians of 396, 432 and 456 B, under the
+unchanged limits (testing.md, the live scene on the bots of #225).
 
 The live scene bounds the bots: the median of its five windows' own bots figures
 must be at most 18 000 B (`LIVE_BOTS_LIMIT_BYTES` in `e2e/heap-probe.ts`). That
@@ -1280,6 +1373,12 @@ match replays exactly from its input stream.
   finishers (the one finisher is the rule above).
 - A dash away from the target for Skerrow (Lunge away): the dash hold leaves it
   unpressed on an escape think. Glide is built, see Openers and escapes.
+- More of the orb than the contest of #225 (see The energy orb): no
+  pre-positioning at the warning (tick 1020; a bot walks only once the orb is
+  collectible), no per-champion or per-profile orb rule (the rule is generic), no
+  hysteresis on the threat test (a ranged bot that kites across its reach flips the
+  contest on and off, measured there), and no path length for "closer" (the centre
+  distance to the orb point decides, not the distance a bot would walk around a pillar).
 
 ## Testing
 
@@ -2201,7 +2300,7 @@ nothing that the sample can see: 102 against 100 wins, no
 pairing apart by more than 3 (the binomial spread of a 50 percent cell of 100 matches is 5).
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds nineteen frozen scenes on arena 1 with the six shipped kits (a
+section. It builds twenty-one frozen scenes on arena 1 with the six shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
@@ -2214,9 +2313,13 @@ its cast in progress, so the ally is held through the windup on every think,
 an Ondrel escape: a kite inside 5 m with Reed Step ready, the dash landing
 search and the aim override on every think, a Brimwick escape: a kite inside 7
 m with Flare Step ready, the landing search for a teleport that is not fixed
-and the aim override on every think, and a dodge: a Quillon standing with two
+and the aim override on every think, a dodge: a Quillon standing with two
 bolts at her, one along an axis and one on a diagonal, so the threat scan of
-both and the sidestep run on every think), warms each bot up with 20000 thinks,
+both and the sidestep run on every think, an orb contest: a Hargrim 7 m from the
+orb with the orb up and the enemy far out of reach, so the nearer scan, the reach
+scan and the path to the orb run on every think, and an orb ignored: a Quillon
+nearer the orb than an enemy in her reach, so the nearer scan passes and the reach
+test stops the contest on every think), warms each bot up with 20000 thinks,
 settles it in the default tiers (windows read like a round until one is under
 the bound, at most 20, which decide nothing: a series that falls is a late
 tier-up the settle absorbs, a series flat through the cap is a state it does not
@@ -2401,3 +2504,55 @@ test replays the final state of the #58 run (health 3, 27, 26 and 13 of 160, 120
 120, everyone at its spawn, seeds 101 to 104) on both kit sets: the two bots of the team
 that is behind are 1 m from their spawns within their reaction delay and a second, and a
 death follows within 3600 ticks.
+
+The rules of #225 (the energy orb), pinned on frozen scenes with the orb on
+(`orb.test.ts`, `sceneOf` with its `orb` option: the match flow, `energyOrb`,
+the round phase at `phaseTicks` 1200 unless given) and in one seeded match
+(`orb-match.test.ts`). A contest is observed against a twin: the same state but
+for `orb.taken = true`, thought on by a bot of the same seed; it is the first
+think on which the two streams differ. The scenes: the contest comes exactly
+`delay` thinks (30, 15 and 6 by tier) after the orb becomes collectible (settled
+at 1199, then 1200), differs in `moveX` and `moveY` alone, and a stepped clone
+with the enemy idle emits `orbTaken` for the bot; the threat at exactly `rangeMax`
+(no contest) and 0.05 m beyond it (contest), and an enemy within `rangeMax`
+behind arena 1's rect that has no clear shot (contest, and in the open none);
+closer (an enemy 0.05 m nearer and a mirror tie: no contest; 0.05 m farther: contest; a
+second enemy that is not the target and is nearer: none; a dead enemy or an
+ally nearer: contest); up (1199 none, 1200 and 1201 and 4000 contest, 1020 none,
+taken, the warmup, the round end and the match end with `phaseTicks` 5000 none,
+free play and a match with no orb as with the orb off); the act-time check (the
+orb taken inside the delay is never walked to); only the move (a retreating
+Hargrim nearer the orb walks to it and still presses Iron Hide on the same thinks
+as its twin); and a bot with no kit and no profile entry contests. Each is red under
+its mutation, applied alone: the contest never set; the flag decided at act time;
+an extra generator draw on a contest; the threshold at 1020; the threshold at 1201;
+taken ignored; the phase ignored; the reach comparison made strict; the reach test
+dropped; the clear shot dropped; `<=` for `<`; only the target compared; the dead
+counted; allies counted; the act-time check dropped; the intent replaced on a
+contest; a kit required for the contest.
+
+The heap check has the scenes `orb contest` and `orb ignored` (see Allocation),
+0 B per think on Node 22 and under Maglev on Node 26.7.0. A six-double object kept
+in a module variable on the contest path of `decide` reads 152 B in the contest
+scene, and in `nearerThanEnemies` 152 B in both, red on Node 22 in every round
+(3 of 3 runs); a double argument to a call Maglev does not inline reads 64 and 80
+B, red on Node 26.7.0 in Maglev alone (3 of 3 runs).
+
+`orb-match.test.ts` plays a Quillon and a Hargrim against a Lumeth and a Hargrim on
+both arenas with the orb on (seeds 101 to 104, match seed 7, normal, 3 rounds to
+win, to matchEnd, `SIX_SET`): the press oracle on every press, `think` leaves the
+checksum alone, no blocked escape, no stall over 120 ticks (17 and 21), inside the
+budget, and the bots take the orb in more than half of the rounds in which it is
+collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 2 of 3).
+With the contest switched off the two cells are red.
+
+The identity harness (the 16 rows of PR #142's harness, orb off: free play has no
+match flow, so `orbUpInto` is false on every think) is unchanged: all 16 hashes
+and input streams are the same on main's `packages/bots/src` (b3a0134, with Durnhal's profile) and
+on the branch (`cmp` on `hashes-*.txt` and `streams-*.json`), with the hashes of #213's
+table: headless fb22c35a5f68, stall 418e9d6417a9, kits 4bb47dbeb659, kits301
+3e8f97a889c6, kitsHard f8f77e6ad9ce, kitsEasy 8dde421a539f, kitsSwapped
+11cdfcf07e77, kitsSeed99 d132e4b317b5, plain1200 3ad008d826fb, plainOther
+c0a93f85762f, kitsLowEarly 2d49cd14d4d3, kitsLow2 ec66cc43b4b9, plainLow
+9c75e0b4cb08, skerrow 2a564f23901b, lumeth2v2 8ce972930111 and lumeth3v3
+bf55f9fe4df6.

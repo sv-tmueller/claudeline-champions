@@ -9,8 +9,13 @@ import { colourNear, countPixels, orFail, watchProblems } from './support';
 // (`?timescale=10`, packages/client/src/dev-launch.ts): a 16 ms frame is about 10 ticks, so the 180
 // ticks of the warning are 18 frames and a read after every frame sees each mode of the hook
 // `data-orb`. The picture is `orb.png`, taken while the orb is up. Every wait is a tick budget and
-// nothing names a tick: the bots change (and the bots do not contest the orb yet), so the second
-// test takes any taker, and a change that kills the walking human first fails it by name.
+// nothing names a tick: the bots change, so the second test takes any taker, and a change that
+// kills the walking human first fails it by name. The bots contest the orb since #225 (a bot walks
+// to it once it is collectible, when no enemy is in its reach and it is nearer than every enemy,
+// after its reaction delay: 30 ticks on easy), so a taker may be a bot: the orb is up for at least
+// one read of about 10 ticks unless a champion already stands on it at tick 1200, which no champion
+// does in this match (the orb is up from tick 1392 and taken at tick 1468, a bot's walk), and the
+// line of kind orb names whoever took it.
 //
 // The units behind it are orb-view.test.ts (the modes against the real sim's events and the first
 // collectible step), kill-feed.test.ts and hud.test.ts (the line) and the loopback orb spec of the
@@ -136,7 +141,8 @@ test('shows the warning ring, then the orb, and draws it on the field', async ({
     expect(modes, 'hidden before the warning').toEqual(['hidden', 'warning']);
 
     // 3. The orb itself, from tick 1200 of the round, unless somebody took it or the round ended first.
-    // The bots do not go for the orb, so with an idle human it is up for at least one read.
+    // The bots go for the orb only after their reaction delay and a walk, so it is up for at least one
+    // read (a champion that already stood on it at tick 1200 would take it on the first step).
     hooks = await runUntil(page, 'the orb', ORB_COLLECTIBLE_TICKS - ORB_WARNING_TICKS + 60, (h) => h.orb !== 'warning', record);
     expect(hooks.orb, 'the warning became the orb').toBe('up');
     expect(modes).toEqual(['hidden', 'warning', 'up']);

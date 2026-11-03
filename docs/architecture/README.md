@@ -51,7 +51,9 @@ first.
   from kit data with range profiles for all seven roster ids; the energy reserve;
   openers and escapes for Hargrim, Quillon and Skerrow (#81), Skerrow's wait at
   6 to 8 m and her Quiet Dart opener, and no dash pressed on an escape think for
-  any kit (#98); aim leading and three tiers. A think allocates nothing in the
+  any kit (#98); aim leading and three tiers; the contest of the energy orb (a
+  bot walks to it once it is collectible when no enemy is in its own reach and it
+  is nearer than every enemy, #225). A think allocates nothing in the
   steady state and a plan search only its path
   (`packages/bots/test/allocation.test.ts`). Lumeth has Binding Sigil beside an
   ally, the 3 m escape trigger with Lantern Burst and Glide, and her ally slots:
@@ -72,7 +74,7 @@ first.
   arena. The standard match has the energy orb on, at the arena's point of
   `data/orbs.json` (#224): a warning ring from `orbSpawn`, the orb while it is
   collectible, a kill-feed line naming the taker and a warning sound; the bots
-  do not go for it yet. The HUD has the ring warning and the kill feed, and the result screen
+  contest it (#225). The HUD has the ring warning and the kill feed, and the result screen
   has the champion, arena, team size and difficulty select. Escape opens a menu
   that pauses the match (Resume, Restart, the select again, a keys view that
   rebinds the nine movement and slot keys and the held self-cast key C, and a

@@ -55,15 +55,18 @@ interface Hooks {
 // its own, so the first read is tick 0.
 const PAUSE_AT_MS = 60_000;
 // The warm-up: plain windows, no profiler, until this tick, then on to the start
-// of the next round: round 4, begun by tick 8969 on the bots of #213, with rounds 1 to 3 played
-// (round 3, begun by tick 7529, is not measured: see EVENT_LEAD_WINDOWS; round 3 was the measured
-// round, begun by tick 4289, on the bots of #137).
-const WARM_UP_TICKS = 8000;
+// of the next round: round 3, begun by tick 3149 on the bots of #225, which contest the energy
+// orb (round 3 is the measured round again, as on the bots of #137 where it began by tick 4289;
+// round 4 began by tick 8969 on the bots of #213, which the 8000 of that package waited for, and
+// the match now ends at tick 4619 in this scene). Round 2 begins before tick 2100, so the first round
+// that begins after it is round 3.
+const WARM_UP_TICKS = 2100;
 // The warm-up fails past this tick: the match ended or a round never began. It is
 // WARM_UP_TICKS plus the longest round that match-end.spec.ts budgets, a round that
 // runs to sudden death, about 7000 ticks: a round in progress at WARM_UP_TICKS can end
-// that late, and the next one begins then (it was 2100 + 7000 = 9100 before #213).
-const WARM_UP_BUDGET_TICKS = 15_000;
+// that late, and the next one begins then (2100 + 7000 = 9100; 8000 + 7000 = 15 000 on the
+// bots of #213).
+const WARM_UP_BUDGET_TICKS = 9_100;
 // Plain windows of the round before the measured ones, so that the measured windows
 // hold the round's first projectiles and hits, the event paths this scene exists to
 // cover. Measured on the bots of #137, which dodge, with the moving pointer of POINTERS
@@ -91,11 +94,26 @@ const WARM_UP_BUDGET_TICKS = 15_000;
 // (decision 9 of batch #134): the measured windows were the first ones of the round's chase,
 // where the bots' plans read the most (13 KB and 6 KB of `splitPath`, in windows 2 and 3), and
 // the bots limit of heap-probe.ts is derived from them. It is 4 on the bots of #213 (above).
-const EVENT_LEAD_WINDOWS = 4;
-// The windows measured, after the lead: windows 4 to 8 of round 4, ticks 9089 to 9239 (windows 2 to 6
-// of round 3, ticks 4349 to 4499, on the bots of #137).
+// On the bots of #225, which contest the energy orb (the orb is on in this match since #224), round 3
+// begins by tick 3149 and the first death of the round is read at tick 3719 (bar 2 of the
+// four, in window 18 of the round); the first projectile is live by window 2 (tick 3239) and the
+// bots chase for the first ten windows: a scratch run of 30 windows from the round start with the
+// profiler on in every one (not committed) gives the median of the bots' bytes over each run of five
+// windows, from the lead 0 on: 57 628, 38 356, 36 668, 33 120, 21 552, 33 120, 33 120, 24 696, 20 768 and
+// 20 768 B (leads 0 to 9, all over the limit of 18 000 B: the plans of the chase, `splitPath` 12 to 35
+// KB a window; the orb is not up before tick 1200, so no walk to it runs in them), then 8724 (lead 10), 6928 (lead 11) and 2320 B (lead 12,
+// whose last window ends 60 ticks before the death, the floor). The lead is 11: the five windows are
+// 11 to 15 of the round, ticks 3479 to 3629, 90 ticks before the first death, and 3 runs of 3
+// (`--repeat-each=3`) read bots medians of 6644, 6936 and 7196 B and counted-code medians of 396, 432
+// and 456 B (the limits are 18 000 and 780 B), the first window of each with a 24 KB plan; the projectile, hit, cast and stagger
+// assertions hold in all three.
+const EVENT_LEAD_WINDOWS = 11;
+// The windows measured, after the lead: windows 11 to 15 of round 3, ticks 3479 to 3629 (windows 4 to 8
+// of round 4, ticks 9089 to 9239, on the bots of #213, and windows 2 to 6 of round 3, ticks 4349 to
+// 4499, on the bots of #137).
 // The median of the five is the asserted figure, as in the sandbox (see testing.md).
-// The last of them ends 300 ticks before the first death of the round (the floor is 60; 360 on #137).
+// The last of them ends 90 ticks before the first death of the round on the bots of #225 (the floor is 60; 300 on
+// #213 and 360 on #137).
 const MEASURED_WINDOWS = 5;
 // The window ticks, 29 to 31: the hook's first frame only starts the loop clock.
 const WINDOW_TICKS_MIN = 29;
@@ -106,8 +124,10 @@ const WINDOW_TICKS_MAX = 31;
 const FIRST_DEATH_MARGIN_TICKS = 60;
 // After the end assertions, windows run on to the first death of the round.
 const RUN_ON_BUDGET_TICKS = 1200;
-// A live attempt is about 9600 frames on the bots of #213 (the warm-up to tick 8969, the lead,
-// the five windows and the run-on to the first death, tick 9539; about 4900 frames and tick
+// A live attempt is about 3800 frames on the bots of #225 (the warm-up to tick 3149, the lead, the
+// five windows and the run-on to the first death, tick 3719; 2.4 min for 3 attempts in parallel
+// locally on a machine that was running other jobs); about 9600 frames on the bots of #213 (the
+// warm-up to tick 8969, the lead, the five windows and the run-on to the first death, tick 9539; about 4900 frames and tick
 // 4859 on the bots of #137, and about 3400 frames and tick 3419 on 57dd52f). It took 6 to 16 s
 // locally on those (3 attempts in parallel), and 2.2 min for 3 attempts in parallel at 9600
 // frames on a machine that was running other jobs. On the runner the live test took 41 s to
@@ -115,8 +135,8 @@ const RUN_ON_BUDGET_TICKS = 1200;
 // 3def3bc, run 37456539110; the whole Playwright run of 19 tests took 2.7 to 4.2 min), about
 // 18 ms a frame, so 180 s was a margin of about 2x there and would be about 1.05x at 9600
 // frames: the timeout is 360 s, about 2x again. The earlier shape took 1.0 to 1.1 min (jobs
-// 112201476995 and 112203346352 on 7b80afd). The warm-up budget above (15 000 frames, about
-// 270 s at that rate) is reached only when the spec is already failing, and then the timeout
+// 112201476995 and 112203346352 on 7b80afd). The warm-up budget above (9 100 frames, about
+// 160 s at that rate) is reached only when the spec is already failing, and then the timeout
 // may fire first.
 const TEST_TIMEOUT_MS = 360_000;
 

@@ -333,6 +333,13 @@ control without deciding the round.
 - **Bots:** a bot contests the orb when it is up, no enemy is in its threat
   range, and it is closer than any enemy; otherwise it ignores it. Bot
   profiles need no per-champion rule for this.
+  Amended 2026-11-02 by [batch #223 decision 12](https://github.com/sv-tmueller/claudeline-champions/issues/223#issuecomment-6588370289),
+  for #225: "threat range" is the bot's own reach, that is, an enemy is a threat
+  when it is alive, within the bot's profile `rangeMax` (inclusive) and in a
+  clear shot of 0.5 m; "up" means collectible (round phase, not taken, at least
+  1200 ticks into the round), "closer than any enemy" is strictly nearer by
+  centre distance than every alive enemy, and the contest replaces only the
+  bot's move (see [bots](../../architecture/bots.md), The energy orb).
 - **The client** draws the warning marker, the orb, and a line in the kill
   feed when it is taken.
 

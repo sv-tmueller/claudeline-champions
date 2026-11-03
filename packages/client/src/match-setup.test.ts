@@ -21,7 +21,7 @@ import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
 // The tick budget of e2e/match-end.spec.ts for the default match to its result screen: the headless end
-// tick, 5476 (the same with the energy orb on: the bots do not go for it before #225), plus two rounds of about 1000 and one of about 7000, rounded up to 1000 (as every other row's).
+// tick, 5476 (also with the energy orb on and the bots of #225 that contest it: its rounds end at 989, 1395, 1144 and 1052, one of them past tick 1200 and nobody takes the orb), plus two rounds of about 1000 and one of about 7000, rounded up to 1000 (as every other row's).
 const MATCH_END_BUDGET_TICKS = 15_000;
 
 function launch(champion: string, scene: Launch['scene'] = 'match'): Launch {
@@ -327,9 +327,9 @@ describe('a match of bots from setup to the result', () => {
 // of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86, 4198 on those of
 // #98 (the dash hold shortened the first two rounds of the live match, and lengthened this one)
 // 12191 on those of #137 (the dodge: a first round of 6453 ticks goes to sudden death) and is 5381
-// on those of #213 (a melee champion stands inside its reach), and unchanged with the energy orb on (#224: it warns in rounds past 17 s and nobody takes it); every bots change moves it, the console line above reports the current one, and a match that
+// on those of #213 (a melee champion stands inside its reach), and 5794 on those of #225, which contest the energy orb (it is taken once, in a round of 1624 ticks); every bots change moves it, the console line above reports the current one, and a match that
 // ends past the budget fails here before the e2e does.
-const ARENA02_END_TICK = 5_381;
+const ARENA02_END_TICK = 5_794;
 const ARENA02_BUDGET_TICKS = 15_000;
 
 describe('a match of bots on arena02', () => {
@@ -363,21 +363,22 @@ describe('playableTeamSize', () => {
 });
 
 // The tick budgets of the 3v3 rows of e2e/match-end.spec.ts: the end tick of the match when the
-// budget was set (measured through this setup, with the energy orb on since #224, and the client's bot driver on the bots of #213, the
-// stand of the melee champions; 5774 and 15773 on those of #137, the dodge, 5349 and 11095 on those
-// of #112, and 12431 and 7125 with two Quillons a side on 57dd52f),
-// plus two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is
-// 2900, the longest non-sudden 3v3 round measured (2801 ticks, arena02, round 4; 2101 and 2023 are
-// the next, 1954 and 3331 on the earlier bots and kits), rounded up to 100: a healer keeps a round
-// going, and the dodge lengthens it, where the longest was 1557 with two Quillons and the 2v2 rows
-// assume 1000. arena01: ceil((10470 + 2 * 2900 + 7000) / 1000) * 1000 = 24000. arena02:
-// ceil((11903 + 2 * 2900 + 7000) / 1000) * 1000 = 25000. Every kit or bots change moves the end
+// budget was set (measured through this setup, with the energy orb on since #224, and the client's bot driver on the bots of #225, which
+// contest the orb: 7557 and 8780; 10470 and 11903 on those of #213, the stand of the melee champions; 5774 and
+// 15773 on those of #137, the dodge, 5349 and 11095 on those of #112, and 12431 and 7125 with two
+// Quillons a side on 57dd52f), plus two rounds and one sudden-death round of about 7000, rounded up
+// to 1000. The round term is 4400, the longest non-sudden 3v3 round measured (4376 ticks, arena02,
+// round 3, with the orb contested; 2432 and 2366 are the next, on arena01, and 2801 was the longest
+// before the orb bots), rounded up to 100: a healer keeps a round going and the dodge lengthens it,
+// where the longest was 1557 with two Quillons and the 2v2 rows assume 1000. arena01: ceil((7557 + 2 * 4400 + 7000) / 1000) * 1000 =
+// 24000. arena02: ceil((8780 + 2 * 4400 + 7000) / 1000) * 1000 = 25000 (24000 and 25000 with the
+// 10470, 11903 and 2900 of #213: the budgets did not move). Every kit or bots change moves the end
 // tick, the console line reports the current one, and a match that ends past the budget fails
 // here before the e2e does.
-const THREE_V_THREE_ROUND_TICKS = 2900;
-const ARENA01_3V3_END_TICK = 10_470;
+const THREE_V_THREE_ROUND_TICKS = 4400;
+const ARENA01_3V3_END_TICK = 7_557;
 const ARENA01_3V3_BUDGET_TICKS = 24_000;
-const ARENA02_3V3_END_TICK = 11_903;
+const ARENA02_3V3_END_TICK = 8_780;
 const ARENA02_3V3_BUDGET_TICKS = 25_000;
 
 describe('a 3v3 match of bots from setup to the result', () => {

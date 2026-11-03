@@ -70,7 +70,10 @@ others.
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
   timeout 15 s. With the settle of #133 (one window a scene on the runner): 4.8
   to 6.9 s over the three attempts of PR #184, the heap jobs 3.6 to 5.3 s, the
-  timeout stays 15 s (twice 6.9 s is 13.8 s).
+  timeout stays 15 s (twice 6.9 s is 13.8 s). With the two orb scenes of #225 (21
+  scenes) the unit job reads 8.2 s (job 125568510485, 8152 ms), twice which is 16.3 s,
+  so the timeout is 20 s; on a loaded machine (load average 25 on 6 CPUs) it read 16.4 s
+  and failed the old 15 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (eight models): 2.5 to 4.0 s locally, 3.3 to
   7.2 s green, 3.3 to 8.0 s red, timeout 20 s.
@@ -197,6 +200,19 @@ the trigger of about 8 minutes (480 s), at 94 percent of it. The two pushes befo
 it, without and with the file, took 230 and 254 s (the second one red on a
 melee-key list that this package then extended).
 
+The seeded orb matches of `packages/bots/test/orb-match.test.ts` (#225: two cells, a
+Quillon and a Hargrim against a Lumeth and a Hargrim on each arena, with the energy orb
+on, 3 rounds to win) have the timeout of the cells above, 60 s a cell. A cell takes 3.7 s
+locally (a Linux x86 host, Node 24.22, with little else running) and 23.5 and 23.7 s (arena01)
+and 21.0 and 26.6 s (arena02) on the runner (jobs 125568510485 and 125574546646 of runs
+41530318344 and 41532073021, the file 44.5 and 50.3 s beside the other long files), so
+twice the slowest is 53.2 s and the timeout stays 60 s. The unit job of the draft pull
+request read 7 min 11 s and 7 min 24 s (347.8 and 353.0 s of Vitest over 146 files) with
+them. They
+are the only matches the package commits (the optional orb-on determinism row was left out
+for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
+unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.
+
 ## Test types
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
@@ -228,9 +244,9 @@ melee-key list that this package then extended).
   and `audio.test.ts` (six voices) are its units. `match-setup.test.ts` pins
   that the standard match gets the orb (and the sandbox does not), and its
   `playToTheEnd` plays with it, so the `*_END_TICK` rows are the match the page
-  plays: they did not move with the orb on (5476, 5381, 10 470 and 11 903), since
-  the bots do not go for the orb and nobody takes it, so each match logs the
-  warnings and pickups it saw. Every other client unit test is orb-off.
+  plays: they did not move with the orb on while the bots ignored it (5476, 5381, 10 470
+  and 11 903 on the bots of #213), and three of the four moved with the bots of #225, which contest
+  it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
   pairings, fills and the seed schedule, the cell plan (a six-name kit list
   gives 15 pairings and 60 cells with 4 and 12 fills, played by nothing),
@@ -503,7 +519,9 @@ other spec.
   orb-coloured pixel (`#2f4bff`, tolerance 24) in a 1280x720 picture before the
   warning and more than 100 in `orb.png`, taken while the orb is up (379 in the
   last run, the sphere and its ring); the idle human takes nothing and the bots
-  do not go for the orb, so it ends hidden at the round's end with no orb line.
+  contest the orb since #225, so a bot takes it a few dozen ticks after it is up (up at tick
+  1392 and taken at tick 1468 in the last run) and the line names the taker; a round that
+  ended first would leave it hidden with no line, which the test also accepts.
   The second walks the human right (KeyD) from the warning to a touch of the
   orb at (0, 2.5) and waits for the pickup: a feed line `data-kind="orb"` that
   names a champion (any taker; Hargrim in the last run) with an ally or enemy
@@ -605,11 +623,16 @@ other spec.
   (`/?arena=arena02&timescale=100` for arena02) and team size (`teamsize=3` for
   the 3v3 rows), within a budget of ticks and frames per row: 15 000 and 182 on
   arena01 (`ceil(15000 / 96) + 25`; it ends at tick 5664 in the e2e and 5476 in
-  a headless run, a Defeat 1 : 3, on the bots of #213), 15 000 and 182 on arena02
-  (tick 5381 headless and 5664 in the e2e, a Defeat 1 : 3), and 24 000 and 275 on the
-  3v3 of arena01 (it ends at tick 10 470 headless and 10 944 in the e2e, a Victory
-  3 : 2) and 25 000 and 286 on the 3v3 of arena02 (tick 11 903 headless and
-  11 904 in the e2e, a Defeat 2 : 3). The energy orb has been on in these matches since #224 and moved none of these ticks (re-measured: the bots do not go for it, and an idle human takes nothing). On the bots of #137 the rows were 14 000 and
+  a headless run, a Defeat 1 : 3, on the bots of #225 and of #213), 15 000 and 182 on arena02
+  (tick 5794 headless and 6144 in the e2e, a Defeat 1 : 3; 5381 headless on the bots of #213),
+  and 24 000 and 275 on the 3v3 of arena01 (it ends at tick 7557 headless and 7584 in the
+  e2e, a Defeat 0 : 3; 10 470 and 10 944, a Victory 3 : 2, on the bots of #213) and 25 000 and
+  286 on the 3v3 of arena02 (tick 8780 headless and 9024 in the e2e, a Defeat 0 : 3; 11 903 and
+  11 904, a Defeat 2 : 3, on the bots of #213). The energy orb has been on in these matches since #224 and moved
+  none of these ticks on the bots of #213 (they ignored it, and an idle human takes nothing); the
+  bots of #225 contest it and moved three of the four (above). The 3v3 round term is 4400 (4376,
+  arena02, round 3; 2900 on the bots of #213), so the budgets do not move: 7557 + 8800 + 7000 and 8780
+  + 8800 + 7000 round up to 24 000 and 25 000. On the bots of #137 the rows were 14 000 and
   171 (5184 in the e2e, 4936 headless), 22 000 and 255 (12 384 and 12 191), 19 000
   and 223 (6144 and 5774, a Defeat 0 : 3) and 29 000 and 328 (16 224 and 15 773). A headless run through the client's setup
   and driver gives each row's tick, in `match-setup.test.ts`. The budget is
@@ -739,10 +762,11 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   with real changes. The clock is paused before the page loads and never runs a
   frame, so the first read is tick 0 and every tick is the hook's. The warm-up
   is plain windows with no profiler from tick 0 to the first round that begins
-  after tick 8000 (round 4, begun by tick 8969 on the bots of #213 on every run
-  so far: the bots are deterministic; it was tick 2100 and round 3, begun by tick
-  4289, on the bots of #137), then 4 plain windows of the round (the lead, 120
-  ticks), then the next 5 windows are measured, ticks 9089 to 9239. The figures
+  after tick 2100 (round 3, begun by tick 3149 on the bots of #225 on every run
+  so far: the bots are deterministic; it was tick 8000 and round 4, begun by tick
+  8969, on the bots of #213, and round 3, begun by tick 4289, on the bots of #137),
+  then 11 plain windows of the round (the lead, 330 ticks), then the next 5 windows
+  are measured, ticks 3479 to 3629. The figures
   that follow are those of round 3 on the bots of #137 (the warm-up and the
   lead of 2 windows, ticks 4349 to 4499), kept as the derivation of the lead; the
   #213 paragraph below says what moved them. The
@@ -780,6 +804,32 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   with `--repeat-each=3` (2.2 min locally with other jobs running), and the
   variants above in a scratch copy of the tree; the match-end rows moved with
   the rest of the cascade (see match-end.spec.ts above).
+- The live scene on the bots of #225 (the bots contest the energy orb, which is on
+  in this match since #224). The match now ends at tick 4619 in the page, so the
+  warm-up to tick 8000 of the bots of #213 finds no round and fails the spec ("the
+  match ended at tick 4619 before a round began"). The constants were re-measured,
+  as decisions 7 and 11 of batch #223 allow (the limits of 600, 780 and 18 000 B
+  do not move): the warm-up is 2100 again (round 3 begins by tick 3149; its budget
+  is 2100 + 7000 = 9100), and the lead 11. The lead is read off a scratch run of 30
+  measured windows from the round start, with the profiler on in each, and the
+  median of the bots' bytes over each run of five: leads 0 to 9 read 57 628, 38 356,
+  36 668, 33 120, 21 552, 33 120, 33 120, 24 696, 20 768 and 20 768 B (the plans of
+  the chase, `splitPath` 12 to 35 KB a window, over the limit of 18 000 B; the orb is
+  not up before tick 1200, so no walk to it runs in them), lead 10 reads 8724, lead 11 6928 and lead 12 2320 B, and the
+  first death of the round is read at tick 3719, so lead 12 would leave the floor of
+  60 ticks and lead 11 leaves 90. The five windows are 11 to 15 of round 3, ticks 3479
+  to 3629: the round's first projectile is live by window 2, and the windows hold a
+  hit, a bot casting and a champion staggered by a hit. On the final constants
+  (`--repeat-each=3`, local, Node 24, 1.9 min for 3 attempts) the three attempts read
+  counted-code medians of 456, 396 and 432 B (limit 780) and bots medians of 7196, 6644
+  and 6936 B (limit 18 000), with the first death at tick 3719 and the margin 90. The
+  windows fall 330 to 480 ticks into a round, before the warning at 1020 and the
+  orb at 1200, so `orb-view.ts` is hidden and `orb.ts` is in no window; the figures
+  moved with the match and not with the orb code. A live attempt is about 3800 frames
+  (about 9600 on the bots of #213); the test timeout stays 360 s. `orb.spec.ts` and
+  the `match-end.spec.ts` rows ran green with `--repeat-each=3` on the same tree: the
+  orb is up from tick 1392 and taken at tick 1468 in the first test, and the match-end
+  figures are in the rows above.
 - The live scene's pointer. Before every window of the run, from the first read
   (the warm-up, the lead, the measured windows and the run-on), a synthetic
   `mousemove` is dispatched on `window` through `page.evaluate`. The page runs

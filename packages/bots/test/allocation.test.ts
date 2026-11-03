@@ -109,6 +109,15 @@ import { spawnBolt } from './scenes';
  * Hargrim, M1 in its band on every think), and also 168 in skerrow engage and 336 in skerrow wait,
  * on Node 22 and Node 26, in both tiers: a scene that already exists reaches the branch, so the
  * branch needs none of its own.
+ * The same object (six doubles) kept in a module variable on the two paths of #225 reads 152 in the
+ * orb contest scene when made on the contest path of `decide` (once a think), and 152 in both orb
+ * scenes when made in `nearerThanEnemies` (the orb ignored scene runs the scan on every think and
+ * stops at the reach test after it), in every round on Node 22 (the lowest of 3 of 3 runs, settle
+ * windows alike). A double argument (and result) of a call that Maglev does not inline, a function
+ * of 120 steps called for the bot's squared distance and for each enemy's, reads 64 in the orb
+ * contest scene and 80 in the orb ignored scene, red in 3 of 3 runs on Node 26.7 in Maglev alone;
+ * the default tiers read the same figures, under their limit of 128. A small function is inlined
+ * and reads 0.
  * The unit tests pin the returned input as the bot's own record, and review covers the decision
  * record.
  *
@@ -179,6 +188,9 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  *   rng.ts:next for the dodge coin                 the dodge block, 32 B
  *   a double argument to dodgeInto                 the dodge scene 16 B; the dodge block 144 B;
  *                                                  the draw block 240 B
+ *   a double argument to a function of orb.ts      the orb contest scene 64 B, the orb ignored
+ *     that is too large to inline (#225)           scene 80 B (the default tiers read the same and
+ *                                                  stay under 128)
  *
  * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
  * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
@@ -621,7 +633,56 @@ function buildScenes(): Scene[] {
       configMirror(),
       5,
     ),
+    // An orb contest: Hargrim 7 m from the orb at (0, 2.5), the round at tick 1200 (collectible), the
+    // enemy Hargrim 11.9 m from it and far beyond reach: the orb is up, no enemy is in reach and the
+    // bot is nearer, so every think reads the orb, scans the enemies twice (nearer, reach) and walks
+    // the path to the orb with the follower of the 'orb' goal. The state is frozen, so the bot never
+    // arrives.
+    scene(
+      'orb contest',
+      0,
+      'engage',
+      false,
+      true,
+      (state) => {
+        arrangeOrb(state);
+        put(state, 0, -7, 3);
+        put(state, 2, 11, 7);
+      },
+      configOrb(),
+    ),
+    // An orb ignored: Quillon 4.03 m from the orb, nearer than the enemy Hargrim (4.5 m), who is 8.5 m
+    // from her on a clear lane and so in her reach (12.9 m), every slot on cooldown: the orb is up and
+    // the reach test stops the contest on every think, after the nearer test passed. She stands.
+    scene(
+      'orb ignored',
+      1,
+      'engage',
+      false,
+      false,
+      (state) => {
+        arrangeOrb(state);
+        put(state, 1, -4, 3);
+        put(state, 2, 4.5, 3);
+        ch(state, 1).cooldowns.fill(100);
+      },
+      configOrb(),
+    ),
   ];
+}
+
+/** The mirror match with the energy orb of arena01 (data/orbs.json), for a frozen scene. */
+function configOrb(): MatchConfig {
+  return { ...configMirror(), roundsToWin: 3, energyOrb: { x: 0, y: 2.5 } };
+}
+
+/** The round of the orb scenes: round 1 at tick 1200, the first tick the orb is collectible. */
+function arrangeOrb(state: GameState): void {
+  const match = state.match;
+  if (match === undefined) throw new Error('the orb scenes need the match flow');
+  match.phase = 'round';
+  match.round = 1;
+  match.phaseTicks = 1200;
 }
 
 /**
@@ -684,12 +745,14 @@ describe('think allocation', () => {
   // Runner (ubuntu-latest, Node 22): 2.9 and 3.9 s green, 5.9, 5.9 and 5.7 s red on 5820f16
   // (runs 39001711657, 39008413462, 39009180211 x3), then 6.9, 5.0 and 4.8 s on the settled check
   // (the three attempts of run 40339535608 of PR #184, one settle window of 10 to 58 ms a scene
-  // each); 1.6 s locally (Apple M5 Pro, Node 22.23.2, full npm run test). Timeout: the smallest of
-  // 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite): 13.8 s, so
-  // 15. A red run to the cap of the settle takes 2 to 4 s locally (the `{ slot, ex }` mutation of
+  // each); 1.6 s locally (Apple M5 Pro, Node 22.23.2, full npm run test); 8.2 s with the two orb
+  // scenes (#225, 21 scenes: job 125568510485 of run 41530318344, the unit job of the draft pull
+  // request, Node 22), and 16.4 s on a loaded Linux machine (load average 25 on 6 CPUs). Timeout: the
+  // smallest of 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite):
+  // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 2 to 4 s locally (the `{ slot, ex }` mutation of
   // bots.md, all 17 scenes at the cap), inside it. The heap jobs (Node 24 and 26, both tiers)
   // read 3.6 to 5.3 s.
-  it('allocates under the limit per think in every scene', { timeout: 15_000 }, () => {
+  it('allocates under the limit per think in every scene', { timeout: 20_000 }, () => {
     const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
     const scenes = buildScenes();
     const lines: string[] = [];

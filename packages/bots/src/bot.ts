@@ -26,6 +26,7 @@ import type { Measure } from './hypot';
 import { chooseIntent, scoreIntentsInto } from './intent';
 import type { Intent, ScoredIntent, Scores } from './intent';
 import { KITE_STEP, createKiteScratch, kiteStepInto } from './kite';
+import { nearerThanEnemies, orbUpInto } from './orb';
 import type { BotProfile } from './profile';
 import {
   SIGHT_CLEARANCE,
@@ -55,12 +56,17 @@ export const TARGET_SWITCH_MARGIN = 1;
 /** Thinks for which one aim error draw is kept. */
 export const AIM_ERROR_HOLD = 15;
 
-/** What the path follower is walking to: the target, the bot's own spawn or a cell that sees the target. */
-type FollowGoal = 'target' | 'spawn' | 'sight';
+/**
+ * What the path follower is walking to: the target, the bot's own spawn, a cell that sees the
+ * target or the energy orb.
+ */
+type FollowGoal = 'target' | 'spawn' | 'sight' | 'orb';
 
 interface Decision {
   intent: Intent;
   targetId: number;
+  /** The bot contests the energy orb: it is up, no enemy is in reach and the bot is nearer. */
+  orb: boolean;
 }
 
 function fail(problem: string): never {
@@ -199,11 +205,11 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   //
   // The delay line: what was decided `delay` thinks ago is what the bot acts on now.
   const ring: Decision[] = [];
-  for (let i = 0; i < tier.delay; i++) ring.push({ intent: 'idle', targetId: -1 });
+  for (let i = 0; i < tier.delay; i++) ring.push({ intent: 'idle', targetId: -1, orb: false });
   let ringIndex = 0;
-  const decided: Decision = { intent: 'engage', targetId: -1 };
-  const acted: Decision = { intent: 'idle', targetId: -1 };
-  const lastActed: Decision = { intent: 'idle', targetId: -1 };
+  const decided: Decision = { intent: 'engage', targetId: -1, orb: false };
+  const acted: Decision = { intent: 'idle', targetId: -1, orb: false };
+  const lastActed: Decision = { intent: 'idle', targetId: -1, orb: false };
   const scores: Scores = { engage: 0.5, kite: 0.5, retreat: 0.5 };
   const command: MoveCommand = { moveX: 0, moveY: 0 };
   const choice: CastChoice = { slot: 'M1', ex: false };
@@ -211,6 +217,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   const sight: SightScratch = createSightScratch();
   const spawnPoint: Vec2 = { x: 0.5, y: 0.5 };
   const goalPoint: Vec2 = { x: 0.5, y: 0.5 };
+  const orbPoint: Vec2 = { x: 0.5, y: 0.5 };
   const kiteScratch = createKiteScratch();
   const dodgeScratch = createDodgeScratch(tier.dodgeChance, tier.castDelay);
   const kitCache = createKitCache();
@@ -255,6 +262,12 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   }
 
   function decide(state: GameState, me: ChampionState, profile: BotProfile): void {
+    // The orb contest: it is up, no enemy is in the bot's reach and the bot is nearer than every
+    // enemy. Decided here, so it goes through the reaction delay with the intent.
+    decided.orb =
+      orbUpInto(orbPoint, state) &&
+      nearerThanEnemies(state, me, orbPoint) &&
+      !enemyInReach(state, me, profile, sight, dist);
     const targetId = chooseTarget(state, me, decided.targetId, dist);
     const target = state.champions[targetId];
     if (targetId < 0 || target === undefined) {
@@ -519,8 +532,10 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
       const slot = ring[ringIndex] as Decision;
       acted.intent = slot.intent;
       acted.targetId = slot.targetId;
+      acted.orb = slot.orb;
       slot.intent = decided.intent;
       slot.targetId = decided.targetId;
+      slot.orb = decided.orb;
       ringIndex = (ringIndex + 1) % tier.delay;
 
       const target = enemyAlive(state, me, acted.targetId);
@@ -550,7 +565,13 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         sight.standClearance = SIGHT_CLEARANCE;
       }
       escapeScratch.streak = cues.escapeThink ? escapeScratch.streak + 1 : 0;
-      move(state, me, profile);
+      // The orb contest replaces the move alone, and only while the orb is still up: the decision is
+      // `delay` thinks old. The intent, the target, the casts and the aim stand as decided.
+      if (acted.orb && orbUpInto(orbPoint, state)) {
+        follow('orb', navGrid(state), me, orbPoint);
+      } else {
+        move(state, me, profile);
+      }
       input.moveX = command.moveX;
       input.moveY = command.moveY;
       if (acted.intent === 'idle' || target === undefined) {
