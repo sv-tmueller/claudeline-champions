@@ -61,6 +61,23 @@ describe('spawnArea', () => {
     ]);
   });
 
+  it('arms a fused area: fuseTicks F, the first application F ticks away, a life of F + D', () => {
+    const state = open();
+    spawnArea(state, spec({ fuseTicks: 45 }));
+    expect(state.areas[0]).toMatchObject({
+      fuseTicks: 45,
+      ticksToNextApply: 45,
+      remainingTicks: 165,
+      intervalTicks: 30,
+    });
+  });
+
+  it('leaves the fuseTicks key out of an unfused area', () => {
+    const state = open();
+    spawnArea(state, spec());
+    expect(Object.keys(state.areas[0] ?? {})).not.toContain('fuseTicks');
+  });
+
   it('stores -0 coordinates as +0 and copies the effects', () => {
     const state = open();
     const effect = { type: 'damage' as const, amount: 5 };
@@ -83,6 +100,10 @@ describe('spawnArea', () => {
     ['a fractional duration', { durationTicks: 2.5 }],
     ['a zero interval', { intervalTicks: 0 }],
     ['a fractional interval', { intervalTicks: 0.5 }],
+    ['a zero fuse', { fuseTicks: 0 }],
+    ['a negative fuse', { fuseTicks: -1 }],
+    ['a fractional fuse', { fuseTicks: 1.5 }],
+    ['a NaN fuse', { fuseTicks: NaN }],
     ['an unknown target filter', { targets: 'everyone' as never }],
     ['a zero effect amount', { effects: [{ type: 'heal' as const, amount: 0 }] }],
     ['an infinite effect amount', { effects: [{ type: 'damage' as const, amount: Infinity }] }],
@@ -256,5 +277,97 @@ describe('area hit effects', () => {
     for (let i = 0; i < 25; i++) step(state, []);
     expect(champion(state, 2).statuses).toHaveLength(1);
     expect(champion(state, 2).statuses[0]).toMatchObject({ type: 'slow', sourceId: 0 });
+  });
+});
+
+describe('the fuse', () => {
+  /** The step numbers (1 = the first step after a dev spawn) on which an areaTick is emitted. */
+  function applications(state: GameState, steps: number): number[] {
+    const applied: number[] = [];
+    for (let n = 1; n <= steps; n++) {
+      step(state, []);
+      if (state.events.some((e) => e.type === 'areaTick')) applied.push(n);
+    }
+    return applied;
+  }
+
+  it('does nothing while armed: no areaTick, no damage, a champion inside is untouched', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(state, spec({ fuseTicks: 30, durationTicks: 1, intervalTicks: 1 }));
+    for (let n = 1; n <= 30; n++) {
+      step(state, []);
+      expect(state.events).toEqual([]);
+      expect(champion(state, 2).health).toBe(120);
+      expect(state.areas[0]?.fuseTicks).toBe(30);
+    }
+    expect(state.areas).toHaveLength(1);
+  });
+
+  it('first applies on step F + 1 after a dev spawn, then every interval', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(state, spec({ fuseTicks: 20, durationTicks: 90, intervalTicks: 30 }));
+    expect(applications(state, 110)).toEqual([21, 51, 81]);
+    expect(state.areas).toEqual([]);
+  });
+
+  it('applies ceil(D / I) times for a fuse and a duration that is no multiple of the interval', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(state, spec({ fuseTicks: 15, durationTicks: 70, intervalTicks: 30 }));
+    expect(applications(state, 200)).toEqual([16, 46, 76]);
+    expect(champion(state, 2).health).toBe(105);
+  });
+
+  it('zeroes fuseTicks on the first application and keeps the key', () => {
+    const state = open();
+    spawnArea(state, spec({ fuseTicks: 15, durationTicks: 60, intervalTicks: 30 }));
+    for (let n = 1; n <= 15; n++) step(state, []);
+    expect(state.areas[0]?.fuseTicks).toBe(15);
+    step(state, []);
+    expect(state.areas[0]).toHaveProperty('fuseTicks', 0);
+    expect(state.areas[0]?.ticksToNextApply).toBe(29);
+    step(state, []);
+    expect(state.areas[0]?.fuseTicks).toBe(0);
+  });
+
+  it('applies and expires a fused one-hit area in the same step', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(state, spec({ fuseTicks: 15, durationTicks: 1, intervalTicks: 1 }));
+    for (let n = 1; n <= 15; n++) step(state, []);
+    expect(state.areas).toHaveLength(1);
+    step(state, []);
+    expect(state.areas).toEqual([]);
+    expect(state.events.map((e) => e.type)).toEqual(['areaTick', 'damage', 'areaExpired']);
+    expect(champion(state, 2).health).toBe(115);
+  });
+
+  it('hits whoever is inside on the detonation step, not whoever was inside when it was armed', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    place(state, 3, 10, 0);
+    spawnArea(state, spec({ fuseTicks: 20, durationTicks: 1, intervalTicks: 1 }));
+    for (let n = 1; n <= 20; n++) step(state, []);
+    place(state, 2, 10, 5);
+    place(state, 3, 0, 0);
+    step(state, []);
+    expect(state.areas).toEqual([]);
+    expect(champion(state, 2).health).toBe(120);
+    expect(champion(state, 3).health).toBe(115);
+    expect(state.events.map((e) => e.type)).toEqual(['areaTick', 'damage', 'areaExpired']);
+  });
+
+  it('emits the same events as an unfused area, shifted by the fuse, and no new kind', () => {
+    const state = open();
+    place(state, 2, 0, 0);
+    spawnArea(state, spec({ fuseTicks: 15, durationTicks: 1, intervalTicks: 1 }));
+    const kinds = new Set<string>();
+    for (let n = 1; n <= 16; n++) {
+      step(state, []);
+      for (const e of state.events) kinds.add(e.type);
+    }
+    expect([...kinds].sort()).toEqual(['areaExpired', 'areaTick', 'damage']);
   });
 });

@@ -1,7 +1,7 @@
 import { createMatch, parseArenaDef, step, type GameState } from '@claudeline/sim';
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
-import { bindDebugShot, fireDebugShot } from './debug-shot';
+import { bindDebugShot, fireDebugArea, fireDebugShot } from './debug-shot';
 
 function match(): GameState {
   return createMatch(
@@ -71,6 +71,45 @@ describe('fireDebugShot', () => {
   });
 });
 
+describe('fireDebugArea', () => {
+  it('spawns a fused one-hit area at the aim: fuse 90, radius 2.5, 30 damage to enemies', () => {
+    const state = match();
+    const id = fireDebugArea(state, 0, -1100, 200);
+    expect(id).toBe(state.areas[0]?.id);
+    expect(state.areas).toHaveLength(1);
+    const area = state.areas[0];
+    expect([area?.x, area?.y]).toEqual([-11, 2]);
+    expect(area?.ownerId).toBe(0);
+    expect(area?.radius).toBe(2.5);
+    expect(area?.targets).toBe('enemies');
+    expect(area?.fuseTicks).toBe(90);
+    expect(area?.ticksToNextApply).toBe(90);
+    expect(area?.remainingTicks).toBe(91);
+    expect(area?.effects).toEqual([{ type: 'damage', amount: 30 }]);
+  });
+
+  it('detonates on the 91st step and hurts the champion standing in it', () => {
+    const state = match();
+    const target = state.champions[2];
+    if (!target) throw new Error('no champion 2');
+    fireDebugArea(state, 0, target.x * 100, target.y * 100);
+    for (let n = 1; n <= 90; n++) {
+      step(state, []);
+      expect(state.champions[2]?.health).toBe(120);
+    }
+    expect(state.areas).toHaveLength(1);
+    step(state, []);
+    expect(state.champions[2]?.health).toBe(90);
+    expect(state.areas).toHaveLength(0);
+  });
+
+  it('returns null and spawns nothing for a champion that does not exist', () => {
+    const state = match();
+    expect(fireDebugArea(state, 9, 0, 0)).toBeNull();
+    expect(state.areas).toHaveLength(0);
+  });
+});
+
 function fakeEvent(fields: Record<string, unknown>): Event & Record<string, unknown> {
   return Object.assign(new Event('keydown', { cancelable: true }), fields);
 }
@@ -132,5 +171,43 @@ describe('bindDebugShot', () => {
     unbind();
     win.dispatchEvent(fakeEvent(KEYS));
     expect(fired()).toBe(0);
+  });
+});
+
+describe('bindDebugShot with Shift held', () => {
+  function setup() {
+    const win = new EventTarget();
+    const canvas = { dataset: {} as Record<string, string | undefined> };
+    let shots = 0;
+    let areas = 0;
+    bindDebugShot(win, canvas, () => ++shots, () => ++areas);
+    return { win, canvas, count: () => ({ shots, areas }) };
+  }
+
+  it('spawns an area on Shift+F4 and no shot, counting it in debugAreas', () => {
+    const { win, canvas, count } = setup();
+    expect(canvas.dataset['debugAreas']).toBe('0');
+    const event = fakeEvent({ ...KEYS, shiftKey: true });
+    win.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(count()).toEqual({ shots: 0, areas: 1 });
+    expect(canvas.dataset['debugAreas']).toBe('1');
+    expect(canvas.dataset['debugShots']).toBe('0');
+  });
+
+  it('keeps F4 alone a shot', () => {
+    const { win, canvas, count } = setup();
+    win.dispatchEvent(fakeEvent({ ...KEYS, shiftKey: false }));
+    expect(count()).toEqual({ shots: 1, areas: 0 });
+    expect(canvas.dataset['debugShots']).toBe('1');
+    expect(canvas.dataset['debugAreas']).toBe('0');
+  });
+
+  it('ignores Shift+F4 with Alt, Ctrl, Meta or a repeat', () => {
+    const { win, count } = setup();
+    for (const change of [{ altKey: true }, { ctrlKey: true }, { metaKey: true }, { repeat: true }]) {
+      win.dispatchEvent(fakeEvent({ ...KEYS, shiftKey: true, ...change }));
+    }
+    expect(count()).toEqual({ shots: 0, areas: 0 });
   });
 });

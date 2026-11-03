@@ -33,7 +33,7 @@ A match is a state machine: `warmup -> round -> roundEnd -> (round | matchEnd)` 
 Notes on the flow:
 
 - Warmup happens once, before round 1. Between rounds the state goes from `roundEnd` straight to `round`, as in the spec's state machine. The 3 s round end pause is the only break between rounds.
-- During the round end pause, movement and casting are locked. Projectiles and areas are removed on the tick the round is decided. No damage, healing or status effect is applied during the pause `[tuned]`.
+- During the round end pause, movement and casting are locked. Projectiles and areas are removed on the tick the round is decided, an armed fused area (section 2.7) included. No damage, healing or status effect is applied during the pause `[tuned]`.
 - The match has no cap on the number of rounds. Draws score nothing, so a match can run longer than five rounds.
 
 ### 1.1 Sudden death
@@ -159,6 +159,20 @@ A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `
 - **Decay:** the whole counter goes to 0 when `windowTicks` ticks pass with no qualifying hit. There is one timer per champion, not one per stack. A hit in tick T keeps the count through tick T + `windowTicks` - 1; it is 0 at the end of tick T + `windowTicks`, unless another hit lands in that tick. A dead champion's counter decays like any other.
 - **Pause:** the window runs during a round and in free play, and it is frozen during the warmup, the round end pause and after the match ends; the count stays as it was.
 - **Reset:** the counter is set to 0 at the start of each round, like energy (section 1.2).
+
+### 2.7 The fuse on an area `[tuned]`
+
+An `area` effect may carry `fuseTicks`, an integer number of ticks. It is a delayed detonation: the area is placed when the cast fires and does nothing until the fuse has burnt. The design is spec `2026-10-24-blc-feel-roster-v3-design.md` section 4.2.
+
+- **Who may use it:** any `area` effect, including the one at the end of a dash. A kit file takes a whole number from 1 to 36000 (the generic tick bound of the kit format) and the roster test holds a kit to 15 to 120 ticks `[tuned]`. A fuse under 15 ticks reads as instant.
+- **Armed means visible and inert.** From the tick it is placed until its first pulse the area is in the match and drawn, and deals, heals and applies nothing. It stays where it was placed, at the aim of the tick the cast fired: the fuse follows no one.
+- **When it pulses.** The first pulse lands `fuseTicks` ticks after the tick the cast fired, on the same tick numbering as an area without a fuse, whose first pulse is the tick it is placed. It then pulses every `intervalTicks` for its `durationTicks`, so `ceil(durationTicks / intervalTicks)` pulses in all. A one-hit area pulses and ends on the same tick.
+- **Locked phases.** The warmup and the round end pause freeze the fuse like every area clock. Round end removes an armed area, so no pulse ever falls into the pause.
+- **The linger rule counts the fuse.** `fuseTicks + durationTicks` stays under the cooldown of the slot, so a slot never has two of its own areas alive. This holds for a fused one-hit area too.
+- **Control on a fused area.** A fused one-hit area may carry stun, root or silence: the ban on a pulsing area exists for repeated control, and a single delayed hit gives the target the fuse to walk out. A fused area that pulses more than once keeps the ban (roster-v2 section 0). The damage and heal totals of roster-v2 section 0 hold for a fused area as for any other.
+- **No remote trigger.** The fuse is fixed at the cast. Nothing detonates an area early, and no area waits for a trigger.
+- **The client** draws an armed area from the area entity, with no new event kind. The first `areaTick` of the area is the end of the fuse.
+- No shipped kit has a fuse yet. The Ysmeer kit of roster-v3 is the first that will.
 
 ## 3. Energy economy
 
