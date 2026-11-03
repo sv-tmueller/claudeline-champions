@@ -526,7 +526,7 @@ describe('validateKit and a projectile with allyEffects', () => {
   });
 });
 
-describe('validateKit and the fuse of an area (rules 2.6)', () => {
+describe('validateKit and the fuse of an area (rules 2.7)', () => {
   const withFuse = (fuseTicks: unknown): Mutate => (k) => void ((slam(k) as { fuseTicks?: unknown }).fuseTicks = fuseTicks);
 
   it.each([1, 15, 120, 36000])('accepts a fuseTicks of %i and copies it', (fuseTicks) => {

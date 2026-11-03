@@ -5,7 +5,7 @@ const SHOT_DAMAGE = 30;
 const SHOT_SPEED = 10;
 const SHOT_RADIUS = 0.25;
 const SHOT_LIFETIME_TICKS = 180;
-// The fused area of Shift+F4 (rules 2.6): no shipped kit has a fuse, so the e2e of the armed look
+// The fused area of Shift+F4 (rules 2.7): no shipped kit has a fuse, so the e2e of the armed look
 // spawns one. 90 ticks is inside the 15 to 120 range; one hit of 30 damage, as a shot does.
 const AREA_FUSE_TICKS = 90;
 const AREA_RADIUS = 2.5;

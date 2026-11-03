@@ -16,7 +16,7 @@ export interface AreaSpec {
   targets: AreaTargets;
   effects: readonly Effect[];
   /**
-   * Rules 2.6: ticks from the spawn to the first pulse, a positive integer. The area is inert
+   * Rules 2.7: ticks from the spawn to the first pulse, a positive integer. The area is inert
    * until then. The key is left out of the entity when this is undefined.
    */
   fuseTicks?: number | undefined;
@@ -84,7 +84,7 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
   };
   if (spec.fuseTicks !== undefined) {
     // The fuse and the pulse clock: the first pulse is `fuseTicks` steps away and the area lives on
-    // for its duration after it (rules 2.6).
+    // for its duration after it (rules 2.7).
     area.fuseTicks = spec.fuseTicks;
     area.ticksToNextApply = spec.fuseTicks;
     area.remainingTicks = spec.fuseTicks + spec.durationTicks;

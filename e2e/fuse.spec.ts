@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { PROBE_VIEWPORT } from './heap-probe';
 import { orFail, watchProblems } from './support';
 
-// The armed look of a fused area (rules 2.6), in a browser. No shipped kit has a fuse, so the dev-only
+// The armed look of a fused area (rules 2.7), in a browser. No shipped kit has a fuse, so the dev-only
 // Shift+F4 key of the sandbox spawns one at the aim: a one-hit area of 2.5 m with a fuse of 90 ticks
 // and 30 damage to the enemy team, through `debug.spawnArea`. The aim is the cursor on champion 2, who
 // has no kit and no bot and stands still at (12, 2). The area is drawn from the area entity alone, with

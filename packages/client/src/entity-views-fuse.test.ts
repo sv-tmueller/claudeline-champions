@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import { createAreaViews, type EntityViews } from './entity-views';
 
-// The armed look of a fused area (rules 2.6), driven by the real sim in the order main.ts uses:
+// The armed look of a fused area (rules 2.7), driven by the real sim in the order main.ts uses:
 // capture, step, sync. The views read `fuseTicks` and `ticksToNextApply` from the area entity,
 // with no event: the area is armed while `fuseTicks` is above 0.
 

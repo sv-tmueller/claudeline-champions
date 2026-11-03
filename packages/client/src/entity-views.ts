@@ -35,7 +35,7 @@ export interface ViewEntity {
   y: number;
   radius: number;
   /**
-   * Rules 2.6: only on an area spawned with a fuse. The area is armed, inert, while this is above
+   * Rules 2.7: only on an area spawned with a fuse. The area is armed, inert, while this is above
    * 0; `1 - ticksToNextApply / fuseTicks` is how far the fuse has burnt.
    */
   fuseTicks?: number;

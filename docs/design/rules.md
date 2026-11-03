@@ -33,7 +33,7 @@ A match is a state machine: `warmup -> round -> roundEnd -> (round | matchEnd)` 
 Notes on the flow:
 
 - Warmup happens once, before round 1. Between rounds the state goes from `roundEnd` straight to `round`, as in the spec's state machine. The 3 s round end pause is the only break between rounds.
-- During the round end pause, movement and casting are locked. Projectiles and areas are removed on the tick the round is decided, an armed fused area (section 2.6) included. No damage, healing or status effect is applied during the pause `[tuned]`.
+- During the round end pause, movement and casting are locked. Projectiles and areas are removed on the tick the round is decided, an armed fused area (section 2.7) included. No damage, healing or status effect is applied during the pause `[tuned]`.
 - The match has no cap on the number of rounds. Draws score nothing, so a match can run longer than five rounds.
 
 ### 1.1 Sudden death
@@ -160,7 +160,7 @@ A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `
 - **Pause:** the window runs during a round and in free play, and it is frozen during the warmup, the round end pause and after the match ends; the count stays as it was.
 - **Reset:** the counter is set to 0 at the start of each round, like energy (section 1.2).
 
-### 2.6 The fuse on an area `[tuned]`
+### 2.7 The fuse on an area `[tuned]`
 
 An `area` effect may carry `fuseTicks`, an integer number of ticks. It is a delayed detonation: the area is placed when the cast fires and does nothing until the fuse has burnt. The design is spec `2026-10-24-blc-feel-roster-v3-design.md` section 4.2.
 

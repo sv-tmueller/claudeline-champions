@@ -208,7 +208,7 @@ function catalogProblems(kit: KitDef): string[] {
         bad(path, 'no v1 kit lists energyGain');
         break;
       case 'area': {
-        // The three lingering-area rules of roster-v2 section 0 and the fuse rules of rules 2.6. An
+        // The three lingering-area rules of roster-v2 section 0 and the fuse rules of rules 2.7. An
         // unfused one-hit area is outside all of them; a fused one-hit area is held to the fuse range,
         // the damage total and the cooldown, and keeps the one-hit exception for stun, root and silence.
         const { fuseTicks } = effect;
@@ -674,7 +674,7 @@ describe('the lingering area rules', () => {
 });
 
 describe('the fuse rules', () => {
-  // Rules 2.6 and roster-v2 section 0: no shipped kit has a fuse, so each row fuses an area of a
+  // Rules 2.7 and roster-v2 section 0: no shipped kit has a fuse, so each row fuses an area of a
   // copy of Hargrim, whose M2 is a one-hit area with a slow and whose cooldown is 360 ticks.
   const M2 = 'hargrim.slots.M2.effects[0]';
   const fused = (fuseTicks: number, durationTicks = 1, intervalTicks = 1): KitDef => {

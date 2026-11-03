@@ -315,7 +315,7 @@ sim steps first and the views read its state afterwards.
   disc is the translucent team colour of the area for its whole life and is
   static between pulses: there is no pulse cue, and the pulses are the sim's
   (batch #177 decision 2). It is released at its expiry, or in the frame of a
-  round decision, which clears the areas. A fused area (rules 2.6) is armed
+  round decision, which clears the areas. A fused area (rules 2.7) is armed
   while `fuseTicks > 0` on the area entity, with no event and no new DOM hook:
   the disc takes a fainter fill, a ring outlines it and a child disc grows from
   nothing to the full area as `1 - ticksToNextApply / fuseTicks`, all pooled

@@ -39,9 +39,9 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
     never ends. A slow, a damage or a knockback on a pulse is allowed.
   - Each lingering duration is shorter than the cooldown of its slot, so a
     slot never has two of its own areas alive and the live entities stay few
-    (step 7 of the tick is quadratic in them). With a fuse (rules 2.6) the
+    (step 7 of the tick is quadratic in them). With a fuse (rules 2.7) the
     fuse plus the duration is shorter than the cooldown.
-- A fused area (rules 2.6, the `fuseTicks` of roster-v3) is inert and visible
+- A fused area (rules 2.7, the `fuseTicks` of roster-v3) is inert and visible
   until its fuse of 15 to 120 ticks has burnt, then follows the rules above.
   A fused one-hit area may carry stun, root or silence, and a fused pulsing
   area keeps the ban. The roster walker checks both rules, and the length of a

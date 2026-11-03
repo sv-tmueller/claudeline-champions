@@ -159,7 +159,7 @@ and the same input stream, `checksum` after N ticks is identical on every run.
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
   the next application, an inline `effects` list and `castId` as for a
-  projectile. An area spawned with a fuse (rules 2.6) also has `fuseTicks`: the
+  projectile. An area spawned with a fuse (rules 2.7) also has `fuseTicks`: the
   fuse length while armed, 0 from the first pulse on. The key is left out of an
   area without a fuse and is never `undefined`.
 - Kits and casts: `state.kits` holds the kits of the match, plain data, and
@@ -288,7 +288,7 @@ slots in `Button` bit order.
 A projectile with lifetime L makes exactly L sweeps. An area with duration D
 and interval I applies `ceil(D / I)` times, on its ticks 0, I, 2I and so on;
 with D = 1 and I = 1 it applies once and expires in the same step. A fused
-area (fuse F, rules 2.6) spawns with `ticksToNextApply` F and `remainingTicks`
+area (fuse F, rules 2.7) spawns with `ticksToNextApply` F and `remainingTicks`
 F + D, so its pulses fall F steps later (the first on the tick F after the cast
 tick, or the step F + 1 after a dev spawn between steps), at F + kI, and a one-hit
 fused area pulses and expires in the same step. Entities
@@ -349,7 +349,7 @@ champion is inside when its body overlaps the circle, `dist <= radius + 0.5`,
 inclusive (a tuning choice that may become a `[tuned]` rule later). Areas ignore
 obstacles. The target list in `areaTick` is built before any effect applies.
 
-A fused area (`fuseTicks`, rules 2.6; roster-v2 section 0 holds a kit to 15 to
+A fused area (`fuseTicks`, rules 2.7; roster-v2 section 0 holds a kit to 15 to
 120 ticks) is armed from its spawn until its first pulse: inert, in
 `state.areas`, drawn by the client, applying nothing. `ticksToNextApply` is the
 fuse and the pulse clock in one: it starts at F, not 0, so the first `areaTick`
@@ -415,7 +415,7 @@ them from inside the sim, through `cast.ts`.
 | Module | Export | Returns |
 | --- | --- | --- |
 | `projectile.ts` | `spawnProjectile(state, spec, castId = null)` | the new entity id |
-| `area.ts` | `spawnArea(state, spec, castId = null)`, with an optional `fuseTicks` in the spec (rules 2.6) | the new entity id |
+| `area.ts` | `spawnArea(state, spec, castId = null)`, with an optional `fuseTicks` in the spec (rules 2.7) | the new entity id |
 | `melee.ts` | `meleeArc(state, spec)`, with an optional `castId` in the spec | the target ids |
 | `status.ts` | `applyStatus(state, targetId, spec, source)` | whether anything changed |
 | `status.ts` | `applyShield(state, targetId, { absorb, ticks }, source)` | whether a shield was added |
@@ -820,7 +820,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 | Effect | Fields | What it does |
 | --- | --- | --- |
 | `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner in flight; aimed within the caster's own circle, nothing spawns and they land on her at 60 percent heal, see Firing), `effects` on the other team |
-| `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects`, optional `fuseTicks` | spawns an area, armed for `fuseTicks` ticks first when it has one (rules 2.6); `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
+| `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects`, optional `fuseTicks` | spawns an area, armed for `fuseTicks` ticks first when it has one (rules 2.7); `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
 | `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
 | `teleport` | `range`, `fixed` | goes exactly `range` m along the fire direction, or only as far as the aim when not `fixed` |

@@ -54,7 +54,7 @@ export type AbilityEffect =
       targets: AreaTargets;
       effects: Effect[];
       /**
-       * Rules 2.6: ticks from the cast to the first pulse, an area that is visible and inert until
+       * Rules 2.7: ticks from the cast to the first pulse, an area that is visible and inert until
        * then. `validateKit` takes 1 to 36000; the roster walker holds a kit to 15 to 120. The key
        * is left out when there is none, and on any other effect it is not read.
        */

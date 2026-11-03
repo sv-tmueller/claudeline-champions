@@ -482,7 +482,7 @@ describe('the round decision', () => {
     expect(state.casts).toEqual([]);
   });
 
-  it('ends a fused area armed at the decision with areaExpired and no areaTick (rules 2.6)', () => {
+  it('ends a fused area armed at the decision with areaExpired and no areaTick (rules 2.7)', () => {
     const state = begun();
     kill(state, 3);
     const area = debug.spawnArea(state, {
