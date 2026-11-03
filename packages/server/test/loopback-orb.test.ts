@@ -9,11 +9,15 @@ import type { TestClient } from './loopback';
 // The energy orb through the Room and the codec (online design section 5, Data; rules.md 3.3): the
 // Room sets `energyOrb` from its data, `matchStart` carries it to both clients, and `orbSpawn` and
 // `orbTaken` reach both of them at the server's tick. One human walks to the orb point, the other
-// stands still. It pins no tick and no taker: the bots change, and the first pickup may fall in a
-// later round.
+// three stand still. All four seats are humans, so no bot is in the room: a bot profile may hunt the
+// walking human (a melee kit kills it in about 500 ticks, before the orb is up at tick 1200 of the
+// round) and a bot may end the round early, and either would hide the pickup this file looks for. It
+// pins no tick and no taker.
 
 const ARENA_ID = 'arena01';
 const LIMIT_FRAMES = 20_000;
+/** The control run: no human dies, so it plays a fixed span instead, well past the orb of round 1 (up at tick 1201, collectible at 1380). */
+const CONTROL_FRAMES = 3_000;
 
 interface Played {
   harness: Harness;
@@ -35,7 +39,13 @@ function setUp(data: RoomData): Played {
   harness.flush();
   guest.send({ t: 'select', team: 'B', championId: data.roster[0] ?? '' });
   harness.flush();
-  for (const p of [host, guest]) p.send({ t: 'ready', ready: true });
+  // The joiners take the team with fewer humans: the third lands on A and the fourth on B.
+  const others = [harness.client(), harness.client()];
+  for (const [i, p] of others.entries()) {
+    p.join(i === 0 ? 'Cy' : 'Di');
+    harness.flush();
+  }
+  for (const p of [host, guest, ...others]) p.send({ t: 'ready', ready: true });
   harness.flush();
   return { harness, host, guest, takenAt: null };
 }
@@ -45,10 +55,10 @@ function orbEvents(events: readonly SimEvent[]): SimEvent[] {
 }
 
 /** Plays until the first snapshot on or after the first `orbTaken`, or until the limit. */
-function playToThePickup(played: Played, walkTo: { x: number; y: number } | undefined): void {
+function playToThePickup(played: Played, walkTo: { x: number; y: number } | undefined, limit = LIMIT_FRAMES): void {
   const { harness, host, guest } = played;
   let frames = 0;
-  while (harness.room.phase === 'match' && frames++ < LIMIT_FRAMES) {
+  while (harness.room.phase === 'match' && frames++ < limit) {
     if (walkTo !== undefined) host.sendWalkTo(walkTo);
     harness.flush();
     harness.frame();
@@ -62,7 +72,7 @@ function playToThePickup(played: Played, walkTo: { x: number; y: number } | unde
   }
 }
 
-// The play is one hook, 2.4 s locally with the non-vacuous row; the runner is 3 to 4 times slower (the
+// The play is one hook, about 1 s locally with the non-vacuous row; the runner is 3 to 4 times slower (the
 // loopback files of this folder), so the hook takes the 20 s top of the rule (testing.md, Check suite).
 describe('loopback: the energy orb', () => {
   const data = roomData();
@@ -133,7 +143,7 @@ describe('loopback: the energy orb', () => {
   it('is not vacuous: data with no row for the arena gives no energyOrb key and no orb events', { timeout: 15_000 }, () => {
     const bare: RoomData = { ...loadRoomData(), orbs: new Map() };
     const off = setUp(bare);
-    playToThePickup(off, { x: 0, y: 2.5 });
+    playToThePickup(off, { x: 0, y: 2.5 }, CONTROL_FRAMES);
     expect(off.host.start).not.toBeNull();
     expect(Object.hasOwn(off.host.start?.config ?? {}, 'energyOrb')).toBe(false);
     expect(Object.hasOwn(off.harness.observed.config ?? {}, 'energyOrb')).toBe(false);

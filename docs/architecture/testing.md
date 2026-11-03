@@ -133,9 +133,9 @@ for every arena with a point. It moved no hook: `loopback.test.ts` took 10.2 and
 on one machine (this one is slower than the 8.8 to 9.1 s of the author's), so
 the 60 s hook and the 15 s rows stay. The orb adds one comparison per step; a
 round that reaches 17 s emits two events. `loopback-orb.test.ts` plays up to
-the first pickup in a `beforeAll` (20 s, the top of the rule; 2.4 s for the file
-locally, the runner being 3 to 4 times slower), and its non-vacuous row, which
-plays a whole match with no orb, has a 15 s timeout.
+the first pickup in a `beforeAll` (20 s, the top of the rule; about 1 s for the
+file locally, the runner being 3 to 4 times slower), and its non-vacuous row,
+which plays 3000 frames with no orb, has a 15 s timeout.
 
 The re-read with Durnhal's profile (#211), by the rule above. The hook bodies
 were timed by a console line (a commit of its own, removed again) in the unit job
@@ -276,8 +276,9 @@ melee-key list that this package then extended).
   Since #224 the Room's matches have the orb on, as the product does (the
   local reference run reads `energyOrb` from the observed config, so the
   comparison covers it), and `loopback-orb.test.ts` walks a human on team A to
-  the orb point of arena01 with a human on team B standing still and two
-  bots: both clients' `matchStart` carries the table's point, `orbSpawn` and
+  the orb point of arena01 with three humans standing still and no bot (a bot
+  profile, Durnhal's since #211, hunts and kills the walker in about 500 ticks,
+  before the orb is up, so the room has four humans): both clients' `matchStart` carries the table's point, `orbSpawn` and
   `orbTaken` arrive once each in the round of the pickup at the server's tick
   and equal to the server's copies, the state rebuilt at the first snapshot
   after the pickup has the orb taken and the taker's energy of the event, every
