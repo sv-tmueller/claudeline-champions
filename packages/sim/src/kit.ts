@@ -53,6 +53,12 @@ export type AbilityEffect =
       intervalTicks: number;
       targets: AreaTargets;
       effects: Effect[];
+      /**
+       * Rules 2.7: ticks from the cast to the first pulse, an area that is visible and inert until
+       * then. `validateKit` takes 1 to 36000; the roster walker holds a kit to 15 to 120. The key
+       * is left out when there is none, and on any other effect it is not read.
+       */
+      fuseTicks?: number;
     }
   | {
       type: 'meleeArc';
@@ -218,7 +224,7 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
       if (targets !== 'enemies' && targets !== 'allies' && targets !== 'all') {
         return fail(at('targets'), `unknown targets ${String(targets)}`);
       }
-      return {
+      const area: Extract<AbilityEffect, { type: 'area' }> = {
         type,
         placement,
         radius,
@@ -227,6 +233,8 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
         targets,
         effects: readHitEffects(effect['effects'], at('effects')),
       };
+      if (effect['fuseTicks'] !== undefined) area.fuseTicks = readTicks(effect['fuseTicks'], at('fuseTicks'));
+      return area;
     }
     case 'meleeArc': {
       const radius = readMagnitude(effect['radius'], at('radius'));

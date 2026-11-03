@@ -482,6 +482,52 @@ describe('the round decision', () => {
     expect(state.casts).toEqual([]);
   });
 
+  it('ends a fused area armed at the decision with areaExpired and no areaTick (rules 2.7)', () => {
+    const state = begun();
+    kill(state, 3);
+    const area = debug.spawnArea(state, {
+      ownerId: 2,
+      x: 0,
+      y: 8,
+      radius: 1,
+      durationTicks: 1,
+      intervalTicks: 1,
+      targets: 'enemies',
+      effects: [{ type: 'damage', amount: 1 }],
+      fuseTicks: 90,
+    });
+    lethalAt(state, 0, 2);
+    step(state, [input(0, 0, 0, 0, 1)]);
+    expect(types(state)).toContain('roundEnded');
+    expect(ofType(state, 'areaTick')).toEqual([]);
+    expect(ofType(state, 'areaExpired')).toEqual([{ type: 'areaExpired', areaId: area }]);
+    expect(types(state).indexOf('areaExpired')).toBeGreaterThan(types(state).indexOf('roundEnded'));
+    expect(state.areas).toEqual([]);
+  });
+
+  it('lets a fuse that runs out in the deciding step pulse before the round end removes the area', () => {
+    const state = begun();
+    kill(state, 3);
+    const area = debug.spawnArea(state, {
+      ownerId: 2,
+      x: 0,
+      y: 8,
+      radius: 1,
+      durationTicks: 600,
+      intervalTicks: 30,
+      targets: 'enemies',
+      effects: [{ type: 'damage', amount: 1 }],
+      fuseTicks: 1,
+    });
+    step(state, []);
+    expect(types(state)).toEqual([]);
+    lethalAt(state, 0, 2);
+    step(state, [input(0, 0, 0, 0, 1)]);
+    expect(state.areas).toEqual([]);
+    expect(types(state)).toEqual(expect.arrayContaining(['areaTick', 'roundEnded', 'areaExpired']));
+    expect(ofType(state, 'areaTick')[0]?.areaId).toBe(area);
+  });
+
   it('counts every windup of the winners as interrupted, in champion id order', () => {
     const state = begun();
     kill(state, 2, 3);

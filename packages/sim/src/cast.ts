@@ -182,6 +182,8 @@ function runEffects(
             intervalTicks: effect.intervalTicks,
             targets: effect.targets,
             effects: effect.effects,
+            // `spawnArea` leaves the key out of the entity when this is undefined.
+            fuseTicks: effect.fuseTicks,
           },
           cast.castId,
         );
