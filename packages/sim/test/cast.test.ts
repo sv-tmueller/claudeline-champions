@@ -899,6 +899,16 @@ describe('resetAbilityState', () => {
     expect(state.projectiles).toEqual([]);
     expect(state.areas).toEqual([]);
   });
+
+  it('sets an on-hit counter to its zero, and adds none to a champion that has none', () => {
+    const state = setup([{ ...kitWith('k0'), counter: { from: 'Q', cap: 3, windowTicks: 120 } }]);
+    champion(state, 0).counter = { count: 2, lastHitTick: 41 };
+    const others = state.champions.slice(1).map((c) => 'counter' in c);
+    resetAbilityState(state);
+    expect(champion(state, 0).counter).toEqual({ count: 0, lastHitTick: 0 });
+    expect(state.champions.slice(1).map((c) => 'counter' in c)).toEqual(others);
+    expect(others.includes(true)).toBe(false);
+  });
 });
 
 describe('a cast projectile with allyEffects', () => {

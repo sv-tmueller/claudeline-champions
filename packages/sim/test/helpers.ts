@@ -306,6 +306,16 @@ export function checkAbilityInvariants(state: GameState): string[] {
       if (!isInt(value) || value < 0 || value > max) bad(c, `cooldown ${slots[i]} is ${value} of at most ${max}`);
     });
     if (!c.alive && c.cast !== null) bad(c, 'dead with a cast');
+    // The counter exists exactly when the kit declares one; a count never passes the cap, and the
+    // last hit is a tick that has been (0 is the idle value of a count of 0).
+    const spec = kit?.counter;
+    if ((spec === undefined) !== (c.counter === undefined)) bad(c, 'counter key does not match the kit');
+    if (spec !== undefined && c.counter !== undefined) {
+      const { count, lastHitTick } = c.counter;
+      if (!isInt(count) || count < 0 || count > spec.cap) bad(c, `counter count ${count} of at most ${spec.cap}`);
+      if (!isInt(lastHitTick) || lastHitTick < 0 || lastHitTick > state.tick) bad(c, `counter lastHitTick ${lastHitTick}`);
+      if (count === 0 && lastHitTick !== 0) bad(c, `counter at 0 with lastHitTick ${lastHitTick}`);
+    }
     if (c.cast) {
       const { cast } = c;
       const record = state.casts.find((r) => r.id === cast.castId);

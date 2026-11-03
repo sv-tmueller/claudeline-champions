@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COUNTER_MAX_CAP,
+  COUNTER_MAX_WINDOW_TICKS,
+  COUNTER_MIN_WINDOW_TICKS,
   DEFAULT_ROUNDS_TO_WIN,
   ENERGY_GAIN_M1,
   ENERGY_GAIN_SKILL,
@@ -93,5 +96,13 @@ describe('energy orb constants', () => {
     expect(ORB_COLLECTIBLE_TICKS).toBe(1200);
     expect(ORB_RADIUS).toBe(0.5);
     expect(ORB_ENERGY).toBe(25);
+  });
+});
+
+describe('on-hit counter constants', () => {
+  it('holds the v3 design section 4.4 bounds: a cap of at most 5, a window of 60 to 600 ticks', () => {
+    expect(COUNTER_MAX_CAP).toBe(5);
+    expect(COUNTER_MIN_WINDOW_TICKS).toBe(60);
+    expect(COUNTER_MAX_WINDOW_TICKS).toBe(600);
   });
 });

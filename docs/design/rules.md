@@ -61,6 +61,7 @@ The sim also does this `[tuned]`:
 - A cast in progress is dropped.
 - The round timer is set to 90 s and the ring is removed.
 - With the energy orb on, the orb is up again, untaken (section 3.3).
+- A kit's on-hit counter is set to 0 (section 2.6).
 
 Round wins are the only thing that carries over.
 
@@ -145,6 +146,19 @@ When a cast fires a projectile that has ally effects, and the aim position of th
 - Energy is unchanged: healing yourself gives nothing (section 3.1), and the cast pays no more than any other cast of that slot.
 - A wound status, which cuts healing, multiplies the reduced amount: the self-cast factor comes first, then the wound cut.
 - A player who holds the mouse on their own champion triggers the rule, as the aim position alone decides it.
+
+### 2.6 The on-hit counter `[tuned]`
+
+A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `counter: { from: <slot>, cap: <1 to 5>, windowTicks: <60 to 600> }`. It is the one exception to roster-v1's "a kit has no passive", and it is declared in the kit data and not hidden in code. A kit with no `counter` has none of the state and none of the rules below. The spend verbs of the counter (`consumeCounter`) are part 4.4b (#161) and are not in the sim yet.
+
+- **Build:** a hit by the `from` slot that lands on an enemy adds one, up to `cap`. The EX variant of the `from` slot counts as that slot. A hit lands as it does for energy (section 3.1): the target is an enemy, alive and not invulnerable before the effects, and the hit's effects include `damage`. A hit that a shield fully absorbs still counts. A status, a shield or a push alone does not.
+- **Each hit counts:** unlike energy, the build ignores the once-per-target rule. Each pulse of an area that hits an enemy, and each enemy a piercing projectile or a melee arc hits, adds one.
+- **At the cap:** a hit that lands at the cap adds nothing, but it still restarts the window.
+- **Invulnerable:** a hit on an invulnerable champion adds nothing and does not restart the window.
+- **What never builds:** damage over time pulses, ring damage, dev tool spawns, effects aimed at the caster, and the projectile of a caster who has died since firing it.
+- **Decay:** the whole counter goes to 0 when `windowTicks` ticks pass with no qualifying hit. There is one timer per champion, not one per stack. A hit in tick T keeps the count through tick T + `windowTicks` - 1; it is 0 at the end of tick T + `windowTicks`, unless another hit lands in that tick. A dead champion's counter decays like any other.
+- **Pause:** the window runs during a round and in free play, and it is frozen during the warmup, the round end pause and after the match ends; the count stays as it was.
+- **Reset:** the counter is set to 0 at the start of each round, like energy (section 1.2).
 
 ## 3. Energy economy
 

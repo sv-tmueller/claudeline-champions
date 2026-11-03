@@ -394,8 +394,8 @@ export function dropUnusedCasts(state: GameState): void {
 
 /**
  * The ability part of the round reset: every champion's energy and cooldowns go to 0, its windup
- * and dash are dropped and its statuses removed, the cast records are emptied, and the projectiles
- * and areas still alive forget their cast. Emits nothing: `startRound` in `flow.ts` calls it and
+ * and dash are dropped and its statuses removed, its on-hit counter (when it has one) goes to 0,
+ * the cast records are emptied, and the projectiles and areas still alive forget their cast. Emits nothing: `startRound` in `flow.ts` calls it and
  * wraps it in `roundStarted`. Not in the index.
  */
 export function resetAbilityState(state: GameState): void {
@@ -405,6 +405,7 @@ export function resetAbilityState(state: GameState): void {
     champion.cast = null;
     champion.dash = null;
     champion.statuses = [];
+    if (champion.counter !== undefined) champion.counter = { count: 0, lastHitTick: 0 };
   }
   state.casts = [];
   for (const projectile of state.projectiles) projectile.castId = null;

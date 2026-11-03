@@ -295,6 +295,42 @@ describe('checksum of ability state', () => {
   });
 });
 
+describe('checksum of the on-hit counter', () => {
+  function counting(): GameState {
+    const state = createMatch(config2v2(), arena01, 1337, [
+      { ...testStriker(), id: 'hargrim', counter: { from: 'M1', cap: 5, windowTicks: 60 } },
+    ]);
+    state.champions[0]!.counter = { count: 2, lastHitTick: 33 };
+    return state;
+  }
+
+  it('is stable for equal states and changes with the count, the tick, and the kit declaration', () => {
+    const base = checksum(counting());
+    expect(checksum(counting())).toBe(base);
+    const mutations: [string, (s: GameState) => void][] = [
+      ['count', (s) => void (s.champions[0]!.counter!.count = 3)],
+      ['lastHitTick', (s) => void (s.champions[0]!.counter!.lastHitTick = 34)],
+      ['counter key removed', (s) => void delete s.champions[0]!.counter],
+      ['kit cap', (s) => void (s.kits[0]!.counter!.cap = 4)],
+      ['kit window', (s) => void (s.kits[0]!.counter!.windowTicks = 61)],
+      ['kit source', (s) => void (s.kits[0]!.counter!.from = 'Q')],
+      ['kit declaration removed', (s) => void delete s.kits[0]!.counter],
+    ];
+    for (const [name, mutate] of mutations) {
+      const state = counting();
+      mutate(state);
+      expect(checksum(state), name).not.toBe(base);
+    }
+  });
+
+  it('survives a clone, with the counter object and with no counter key at all', () => {
+    const state = counting();
+    expect(cloneState(state)).toEqual(state);
+    expect(checksum(cloneState(state))).toBe(checksum(state));
+    expect('counter' in cloneState(fresh()).champions[0]!).toBe(false);
+  });
+});
+
 describe('checksum of match state', () => {
   function playing(): GameState {
     const state = createMatch({ ...config2v2(), roundsToWin: 3 }, arena01, 1337);

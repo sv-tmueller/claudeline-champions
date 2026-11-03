@@ -10,6 +10,7 @@ import {
   tickCooldowns,
 } from './cast';
 import { resolveChampion } from './collision';
+import { stepCounters } from './counter';
 import { atan2 } from './dmath';
 import { stepLocked, stepSuddenDeathAndDecision } from './flow';
 import { length } from './geometry';
@@ -90,6 +91,7 @@ export function step(state: GameState, inputs: readonly (PlayerInput | undefined
     stepOrb(state, state.match);
     stepSuddenDeathAndDecision(state, state.match);
   }
+  stepCounters(state);
   dropUnusedCasts(state);
   if (state.match !== undefined) state.match.phaseTicks += 1;
 
