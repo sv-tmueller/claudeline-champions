@@ -4,7 +4,7 @@ import type { AbilitySpec, ChampionState, GameState, KitDef, PlayerInput, SimEve
 import { createBot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
 import type { Difficulty } from '../src/difficulty';
-import { arena01, clearShotOracle, jsonKits } from './helpers';
+import { arena01, clearShotOracle, jsonKits, sevenKits } from './helpers';
 import { boltAbility, boltSlot } from './kits';
 import { KIT_SETS, MELEE, pressProblems } from './press-oracle';
 import { firstPress, labelOf, sceneOf } from './scenes';
@@ -107,6 +107,10 @@ describe('the other melee slots in the same state', () => {
     expect(firstPress(scene('skerrow', { ready: ['M1'] }))?.label).toBe('M1');
   });
 
+  it('presses Durnhal M1 (the arc of 3.5 m): no clear shot is asked of it either', () => {
+    expect(firstPress(scene('durnhal', { kits: sevenKits(), ready: ['M1'] }))?.label).toBe('M1');
+  });
+
   it('presses Rend (Skerrow E), and Rend EX at 25 energy', () => {
     expect(firstPress(scene('skerrow', { ready: ['E'] }))?.label).toBe('E');
     expect(firstPress(scene('skerrow', { ready: ['E'], energy: 25 }))?.label).toBe('E+SHIFT');
@@ -167,7 +171,7 @@ describe('the oracle of the headless runs', () => {
     expect(check('M2')).toContain('no clear shot of width 0.5');
   });
 
-  it('lists the four melee keys', () => {
-    expect([...MELEE].sort()).toEqual(['hargrim:M1', 'skerrow:E', 'skerrow:E:ex', 'skerrow:M1']);
+  it('lists the five melee keys', () => {
+    expect([...MELEE].sort()).toEqual(['durnhal:M1', 'hargrim:M1', 'skerrow:E', 'skerrow:E:ex', 'skerrow:M1']);
   });
 });

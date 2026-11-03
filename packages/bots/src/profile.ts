@@ -19,10 +19,10 @@ export interface BotProfile {
 /**
  * The share of `rangeMax` at which a champion with rangeMin 0 stands to engage (#213). Below 1 the
  * stand has slack: a target that steps back a little is still in reach and the champion does not
- * walk in again from outside it. Above 1 m for both melee kits (1.6 and 1.2 m) so that the walk
- * ends before the bodies touch. That bound holds for the shipped kits only: an unshipped rangeMin-0
- * kit whose derived rangeMax lies in (1, 1.25] would get a stand reach under the 1 m touching
- * distance (there is no guard).
+ * walk in again from outside it. Above 1 m for the three melee kits (1.6, 1.2 and 2.4 m) so that
+ * the walk ends before the bodies touch. That bound holds for the shipped kits only: an unshipped
+ * rangeMin-0 kit whose derived rangeMax lies in (1, 1.25] would get a stand reach under the 1 m
+ * touching distance (there is no guard).
  */
 export const STAND_FRACTION = 0.8;
 
@@ -41,6 +41,7 @@ const PROFILES = new Map<string, BotProfile>([
   ['skerrow', profileOf(0, 2.5)],
   ['ondrel', profileOf(5, 9)],
   ['brimwick', profileOf(7, 10)],
+  ['durnhal', profileOf(0, 3.5)],
 ]);
 
 /**
@@ -54,6 +55,7 @@ const KIT_RULES = new Map<string, number>([
   ['skerrow', 0],
   ['ondrel', 5],
   ['brimwick', 7],
+  ['durnhal', 0],
 ]);
 
 /**
@@ -145,6 +147,14 @@ export interface ChampionRules {
    * itself (Hargrim's Rally Cry) is no ally slot. Empty for Hargrim, Quillon and Skerrow.
    */
   readonly allies: readonly Slot[];
+  /**
+   * The escape slots whose base band the walk never presses: a subset of `escapes` (pinned in
+   * profile.test.ts). The kit cache zeroes the base band of these slots, so the walk does not press
+   * one on it and only `chooseEscape` does (see `refreshKitCache`). Durnhal's
+   * Bulwark Charge (#211): with rangeMin 0 its band would cover every engage, and its knock-away
+   * would push a target out of the stand reach. Empty for the other six.
+   */
+  readonly escapeOnly: readonly Slot[];
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
@@ -155,6 +165,7 @@ const NO_RULES: ChampionRules = Object.freeze({
   wait: null,
   escapeWithin: null,
   allies: Object.freeze([]),
+  escapeOnly: Object.freeze([]),
 });
 
 /**
@@ -184,6 +195,11 @@ const NO_RULES: ChampionRules = Object.freeze({
  * (a clear path), then Reed Screen; Brimwick's are Flare Step, a teleport whose landing is found
  * like Skip's, then Smoke Pot, whose haste is the way out. Both use the common trigger, a kite
  * inside rangeMin (5 and 7). Brimwick holds Grand Finale (55); Ondrel does not, see `holdF`.
+ * Durnhal (#211, docs/design/roster-v3.md): Breaker Throw keeps its kit band (0 to 8 m: 18 m/s for
+ * 30 ticks reaches 9 m) and needs a target walking away (the Undertow and Chain Hook precedent).
+ * Bulwark Charge, a dash with a knock-away, then Aegis Line, a self shield, are his escapes on the
+ * common trigger, a retreat with the target within 6 m (rangeMin is 0, so he never kites); Bulwark
+ * Charge is an escape only, see `escapeOnly`. He does not hold Last Bastion, see `holdF`.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -229,9 +245,21 @@ const RULES = new Map<string, ChampionRules>([
       ['F', 'R', 'M2', 'M1'],
     ),
   ],
+  [
+    'durnhal',
+    rule(
+      [{ slot: 'E', band: null, motion: 'away', when: null }],
+      ['SPACE', 'R'],
+      false,
+      null,
+      null,
+      [],
+      ['SPACE'],
+    ),
+  ],
 ]);
 
-/** A frozen row: the row, its two lists, each opener and each literal band, and the wait. */
+/** A frozen row: the row, its lists, each opener and each literal band, and the wait. */
 function rule(
   openers: OpenerRule[],
   escapes: Slot[],
@@ -239,6 +267,7 @@ function rule(
   wait: WaitRule | null = null,
   escapeWithin: number | null = null,
   allies: Slot[] = [],
+  escapeOnly: Slot[] = [],
 ): ChampionRules {
   const frozen = openers.map((opener) =>
     Object.freeze({
@@ -259,6 +288,7 @@ function rule(
         : Object.freeze({ ...wait, band: Object.freeze([wait.band[0], wait.band[1]] as const) }),
     escapeWithin,
     allies: Object.freeze([...allies]),
+    escapeOnly: Object.freeze([...escapeOnly]),
   });
 }
 

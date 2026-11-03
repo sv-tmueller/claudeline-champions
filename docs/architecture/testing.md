@@ -100,11 +100,13 @@ others.
   3.7 s on the runner (job 121633905207, 779e504), 2.1 s on main before #204
   (job 122125510999), then 4.2, 5.05 (5049 ms) and 4.3 s with Durnhal's file
   (jobs 122175440820, 122182006132 and 122189679246); twice 5.05 s is 10.1 s,
-  so the timeout is 15 s.
+  so the timeout was 15 s. With Durnhal's own profile (#211) it read 1.33 s
+  (job 125514192190) and 1.76, 1.39 and 1.43 s (the three attempts of run
+  41517296595); twice 1.76 s is 3.5 s, so the timeout is 10 s again.
 
-Durnhal's file (#204) makes the server field a Durnhal bot on the default range
-profile in these matches and in both loopback specs, until step 1.3 of roadmap
-#176 gives him a profile. The loopback `beforeAll` is the row that moved. Timed
+Durnhal's file (#204) made the server field a Durnhal bot on the default range
+profile in these matches and in both loopback specs, until #211 (step 1.3 of
+roadmap #176, the bots half) gave him a profile. The loopback `beforeAll` is the row that moved. Timed
 around its body on one machine, the 2v2 hook went from 1.1 s to 1.5 to 1.7 s
 and the 3v3 hook from 2.5 to 3.1 s to 4.8 to 5.1 s, so the runner-to-local
 ratio of the header of `loopback.test.ts` (4.5 s over 2.7 s) gave about 8.3 s
@@ -131,9 +133,25 @@ for every arena with a point. It moved no hook: `loopback.test.ts` took 10.2 and
 on one machine (this one is slower than the 8.8 to 9.1 s of the author's), so
 the 60 s hook and the 15 s rows stay. The orb adds one comparison per step; a
 round that reaches 17 s emits two events. `loopback-orb.test.ts` plays up to
-the first pickup in a `beforeAll` (20 s, the top of the rule; 2.4 s for the file
-locally, the runner being 3 to 4 times slower), and its non-vacuous row, which
-plays a whole match with no orb, has a 15 s timeout.
+the first pickup in a `beforeAll` (20 s, the top of the rule; about 1 s for the
+file locally, the runner being 3 to 4 times slower), and its non-vacuous row,
+which plays 3000 frames with no orb, has a 15 s timeout.
+
+The re-read with Durnhal's profile (#211), by the rule above. The hook bodies
+were timed by a console line (a commit of its own, removed again) in the unit job
+of 07464a5, three attempts of run 41517296595 (jobs 125524240852, 125528394943
+and 125531597608): the 2v2 hook 5.27, 3.91 and 3.70 s, the 3v3 hook 18.23, 13.57
+and 13.39 s, the file 30.8, 23.0 and 22.1 s, the rows 1.68, 1.25 and 1.27 s
+(2v2) and 5.39, 4.07 and 3.59 s (3v3). Twice the slowest hook is 36.5 s, above
+the 20 s top of the rule, so the `beforeAll` keeps 60 s; twice the slowest 3v3
+row is 10.8 s, so the rows keep 15 s. The room row "frees the seats" read 1.33
+s (job 125514192190) and 1.76, 1.39 and 1.43 s, so it takes 10 s (the rule: twice
+1.76 s is 3.5 s). The profile does not make the hooks faster than the default
+one did: on one machine (Linux x64, Node 22.23.4, load about 5) they took 3.7 and
+10.9 s with it and 3.5 and 8.9 s without (his three profile rows left out), and
+the file read 16.1 to 30.8 s on the runner in the five jobs of the branch
+(runs 41514425270 and 41516291837 read 17.9 and 16.1 s) against 17.0 to 32.6 s
+before.
 
 `tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
 v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
@@ -142,8 +160,8 @@ the runner before the dodge and 62.4 s after it (job 117369238607). By the rule,
 twice the slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s
 over it; the test sits at 42 percent of its timeout.
 
-The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells) and
-`brimwick.test.ts` (eight) play each cell to matchEnd under the press oracle and
+The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells),
+`brimwick.test.ts` (eight) and `durnhal.test.ts` (twelve, #211) play each cell to matchEnd under the press oracle and
 have their own timeouts too: 60 s a cell and 30 s for each of the three long
 start-edit runs (the long-match precedent of `lumeth.test.ts`, which has 120 s;
 the two Reed Screen runs of 120 ticks take 0.5 s on the runner and have none). A
@@ -163,7 +181,21 @@ s, `brimwick.test.ts` 120 s, `tools/balance/harness.test.ts` 90 s,
 runner time has spread 2x in a day (2.9 to 5.9 s, see Check suite), and a day
 that slow for the whole job would pass the 10 minutes from 5 minutes on, so the
 job keeps less than that margin. The trigger: once a unit job on main passes
-about 8 minutes, cut the cell count of these two files.
+about 8 minutes, cut the cell count of these three files.
+
+`durnhal.test.ts` (#211) has the same timeouts, set by the same rule. A cell
+takes 4.3 to 10.3 s locally (Linux x64, Node 22.23.4, load about 4, the file alone
+66 s) and 5.2 to 17.1 s on the runner over the three attempts of run 41517296595
+of 07464a5, 3.3 to 7.3 s in an earlier job (125520587212): twice 17.1 s is 34.2 s,
+so 60 s. The Last Bastion run read 10.9, 6.1 and 8.5 s (twice the slowest is
+21.7 s, above 20 s, so 30 s); the two Aegis Line runs of 120 ticks 0.34 to 0.46
+s, with no timeout. The file took 155, 107 and 113 s of those attempts. The unit
+job of that commit took 449, 342 and 336 s (Vitest 370, 272 and 271 s), against
+373 s (Vitest 295 s) on main at 88b5603 (job 124649346673); the first attempt ran
+on a slow runner (`ondrel.test.ts` 147 s against 99 and 104 s) and stays under
+the trigger of about 8 minutes (480 s), at 94 percent of it. The two pushes before
+it, without and with the file, took 230 and 254 s (the second one red on a
+melee-key list that this package then extended).
 
 ## Test types
 
@@ -244,8 +276,9 @@ about 8 minutes, cut the cell count of these two files.
   Since #224 the Room's matches have the orb on, as the product does (the
   local reference run reads `energyOrb` from the observed config, so the
   comparison covers it), and `loopback-orb.test.ts` walks a human on team A to
-  the orb point of arena01 with a human on team B standing still and two
-  bots: both clients' `matchStart` carries the table's point, `orbSpawn` and
+  the orb point of arena01 with three humans standing still and no bot (a bot
+  profile, Durnhal's since #211, hunts and kills the walker in about 500 ticks,
+  before the orb is up, so the room has four humans): both clients' `matchStart` carries the table's point, `orbSpawn` and
   `orbTaken` arrive once each in the round of the pickup at the server's tick
   and equal to the server's copies, the state rebuilt at the first snapshot
   after the pickup has the orb taken and the taker's energy of the event, every

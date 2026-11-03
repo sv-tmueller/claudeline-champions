@@ -1,6 +1,7 @@
 import arena01Json from '../../../data/arenas/arena01.json';
 import arena02Json from '../../../data/arenas/arena02.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
+import durnhalJson from '../../../data/kits/durnhal.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
@@ -77,6 +78,15 @@ export function sixKits(): KitDef[] {
     structuredClone(ondrelJson) as unknown as KitDef,
     structuredClone(brimwickJson) as unknown as KitDef,
   ];
+}
+
+/**
+ * The seven shipped kits: `sixKits()` and the shipped Durnhal (#211). `sixKits()` keeps its six, so
+ * the pins that read a Durnhal with no kit stay as they are, and `createMatch` keeps only the kits
+ * in use.
+ */
+export function sevenKits(): KitDef[] {
+  return [...sixKits(), structuredClone(durnhalJson) as unknown as KitDef];
 }
 
 function validAxis(v: number): boolean {

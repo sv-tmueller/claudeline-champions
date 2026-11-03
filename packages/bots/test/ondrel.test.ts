@@ -33,7 +33,7 @@ describe('a match of bots with Ondrel, played to matchEnd', () => {
   // never reach with 100 energy (the declared start edit below does), and Reed Step as an escape
   // in every cell without another dash escaper. `glides` counts the dash escapes of every champion
   // in the cell, so the cells where another kit's Glide could count are left out: the escapers are
-  // read from `ESCAPES`, which today gives Lumeth alone, and the fillers have no dash row.
+  // read from `ESCAPES`, which today gives Lumeth and Durnhal, and the fillers have no dash row.
   it('starts M1, M2, Reed Step, Reed Fence, Undertow and Reed Screen, and escapes by dashing', { timeout: 60_000 }, () => {
     const all = CELLS.map(playCell);
     const casts = (slot: string) => all.reduce((n, r) => n + (r.slots[`ondrel:${slot}`] ?? 0), 0);

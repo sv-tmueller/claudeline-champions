@@ -48,7 +48,7 @@ first.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot test
   (none for a melee arc, whose press lands as the sim's arc does, #186); casting
-  from kit data with range profiles for all six roster ids; the energy reserve;
+  from kit data with range profiles for all seven roster ids; the energy reserve;
   openers and escapes for Hargrim, Quillon and Skerrow (#81), Skerrow's wait at
   6 to 8 m and her Quiet Dart opener, and no dash pressed on an escape think for
   any kit (#98); aim leading and three tiers. A think allocates nothing in the
@@ -63,6 +63,9 @@ first.
   as escapes, rangeMin 7 and Grand Finale held for a target at 55 health or less
   or a cornered one (#165). One escape streak gates the whole escape order, and
   the areas lead at the nominal 20 m/s (measured, see [bots](bots.md), Aim).
+  Durnhal (#211) stands at 2.4 m, throws Breaker Throw at a target walking away,
+  and has Bulwark Charge then Aegis Line as escapes, the dash an escape only (the
+  `escapeOnly` field of his rule).
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
   champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
@@ -92,8 +95,8 @@ first.
   `unlockAchievement`, `openUrl`).
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
-  profiles since #165); Durnhal's kit as data (#204), with no bot profile
-  yet; models for the seven roster ids and the placeholder, each rigged, with
+  profiles since #165); Durnhal's kit as data (#204) with his bot profile
+  (#211); models for the seven roster ids and the placeholder, each rigged, with
   six clips (the client registers and plays all seven roster ids).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).

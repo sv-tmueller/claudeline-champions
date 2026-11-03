@@ -3,8 +3,8 @@ import type { ChampionState, MatchConfig, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import { SLOTS } from '@claudeline/sim';
 import { RANGE_MIN, WITHIN } from './escape-oracle';
-import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sixKits } from './helpers';
-import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
+import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sevenKits, sixKits } from './helpers';
+import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SEVEN_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
 import type { AllyRow, KitSet } from './press-oracle';
 
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
@@ -213,14 +213,14 @@ describe('the band and clearance tables of the shipped kits', () => {
   // Dance start with a dash and a teleport, so they are not among them.
   it('has the melee keys of the shipped kits: the abilities whose first effect is a melee arc', () => {
     const found = new Set<string>();
-    for (const kit of sixKits()) {
+    for (const kit of sevenKits()) {
       for (const slot of SLOTS) {
         const spec = kit.slots[slot];
         if (spec.effects[0]?.type === 'meleeArc') found.add(`${kit.id}:${slot}`);
         if (kit.ex.includes(slot) && spec.ex?.effects[0]?.type === 'meleeArc') found.add(`${kit.id}:${slot}:ex`);
       }
     }
-    expect([...found].sort()).toEqual(['hargrim:M1', 'skerrow:E', 'skerrow:E:ex', 'skerrow:M1']);
+    expect([...found].sort()).toEqual(['durnhal:M1', 'hargrim:M1', 'skerrow:E', 'skerrow:E:ex', 'skerrow:M1']);
     expect(MELEE).toEqual(found);
   });
 
@@ -509,5 +509,72 @@ describe('the band and clearance tables of Ondrel and Brimwick', () => {
     expect(RANGE_MIN['brimwick']).toBe(7);
     expect(WITHIN['ondrel']).toBeUndefined();
     expect(WITHIN['brimwick']).toBeUndefined();
+  });
+});
+
+// Durnhal's kit (#211), worked out again from durnhal.json by the same rules: the M1 arc reaches its
+// radius plus 0.5, an area ahead of him its distance plus its radius plus 0.5, one around him its
+// radius plus 0.5, a bolt speed times lifetime over 60 (multiplied first).
+describe('the band and clearance tables of Durnhal', () => {
+  const kits = sevenKits();
+  const kit = kits.find((k) => k.id === 'durnhal') as KitDef;
+  const slotOf = (key: string): AbilitySpec => {
+    const [slot, variant] = key.split(':') as [Slot, string | undefined];
+    const base = kit.slots[slot];
+    return variant === 'ex' ? (base.ex as AbilitySpec) : base;
+  };
+  const area = (key: string, index = 0) => {
+    const effect = slotOf(key).effects[index];
+    if (effect === undefined || effect.type !== 'area') throw new Error(`${key} has no area`);
+    return effect;
+  };
+
+  it('has the reach and the shot width of every Durnhal ability that is pressed', () => {
+    const shipped = SEVEN_SET;
+    const arc = slotOf('M1').effects[0];
+    if (arc === undefined || arc.type !== 'meleeArc') throw new Error('M1 is no arc');
+    expect(shipped.bands['durnhal:M1']).toEqual({ min: 0, max: arc.radius + 0.5 });
+    for (const key of ['M2', 'M2:ex']) {
+      const placement = area(key).placement;
+      const ahead = placement.type === 'ahead' ? placement.distance : 0;
+      expect(shipped.bands[`durnhal:${key}`], key).toEqual({ min: 0, max: ahead + area(key).radius + 0.5 });
+    }
+    expect(shipped.bands['durnhal:Q']).toEqual({ min: 0, max: area('Q').radius + 0.5 });
+    expect(shipped.bands['durnhal:F']).toEqual({ min: 0, max: area('F').radius + 0.5 });
+    // Breaker Throw is an opener on a target walking away; its EX variant has no condition.
+    for (const key of ['E', 'E:ex']) {
+      const bolt = slotOf(key).effects[0];
+      if (bolt === undefined || bolt.type !== 'projectile') throw new Error(`${key} is no bolt`);
+      const reach = { min: 0, max: (bolt.speed * bolt.lifetimeTicks) / 60 };
+      expect(shipped.bands[`durnhal:${key}`], key).toEqual(key === 'E' ? { ...reach, motion: 'away' } : reach);
+      expect(shipped.clearances[`durnhal:${key}`], key).toBe(bolt.radius);
+    }
+    for (const key of ['M1', 'M2', 'M2:ex', 'Q', 'F']) {
+      expect(shipped.clearances[`durnhal:${key}`], key).toBe(0.5);
+    }
+    // Bulwark Charge is an escape only (no band, only its escape row) and Aegis Line is a shield on
+    // allies (reaches no enemy): neither has a band.
+    expect(shipped.bands['durnhal:SPACE']).toBeUndefined();
+    expect(shipped.bands['durnhal:R']).toBeUndefined();
+    expect(slotOf('R').effects[0]?.type).toBe('area');
+    expect(area('R').targets).toBe('allies');
+    // Last Bastion is not held: its damage is one area of 30, which the run presses at 100 energy.
+    expect(HELD['durnhal:F']).toBeUndefined();
+  });
+
+  it('has the escape rows of Bulwark Charge and Aegis Line, from the kit literals', () => {
+    const charge = slotOf('SPACE').effects[0];
+    if (charge === undefined || charge.type !== 'dash') throw new Error('no dash');
+    expect(ESCAPES['durnhal:SPACE']).toEqual({ slot: 'SPACE', teleport: null, dash: charge.distance, after: null });
+    expect(ESCAPES['durnhal:R']).toEqual({
+      slot: 'R',
+      teleport: null,
+      after: { slot: 'SPACE', teleport: null, dash: charge.distance },
+    });
+  });
+
+  it('has the trigger of the common kind: rangeMin 0 (he never kites), and no trigger of his own', () => {
+    expect(RANGE_MIN['durnhal']).toBe(0);
+    expect(WITHIN['durnhal']).toBeUndefined();
   });
 });

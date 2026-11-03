@@ -24,6 +24,7 @@ export const RANGE_MIN: Record<string, number> = {
   skerrow: 0,
   ondrel: 5,
   brimwick: 7,
+  durnhal: 0,
 };
 
 /**

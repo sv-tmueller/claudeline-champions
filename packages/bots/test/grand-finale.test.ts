@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChampionState } from '@claudeline/sim';
-import { sixKits } from './helpers';
+import { sevenKits, sixKits } from './helpers';
 import { pressOf, sceneOf } from './scenes';
 
 // Brimwick's Grand Finale is held like Reaper's Dance (reaper.test.ts): a target it can finish
@@ -58,5 +58,43 @@ describe('the reserve of Brimwick, whose ultimate is held', () => {
 
   it('holds the EX Firecracker for the finisher against a target at 55 health', () => {
     expect(pressOf(reserve(55))).toBeNull();
+  });
+});
+
+// Durnhal does not hold Last Bastion (#211, `holdF` false, like Ondrel and unlike Brimwick): it is
+// pressed within its band (4.5 m plus 0.5, less the margin: 4.0 m) at 100 energy against a healthy
+// target in the open. A hold would wait for a target at 30 health (the damage read from the kit) or
+// in a corner.
+describe('Last Bastion, not held', () => {
+  const kits = sevenKits();
+  const F_ONLY = { kits, energy: 100, ready: ['F'] } as const;
+
+  it('presses F at a healthy target in the open at 4.0 m, and not at 4.05 m', () => {
+    expect(pressOf(sceneOf('durnhal', 4, F_ONLY))).toBe('F');
+    expect(pressOf(sceneOf('durnhal', 4.05, F_ONLY))).toBeNull();
+    expect(pressOf(sceneOf('durnhal', 1, F_ONLY))).toBe('F');
+  });
+
+  it('presses F at a target with 56 health too: no hold on what F does', () => {
+    const state = sceneOf('durnhal', 4, F_ONLY);
+    (state.champions[2] as ChampionState).health = 56;
+    expect(pressOf(state)).toBe('F');
+  });
+});
+
+describe('the reserve of Durnhal, whose ultimate is not held', () => {
+  const kits = sevenKits();
+  // A standing target: Breaker Throw as the base needs a target walking away, so a press of E at
+  // 80 energy is the EX variant or none. At 3 m F is in reach (4 m) and the reserve holds the EX
+  // back; at 4.5 m F is out of reach, so the reserve is off and the EX goes.
+  const reserve = (distance: number) =>
+    sceneOf('durnhal', distance, { kits, energy: 80, ready: ['E', 'F'] });
+
+  it('withholds the EX Breaker Throw at 80 energy with the target 3 m away, inside the reach of F', () => {
+    expect(pressOf(reserve(3))).toBeNull();
+  });
+
+  it('lets the EX Breaker Throw through at 4.5 m, where F is out of reach', () => {
+    expect(pressOf(reserve(4.5))).toBe('E+SHIFT');
   });
 });

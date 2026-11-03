@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor, rulesFor } from '../src/profile';
-import { jsonKits, profileOf, rosterKits, sixKits } from './helpers';
+import { jsonKits, profileOf, rosterKits, sevenKits, sixKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -135,7 +135,15 @@ describe('rulesFor', () => {
 
   it('gives no rule without a kit or with a kit of another id', () => {
     const quillon = jsonKits().find((kit) => kit.id === 'quillon') as KitDef;
-    const none = { openers: [], escapes: [], holdF: false, wait: null, escapeWithin: null, allies: [] };
+    const none = {
+      openers: [],
+      escapes: [],
+      holdF: false,
+      wait: null,
+      escapeWithin: null,
+      allies: [],
+      escapeOnly: [],
+    };
     expect(rulesFor('hargrim')).toEqual(none);
     expect(rulesFor('hargrim', quillon)).toEqual(none);
   });
@@ -225,11 +233,70 @@ describe('rulesFor Ondrel and Brimwick', () => {
   });
 
   it('gives them no rule without their kit or with a kit of another id', () => {
-    const none = { openers: [], escapes: [], holdF: false, wait: null, escapeWithin: null, allies: [] };
+    const none = {
+      openers: [],
+      escapes: [],
+      holdF: false,
+      wait: null,
+      escapeWithin: null,
+      allies: [],
+      escapeOnly: [],
+    };
     for (const id of ['ondrel', 'brimwick']) {
       expect(rulesFor(id), id).toEqual(none);
       expect(rulesFor(id, kit('hargrim')), id).toEqual(none);
     }
+  });
+});
+
+describe('Durnhal, the melee guardian of #211', () => {
+  const kits = sevenKits();
+  const durnhal = kits.find((k) => k.id === 'durnhal') as KitDef;
+
+  it('reads rangeMax from the base M1 arc of 3.5 m, less the margin: 3 m, rangeMin 0, stand reach 2.4 m', () => {
+    expect(profileFor('durnhal', durnhal)).toEqual(profileOf(0, 3));
+    expect(profileFor('durnhal', durnhal).standReach).toBe(3 * 0.8);
+  });
+
+  it('keeps the table of 3.5 m (stand reach 2.8 m) with no kit, no M1 band or a kit of another id', () => {
+    expect(profileFor('durnhal')).toEqual(profileOf(0, 3.5));
+    expect(profileFor('durnhal').standReach).toBe(3.5 * 0.8);
+    expect(profileFor('durnhal', quietKit('durnhal'))).toEqual(profileOf(0, 3.5));
+    expect(profileFor('durnhal', quietKit('hargrim'))).toEqual(profileOf(0, 3.5));
+  });
+
+  it('derives rangeMax instead of hard-coding it: an arc of 4 m reaches 4.5 m, so 3.5', () => {
+    expect(profileFor('durnhal', withM1(quietKit('durnhal'), arcSlot(4)))).toEqual(profileOf(0, 3.5));
+  });
+
+  it('has the Breaker Throw opener on a target walking away, and Bulwark Charge then Aegis Line as escapes', () => {
+    const rules = rulesFor('durnhal', durnhal);
+    expect(rules.openers).toEqual([{ slot: 'E', band: null, motion: 'away', when: null }]);
+    expect(rules.escapes).toEqual(['SPACE', 'R']);
+    // Last Bastion is not held: F is pressed within its band at 100 energy.
+    expect(rules.holdF).toBe(false);
+    expect(rules.wait).toBeNull();
+    expect(rules.escapeWithin).toBeNull();
+    expect(rules.allies).toEqual([]);
+  });
+
+  it('marks Bulwark Charge as an escape only, a frozen subset of the escapes', () => {
+    const rules = rulesFor('durnhal', durnhal);
+    expect(rules.escapeOnly).toEqual(['SPACE']);
+    expect(Object.isFrozen(rules.escapeOnly)).toBe(true);
+    expect(Object.isFrozen(rules.openers)).toBe(true);
+    expect(Object.isFrozen(rules.escapes)).toBe(true);
+    expect(rules.escapes).toEqual(expect.arrayContaining([...rules.escapeOnly]));
+  });
+
+  it('gives no other champion an escape-only slot, and Durnhal none without his kit or with another', () => {
+    for (const kit of kits) {
+      if (kit.id === 'durnhal') continue;
+      expect(rulesFor(kit.id, kit).escapeOnly, kit.id).toEqual([]);
+      expect(Object.isFrozen(rulesFor(kit.id, kit).escapeOnly), kit.id).toBe(true);
+    }
+    expect(rulesFor('durnhal').escapeOnly).toEqual([]);
+    expect(rulesFor('durnhal', kits.find((k) => k.id === 'hargrim') as KitDef).escapeOnly).toEqual([]);
   });
 });
 

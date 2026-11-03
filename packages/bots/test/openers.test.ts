@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AbilitySpec, ChampionState, KitDef, Slot, SlotSpec } from '@claudeline/sim';
 import { dashBand } from '../src/casting';
-import { jsonKits, rosterKits, sixKits } from './helpers';
+import { jsonKits, rosterKits, sevenKits, sixKits } from './helpers';
 import { pressOf, sceneOf } from './scenes';
 
 function kitById(id: string): KitDef {
@@ -278,5 +278,34 @@ describe('Quiet Dart at a kitted Ondrel or Brimwick', () => {
       expect(pressOf(dart(id, { enemyReady: ['R'] })), `${id} R`).toBe('Q');
       expect(pressOf(dart(id, { enemyReady: [] })), `${id} none`).toBe('M2');
     }
+  });
+});
+
+describe('Breaker Throw, the opener of Durnhal on a target that walks away', () => {
+  // Breaker Throw keeps the kit band less the margin (0 to 8 m: 18 m/s for 30 ticks reaches 9 m) and
+  // needs a target walking away, like Undertow and Chain Hook. Only E is ready; the seven-kit set
+  // carries Durnhal's kit. A melee champion that stands at 2.4 m throws it on the way in.
+  const kits = sevenKits();
+  const throwAt = (distance: number, options: Parameters<typeof sceneOf>[2] = {}) =>
+    sceneOf('durnhal', distance, { kits, ready: ['E'], enemyVx: 5.5, ...options });
+
+  it('presses E from 4 to 8 m at a target walking away, inclusive', () => {
+    for (const d of [4, 6, 8]) expect(pressOf(throwAt(d)), `at ${d} m`).toBe('E');
+  });
+
+  it('does not press E at 8.05 m, past the kit band less the margin', () => {
+    expect(pressOf(throwAt(8.05))).toBeNull();
+  });
+
+  it('does not press E at a target that stands or closes in', () => {
+    expect(pressOf(throwAt(6, { enemyVx: 0 }))).toBeNull();
+    expect(pressOf(throwAt(6, { enemyVx: -5.5 }))).toBeNull();
+  });
+
+  it('presses the EX variant with 25 energy, at a target that stands too, and the base with 24', () => {
+    expect(pressOf(throwAt(6, { energy: 25 }))).toBe('E+SHIFT');
+    expect(pressOf(throwAt(6, { energy: 25, enemyVx: 0 }))).toBe('E+SHIFT');
+    expect(pressOf(throwAt(6, { energy: 24 }))).toBe('E');
+    expect(pressOf(throwAt(6, { energy: 24, enemyVx: 0 }))).toBeNull();
   });
 });
