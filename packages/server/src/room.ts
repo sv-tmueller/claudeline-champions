@@ -321,6 +321,10 @@ export class Room {
     };
     const arena = data.arenas.find((a) => a.id === lobby.settings.arenaId);
     if (arena === undefined) throw new Error(`the room's arena ${lobby.settings.arenaId} is not in its data`);
+    // The orb is on in every match the room plays when its data has a point for the arena; the key
+    // stays out of the config otherwise, never undefined (the codec and the checksum read the key).
+    const orb = data.orbs.get(arena.id);
+    if (orb !== undefined) config.energyOrb = { x: orb.x, y: orb.y };
     const seed = seedOf(this.o.randomBytes(4));
     const state = createMatch(config, arena, seed, data.kits);
 

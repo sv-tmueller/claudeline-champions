@@ -62,6 +62,14 @@ export const ENERGY_GAIN_M1 = 5;
 export const ENERGY_GAIN_SKILL = 10;
 export const ENERGY_GAIN_ULTIMATE = 15;
 
+/**
+ * The on-hit counter, rules.md section 2.6: a kit may declare a cap from 1 to this, and a window
+ * from the first to the second tick count.
+ */
+export const COUNTER_MAX_CAP = 5;
+export const COUNTER_MIN_WINDOW_TICKS = 60;
+export const COUNTER_MAX_WINDOW_TICKS = 600;
+
 /** Match flow, rules.md section 1: the lengths of the phases, in ticks. */
 export const WARMUP_TICKS = 180;
 /** The round clock, 90 s; sudden death starts when it is used up. */

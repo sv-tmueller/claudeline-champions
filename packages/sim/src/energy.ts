@@ -4,6 +4,7 @@ import {
   ENERGY_GAIN_ULTIMATE,
   MAX_ENERGY,
 } from './constants';
+import { buildCounter } from './counter';
 import type { Point } from './geometry';
 import { applyEffects } from './health';
 import type { Slot } from './input';
@@ -44,7 +45,9 @@ function findCast(state: GameState, castId: number): CastRecord {
  * `energyGain` in the list, cut to the room under `MAX_ENERGY`; a target that qualifies is marked
  * even when the cap trims its gain to 0, and then no event is emitted. A dead caster earns
  * nothing. A source with no cast earns nothing and applies its statuses with no slot. Damage over
- * time and heal over time pulses never come through here, so they give nothing. Throws
+ * time and heal over time pulses never come through here, so they give nothing. A hit that
+ * qualifies as `damaging` also builds the caster's on-hit counter, once per hit, whatever the
+ * credit (counter.ts). Throws
  * `Invalid hit: ...` for a cast the state does not hold.
  */
 export function landHit(
@@ -69,6 +72,10 @@ export function landHit(
     effects.some((e) => e.type === 'damage');
 
   const restored = applyEffects(state, ownerId, targetId, effects, origin, record ? record.slot : null);
+
+  // A qualifying hit builds the counter of the slot's kit, every time: the once-per-target rule
+  // below is for energy only.
+  if (damaging && record && caster && caster.alive) buildCounter(state, caster, record.slot);
 
   if (!record || !caster || !caster.alive || record.credited.includes(targetId)) return;
   const healing =

@@ -121,7 +121,10 @@ picked where the spec leaves them open:
 - **Data.** `loadRoomData` reads `data/kits` (all of them, sorted by id, which
   is the roster order) and `data/arenas` through `parseArenaDef`, sorted by id.
   An arena's `maxTeamSize` is the smaller spawn count capped at 3, and an
-  arena under 2 is left out.
+  arena under 2 is left out. It also reads `data/orbs.json`, a missing file
+  being an empty table, and keeps the energy orb point of each arena that has
+  a row (`RoomData.orbs`, by arena id), through the sim's `orbPointFor`, so a
+  bad row throws at load (#224).
 - **Bot driver.** It stays in `server`, as the client's rule: the bot of
   champion `id` is `createBot(id, difficulty, matchSeed * 100 + id)`, and its
   record goes straight into the inputs array. The match seed is a uint32 from 4
@@ -166,12 +169,13 @@ picked where the spec leaves them open:
   IPC message that carries it is P3, and the close of a match nobody watches
   after 3600 ticks is P5, so until then a match whose humans are all gone plays
   on to its end.
-- **Not built.** The server's energy orb: roster v3 says the online server sets
-  `MatchConfig.energyOrb`. The sim has the key since #218 and the protocol's
-  `matchStart` reads and writes it (a finite `x` and `y` after `roundsToWin`,
-  an absent key staying absent; the sim checks the point, the codec only the
-  numbers, and `PROTOCOL_VERSION` stays 1). The server does not read
-  `data/orbs.json` or pass the point yet, so its matches have no orb (step 2.2).
+- **The energy orb.** `Room.startMatch` adds `energyOrb` to the config of every
+  match on an arena that has a point in `RoomData.orbs`, and leaves the key out
+  otherwise (never `undefined`). `matchStart` carries it (the protocol reads and
+  writes a finite `x` and `y` after `roundsToWin`, an absent key staying
+  absent; the sim checks the point, the codec only the numbers, and
+  `PROTOCOL_VERSION` stays 1), so the client rebuilds the same match, and
+  `orbSpawn` and `orbTaken` travel in the event batches like any event (#224).
 
 ## Tests
 
@@ -185,7 +189,13 @@ One line a layer
   room codes, tokens, the version and every server field).
 - Server headless test (the `server` Vitest project, built in P2): `Room` on a
   loopback transport and a manual clock, from create and ready to `matchEnd`,
-  with a checksum match at every snapshot. The reconnect rows are P5's.
+  with a checksum match at every snapshot. The reconnect rows are P5's. Its
+  matches play with the energy orb on, as the product does. A second spec,
+  `loopback-orb.test.ts`, walks a human to the orb point and checks `energyOrb`
+  in `matchStart`, `orbSpawn` and `orbTaken` in both clients' batches at the
+  server's tick, the taken orb in the rebuilt state and the checksum at every
+  snapshot, and that data with no row for the arena gives no key and no orb
+  events (#224).
 - Socket test: a real `ws` server and Node's `WebSocket` client on a free port.
 - Client units: the snapshot buffer, the render clock, event release, input
   ticks.

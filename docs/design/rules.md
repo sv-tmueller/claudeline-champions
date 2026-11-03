@@ -61,6 +61,7 @@ The sim also does this `[tuned]`:
 - A cast in progress is dropped.
 - The round timer is set to 90 s and the ring is removed.
 - With the energy orb on, the orb is up again, untaken (section 3.3).
+- A kit's on-hit counter is set to 0 (section 2.6).
 
 Round wins are the only thing that carries over.
 
@@ -146,6 +147,19 @@ When a cast fires a projectile that has ally effects, and the aim position of th
 - A wound status, which cuts healing, multiplies the reduced amount: the self-cast factor comes first, then the wound cut.
 - A player who holds the mouse on their own champion triggers the rule, as the aim position alone decides it.
 
+### 2.6 The on-hit counter `[tuned]`
+
+A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `counter: { from: <slot>, cap: <1 to 5>, windowTicks: <60 to 600> }`. It is the one exception to roster-v1's "a kit has no passive", and it is declared in the kit data and not hidden in code. A kit with no `counter` has none of the state and none of the rules below. The spend verbs of the counter (`consumeCounter`) are part 4.4b (#161) and are not in the sim yet.
+
+- **Build:** a hit by the `from` slot that lands on an enemy adds one, up to `cap`. The EX variant of the `from` slot counts as that slot. A hit lands as it does for energy (section 3.1): the target is an enemy, alive and not invulnerable before the effects, and the hit's effects include `damage`. A hit that a shield fully absorbs still counts. A status, a shield or a push alone does not.
+- **Each hit counts:** unlike energy, the build ignores the once-per-target rule. Each pulse of an area that hits an enemy, and each enemy a piercing projectile or a melee arc hits, adds one.
+- **At the cap:** a hit that lands at the cap adds nothing, but it still restarts the window.
+- **Invulnerable:** a hit on an invulnerable champion adds nothing and does not restart the window.
+- **What never builds:** damage over time pulses, ring damage, dev tool spawns, effects aimed at the caster, and the projectile of a caster who has died since firing it.
+- **Decay:** the whole counter goes to 0 when `windowTicks` ticks pass with no qualifying hit. There is one timer per champion, not one per stack. A hit in tick T keeps the count through tick T + `windowTicks` - 1; it is 0 at the end of tick T + `windowTicks`, unless another hit lands in that tick. A dead champion's counter decays like any other.
+- **Pause:** the window runs during a round and in free play, and it is frozen during the warmup, the round end pause and after the match ends; the count stays as it was.
+- **Reset:** the counter is set to 0 at the start of each round, like energy (section 1.2).
+
 ## 3. Energy economy
 
 - Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.
@@ -211,6 +225,7 @@ One contested pickup per round charges the ultimate. It rewards map control with
 - **Ties:** with two or more touchers on the same step, of any teams (a tie inside one team too), the match's seeded RNG draws once and picks one of them, with no bias by id. One toucher takes it with no draw.
 - **Unclaimed:** an orb nobody takes stays until the round ends. A pickup on the step that decides the round stands.
 - **Reset:** the next round starts with the orb up and untaken (section 1.2).
+- **Shown:** the standard local match and the online server's match turn the orb on with the arena's point from `data/orbs.json`; free play has none (amended 2026-11-02 by #224). The client draws a warning ring at the point from `orbSpawn`, the orb itself while it is collectible, and removes both on `orbTaken` and at the round's end. The warning plays a sound, and the pickup adds a kill-feed line that names the taker.
 
 ## 4. Statuses
 
@@ -285,8 +300,9 @@ Default controls `[spec]`:
 - Sound is generated in code, with no sound files and no music `[tuned]`. It
   plays a hit (a projectile that touches a champion, and a melee arc with at
   least one target), a cast (the local champion's casts only), a death
-  (every death), a round start and a round end, and nothing for the match
-  end `[tuned]`. The browser starts it on the first key press or mouse press
+  (every death), a round start, a round end and the energy orb's warning,
+  and nothing for the match end or the orb's pickup `[tuned]` (amended
+  2026-11-02 by #224). The browser starts it on the first key press or mouse press
   `[tuned]`. The menu's sound toggle mutes all of it, and the mute is saved
   through the platform with the bindings and read back on the next launch
   `[tuned]`.
@@ -329,7 +345,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Round score | Round wins of both teams, with the 3 needed to win the match. |
 | Round timer | Time left in the round. After it reaches 0 it shows sudden death. |
 | Ring warning | A countdown from 10 s before sudden death starts `[tuned]`. During sudden death a red edge warning shows when the local champion is outside the ring. |
-| Kill feed | A line per death, showing the killer (or "ring") and the victim. Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
+| Kill feed | A line per death, showing the killer (or "ring") and the victim, and a line per orb pickup, showing the taker and "Energy orb" (amended 2026-11-02 by #224). Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
 | Debug overlay | Draws collision circles, obstacles, projectiles and line of sight `[spec]`. Off by default. |
 
 Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. The HUD health bar is the detailed view of the local champion only.

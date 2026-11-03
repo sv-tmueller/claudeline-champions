@@ -127,7 +127,10 @@ Iteration order is always id order. This gives:
   events only from a match with the orb on. Ring `damage`
   and `death` events carry `sourceId` -1 (`RING_SOURCE_ID`). The clocks
   (`phaseTicks`, the ring radius) advance without events, as `tick` and the
-  positions do; every discrete change has an event. Hit and expired positions
+  positions do; every discrete change has an event, with one exception: the
+  on-hit counter (`counter` on the champion) changes without one, because every
+  build follows from a `damage` event of the `from` slot and every decay from
+  the window. Hit and expired positions
   are the projectile centre at contact (the final position for `lifetime`, and
   where it was for `roundEnd`).
 
@@ -142,8 +145,11 @@ and the same input stream, `checksum` after N ticks is identical on every run.
   `dash` (`null` or a record, see [Forced motion](#forced-motion)), `cooldowns`
   (seven integers in `SLOTS` order, the ticks until each slot may cast), `cast`
   (`null` or the windup in progress, `{ castId, slot, ex, windupTicks,
-  windupLeft }`, see [Abilities](#abilities-and-the-effects-toolkit)) and the
-  alive flag.
+  windupLeft }`, see [Abilities](#abilities-and-the-effects-toolkit)), the
+  alive flag and, only when the champion's kit declares an on-hit counter,
+  `counter` (`{ count, lastHitTick }`, see [The on-hit
+  counter](#the-on-hit-counter); the key is missing, not `undefined`, for any
+  other champion).
 - Projectile: id, owner, team (copied from the owner at spawn), position,
   velocity, radius, remaining lifetime ticks, pierce flag, the champions it has
   already hit (`hitIds`, in hit order), an inline `effects` list, an optional
@@ -260,6 +266,12 @@ slots in `Button` bit order.
      each projectile in id order at its position, an `areaExpired` for each
      area in id order. Both lists are replaced by empty ones, the phase becomes
      `roundEnd` and `phaseTicks` 0.
+   - 6d. The on-hit counters (`counter.ts`, `stepCounters`; round phase and free
+     play, so the deciding step too; a locked step never gets here). For each
+     champion in id order, dead ones included, a counter above 0 whose
+     `state.tick - lastHitTick` is at least its kit's `windowTicks` goes back to
+     `{ count: 0, lastHitTick: 0 }`. It emits nothing. See
+     [The on-hit counter](#the-on-hit-counter).
 7. Drop the cast records nothing refers to: no windup, projectile, area or dash
    of that cast is left. A match with no kits allocates nothing in steps 3b to 3d
    or here (the combat e2e counts per-tick allocations), so these hold no
@@ -392,6 +404,7 @@ them from inside the sim, through `cast.ts`.
 | `motion.ts` | `teleport(state, championId, toX, toY)` | false when blocked |
 | `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null)` | `applyEffects` returns the health its `heal` effects restored |
 | `energy.ts` | `landHit(state, { ownerId, castId }, targetId, effects, origin)` | |
+| `counter.ts` | `buildCounter(state, caster, slot)`, `stepCounters(state)` | what `landHit` and `step` call, see [The on-hit counter](#the-on-hit-counter) |
 | `cast.ts` | `tickCooldowns`, `advanceWindup`, `startCast`, `fireDashThen`, `dropUnusedCasts`, `resetAbilityState` | what `step` calls, see [Abilities](#abilities-and-the-effects-toolkit) |
 | `flow.ts` | `stepLocked`, `stepSuddenDeathAndDecision` | what `step` calls for match flow, see [Match flow](#match-flow) |
 
@@ -721,7 +734,8 @@ These are sim-level choices that may become `[tuned]` lines in rules.md:
 - Aim and facing stay live in locked phases and are kept through the reset;
   rules.md locks movement and casting only.
 - Statuses and dashes are frozen through the pause, not run down, and the reset
-  drops them. They get no events of their own at the reset.
+  drops them. They get no events of their own at the reset. An on-hit counter
+  is frozen the same way, and the reset sets it to 0.
 - Projectiles and areas end with `roundEnd` events when a round is decided (and
   any left at a reset), so the rule that every projectile gets one
   `projectileExpired` holds; `roundEnd` is a new `ProjectileEndReason`, and the
@@ -744,7 +758,8 @@ Each kit defines exactly two EX variants.
 - EX variants cost 25 energy (`EX_ENERGY_COST`). The ultimate costs 100
   (`ULTIMATE_ENERGY_COST`). Energy is earned only by landing abilities on enemies
   and, for support kits, by healing allies, and runs from 0 to 100
-  (`MAX_ENERGY`). Energy resets to 0 at the start of each round.
+  (`MAX_ENERGY`). Energy resets to 0 at the start of each round, and so does an
+  on-hit counter.
 - Every ability has: cooldown ticks, windup ticks (0 for instant), movement
   rule during windup (free, slowed, locked), and a list of effects.
 - Effects toolkit (the only primitives kits may use): `projectile`, `dash`,
@@ -771,7 +786,10 @@ interface KitDef {
   support: boolean;            // healing allies earns energy
   slots: Record<Slot, SlotSpec>;
   ex: [Slot, Slot];            // the two slots with an EX variant, never F
+  counter?: CounterSpec;       // the one on-hit counter, see "The on-hit counter"; key missing when none
 }
+interface CounterSpec { from: Slot; cap: number; windowTicks: number }  // cap 1 to 5, window 60 to 600
+
 type SlotSpec = AbilitySpec & { cooldownTicks: number; ex?: AbilitySpec };
 interface AbilitySpec { windupTicks: number; movement: 'free' | 'slowed' | 'locked'; effects: AbilityEffect[] }
 ```
@@ -816,7 +834,12 @@ from 1 to 100; hit effects and status specs as the toolkit accepts them. It also
 checks the structure: every slot present, non-empty effect lists (a projectile
 with `allyEffects` may have an empty `effects`, but never two empty lists), a known
 movement rule, exactly two distinct EX slots (never F) that match the slots
-carrying an `ex`. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
+carrying an `ex`. A `counter`, when given, is one object (a list fails with `a
+kit has one counter, not a list`) whose `from` is a known slot, whose `cap` is an
+integer from 1 to 5 (`COUNTER_MAX_CAP`) and whose `windowTicks` is an integer from
+60 to 600 (`COUNTER_MIN_WINDOW_TICKS`, `COUNTER_MAX_WINDOW_TICKS`); unknown keys
+inside it are dropped, and a `counter` key inside a slot is a stray key like any
+other. Catalog ranges (a stun of 30 to 120 ticks, 8 to 30 damage) are
 not checked here; roster tests do that. The bounds keep `step` from throwing, not
 cheap: the live entities of a kit grow with lifetime over cooldown, step 7
 (`dropUnusedCasts`) is quadratic in them, and the catalog ranges keep them small.
@@ -917,7 +940,44 @@ the cast refers to them.
 calls at the start of every round, inside `roundStarted`. It sets every
 champion's energy and cooldowns to 0, drops its windup and dash, empties
 `statuses` and `state.casts`, sets `castId` to null on the projectiles and areas
-still alive and emits nothing. It is not in the index.
+still alive, sets the `counter` of a champion that has one to `{ count: 0,
+lastHitTick: 0 }` and emits nothing. It is not in the index.
+
+### The on-hit counter
+
+A kit may declare one counter (`KitDef.counter`, rules.md section 2.6, v3 design
+section 4.4a; the spend verbs of 4.4b are not in the sim yet). A champion whose
+kit declares it carries `counter: { count, lastHitTick }` from `createMatch` on,
+at `{ 0, 0 }`; any other champion has no `counter` key at all (never
+`undefined`, so `checksum` does not throw), and no shipped kit declares one, so
+every committed fixture keeps its checksum. Both numbers are in the checksum.
+`lastHitTick` is the `state.tick` of the step the hit landed in.
+
+- **Build.** `landHit` calls `buildCounter` (`counter.ts`) after the effects are
+  applied and before the `credited` early return, when the hit is `damaging` in
+  the energy sense (an enemy that is alive and not invulnerable before the
+  effects, a list that holds `damage`), the cast record exists and the caster is
+  alive. When the record's slot is the kit's `from` slot (the EX variant is the
+  same slot), `count = min(cap, count + 1)` and `lastHitTick = state.tick`. So a
+  hit that a shield absorbs counts; each area pulse and each target of a
+  piercing projectile or an arc counts, because the build ignores `credited`;
+  a hit at the cap adds nothing and still restarts the window; an invulnerable
+  target adds nothing and does not restart it. A dev tool spawn (no cast), a
+  damage over time pulse, ring damage, a self-cast and the projectile of a caster
+  who has died never build.
+- **Decay.** Step 6d (`stepCounters`): `count > 0` and `state.tick -
+  lastHitTick >= windowTicks` resets to `{ 0, 0 }`. Hits land in steps 3 to 5,
+  so with a hit in step T the count survives steps T + 1 to T + W - 1 and is 0
+  at the end of step T + W, unless a qualifying hit lands in that step. There is
+  one timer per champion. A locked phase (warmup, round end pause, match end)
+  never runs step 6d, so the count stays frozen through it, and the last count
+  stays at the match end.
+- **Reset.** `resetAbilityState` (above) at each round start.
+
+`counter.ts` follows the orb: no arrow function, indexed loops, no per-tick
+allocation, integer operations only, and no import of `cast.ts` (the cycle cast,
+projectile, energy, counter, cast), so it looks the kit up itself. It adds no
+`SimEvent`.
 
 ## Match flow
 
@@ -990,7 +1050,8 @@ areas end with `projectileExpired` (`roundEnd`) or `areaExpired` (only a dev
 tool spawn made between steps in a locked phase can leave one), each champion
 goes back to its spawn in the team slot order of `createMatch` with velocity
 `+0`, `health = maxHealth` and `alive = true`, `resetAbilityState` runs (energy
-0, cooldowns 0, no status, dash or cast, `casts` empty), the ring is dropped,
+0, cooldowns 0, no status, dash or cast, `casts` empty, an on-hit counter at
+`{ 0, 0 }`), the ring is dropped,
 the orb, when there is one, is untaken again, `round` counts up, the phase is `round`, and `roundStarted` is emitted last. The
 score and `nextEntityId` carry over, and so do the aim and the facing.
 

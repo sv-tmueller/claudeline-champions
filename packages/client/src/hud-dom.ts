@@ -17,7 +17,7 @@ export function make(parent: HTMLElement, tag: string, attributes: Record<string
  * States are data attributes that the e2e specs read: `data-ready`,
  * `data-windup`, `data-blocked` and `data-silenced` on a slot (the silence is
  * the same for all seven), `data-ready` on an energy mark,
- * `data-visible` on a kill-feed line and `data-team` on its names.
+ * `data-visible` and `data-kind` (death or orb) on a kill-feed line and `data-team` on its names.
  * The shield segment sits inside the health track: `data-part="shield"` carries
  * `data-visible` and `data-absorb`, and its `shield-fill` child the width.
  * The timer also carries `data-sudden`, true while it shows the sudden death
@@ -75,7 +75,7 @@ export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
   const feed = make(root, 'div', { 'data-hud': 'kill-feed' });
   const lines: HudHandles['lines'][number][] = [];
   for (let i = 0; i < KILL_FEED_LINES; i++) {
-    const line = make(feed, 'div', { 'data-line': String(i) });
+    const line = make(feed, 'div', { 'data-line': String(i), 'data-kind': 'death' });
     const killer = make(line, 'span', { 'data-part': 'killer' });
     make(line, 'span', { 'data-part': 'arrow' }, '>');
     const victim = make(line, 'span', { 'data-part': 'victim' });

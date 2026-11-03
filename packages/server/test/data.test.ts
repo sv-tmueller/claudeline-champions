@@ -42,6 +42,15 @@ describe('loadRoomData on the shipped data', () => {
   });
 });
 
+describe('loadRoomData orb points', () => {
+  it('holds the shipped orb point of each arena, read from data/orbs.json', () => {
+    const data = loadRoomData();
+    expect(data.orbs.get('arena01')).toEqual({ x: 0, y: 2.5 });
+    expect(data.orbs.get('arena02')).toEqual({ x: 0, y: 0 });
+    expect(data.orbs.size).toBe(data.arenas.length);
+  });
+});
+
 describe('loadRoomData on a data directory of its own', () => {
   function arenaFile(id: string, teamA: number, teamB: number): string {
     const base = JSON.parse(readFileSync(new URL('arenas/arena01.json', repoData), 'utf8')) as {
@@ -84,6 +93,28 @@ describe('loadRoomData on a data directory of its own', () => {
       { id: 'zz', name: 'Arena zz', maxTeamSize: 3 },
     ]);
     expect(data.arenas.map((a) => a.id)).toEqual(['bb', 'mm', 'zz']);
+  });
+
+  it('has no orb for a data directory without orbs.json, and none for an arena without a row', () => {
+    const { root, dir } = dataDir();
+    writeFileSync(join(dir, 'arenas', 'a.json'), arenaFile('aa', 3, 3));
+    expect(loadRoomData(root).orbs.size).toBe(0);
+    writeFileSync(join(dir, 'orbs.json'), JSON.stringify({ other: { x: 0, y: 0 } }));
+    expect(loadRoomData(root).orbs.size).toBe(0);
+  });
+
+  it('reads the row of an arena from orbs.json', () => {
+    const { root, dir } = dataDir();
+    writeFileSync(join(dir, 'arenas', 'a.json'), arenaFile('aa', 3, 3));
+    writeFileSync(join(dir, 'orbs.json'), JSON.stringify({ aa: { x: 0, y: 2.5 } }));
+    expect(loadRoomData(root).orbs.get('aa')).toEqual({ x: 0, y: 2.5 });
+  });
+
+  it('throws Invalid orb table for a row that is not a valid point', () => {
+    const { root, dir } = dataDir();
+    writeFileSync(join(dir, 'arenas', 'a.json'), arenaFile('aa', 3, 3));
+    writeFileSync(join(dir, 'orbs.json'), JSON.stringify({ aa: { x: 3, y: 1 } }));
+    expect(() => loadRoomData(root)).toThrow(/Invalid orb table/);
   });
 
   it('refuses a data directory with no arena a team of two fits', () => {

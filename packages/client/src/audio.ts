@@ -1,11 +1,11 @@
 import type { GameState } from '@claudeline/sim';
 
 /**
- * The five sounds of the first pass, which are also the voice indices of
- * `createWebSound`. Small integers (Smis) on purpose: `play` is called from the
+ * The six sounds, which are also the voice indices of `createWebSound`: the five of the first
+ * pass and the orb warning. Small integers (Smis) on purpose: `play` is called from the
  * frame path, and a Smi crosses a call without being boxed.
  */
-export const SOUNDS = { hit: 0, cast: 1, death: 2, roundStart: 3, roundEnd: 4 } as const;
+export const SOUNDS = { hit: 0, cast: 1, death: 2, roundStart: 3, roundEnd: 4, orbWarning: 5 } as const;
 
 /** What the game asks of the sound: a desktop build can swap it (`Platform.sound`). */
 export interface SoundOutput {
@@ -28,6 +28,7 @@ const VOICES: readonly { type: OscillatorType; hz: number }[] = [
   { type: 'sawtooth', hz: 110 }, // death: a low buzz that dies away
   { type: 'sine', hz: 660 }, // round start: a clear high tone
   { type: 'sine', hz: 330 }, // round end: the same tone an octave down, longer
+  { type: 'triangle', hz: 880 }, // orb warning: a high, long ping, the orb becomes collectible in 3 s
 ];
 const MASTER_GAIN = 0.2;
 const PEAK = 0.6;
@@ -38,6 +39,7 @@ const CAST_DECAY = 0.05;
 const DEATH_DECAY = 0.12;
 const ROUND_START_DECAY = 0.08;
 const ROUND_END_DECAY = 0.14;
+const ORB_WARNING_DECAY = 0.2;
 
 /** The page's AudioContext, looked up when the first gesture asks, never at load. */
 export function browserAudioContext(): AudioContext {
@@ -132,8 +134,11 @@ export function createWebSound(makeContext: () => AudioContext): SoundOutput {
         case SOUNDS.roundStart:
           gain.setTargetAtTime(0, 0, ROUND_START_DECAY);
           break;
-        default:
+        case SOUNDS.roundEnd:
           gain.setTargetAtTime(0, 0, ROUND_END_DECAY);
+          break;
+        default:
+          gain.setTargetAtTime(0, 0, ORB_WARNING_DECAY);
           break;
       }
     },
@@ -144,8 +149,8 @@ export function createWebSound(makeContext: () => AudioContext): SoundOutput {
  * The second pass over a step's events (after `routeEvents`, which feedback.ts
  * owns): a hit for a projectile that touched a champion and for a melee arc with
  * at least one target, a cast for the local champion only (a 3v3 would be noise
- * otherwise), a death, a round start and a round end. Nothing for the match end,
- * which follows the last round end. Indexed loop, no allocation.
+ * otherwise), a death, a round start, a round end and the orb warning. Nothing for the match
+ * end, which follows the last round end, and nothing for the pickup (its cue is the feed line). Indexed loop, no allocation.
  */
 export function routeSounds(state: GameState, sound: Pick<SoundOutput, 'play'>, localId: number): void {
   const events = state.events;
@@ -170,6 +175,9 @@ export function routeSounds(state: GameState, sound: Pick<SoundOutput, 'play'>, 
         break;
       case 'roundEnded':
         sound.play(SOUNDS.roundEnd);
+        break;
+      case 'orbSpawn':
+        sound.play(SOUNDS.orbWarning);
         break;
       default:
         break;

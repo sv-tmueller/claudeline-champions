@@ -4,6 +4,8 @@ import {
   type ArenaDef,
   type GameState,
   type KitDef,
+  type MatchConfig,
+  type OrbPoint,
   type PlayerConfig,
 } from '@claudeline/sim';
 import type { Launch } from './launch';
@@ -61,13 +63,16 @@ function kitById(kits: readonly KitDef[], id: string): KitDef {
  * champions of team B are the enemy bots, by `ENEMY_ROSTER`. The local team is always
  * A. Every champion needs a kit. The scene `sandbox` is the dev-only scene of the heap probe
  * and the walk spec: the old four-champion roster with the two kits and one bot.
- * Both run the match flow, `roundsToWin` rounds to win.
+ * Both run the match flow, `roundsToWin` rounds to win. The standard match plays with the energy
+ * orb at `energyOrb` (the arena's row of `data/orbs.json`, read by main.ts); the sandbox ignores it,
+ * and a missing point leaves the `energyOrb` key out of the config.
  */
 export function createLocalMatch(
   launch: Launch,
   arena: ArenaDef,
   kits: readonly KitDef[],
   roundsToWin: number = DEFAULT_ROUNDS_TO_WIN,
+  energyOrb?: OrbPoint,
 ): LocalMatch {
   if (launch.scene === 'sandbox') {
     const sandboxKits = SANDBOX_KIT_IDS.map((id) => kitById(kits, id));
@@ -83,6 +88,8 @@ export function createLocalMatch(
     ...allies.map((championId): PlayerConfig => ({ championId, team: 'A' })),
     ...enemies.map((championId): PlayerConfig => ({ championId, team: 'B' })),
   ];
-  const state = createMatch({ teamSize, players, roundsToWin }, arena, LOCAL_SEED, kits);
+  const config: MatchConfig = { teamSize, players, roundsToWin };
+  if (energyOrb !== undefined) config.energyOrb = energyOrb;
+  const state = createMatch(config, arena, LOCAL_SEED, kits);
   return { state, botIds: Array.from({ length: 2 * teamSize - 1 }, (_, index) => index + 1) };
 }

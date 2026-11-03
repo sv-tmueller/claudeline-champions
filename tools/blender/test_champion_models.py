@@ -74,7 +74,8 @@ MIN_DISTANCE = 80
 # Colours the client draws next to a champion. They are copied from
 # packages/client/src: ALLY_BAR_COLOUR and ENEMY_BAR_COLOUR (health-bars.ts),
 # RING_COLOUR (impact-rings.ts), DEAD_COLOUR (champion-look.ts),
-# PROJECTILE_ALLY_COLOUR and PROJECTILE_ENEMY_COLOUR (entity-views.ts), the
+# PROJECTILE_ALLY_COLOUR and PROJECTILE_ENEMY_COLOUR (entity-views.ts),
+# ORB_COLOUR (orb-view.ts, the energy orb and its warning ring), the
 # FLASH_COLOUR (champion-look.ts, the white hit flash) and the debug overlay line
 # (debug-overlay.ts).
 # The client may change them, so update this list in the same change.
@@ -86,6 +87,7 @@ CLIENT_COLOURS = {
     "dead grey": (0x5A, 0x60, 0x70),
     "ally projectile": (0x5C, 0xD6, 0xFF),
     "enemy projectile": (0xFF, 0x8A, 0x5C),
+    "energy orb": (0x2F, 0x4B, 0xFF),
     "debug overlay": (0xFF, 0x00, 0xFF),
 }
 

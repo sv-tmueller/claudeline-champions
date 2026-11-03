@@ -91,8 +91,8 @@ function withWarnings<T>(run: () => T): { result: T; warnings: unknown[][] } {
 }
 
 describe('SOUNDS', () => {
-  it('indexes the five voices 0 to 4', () => {
-    expect(SOUNDS).toEqual({ hit: 0, cast: 1, death: 2, roundStart: 3, roundEnd: 4 });
+  it('indexes the six voices 0 to 5', () => {
+    expect(SOUNDS).toEqual({ hit: 0, cast: 1, death: 2, roundStart: 3, roundEnd: 4, orbWarning: 5 });
   });
 });
 
@@ -111,13 +111,13 @@ describe('createWebSound', () => {
     sound.unlock();
     sound.unlock();
     expect(counts.contexts).toBe(1);
-    expect(counts.oscillators).toBe(5);
-    expect(counts.gains).toBe(6);
-    expect(counts.starts).toBe(5);
+    expect(counts.oscillators).toBe(6);
+    expect(counts.gains).toBe(7);
+    expect(counts.starts).toBe(6);
   });
 
   it('plays voice i with exactly one cancel, one set to the peak and one decay, all at time 0', () => {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const { counts, make } = fakeContext();
       const sound = createWebSound(make);
       sound.unlock();
@@ -130,11 +130,11 @@ describe('createWebSound', () => {
     }
   });
 
-  it('ignores an index outside the five voices', () => {
+  it('ignores an index outside the six voices', () => {
     const { counts, make } = fakeContext();
     const sound = createWebSound(make);
     sound.unlock();
-    sound.play(5);
+    sound.play(6);
     sound.play(-1);
     expect(counts.calls).toEqual([]);
   });
@@ -357,6 +357,15 @@ describe('routeSounds', () => {
     const { sound, plays } = recorder();
     routeSounds(stateOf(EVENTS), sound, 0);
     expect(plays).toEqual([SOUNDS.hit, SOUNDS.cast, SOUNDS.death, SOUNDS.roundStart, SOUNDS.roundEnd, SOUNDS.hit]);
+  });
+
+  it('plays the warning sound on orbSpawn and nothing on orbTaken', () => {
+    const { sound, plays } = recorder();
+    routeSounds(stateOf([{ type: 'orbSpawn', round: 1, x: 0, y: 2.5 }]), sound, 0);
+    expect(plays).toEqual([SOUNDS.orbWarning]);
+    const taken = recorder();
+    routeSounds(stateOf([{ type: 'orbTaken', round: 1, championId: 0, amount: 25, energy: 25 }]), taken.sound, 0);
+    expect(taken.plays).toEqual([]);
   });
 
   it('plays a cast only for the local champion', () => {

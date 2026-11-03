@@ -730,6 +730,63 @@ describe('HUD kill feed', () => {
   });
 });
 
+describe('HUD kill feed, an orb pickup', () => {
+  it('names the taker and the orb: the line is of kind orb, the victim part the orb label', () => {
+    const { hud, state, feed, elements } = rig();
+    state.tick = 100;
+    hud.update(state);
+    clearLogs(elements);
+    feed.pushOrb(100, 2);
+    hud.update(state);
+    const [first] = elements.lines;
+    expect(first?.line.log).toEqual(['data-visible=true', 'data-kind=orb']);
+    expect(first?.killer.log).toEqual(['text=Lumeth', 'data-team=enemy']);
+    expect(first?.victim.log).toEqual(['text=Energy orb', 'data-team=orb']);
+  });
+
+  it('writes the kind only when the line changes kind, and rewrites both names then', () => {
+    const { hud, state, feed, elements } = rig();
+    state.tick = 100;
+    feed.pushOrb(100, 0);
+    hud.update(state);
+    clearLogs(elements);
+    // A second line of the same kind in another slot leaves the first line alone.
+    feed.pushOrb(101, 1);
+    hud.update(state);
+    expect(elements.lines[0]?.line.log).toEqual([]);
+    expect(elements.lines[0]?.killer.log).toEqual([]);
+    expect(elements.lines[0]?.victim.log).toEqual([]);
+    // The first expires, the second moves up with its kind kept: nothing is rewritten.
+    clearLogs(elements);
+    state.tick = 100 + KILL_FEED_TICKS;
+    hud.update(state);
+    expect(elements.lines[0]?.killer.log).toEqual(['text=Quillon', 'data-team=ally']);
+    // A death line pushed after it takes the second slot, which showed an orb line: the kind is written back.
+    clearLogs(elements);
+    feed.push(state.tick, 2, 0);
+    hud.update(state);
+    expect(elements.lines[1]?.line.log).toEqual(['data-visible=true', 'data-kind=death']);
+    expect(elements.lines[1]?.killer.log).toEqual(['text=Lumeth', 'data-team=enemy']);
+    expect(elements.lines[1]?.victim.log).toEqual(['text=Hargrim', 'data-team=ally']);
+  });
+
+  it('sets the kind back to death when a death line replaces an orb line in a slot', () => {
+    const { hud, state, feed, elements } = rig();
+    state.tick = 100;
+    feed.pushOrb(100, 0);
+    hud.update(state);
+    clearLogs(elements);
+    state.tick = 100 + KILL_FEED_TICKS;
+    hud.update(state);
+    clearLogs(elements);
+    feed.push(state.tick, 2, 0);
+    hud.update(state);
+    expect(elements.lines[0]?.line.log).toEqual(['data-visible=true', 'data-kind=death']);
+    expect(elements.lines[0]?.killer.log).toEqual(['text=Lumeth', 'data-team=enemy']);
+    expect(elements.lines[0]?.victim.log).toEqual(['text=Hargrim', 'data-team=ally']);
+  });
+});
+
 describe('HUD kill feed of a 3v3', () => {
   it('names all six champions with their sides', () => {
     const { hud, state, feed, elements } = rig(true);

@@ -1,4 +1,7 @@
 import {
+  COUNTER_MAX_CAP,
+  COUNTER_MAX_WINDOW_TICKS,
+  COUNTER_MIN_WINDOW_TICKS,
   MAX_DASH_DISTANCE,
   MAX_STATUS_TICKS,
   MIN_DASH_DISTANCE,
@@ -92,6 +95,17 @@ export type SlotSpec = AbilitySpec & {
   ex?: AbilitySpec;
 };
 
+/**
+ * The on-hit counter a kit may declare (rules.md section 2.6): a hit by the `from` slot that lands
+ * on an enemy adds one, up to `cap` (1 to 5), and the count resets when `windowTicks` (60 to 600)
+ * pass with no such hit.
+ */
+export interface CounterSpec {
+  from: Slot;
+  cap: number;
+  windowTicks: number;
+}
+
 export interface KitDef {
   /** Matches `PlayerConfig.championId`. */
   id: string;
@@ -103,6 +117,8 @@ export interface KitDef {
   slots: Record<Slot, SlotSpec>;
   /** The two slots with an EX variant; never F. */
   ex: [Slot, Slot];
+  /** The one on-hit counter of the kit; the key is left out when there is none. */
+  counter?: CounterSpec;
 }
 
 type Json = Record<string, unknown>;
@@ -274,6 +290,30 @@ function readEffects(value: unknown, path: string): AbilityEffect[] {
   return value.map((item, i) => readEffect(item, `${path}[${i}]`, false));
 }
 
+/** An integer from `min` to `max`, for the counter's cap and window. */
+function readCounterInt(value: unknown, path: string, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    return fail(path, `${String(value)} is not an integer from ${min} to ${max}`);
+  }
+  return value;
+}
+
+/** The kit's one on-hit counter, as a copy that holds the three fields and nothing else. */
+function readCounter(value: unknown, path: string): CounterSpec {
+  if (Array.isArray(value)) return fail(path, 'a kit has one counter, not a list');
+  const counter = readObject(value, path);
+  return {
+    from: readSlot(counter['from'], `${path}.from`),
+    cap: readCounterInt(counter['cap'], `${path}.cap`, 1, COUNTER_MAX_CAP),
+    windowTicks: readCounterInt(
+      counter['windowTicks'],
+      `${path}.windowTicks`,
+      COUNTER_MIN_WINDOW_TICKS,
+      COUNTER_MAX_WINDOW_TICKS,
+    ),
+  };
+}
+
 function readAbility(value: unknown, path: string): AbilitySpec {
   const spec = readObject(value, path);
   const windupTicks = readWindup(spec['windupTicks'], `${path}.windupTicks`);
@@ -334,5 +374,8 @@ export function validateKit(kit: unknown): KitDef {
         : { cooldownTicks, ...ability, ex: readAbility(exRaw, `${path}.ex`) };
   }
 
-  return { id, maxHealth, moveSpeed, support, slots, ex: [first, second] };
+  const kitDef: KitDef = { id, maxHealth, moveSpeed, support, slots, ex: [first, second] };
+  // The key is left out, never undefined: `checksum` throws on an undefined value.
+  if (root['counter'] !== undefined) kitDef.counter = readCounter(root['counter'], at('counter'));
+  return kitDef;
 }

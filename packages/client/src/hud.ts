@@ -20,7 +20,7 @@ import {
   type SlotView,
 } from './hud-views';
 import { dmText, intText } from './hook-text';
-import { KILL_FEED_LINES, type KillFeed } from './kill-feed';
+import { KILL_FEED_LINES, KILL_KIND_DEATH, KILL_KIND_ORB, type KillFeed } from './kill-feed';
 import { championName } from './roster';
 
 /**
@@ -66,6 +66,13 @@ export interface HudState {
 }
 
 const RING_NAME = 'Ring';
+// The victim part of an orb pickup line: a label with its own side, `orb`, and the text of each kind
+// for `data-kind` (indexed by `KILL_KIND_*`).
+const ORB_NAME = 'Energy orb';
+const SIDE_ORB = 'orb';
+const KIND_TEXTS: readonly string[] = ['death', 'orb'];
+// The victim cache value of a line that shows the orb label (a champion id is 0 or more).
+const VICTIM_ORB = -3;
 // The timer key of the sudden death text, past the 91 keys of the seconds.
 const SUDDEN_KEY = 100;
 const SIDE_ALLY = 'ally';
@@ -150,6 +157,7 @@ export class Hud {
   private readonly lineShown: number[] = [];
   private readonly lineKiller: number[] = [];
   private readonly lineVictim: number[] = [];
+  private readonly lineKind: number[] = [];
   private feedChanges = -1;
 
   constructor(
@@ -182,6 +190,8 @@ export class Hud {
       this.lineShown.push(-1);
       this.lineKiller.push(-2);
       this.lineVictim.push(-2);
+      // A line is built with the kind death, so a death line writes no kind.
+      this.lineKind.push(KILL_KIND_DEATH);
     }
   }
 
@@ -378,12 +388,25 @@ export class Hud {
       }
       if (shown === 0) continue;
       const entry = feed.line(i);
+      if (entry.kind !== this.lineKind[i]) {
+        this.lineKind[i] = entry.kind;
+        handle.line.setAttribute('data-kind', KIND_TEXTS[entry.kind] ?? KIND_TEXTS[KILL_KIND_DEATH] as string);
+        // The other kind wrote the names with other meaning, so both are written again.
+        this.lineKiller[i] = -2;
+        this.lineVictim[i] = -2;
+      }
       if (entry.killerId !== this.lineKiller[i]) {
         this.lineKiller[i] = entry.killerId;
         handle.killer.textContent = this.names[entry.killerId] ?? RING_NAME;
         handle.killer.setAttribute('data-team', this.sides[entry.killerId] ?? SIDE_RING);
       }
-      if (entry.victimId !== this.lineVictim[i]) {
+      if (entry.kind === KILL_KIND_ORB) {
+        if (this.lineVictim[i] !== VICTIM_ORB) {
+          this.lineVictim[i] = VICTIM_ORB;
+          handle.victim.textContent = ORB_NAME;
+          handle.victim.setAttribute('data-team', SIDE_ORB);
+        }
+      } else if (entry.victimId !== this.lineVictim[i]) {
         this.lineVictim[i] = entry.victimId;
         handle.victim.textContent = this.names[entry.victimId] ?? RING_NAME;
         handle.victim.setAttribute('data-team', this.sides[entry.victimId] ?? SIDE_RING);

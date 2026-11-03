@@ -343,6 +343,17 @@ export interface ChampionState {
   cooldowns: number[];
   /** The windup in progress, or null. */
   cast: CastState | null;
+  /** The on-hit counter; the key is left out when the champion's kit declares none. */
+  counter?: CounterState;
+}
+
+/**
+ * The state of an on-hit counter (rules.md section 2.6): the count, and `state.tick` of the step
+ * in which the last qualifying hit landed. A count of 0 has the `lastHitTick` 0.
+ */
+export interface CounterState {
+  count: number;
+  lastHitTick: number;
 }
 
 /** `warmup` before round 1, `roundEnd` is the pause after a decided round, `matchEnd` is final. */

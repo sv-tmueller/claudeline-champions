@@ -1,5 +1,6 @@
 import {
   DEFAULT_ROUNDS_TO_WIN,
+  orbPointFor,
   parseArenaDef,
   step,
   type ArenaDef,
@@ -11,6 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import arena02Json from '../../../data/arenas/arena02.json';
+import orbsJson from '../../../data/orbs.json';
 import { createBotDriver } from './bot-driver';
 import type { Launch } from './launch';
 import { LOCAL_SEED, createLocalMatch, playableTeamSize } from './match-setup';
@@ -19,7 +21,7 @@ import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
 // The tick budget of e2e/match-end.spec.ts for the default match to its result screen: the headless end
-// tick, 5476, plus two rounds of about 1000 and one of about 7000, rounded up to 1000 (as every other row's).
+// tick, 5476 (the same with the energy orb on: the bots do not go for it before #225), plus two rounds of about 1000 and one of about 7000, rounded up to 1000 (as every other row's).
 const MATCH_END_BUDGET_TICKS = 15_000;
 
 function launch(champion: string, scene: Launch['scene'] = 'match'): Launch {
@@ -91,6 +93,23 @@ describe('createLocalMatch', () => {
   it('takes the rounds to win from the argument', () => {
     const { state } = createLocalMatch(launch('hargrim'), arena, TEST_KITS, 1);
     expect(state.match?.roundsToWin).toBe(1);
+  });
+
+  it('turns the orb on with the point it is given: match.orb is the point, not taken', () => {
+    const { state } = createLocalMatch(launch('hargrim'), arena, TEST_KITS, 3, { x: 0, y: 2.5 });
+    expect(state.match?.orb).toEqual({ x: 0, y: 2.5, taken: false });
+  });
+
+  it('has no orb key without a point, and never an undefined one', () => {
+    const { state } = createLocalMatch(launch('hargrim'), arena, TEST_KITS);
+    expect(Object.hasOwn(state.match ?? {}, 'orb')).toBe(false);
+    const explicit = createLocalMatch(launch('hargrim'), arena, TEST_KITS, 3, undefined).state;
+    expect(Object.hasOwn(explicit.match ?? {}, 'orb')).toBe(false);
+  });
+
+  it('gives the 3v3 the orb too', () => {
+    const { state } = createLocalMatch(launch3('hargrim', 'arena02'), arena02, KITS_3V3, 3, { x: 0, y: 0 });
+    expect(state.match?.orb).toEqual({ x: 0, y: 0, taken: false });
   });
 
   it('takes the health from the kits', () => {
@@ -219,6 +238,11 @@ describe('createLocalMatch', () => {
       expect(botIds).toEqual([3]);
     });
 
+    it('ignores the orb point: the sandbox plays with no orb', () => {
+      const { state } = createLocalMatch(launch('hargrim', 'sandbox'), arena, TEST_KITS, 3, { x: 0, y: 2.5 });
+      expect(Object.hasOwn(state.match ?? {}, 'orb')).toBe(false);
+    });
+
     it('ignores the pick of the launch', () => {
       const { state } = createLocalMatch(launch('quillon', 'sandbox'), arena, TEST_KITS);
       expect(state.champions[0]?.championId).toBe('hargrim');
@@ -237,11 +261,14 @@ function playToTheEnd(
   limit: number,
   played: ArenaDef = arena,
   teamSize: 2 | 3 = 2,
-): { state: GameState; winner: string | undefined; matchEnded: number } {
-  const { state, botIds } = createLocalMatch({ ...launch('hargrim'), arena: played.id, teamSize }, played, KITS_3V3, roundsToWin);
+): { state: GameState; winner: string | undefined; matchEnded: number; orbSpawns: number; orbTaken: number } {
+  const orb = orbPointFor(orbsJson, played);
+  const { state, botIds } = createLocalMatch({ ...launch('hargrim'), arena: played.id, teamSize }, played, KITS_3V3, roundsToWin, orb);
   const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
   const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
   let matchEnded = 0;
+  let orbSpawns = 0;
+  let orbTaken = 0;
   let winner: string | undefined;
   const started = Date.now();
   while (state.match?.phase !== 'matchEnd' && state.tick < limit) {
@@ -252,14 +279,16 @@ function playToTheEnd(
         matchEnded++;
         winner = event.winner;
       }
+      if (event.type === 'orbSpawn') orbSpawns++;
+      if (event.type === 'orbTaken') orbTaken++;
     }
   }
   // The run time and tick count are reported in the pull request.
   const score = state.match?.score;
   console.log(
-    `integration ${teamSize}v${teamSize} match on ${played.id} (${roundsToWin} to win): matchEnd at tick ${state.tick}, round ${state.match?.round}, score ${score?.A} : ${score?.B}, in ${Date.now() - started} ms`,
+    `integration ${teamSize}v${teamSize} match on ${played.id} (${roundsToWin} to win): matchEnd at tick ${state.tick}, round ${state.match?.round}, score ${score?.A} : ${score?.B}, orb ${orbSpawns} warnings ${orbTaken} taken, in ${Date.now() - started} ms`,
   );
-  return { state, winner, matchEnded };
+  return { state, winner, matchEnded, orbSpawns, orbTaken };
 }
 
 describe('a match of bots from setup to the result', () => {
@@ -280,7 +309,10 @@ describe('a match of bots from setup to the result', () => {
   // (the console line above reports its end tick, and every bots change moves it):
   // two more rounds and one sudden-death round. A bots change past it fails here first.
   it('ends the match to 3 rounds with a winner on 3 within the budget of the e2e', { timeout: 60_000 }, () => {
-    const { state, winner, matchEnded } = playToTheEnd(DEFAULT_ROUNDS_TO_WIN, MATCH_END_BUDGET_TICKS);
+    const { state, winner, matchEnded, orbSpawns } = playToTheEnd(DEFAULT_ROUNDS_TO_WIN, MATCH_END_BUDGET_TICKS);
+    // The standard match plays with the orb on (spec section 6): the rounds that reach 17 s warn of it.
+    expect(state.match?.orb).toBeDefined();
+    expect(orbSpawns).toBeGreaterThan(0);
     expect(state.match?.phase).toBe('matchEnd');
     expect(matchEnded).toBe(1);
     const score = state.match?.score;
@@ -295,7 +327,7 @@ describe('a match of bots from setup to the result', () => {
 // of about 7000, rounded up to 1000. The end tick was 3474 on the bots of #86, 4198 on those of
 // #98 (the dash hold shortened the first two rounds of the live match, and lengthened this one)
 // 12191 on those of #137 (the dodge: a first round of 6453 ticks goes to sudden death) and is 5381
-// on those of #213 (a melee champion stands inside its reach); every bots change moves it, the console line above reports the current one, and a match that
+// on those of #213 (a melee champion stands inside its reach), and unchanged with the energy orb on (#224: it warns in rounds past 17 s and nobody takes it); every bots change moves it, the console line above reports the current one, and a match that
 // ends past the budget fails here before the e2e does.
 const ARENA02_END_TICK = 5_381;
 const ARENA02_BUDGET_TICKS = 15_000;
@@ -331,7 +363,7 @@ describe('playableTeamSize', () => {
 });
 
 // The tick budgets of the 3v3 rows of e2e/match-end.spec.ts: the end tick of the match when the
-// budget was set (measured through this setup and the client's bot driver on the bots of #213, the
+// budget was set (measured through this setup, with the energy orb on since #224, and the client's bot driver on the bots of #213, the
 // stand of the melee champions; 5774 and 15773 on those of #137, the dodge, 5349 and 11095 on those
 // of #112, and 12431 and 7125 with two Quillons a side on 57dd52f),
 // plus two rounds and one sudden-death round of about 7000, rounded up to 1000. The round term is

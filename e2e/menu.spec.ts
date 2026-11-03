@@ -3,7 +3,7 @@ import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
 // The Escape menu: the pause, restart, the champion, arena, team and difficulty select (the
 // team row, the 3v3 relaunch and a Restart that keeps it, the hard-tier relaunch likewise),
-// a rebinding that survives a reload, and the sound: the five sounds on their events against
+// a rebinding that survives a reload, and the sound: the six sounds on their events against
 // a counting fake AudioContext, and the mute toggle with its round trip through the saved
 // settings. Like match.spec.ts the clock is paused and the test runs it in 16 ms frames,
 // reading the hooks between steps, so a slow machine changes the time a test takes and never
@@ -412,7 +412,7 @@ test('relaunches on the hard tier from the menu select, and a restart keeps the 
 interface FakeAudio {
   contexts: number;
   resumes: number;
-  /** One count per voice, in SOUNDS order: hit, cast, death, round start, round end. */
+  /** One count per voice, in SOUNDS order: hit, cast, death, round start, round end, orb warning. */
   plays: number[];
 }
 
@@ -425,7 +425,7 @@ interface FakeAudio {
  */
 async function installFakeAudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const fake: FakeAudio = { contexts: 0, resumes: 0, plays: [0, 0, 0, 0, 0] };
+    const fake: FakeAudio = { contexts: 0, resumes: 0, plays: [0, 0, 0, 0, 0, 0] };
     (window as unknown as { __fakeAudio: FakeAudio }).__fakeAudio = fake;
     class FakeParam {
       value = 0;
@@ -447,7 +447,7 @@ async function installFakeAudio(page: Page): Promise<void> {
         throw new Error('a play read currentTime');
       }
       createGain(): { gain: FakeParam; connect(): void } {
-        // The first gain is the master, the next five the voices.
+        // The first gain is the master, the next six the voices.
         return { gain: new FakeParam(this.gains++ - 1), connect() {} };
       }
       createOscillator(): { type: string; frequency: { value: number }; connect(): void; start(): void } {
@@ -495,7 +495,7 @@ async function runFramesUntil(page: Page, label: string, done: (read: MatchRead)
   throw new Error(`${label}: not reached within ${SOUND_FRAME_BUDGET} frames, is the time scale on?`);
 }
 
-test('plays the five sounds on their events, and the mute survives a reload', async ({ page }) => {
+test('plays the sounds on their events, and the mute survives a reload', async ({ page }) => {
   test.setTimeout(TEST_TIMEOUT_MS);
   const { problems, failed } = watchProblems(page);
   const mute = page.locator('[data-menu="panel"] [data-action="mute"]');
@@ -504,7 +504,7 @@ test('plays the five sounds on their events, and the mute survives a reload', as
     await open(page, `/?timescale=${SOUND_SCALE}`, failed);
     // Nothing is built before a gesture. A key press in the warmup is one, and the warmup runs
     // on to round 1.
-    expect(await readAudio(page), 'no context before a gesture').toEqual({ contexts: 0, resumes: 0, plays: [0, 0, 0, 0, 0] });
+    expect(await readAudio(page), 'no context before a gesture').toEqual({ contexts: 0, resumes: 0, plays: [0, 0, 0, 0, 0, 0] });
     await page.keyboard.press('KeyW');
     let audio = await readAudio(page);
     expect(audio.contexts, 'the gesture made the context').toBe(1);
@@ -518,7 +518,7 @@ test('plays the five sounds on their events, and the mute survives a reload', as
     await page.mouse.up();
     const ended = await runFramesUntil(page, 'round 1 to end', (read) => read.phase === 'roundEnd');
     audio = await readAudio(page);
-    const [hit, cast, death, roundStart, roundEnd] = audio.plays as [number, number, number, number, number];
+    const [hit, cast, death, roundStart, roundEnd, orbWarning] = audio.plays as [number, number, number, number, number, number];
     expect(roundStart, 'a round start per round begun').toBe(ended.round);
     expect(roundEnd, 'one round end').toBe(1);
     expect(death, 'a death sound per death').toBe(ended.deaths);
@@ -526,6 +526,9 @@ test('plays the five sounds on their events, and the mute survives a reload', as
     expect(hit, 'a hit sound for every projectile hit').toBeGreaterThanOrEqual(ended.hits);
     expect(hit, 'and some hits').toBeGreaterThan(0);
     expect(cast, 'the local champion cast').toBeGreaterThanOrEqual(1);
+    // The warning of the orb plays once for each round that reached 17 s: at most one, here, since the
+    // 96-tick frames of this scale may end a round before the warning.
+    expect(orbWarning, 'at most one orb warning in round 1').toBeLessThanOrEqual(1);
     expect(audio.contexts, 'one context').toBe(1);
 
     // Mute from the menu: the button reads it, and nothing plays through the next round start.
@@ -550,7 +553,7 @@ test('plays the five sounds on their events, and the mute survives a reload', as
     await page.keyboard.press('KeyW');
     expect((await readAudio(page)).contexts, 'the gesture made the context of the new page').toBe(1);
     await runFramesUntil(page, 'round 1 to begin after the reload', (read) => read.phase === 'round');
-    expect((await readAudio(page)).plays, 'the stored mute silences the round start').toEqual([0, 0, 0, 0, 0]);
+    expect((await readAudio(page)).plays, 'the stored mute silences the round start').toEqual([0, 0, 0, 0, 0, 0]);
 
     // Unmute: the round that ends and the round that begins next both play.
     await openMenu(page);

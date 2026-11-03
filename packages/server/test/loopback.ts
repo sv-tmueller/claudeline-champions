@@ -184,6 +184,25 @@ export class TestClient {
     }
     this.send({ t: 'input', tick: this.counter++, input });
   }
+
+  /**
+   * One input that walks at `point` and casts nothing. It stops short of the point by a quarter of
+   * a meter on each axis, which is inside the touch distance of a champion and the orb. Sends
+   * nothing before the first snapshot.
+   */
+  sendWalkTo(point: { x: number; y: number }): void {
+    const me = this.start === null ? undefined : this.state?.champions[this.start.you];
+    if (this.start === null || me === undefined) return;
+    const axis = (d: number): MoveAxis => (d > 0.25 ? 1 : d < -0.25 ? -1 : 0);
+    const input: PlayerInput = {
+      moveX: axis(point.x - me.x),
+      moveY: axis(point.y - me.y),
+      aimX: Math.round(point.x * 100),
+      aimY: Math.round(point.y * 100),
+      buttons: 0,
+    };
+    this.send({ t: 'input', tick: this.counter++, input });
+  }
 }
 
 export interface HarnessOptions {

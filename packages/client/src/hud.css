@@ -324,6 +324,11 @@
   color: var(--hud-enemy);
 }
 
+/* An orb pickup line: the taker in its side's colour, the orb label in the energy colour. */
+#hud [data-team='orb'] {
+  color: var(--hud-energy);
+}
+
 #hud [data-part='arrow'] {
   margin: 0 calc(var(--hud-u) * 0.4);
 }
