@@ -2,7 +2,7 @@
 
 Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written (her kit, counter and model
-come in her own series); Ysmeer's comes in his series
+come in her own series); Ysmeer's comes in her series
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -35,7 +35,8 @@ unchanged.
   step 4.1), and the counter web over all nine and the range table come when
   the three are in (spec section 5.4). Wrenna's section already holds her own
   web line against the seven champions that exist and her own range row, so
-  that closing step only adds Ysmeer's.
+  for Wrenna that closing step only adds her cell against Ysmeer. It does not
+  cover Durnhal's line against Ondrel or his range row.
 - Statuses and mechanics a kit needs that the catalog does not have yet are
   named in the champion's section. Each is built in its own package with a
   rules entry before the kit that uses it.
@@ -170,29 +171,29 @@ the kit data below are the ones the table leaves open.
 | Slot | Name | What it does |
 |---|---|---|
 | M1 | Longbow | Projectile, speed 24, range 14 m: 11 damage. Builds 1 Focus on an enemy hit. Cooldown 0.7 s. |
-| M2 | Barbed Arrow | Projectile, speed 22, range 13 m: 12 damage and a damage over time of 12 over 3 s. Cooldown 6 s. **EX:** also slow 30 percent for 2 s. |
+| M2 | Barbed Arrow | Projectile, speed 22, range 12.83 m: 12 damage and a damage over time of 12 over 3 s. Cooldown 6 s. **EX:** also slow 30 percent for 2 s. |
 | SPACE | Tumble | Dash 5 m and haste 25 percent for 1.5 s. Cooldown 9 s. |
 | Q | Pinning Shot | Projectile, speed 20, range 12 m: 9 damage and root 1 s. Cooldown 11 s. |
-| E | Heartseeker | Projectile, speed 25, range 16 m, windup 0.5 s slowed: 16 damage; spends all Focus for +4 damage per stack (up to 28). Cooldown 8 s. **EX:** pierces, 20 damage, no Focus spend. |
+| E | Heartseeker | Projectile, speed 25, range 15.83 m, windup 0.5 s slowed: 16 damage; spends all Focus for +4 damage per stack (up to 28). Cooldown 8 s. **EX:** pierces, 20 damage, no Focus spend. |
 | R | Fade Step | Spends all Focus to cut Tumble's cooldown by 2 s per stack; gains a 25 shield for 3 s. Cooldown 13 s. |
 | F | Arrow Storm | Placed area at aim (range 13 m), radius 3 m, 4 pulses of 12 every 0.5 s (48 total) and slow 30 percent. Windup 0.6 s, locked. |
 
-**Deviations from the draft.** No number of v3 spec section 5.2 moves: every
-one sits inside its catalog range (the range table at the end of this section
-checks each), so there is no value to change and no reason to record for one.
-What this package adds to the draft is three things:
+**Deviations from the draft.** One value of v3 spec section 5.2 moves: the
+reach of two projectiles, which the abilities table above gives as 12.83 m
+and 15.83 m in its range column, as roster-v1 gives Quillon's 13.93 m, and
+not as the draft's 13 m and 16 m. A projectile's lifetime is a whole tick
+(roster-v1 section 0, "reach"), and 13 m at 22 m/s is 35.45 ticks while 16 m
+at 25 m/s is 38.4, so both round down, to 35 and 38 ticks. The speeds stay as
+the draft has them, as Quillon's Rod Bolt, Bind Shot and Lance do in roster
+v1. Longbow (35 ticks, exactly 14 m) and Pinning Shot (36 ticks, exactly 12
+m) have no rounding. Every other number sits inside its catalog range (the
+range table at the end of this section checks each), so there is no other
+value to change. What this package adds to the draft is two things:
 
 - Two web lines the spec does not state, Quillon and Lumeth. The spec names
   five of the seven opponents, and its section 5.4 asks that each existing
   champion get at least one win and one loss against the three new ones. The
   counter web below gives the reasons.
-- The reach of Barbed Arrow and Heartseeker is 12.83 m and 15.83 m, not the
-  13 m and 16 m of the draft. A projectile's lifetime is a whole tick
-  (roster-v1 section 0, "reach"), and 13 m at 22 m/s is 35.45 ticks while 16
-  m at 25 m/s is 38.4, so both round down, to 35 and 38 ticks. The speeds stay
-  as the draft has them, as Quillon's Rod Bolt, Bind Shot and Lance do in
-  roster v1. Longbow (35 ticks, exactly 14 m) and Pinning Shot (36 ticks,
-  exactly 12 m) have no rounding.
 - The draft's one-line ability text is expanded into the kit data below,
   where the choices it leaves open (windups, radii, ticks) each have their
   precedent.
@@ -215,7 +216,7 @@ is 4 wins and 3 losses, and Ysmeer's section adds the ninth.
 | Wrenna | beats | beats | loses | loses | loses | beats | beats |
 
 - Beats Hargrim (spec). His hook reaches 9 m and Rush closes 5 m, and her
-  band begins at 10 m. Barbed Arrow and Pinning Shot slow and root what
+  band begins at 10 m. Barbed Arrow EX and Pinning Shot slow and root what
   closes, and Tumble opens the gap again, so every second he spends walking
   is a free Longbow shot. Longbow reaches 14 m, five more than the hook.
 - Beats Durnhal (spec). The same kiting against 3.5 m of reach and a thrown
@@ -246,15 +247,18 @@ is 4 wins and 3 losses, and Ysmeer's section adds the ninth.
 - Loses to Ondrel (spec). Wrenna holds range by walking backwards. The Mire
   (30 percent), Reed Screen's field (30 percent) and Undertow's slow (40
   percent) add up past the 70 percent cap and take that speed away, while
-  Drowned Ground and Reed Fence take the room. Ondrel's tools reach 8 to 10.5
-  m, so she wins by shaping where Wrenna can stand, not by outranging her.
-- Loses to Lumeth (this package, not the spec). Mend Bolt heals 10 every 0.6 s
-  (16.7 a second) against Longbow's 11 every 0.7 s (15.7 a second), Aegis Veil
-  (30 absorb) takes a Heartseeker of 28 whole, and Binding Sigil (placed up to
-  9 m, radius 2.0 m, so 11.5 m of reach) roots a Wrenna at 10 to 11.5 m, and a
-  rooted champion cannot start Tumble. It is written as a loss so that Lumeth
-  has a win against the three: Durnhal and Ysmeer both beat her. Her M1 reaches
-  12 m, 2 m less than Wrenna's.
+  Drowned Ground and Reed Fence take the room. Her ordinary tools reach 8 to
+  10.5 m (Undertow 8 m, Clod Toss 10 m, the Mire 10.5 m), and only the Mire EX
+  (11 m) and Drowned Ground (12.5 m) reach further, so she wins by shaping
+  where Wrenna can stand, not by outranging her.
+- Loses to Lumeth (this package, not the spec). Mend Bolt heals an ally 10
+  every 0.6 s (16.7 a second, and 10 a second when she aims it at herself, at
+  60 percent by rules 2.5) against Longbow's 11 every 0.7 s (15.7 a second),
+  Aegis Veil (30 absorb) takes a Heartseeker of 28 whole, and Binding Sigil
+  (placed up to 9 m, radius 2.0 m, so 11.5 m of reach) roots a Wrenna at 10 to
+  11.5 m, and a rooted champion cannot start Tumble. It is written as a loss
+  so that Lumeth has a win against the three: Durnhal and Ysmeer both beat
+  her. Her M1 reaches 12 m, 2 m less than Wrenna's.
 
 The web stays intent, and balance measures the truth.
 
@@ -269,8 +273,8 @@ the two spend verbs, which belong to the counter.
   the window is 360 ticks (6 s), inside the spec's ranges (1 to 5 and 60 to
   600). One timer covers the whole counter, not one per stack: 6 s after her
   last qualifying hit, all of it is gone. At the Longbow's cadence of 42 ticks
-  three hits build 3 Focus in 126 ticks, so the window is generous and a gap
-  of 6 s with no Longbow hit is what loses it.
+  the third hit lands 84 ticks after the first, so the window is generous and
+  a gap of 6 s with no Longbow hit is what loses it.
 - **Build:** the on-hit counter (#227) adds the declaration to the kit schema
   and builds, decays and resets the count. Only M1 builds it, on a hit on an
   enemy that is not invulnerable. Her other projectiles, Barbed Arrow,
@@ -295,14 +299,16 @@ S, with `ticks` S times 60 (one tick every 30 ticks, as Skerrow's Rend), and
 
 - M1 windup 6 ticks, free, and projectile radius 0.25 m (Quillon's Rod Bolt).
 - M2 windup 18 ticks, slowed, and radius 0.35 m, a status-carrying shot like
-  Bind Shot (windup 18, slowed). The damage over time is 2 per tick over 180
-  ticks: 6 ticks, 12 in total. The EX copies the windup and the movement, and
-  adds a slow of 30 percent for 120 ticks.
+  Bind Shot (windup 18, slowed) and the radius of Mend Bolt and Flash Powder.
+  The damage over time is 2 per tick over 180 ticks: 6 ticks, 12 in total. The
+  EX copies the windup and the movement, and adds a slow of 30 percent for 120
+  ticks.
 - SPACE windup 0, free, like every SPACE: the dash is 5 m in 15 ticks, as
   Hargrim's Rush, and the haste is 25 percent for 90 ticks on self.
 - Q windup 18 ticks, slowed, and radius 0.4 m (Bind Shot and Chain Hook); the
   root is 60 ticks, the catalog minimum.
-- E windup 30 ticks, slowed (the table's 0.5 s), radius 0.25 m. The EX copies
+- E windup 30 ticks, slowed (the table's 0.5 s), radius 0.25 m (Rod Bolt, the
+  same projectile as M1). The EX copies
   the windup, the movement, the lifetime and the radius, with `pierce` true
   and no `consumeCounter` and no `endArea`.
 - R windup 0, free, like every R, and the shield 180 ticks.
@@ -333,8 +339,11 @@ Ysmeer's section is in.
 
 Her band sits above Quillon's 9 to 13 m on purpose, and her M1 reaches 14.00 m
 against Rod Bolt's 13.93 m, the longest basic shot of the roster. It begins
-at 10 m because every tool of Ondrel's reaches 10.5 m or less and Brimwick's
-longest is the 12 m of her ultimate.
+at 10 m because Ondrel's M1 reaches 10 m and her Mire 10.5 m, past the 9 m
+hook and every melee tool, and Brimwick's longest shot is the 12 m of her
+ultimate. Two tools still reach into the band: the Mire EX (11 m, 25 energy)
+and Drowned Ground (12.5 m, her ultimate), which is why her web line is a
+loss.
 
 Every number of this section that a catalog range binds has one row. The
 sources are the approved spec section 10 and section 4.6, rules sections 4.1
@@ -356,6 +365,7 @@ and 4.4.
 | M2 | damage over time, duration | 180 ticks (3 s) | 60 to 240 | rules 4.1 | yes |
 | M2 EX | projectile speed, radius, damage | 22 m/s, 0.35 m, 12 | 12 to 25, 0.2 to 0.6, 8 to 30 | approved spec 10 | yes |
 | M2 EX | damage over time, total | 12 | 8 to 30 | rules 4.1 | yes |
+| M2 EX | damage over time, duration | 180 ticks (3 s) | 60 to 240 | rules 4.1 | yes |
 | M2 EX | slow percent | 30 | 20 to 60 | rules 4.1 | yes |
 | M2 EX | slow ticks | 120 (2 s) | 60 to 180 | rules 4.1 | yes |
 | SPACE | haste percent | 25 | 20 to 50 | rules 4.1 | yes |
@@ -374,7 +384,7 @@ and 4.4.
 | R | shield absorb | 25 | 20 to 60 | rules 4.1 | yes |
 | R | shield ticks | 180 (3 s) | 180 to 360 | rules 4.1 | yes |
 | R | `cooldownTicksPerStack`, the cut at 3 stacks | 120, so 360 of 540 ticks | never below 0 | v3 spec 4.4 | yes |
-| F | damage per pulse | 12 | 8 to 30 | approved spec 10 | yes |
+| F | damage per pulse | 12 | 8 to 60 | approved spec 10 | yes |
 | F | total over 4 pulses | 48 (12 times 4) | 8 to 60 | roster-v2 §0 | yes |
 | F | slow percent | 30 | 20 to 60 | rules 4.1 | yes |
 | F | slow ticks | 60 (1 s) | 60 to 180 | rules 4.1 | yes |
