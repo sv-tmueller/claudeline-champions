@@ -245,7 +245,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   that the standard match gets the orb (and the sandbox does not), and its
   `playToTheEnd` plays with it, so the `*_END_TICK` rows are the match the page
   plays: they did not move with the orb on while the bots ignored it (5476, 5381, 10 470
-  and 11 903 on the bots of #213), and they moved with the bots of #225, which contest
+  and 11 903 on the bots of #213), and three of the four moved with the bots of #225, which contest
   it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
   pairings, fills and the seed schedule, the cell plan (a six-name kit list
@@ -814,8 +814,8 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   measured windows from the round start, with the profiler on in each, and the
   median of the bots' bytes over each run of five: leads 0 to 9 read 57 628, 38 356,
   36 668, 33 120, 21 552, 33 120, 33 120, 24 696, 20 768 and 20 768 B (the plans of
-  the walk to the orb and to the target, `splitPath` 12 to 35 KB a window, over the
-  limit of 18 000 B), lead 10 reads 8724, lead 11 6928 and lead 12 2320 B, and the
+  the chase, `splitPath` 12 to 35 KB a window, over the limit of 18 000 B; the orb is
+  not up before tick 1200, so no walk to it runs in them), lead 10 reads 8724, lead 11 6928 and lead 12 2320 B, and the
   first death of the round is read at tick 3719, so lead 12 would leave the floor of
   60 ticks and lead 11 leaves 90. The five windows are 11 to 15 of round 3, ticks 3479
   to 3629: the round's first projectile is live by window 2, and the windows hold a

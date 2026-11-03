@@ -368,7 +368,8 @@ the field. The rule draws no random number.
 Measured, on the six shipped kits with the orb on: every one of the 21 pairings
 (15 two-kit pairs and the 6 mirrors, with a filler of Hargrim or Quillon as
 six-cells.ts has it), both arenas, seeds 101 to 104, match seed 7, normal tier,
-played to matchEnd (a scratch, not committed, 42 matches). A round is an orb
+played to matchEnd (a scratch, not committed, 42 matches; Durnhal of #211, the seventh kit, was
+not in it). A round is an orb
 round when it reaches tick 1200, and most do not: normal bots end a round at
 tick 1000 for most pairings, so the orb is up in 20 of 78 rounds on arena 1 and 16
 of 82 on arena 2. The bots took it in 14 of the 20 and 9 of the 16 (70 and 56
@@ -2547,8 +2548,8 @@ With the contest switched off the two cells are red.
 
 The identity harness (the 16 rows of PR #142's harness, orb off: free play has no
 match flow, so `orbUpInto` is false on every think) is unchanged: all 16 hashes
-and input streams are the same on main's `packages/bots/src` and on the branch
-(`cmp` on `hashes-*.txt` and `streams-*.json`), with the hashes of #213's
+and input streams are the same on main's `packages/bots/src` (b3a0134, with Durnhal's profile) and
+on the branch (`cmp` on `hashes-*.txt` and `streams-*.json`), with the hashes of #213's
 table: headless fb22c35a5f68, stall 418e9d6417a9, kits 4bb47dbeb659, kits301
 3e8f97a889c6, kitsHard f8f77e6ad9ce, kitsEasy 8dde421a539f, kitsSwapped
 11cdfcf07e77, kitsSeed99 d132e4b317b5, plain1200 3ad008d826fb, plainOther

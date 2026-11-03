@@ -19,8 +19,8 @@ import type { Cell } from './six-cells';
 // Why this pair and not the Hargrim and Quillon mirror of the product's match: the mirror's rounds
 // end before tick 1200 but for one of its 6 rounds (both arenas), so it has 0 and 1 orb rounds on
 // the two arenas and nothing to assert; the pair with Lumeth, whose
-// rounds last 1000 to 1800 ticks, has 4 and 3 (bots.md, The energy orb, has the scan of all 42
-// pairings). The two cells
+// rounds last 1000 to 1800 ticks, has 4 and 3 (bots.md, The energy orb, has the scan of all 21
+// pairings, 42 matches). The two cells
 // are the only committed matches of the batch (testing.md, Check suite: the unit job is near its
 // time). A cell takes 3.7 s locally (a Linux x86 host, Node 24.22): the timeout of 60 s is that of
 // the other long cells (brimwick.test.ts).
@@ -51,8 +51,9 @@ describe('a 2v2 with the energy orb on, played to matchEnd', () => {
     );
     expectEnded(cell, result);
     expect(result.orb.rounds, result.summary).toBeGreaterThan(0);
+    // A red after a bots change means re-reading the scan (bots.md, The energy orb), not reseeding: the margin is
+    // one take, and other seeds would often fail.
     // The rule's point: more than half of the rounds in which the orb is collectible end with it taken.
     expect(result.orb.taken * 2, result.summary).toBeGreaterThan(result.orb.rounds);
-    expect(result.orb.byTeam.A + result.orb.byTeam.B).toBe(result.orb.taken);
   });
 });

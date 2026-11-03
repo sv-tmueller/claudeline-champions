@@ -100,8 +100,8 @@ const WARM_UP_BUDGET_TICKS = 9_100;
 // bots chase for the first ten windows: a scratch run of 30 windows from the round start with the
 // profiler on in every one (not committed) gives the median of the bots' bytes over each run of five
 // windows, from the lead 0 on: 57 628, 38 356, 36 668, 33 120, 21 552, 33 120, 33 120, 24 696, 20 768 and
-// 20 768 B (leads 0 to 9, all over the limit of 18 000 B: the plans of the walk to the orb and to the
-// target, `splitPath` 12 to 35 KB a window), then 8724 (lead 10), 6928 (lead 11) and 2320 B (lead 12,
+// 20 768 B (leads 0 to 9, all over the limit of 18 000 B: the plans of the chase, `splitPath` 12 to 35
+// KB a window; the orb is not up before tick 1200, so no walk to it runs in them), then 8724 (lead 10), 6928 (lead 11) and 2320 B (lead 12,
 // whose last window ends 60 ticks before the death, the floor). The lead is 11: the five windows are
 // 11 to 15 of the round, ticks 3479 to 3629, 90 ticks before the first death, and 3 runs of 3
 // (`--repeat-each=3`) read bots medians of 6644, 6936 and 7196 B and counted-code medians of 396, 432

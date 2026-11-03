@@ -747,7 +747,7 @@ describe('think allocation', () => {
   // (the three attempts of run 40339535608 of PR #184, one settle window of 10 to 58 ms a scene
   // each); 1.6 s locally (Apple M5 Pro, Node 22.23.2, full npm run test); 8.2 s with the two orb
   // scenes (#225, 21 scenes: job 125568510485 of run 41530318344, the unit job of the draft pull
-  // request, Node 24), and 16.4 s on a loaded Linux machine (load average 25 on 6 CPUs). Timeout: the
+  // request, Node 22), and 16.4 s on a loaded Linux machine (load average 25 on 6 CPUs). Timeout: the
   // smallest of 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite):
   // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 2 to 4 s locally (the `{ slot, ex }` mutation of
   // bots.md, all 17 scenes at the cap), inside it. The heap jobs (Node 24 and 26, both tiers)

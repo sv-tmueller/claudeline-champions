@@ -120,7 +120,7 @@ describe('a bot contests the energy orb when it is up, nothing is in reach and i
   });
 });
 
-describe('the threat: an enemy within the bot own reach, inclusive, with a clear shot', () => {
+describe("the threat: an enemy within the bot's own reach, inclusive, with a clear shot", () => {
   // The reach of the bot is the profile of the shipped kit, not the table entry.
   const reach = profileFor('hargrim', jsonKits().find((k) => k.id === 'hargrim')).rangeMax;
   const at = (distance: number) =>
@@ -210,8 +210,11 @@ describe('the orb is up only when it is collectible', () => {
 
   it('does not contest an orb that is taken', () => {
     const s = at({ taken: true });
-    expect(diffOf(thinkRows(createBot(0, 'hard', 1), s, 30), thinkRows(createBot(0, 'hard', 1), twinOf(s), 30)).first).toBe(-1);
-    // Taken is also what the twin is: the bot's stream with it taken must not walk to (0, 2.5).
+    const thinks = TIERS.hard.delay + WINDOW;
+    // The stream with the orb taken differs from the one with it up from the first think of the contest:
+    // the bot does not walk to a taken orb (this fails if a taken orb is contested).
+    expect(diffOf(thinkRows(createBot(0, 'hard', 1), at({}), thinks), thinkRows(createBot(0, 'hard', 1), s, thinks)).first).toBe(TIERS.hard.delay);
+    // And it must not walk to (0, 2.5).
     const walkers = thinkRows(createBot(0, 'hard', 1), s, 40).filter((r) => r[0] > 0 && r[1] === 0);
     expect(walkers).toEqual([]);
   });
@@ -270,8 +273,8 @@ describe('only the move is replaced', () => {
       health: 0.2,
       orb: {},
     });
-    const a = thinkRows(createBot(0, 'hard', 1), state, TIERS.hard.delay + THINKS_PAST);
-    const b = thinkRows(createBot(0, 'hard', 1), twinOf(state), TIERS.hard.delay + THINKS_PAST);
+    const a = thinkRows(createBot(0, 'hard', 1), state, TIERS.hard.delay + WINDOW);
+    const b = thinkRows(createBot(0, 'hard', 1), twinOf(state), TIERS.hard.delay + WINDOW);
     const diff = diffOf(a, b);
     expect(diff.first).toBe(TIERS.hard.delay);
     expect([...diff.fields].every((f) => f === 'moveX' || f === 'moveY')).toBe(true);
@@ -281,4 +284,3 @@ describe('only the move is replaced', () => {
   });
 });
 
-const THINKS_PAST = 30;
