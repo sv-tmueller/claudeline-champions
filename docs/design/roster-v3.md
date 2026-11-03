@@ -178,7 +178,7 @@ the kit data below are the ones the table leaves open.
 | R | Fade Step | Spends all Focus to cut Tumble's cooldown by 2 s per stack; gains a 25 shield for 3 s. Cooldown 13 s. |
 | F | Arrow Storm | Placed area at aim (range 13 m), radius 3 m, 4 pulses of 12 every 0.5 s (48 total) and slow 30 percent. Windup 0.6 s, locked. |
 
-**Deviations from the draft.** One value of v3 spec section 5.2 moves: the
+**Deviations from the draft.** Two values of v3 spec section 5.2 move: the
 reach of two projectiles, which the abilities table above gives as 12.83 m
 and 15.83 m in its range column, as roster-v1 gives Quillon's 13.93 m, and
 not as the draft's 13 m and 16 m. A projectile's lifetime is a whole tick
@@ -308,9 +308,9 @@ S, with `ticks` S times 60 (one tick every 30 ticks, as Skerrow's Rend), and
 - Q windup 18 ticks, slowed, and radius 0.4 m (Bind Shot and Chain Hook); the
   root is 60 ticks, the catalog minimum.
 - E windup 30 ticks, slowed (the table's 0.5 s), radius 0.25 m (Rod Bolt, the
-  same projectile as M1). The EX copies
-  the windup, the movement, the lifetime and the radius, with `pierce` true
-  and no `consumeCounter` and no `endArea`.
+  same projectile as M1). The EX copies the windup, the movement, the
+  lifetime and the radius, with `pierce` true and no `consumeCounter` and no
+  `endArea`.
 - R windup 0, free, like every R, and the shield 180 ticks.
 - F windup 36 ticks, locked (the table's 0.6 s). The area is placed at the aim
   up to 13 m, radius 3 m, `durationTicks` 120 and `intervalTicks` 30: 4 pulses
@@ -338,12 +338,13 @@ Ysmeer's section is in.
 | Wrenna | 10 to 14 m, Heartseeker 15.83 m | section 2 |
 
 Her band sits above Quillon's 9 to 13 m on purpose, and her M1 reaches 14.00 m
-against Rod Bolt's 13.93 m, the longest basic shot of the roster. It begins
-at 10 m because Ondrel's M1 reaches 10 m and her Mire 10.5 m, past the 9 m
-hook and every melee tool, and Brimwick's longest shot is the 12 m of her
-ultimate. Two tools still reach into the band: the Mire EX (11 m, 25 energy)
-and Drowned Ground (12.5 m, her ultimate), which is why her web line is a
-loss.
+against Rod Bolt's 13.93 m, the longest basic shot of the roster. Its start at
+10 m clears Hargrim's 9 m hook, Durnhal's 9 m throw, every melee strike and the
+end of Ondrel's Clod Toss (10 m). It does not clear everything. Still
+reaching into the band, among others, are Ondrel's Mire (10.5 m), Mire EX (11
+m) and Drowned Ground (12.5 m), and Brimwick's Spark (11 m), Firecracker (11
+m, 11.5 m as the EX) and Grand Finale (12 m); the web lines above weigh each
+against her.
 
 Every number of this section that a catalog range binds has one row. The
 sources are the approved spec section 10 and section 4.6, rules sections 4.1
