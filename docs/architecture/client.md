@@ -230,8 +230,17 @@ take none of them), so the unit tests load the files statically instead:
 `tsconfig.tools.json` has `types: ["node"]` and rejects `import.meta.glob`.
 
 `match-setup.ts` builds the match with `roundsToWin: DEFAULT_ROUNDS_TO_WIN` (the
-sim's constant, 3):
-
+sim's constant, 3). `createLocalMatch` takes an optional fifth parameter,
+`energyOrb?: OrbPoint`, which `main.ts` reads from `data/orbs.json` through the
+sim's `orbPointFor` (a static JSON import, so a bad row is a page error, and an
+arena without a row plays without the orb): the standard match plays with the
+energy orb on (rules.md section 3.3, #224), the config gets the `energyOrb` key
+only when there is a point (never `undefined`), and the sandbox ignores it.
+Free play does not exist in the client. The bots ignore the orb until they are
+taught it. The headless tests of the standard match (`playToTheEnd` in
+`match-setup.test.ts`) pass the point too, so the four `*_END_TICK` rows
+measure the match the page plays; every other client unit test is orb-off. The
+orb's view is `orb-view.ts` (see Scene):
 - Champion 0 is the human, the local pick, on team A. It stays champion 0, so
   the first team A spawn, (-12, 2) on arena01 and (-11, 2) on arena02, and the
   e2e coordinates hold.
@@ -314,8 +323,27 @@ sim steps first and the views read its state afterwards.
 - `impact-rings.ts`: a fixed pool of rings that grow and fade where a
   projectile ended, aged in sim ticks. A hit on the owner's own team (a heal
   bolt) draws its ring in the owner team's projectile colour.
+- `orb-view.ts`: the energy orb. Two meshes of one material (`ORB_COLOUR`,
+  `#2f4bff`), built once from `state.match.orb` and never added to or removed:
+  a flat ring on the floor at the point, as wide as the reach of a champion
+  circle that touches the orb (0.5 m plus 0.5 m), and a sphere of the orb's
+  radius on it. No glb. The mode is a small integer, `ORB_HIDDEN`,
+  `ORB_WARNING` (the ring) or `ORB_UP` (the ring and the sphere). The handlers
+  of `CombatFeedback` write it: `orbSpawn` sets the warning, and `orbTaken`,
+  `roundEnded` and `roundStarted` set hidden. `OrbView.sync(state)`, called by
+  `stepSim` after every step's events, moves the warning to up once
+  `match.phaseTicks` reads 1200 (`ORB_COLLECTIBLE_TICKS`). `step` adds one to
+  `phaseTicks` after the orb, so the state that emits `orbSpawn` reads 1021 and
+  the state that reads 1200 is one step before the first that can take the
+  orb; `orb-view.test.ts` pins both on the real sim. Visibility is written
+  only when the mode changes, and `data-orb` (`hidden`, `warning` or `up`, from
+  `ORB_TEXTS`) only when it changed, so a steady frame writes nothing and a
+  view that is hidden costs nothing in the probe's windows (they fall 120 to
+  270 ticks into a round, before the warning). A match without an orb gets a
+  view that nothing shows.
 - `feedback.ts` and `champion-look.ts`: `routeEvents` turns the step's events
-  into the hit flash, the rings, the hit and death counters and the kill feed;
+  into the hit flash, the rings, the hit and death counters, the kill feed and
+  the orb view's mode;
   `champion-look` swaps a champion's materials between its own, the white flash
   and the faded dead grey.
 - `debug-shot.ts`: the dev-only F4 shot above.
@@ -327,7 +355,7 @@ sim steps first and the views read its state afterwards.
 - Canvas data hooks: `data-tick`, `data-p0x` and `data-p0y` (the human's position
   in centimetres), `data-f0` (its facing in radians, three decimals),
   `data-projectiles`, `data-areas`, `data-hits`, `data-deaths`, `data-flashing`,
-  `data-rings`, `data-bar0` to `data-bar3`, or to `data-bar5` in a 3v3 (a
+  `data-rings`, `data-orb` (hidden, warning or up), `data-bar0` to `data-bar3`, or to `data-bar5` in a 3v3 (a
   champion's fill percent, "x" for a hidden bar), `data-anim0` to `data-anim3`,
   or to `data-anim5` in a 3v3 (what a champion's clips play, see Animation),
   `data-overlay`,
@@ -337,7 +365,7 @@ sim steps first and the views read its state afterwards.
   A per-tick hook is written only when its value changes, with `setAttribute`
   and text from the tables of `hook-text.ts` (integers, signed centimetres,
   facing in milliradians, percents), `flashTexts` in `feedback.ts` and
-  `ANIM_TEXTS` in `champion-anim.ts`, all made once at startup, so a change
+  `ANIM_TEXTS` in `champion-anim.ts` and `ORB_TEXTS` in `orb-view.ts`, all made once at startup, so a change
   write builds no string. A table falls back to the formatter past its range. A
   position is two hooks and a bar is one hook per champion because a combined
   "x,y" or "a,b,c,d" text cannot come from a table.
@@ -383,6 +411,7 @@ same commit.
 | `impact-rings.ts` | `RING_COLOUR`; a heal bolt's ring reuses the projectile colours below |
 | `champion-look.ts` | `FLASH_COLOUR`, `DEAD_COLOUR` |
 | `entity-views.ts` | `PROJECTILE_ALLY_COLOUR`, `PROJECTILE_ENEMY_COLOUR` |
+| `orb-view.ts` | `ORB_COLOUR` (`#2f4bff`, the orb and its warning ring; no other colour of the client or of a champion model, arena floor or trim is within 80 of it, and it stays out of the e2e pixel boxes) |
 | `debug-overlay.ts` | the magenta overlay `#ff00ff` |
 
 ## Animation
@@ -577,7 +606,15 @@ eighth, under the same root.
   spans `ring-countdown`, `ring-radius` and `ring-distance`. Lengths are
   decimetres from the table of `hook-text.ts` (`dmText`).
 - Kill feed: up to 5 lines for 300 ticks each. `feedback.ts` pushes a death as
-  killer and victim, and names come from `roster.ts`. `routeEvents` makes no ring
+  killer and victim, and names come from `roster.ts`. An orb pickup is a line
+  too: `KillLine` has an integer `kind` (`KILL_KIND_DEATH` or `KILL_KIND_ORB`),
+  `pushOrb(tick, takerId)` writes the taker as the killer, and the line carries
+  `data-kind` (`death` or `orb`, built as death). For an orb line the killer
+  part is the taker's name with its `data-team`, and the victim part reads
+  "Energy orb" with `data-team="orb"`, drawn in `var(--hud-energy)`, so no
+  colour is new. The HUD's cache keys on the kind as well as the ids, so a line
+  that changes kind rewrites both parts. The pickup is no death: the tallies
+  and `deaths` do not move. `routeEvents` makes no ring
   for a `projectileExpired` with the reason `roundEnd`: that shot was cut off by
   the round, and nothing was hit. The deciding death still reaches the feed,
   since the sim emits the deaths before `roundEnded`.
@@ -600,7 +637,9 @@ its `death` handler writes: a death counts for its victim, and a kill for the
 source only when that is another champion of the match, so a death by the
 ring (`RING_SOURCE_ID`) counts a death and no kill. They are match totals and
 never reset: a page is one match, and Restart reloads it. The constructor of
-`CombatFeedback` is unchanged.
+`CombatFeedback` has an optional sixth parameter since #224, the `OrbView`
+(a feedback built without one, as most tests do, writes the feed and skips the
+view).
 
 `Scoreboard.update` (`scoreboard.ts`, in the heap probe's counted code) runs
 once per stepping frame after `Hud.update`, and once at startup. It writes
@@ -850,7 +889,7 @@ The first-pass sound is generated in code, with Web Audio oscillators and no
 sound files, so there is no license question. It lives in `audio.ts`, behind the
 `SoundOutput { unlock(), setMuted(on), play(sound) }` of `Platform.sound`.
 What plays (tuned values, rules.md section 6; no music, and nothing on
-`matchEnded`, which follows the last `roundEnded`):
+`matchEnded`, which follows the last `roundEnded`, or on `orbTaken`):
 
 | Event | Sound (`SOUNDS`) | Voice, decay |
 |-------|------------------|--------------|
@@ -859,9 +898,11 @@ What plays (tuned values, rules.md section 6; no music, and nothing on
 | every `death` | death, 2 | sawtooth 110 Hz, 120 ms |
 | `roundStarted` | round start, 3 | sine 660 Hz, 80 ms |
 | `roundEnded` | round end, 4 | sine 330 Hz, 140 ms |
+| `orbSpawn` | orb warning, 5 | triangle 880 Hz, 200 ms |
 
-The cast is the local champion's only, which keeps a 3v3 from turning into
-noise. The master gain is 0.2 and a voice peaks at 0.6.
+The warning plays once a round, 3 s before the orb can be taken; the pickup
+has no sound, its cue is the feed line. The cast is the local champion's only,
+which keeps a 3v3 from turning into noise. The master gain is 0.2 and a voice peaks at 0.6.
 
 - **The second event pass.** `routeSounds(state, sound, localId)` is an indexed
   loop over `state.events` with a switch, called by `stepSim` right after

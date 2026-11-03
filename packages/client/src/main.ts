@@ -1,4 +1,4 @@
-import { parseArenaDef, step, type KitDef, type PlayerInput } from '@claudeline/sim';
+import { orbPointFor, parseArenaDef, step, type KitDef, type PlayerInput } from '@claudeline/sim';
 import {
   Color,
   DirectionalLight,
@@ -10,6 +10,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import orbTable from '../../../data/orbs.json';
 import { arenaById } from './arenas';
 import { bindSoundUnlock, routeSounds } from './audio';
 import { createBotDriver } from './bot-driver';
@@ -35,6 +36,7 @@ import { buildHud } from './hud-dom';
 import { primeStatusReads } from './hud-views';
 import { createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
+import { ORB_TEXTS, createOrbView } from './orb-view';
 import { opensSelect, parseLaunch } from './launch';
 import { LOCAL_SEED, createLocalMatch } from './match-setup';
 import { bindInput, createInputCore } from './input';
@@ -84,7 +86,10 @@ if (opensSelect(location.search, import.meta.env.DEV ? DEV_LAUNCH_KEYS : [])) {
 const launch = parseLaunch(location.search, kitIds, arenaIds, import.meta.env.DEV);
 const arena = arenaById(arenas, launch.arena);
 
-const { state, botIds } = createLocalMatch(launch, arena, kits);
+// The standard match plays with the energy orb at the arena's row of data/orbs.json (rules.md 3.3), read
+// through the sim's own check, so a bad row is a page error; an arena without a row plays without the orb.
+// The sandbox scene ignores the point.
+const { state, botIds } = createLocalMatch(launch, arena, kits, undefined, orbPointFor(orbTable, arena));
 // The bots think here, in the main thread, once per tick before `step`.
 const bots = createBotDriver(botIds, launch.difficulty, LOCAL_SEED);
 const roundsToWin = state.match?.roundsToWin;
@@ -127,8 +132,10 @@ const healthBars = createHealthBars(state.champions, human.team);
 const killFeed = createKillFeed();
 // The state of each champion's clips: the event pass writes its triggers, draw plays it.
 const anims = createAnims(state.champions.length);
-const feedback = new CombatFeedback(state.champions, human.team, impactRings, killFeed, anims);
-scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group);
+// The orb's warning ring and the orb, hidden until the sim's events show them.
+const orbView = createOrbView(state);
+const feedback = new CombatFeedback(state.champions, human.team, impactRings, killFeed, anims, orbView);
+scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group, orbView.group);
 
 // Built before the models load, so the HUD shows while they do.
 const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
@@ -273,7 +280,7 @@ function writeHooks(): void {
 }
 
 // The last value written to each combat hook, so the DOM is only touched on a change.
-const written = { projectiles: -1, areas: -1, hits: -1, deaths: -1, flashMask: -1, rings: -1 };
+const written = { projectiles: -1, areas: -1, hits: -1, deaths: -1, flashMask: -1, rings: -1, orb: -1 };
 
 function writeCombatHooks(): void {
   if (projectileViews.count !== written.projectiles) {
@@ -291,6 +298,11 @@ function writeCombatHooks(): void {
   if (feedback.deaths !== written.deaths) {
     written.deaths = feedback.deaths;
     canvas.setAttribute('data-deaths', intText(written.deaths));
+  }
+  // The orb view's mode, one of the three ORB_TEXTS: hidden, warning (marker only) or up (collectible).
+  if (orbView.mode !== written.orb) {
+    written.orb = orbView.mode;
+    canvas.setAttribute('data-orb', ORB_TEXTS[written.orb] as string);
   }
   const mask = feedback.flashMask(state.tick);
   if (mask !== written.flashMask) {
@@ -317,6 +329,8 @@ function stepSim(steps: number): void {
     // Every step: the sim clears its events at the start of the next one.
     routeEvents(state, feedback);
     routeSounds(state, platform.sound, HUMAN_ID);
+    // After the events: the warning becomes the orb when the state reads 1200 ticks of the round.
+    orbView.sync(state);
   }
   // `step` replaces the projectile and area arrays, so read them fresh here.
   projectileViews.sync(state.projectiles);

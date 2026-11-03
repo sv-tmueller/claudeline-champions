@@ -12,6 +12,7 @@ import {
 } from './champion-anim';
 import { RING_TINT_ALLY, RING_TINT_ENEMY, RING_TINT_YELLOW, type ImpactRings, type RingTint } from './impact-rings';
 import type { KillFeed } from './kill-feed';
+import { ORB_HIDDEN, ORB_WARNING, type OrbView } from './orb-view';
 
 /** A hit flash lasts this many sim ticks. */
 export const FLASH_TICKS = 8;
@@ -45,6 +46,10 @@ export interface FeedbackHandlers {
   /** A projectile ended on an obstacle, the boundary or its lifetime. */
   expire(tick: number, event: ProjectileExpiredEvent): void;
   death(tick: number, targetId: number, sourceId: number): void;
+  /** The orb's warning: it becomes collectible in 3 s. The point is the view's, from the match. */
+  orbSpawn(tick: number): void;
+  /** A champion took the orb. Only the id is read: the rest of the event is doubles. */
+  orbTaken(tick: number, championId: number): void;
 }
 
 /**
@@ -90,6 +95,12 @@ export function routeEvents(state: GameState, handlers: FeedbackHandlers): void 
       case 'death':
         handlers.death(tick, event.targetId, event.sourceId);
         break;
+      case 'orbSpawn':
+        handlers.orbSpawn(tick);
+        break;
+      case 'orbTaken':
+        handlers.orbTaken(tick, event.championId);
+        break;
       default:
         // Heal, area and the other spawn events have no feedback yet.
         break;
@@ -115,8 +126,8 @@ export function flashTexts(championCount: number): string[] {
 }
 
 /**
- * Flash windows, hit and death counters, the impact rings, the kill feed and the triggers
- * of the champions' animations.
+ * Flash windows, hit and death counters, the impact rings, the kill feed, the triggers
+ * of the champions' animations and the mode of the orb view.
  */
 export class CombatFeedback implements FeedbackHandlers {
   /** Running total of projectile hits. */
@@ -139,7 +150,8 @@ export class CombatFeedback implements FeedbackHandlers {
    * `champions` is the match's champion array (read for teams, so a hit's ring can tell a
    * heal bolt from a damage shot), `localTeam` the team whose projectiles are ally-coloured
    * and `anims` the animation record of each champion, which the handlers write the pending
-   * triggers of (champion-anim.ts takes them in `draw`).
+   * triggers of (champion-anim.ts takes them in `draw`). `orb` is the view the orb events and the
+   * round's start and end set the mode of; a feedback built without one (most tests) only writes the feed.
    */
   constructor(
     private readonly champions: readonly { readonly team: TeamId }[],
@@ -147,6 +159,7 @@ export class CombatFeedback implements FeedbackHandlers {
     private readonly rings: ImpactRings,
     private readonly killFeed: KillFeed,
     private readonly anims: readonly ChampionAnim[],
+    private readonly orb?: OrbView,
   ) {
     this.flashEndTick = Array.from({ length: champions.length }, () => 0);
     this.killCounts = new Int32Array(champions.length);
@@ -180,10 +193,12 @@ export class CombatFeedback implements FeedbackHandlers {
   }
 
   roundEnded(): void {
+    this.orb?.setMode(ORB_HIDDEN);
     for (let i = 0; i < this.anims.length; i++) triggerDash(this.anims[i] as ChampionAnim, 0);
   }
 
   roundStarted(): void {
+    this.orb?.setMode(ORB_HIDDEN);
     for (let i = 0; i < this.anims.length; i++) triggerSnap(this.anims[i] as ChampionAnim);
   }
 
@@ -210,6 +225,15 @@ export class CombatFeedback implements FeedbackHandlers {
     this.killFeed.push(tick, sourceId, targetId);
     const anim = this.anims[targetId];
     if (anim !== undefined) triggerDeath(anim);
+  }
+
+  orbSpawn(): void {
+    this.orb?.setMode(ORB_WARNING);
+  }
+
+  orbTaken(tick: number, championId: number): void {
+    this.killFeed.pushOrb(tick, championId);
+    this.orb?.setMode(ORB_HIDDEN);
   }
 
   /** Integers only, like the handlers: a death is cold, and the counts are typed arrays. */

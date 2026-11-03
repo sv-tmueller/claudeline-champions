@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { parseArenaDef } from '@claudeline/sim';
-import type { ArenaDef, KitDef } from '@claudeline/sim';
+import { orbPointFor, parseArenaDef } from '@claudeline/sim';
+import type { ArenaDef, KitDef, OrbPoint } from '@claudeline/sim';
 import type { ArenaListing } from '@claudeline/protocol';
 
 /** What a room knows about the game: the server is the authority on data (online design section 5). */
@@ -12,6 +12,8 @@ export interface RoomData {
   /** The champion ids in roster order, which is the kit ids sorted. */
   roster: string[];
   listings: ArenaListing[];
+  /** The energy orb point of each arena that has a row in `orbs.json`, by arena id (rules.md 3.3). */
+  orbs: ReadonlyMap<string, OrbPoint>;
 }
 
 /** The repository's `data/` directory, found from this file: `packages/server/src/data.ts`. */
@@ -28,11 +30,23 @@ function jsonFiles(root: URL, dir: string): URL[] {
     .map((name) => new URL(`${dir}${name}`, root));
 }
 
+/** The parsed `orbs.json` under `root`, or an empty table when the file does not exist. */
+function readOrbTable(root: URL): unknown {
+  try {
+    return JSON.parse(readFileSync(new URL('orbs.json', root), 'utf8')) as unknown;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    throw error;
+  }
+}
+
 /**
- * Reads `kits/` and `arenas/` under `root` (a URL ending in a slash). The kits are plain data that
+ * Reads `kits/`, `arenas/` and `orbs.json` under `root` (a URL ending in a slash). The kits are plain data that
  * `createMatch` validates. An arena goes through `parseArenaDef`. `maxTeamSize` is the smaller of
  * the two spawn counts, at most 3, and an arena with fewer than two spawns a team is left out.
- * Throws when no arena is left: that is a defect of the data, not of any message.
+ * The orb point of each kept arena goes through `orbPointFor`, so a bad row throws at load; a
+ * missing file or an arena without a row has no orb. Throws when no arena is left: that is a
+ * defect of the data, not of any message.
  */
 export function loadRoomData(root: URL = DATA_ROOT): RoomData {
   const kits = jsonFiles(root, 'kits/')
@@ -40,6 +54,8 @@ export function loadRoomData(root: URL = DATA_ROOT): RoomData {
     .sort(byId);
   const arenas: ArenaDef[] = [];
   const listings: ArenaListing[] = [];
+  const orbs = new Map<string, OrbPoint>();
+  const orbTable = readOrbTable(root);
   const parsed = jsonFiles(root, 'arenas/')
     .map((file) => parseArenaDef(JSON.parse(readFileSync(file, 'utf8')) as unknown))
     .sort(byId);
@@ -47,8 +63,10 @@ export function loadRoomData(root: URL = DATA_ROOT): RoomData {
     const spawns = Math.min(arena.spawns.teamA.length, arena.spawns.teamB.length);
     if (spawns < 2) continue;
     arenas.push(arena);
+    const orb = orbPointFor(orbTable, arena);
+    if (orb !== undefined) orbs.set(arena.id, orb);
     listings.push({ id: arena.id, name: arena.name, maxTeamSize: spawns >= 3 ? 3 : 2 });
   }
   if (arenas.length === 0) throw new Error('data/arenas has no arena with two spawns a team');
-  return { kits, arenas, roster: kits.map((k) => k.id), listings };
+  return { kits, arenas, roster: kits.map((k) => k.id), listings, orbs };
 }

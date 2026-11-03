@@ -38,7 +38,7 @@ import type { CDPSession, Page } from '@playwright/test';
 // callee V8 inlines into it land on it, so excluding it would hide a regression
 // (the escaping array in frame passed with the hook excluded).
 export const COMBAT_CODE =
-  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|scoreboard|hook-text|kill-feed|roster|bot-driver|result-screen|camera|audio|champion-anim|clip-sampler)\.ts:|^main\.ts:/;
+  /^(entity-views|health-bars|impact-rings|champion-look|feedback|interpolate|debug-overlay|loop|input|hud|hud-views|scoreboard|hook-text|kill-feed|roster|bot-driver|result-screen|camera|audio|champion-anim|clip-sampler|orb-view)\.ts:|^main\.ts:/;
 // Three's own animation callback. It is logged and never counted.
 const ON_ANIMATION_FRAME = /^three\.module[^:]*:onAnimationFrame$/;
 // The sweep files of the sim. Their garbage was huge (about 790 KB per window, in
