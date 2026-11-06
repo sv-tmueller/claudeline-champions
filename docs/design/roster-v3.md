@@ -415,10 +415,11 @@ reads as a stave. The quiver is one box of 0.08 m by 0.10 m by 0.44 m on
 offset to x -0.10 so the two do not read as one cue. Two numbers are fixed, by
 the shared clips and the colour rule. The quiver's x offset must stay small: at
 -0.16 m, on the back of the body as `Death` lays it down (key 30, `Hips` at -85
-degrees and -0.64 m), it sinks 17.3 mm under the floor, and at -0.10 m every key
-and every sample holds at 0. The limbs stop at 1.30 m, so `Cast`'s raise of
-`Arm_L` to -85 degrees keeps the top at 1.7000 m rather than lifting the bow
-over the limit. The pose tables stay shared, with no per-champion pose. The
+degrees and -0.64 m), it sinks 7.3 mm under the floor (near -0.17 m it sinks
+17.2 mm), and at -0.10 m every key and every sample holds at 0. The limbs stop
+at 1.30 m, so `Cast`'s raise of `Arm_L` to -85 degrees keeps the top at
+1.7000 m rather than lifting the bow over the limit. The pose tables stay
+shared, with no per-champion pose. The
 model's top is the head's 1.7000 m at rest, and the clip tops are 1.7095 m
 (Idle), 1.7228 m (Run), 1.7000 m (Attack), 1.7000 m (Cast), 1.7000 m (Hit) and
 1.7026 m (Death), all under 1.90 m, with every clip's low at 0.0000 m. The

@@ -216,9 +216,9 @@ rest sit inside 80 of her own plum. Her cue is a bow of three boxes on `Arm_L`
 at y = 0.45: a grip 0.05 by 0.05 by 0.34 m and two limbs 0.30 and 0.24 m long,
 angled 30 degrees off it, plus one quiver 0.08 by 0.10 by 0.44 m on `Spine` at
 (-0.10, 0, 1.30). The quiver's x offset must stay small: at -0.16 m, on the back
-of the body as it lies at Death key 30, it sinks 17.3 mm under the floor. The
-model has 624 vertices and 300 triangles, a ground radius of 0.4847 m and
-40 924 bytes.
+of the body as it lies at Death key 30, it sinks 7.3 mm under the floor (near
+-0.17 m it sinks 17.2 mm). The model has 624 vertices and 300 triangles, a
+ground radius of 0.4847 m and 40 924 bytes.
 
 That client test keeps its own `BODY_COLOURS` table with the bodies above, so
 change both in the same commit.
