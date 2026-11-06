@@ -9,10 +9,12 @@ client mapping (x, 0, -y), so no axis conversion happens here.
 The visual pass lives inside the existing nodes, so the node set is the
 validator's: the Floor mesh holds a trim border, the spawn discs and the
 field, plus the floor inlays (the end circle, the centre line and the orb
-mark), and each Wall_* mesh holds the wall and its trim cap. Every added
-shape is built from explicit vertices and faces (or `create_cone`, the op
-main's circle obstacles used), never from an op whose face order can vary
-between runs: `bmesh.ops.bevel` is not used.
+mark), and each Wall_* mesh holds the wall and its trim cap. Each `Obstacle_i`
+mesh holds the profile its kind names (issue #237): a blocking rect is a wall
+segment, a blocking circle a column, a non-blocking rect a crate and a
+non-blocking circle a barrel. Every added shape is built from explicit
+vertices and faces (or `create_cone`, the op main's discs used), never from an
+op whose face order can vary between runs: `bmesh.ops.bevel` is not used.
 """
 import argparse
 import json
@@ -39,7 +41,21 @@ RING_INLAY_WIDTH = 0.1  # the end circle's band, centred on ring.endRadius
 LINE_WIDTH = 0.1  # the centre line's width, matching the ring's band
 LINE_HEIGHT = 0.008  # the line's top, under DISC_HEIGHT so no faces are coplanar
 MARK_RADIUS = 0.3  # the orb mark's radius
-BEVEL = 0.08  # the chamfer on an obstacle's top edge, in both directions
+# The four obstacle profiles: a blocking rect is a wall segment, a blocking
+# circle a column, a non-blocking rect a crate and a non-blocking circle a
+# barrel. Each is stacked convex bands from the base to the height, so every
+# vertex stays inside the footprint and nothing stands above the top face.
+OBSTACLE_INSET = 0.1  # a wall segment's body or a column's shaft, inwards
+BASE_COURSE = 0.15  # a wall segment's base course, full footprint
+TOP_COURSE = 0.15  # a wall segment's cap, full footprint
+BASE_RING_HEIGHT = 0.15  # a column's base ring, full radius
+CAPITAL_HEIGHT = 0.15  # a column's capital, full radius
+GROOVE_DEPTH = 0.05  # a crate's slat grooves, below the height
+GROOVE_WIDTH = 0.06  # the gap between two crate slats
+CRATE_GROOVES = 2  # the gaps across a crate's long axis
+HOOP_INSET = 0.05  # a barrel's hoop bands, outwards of the body
+HOOP_HEIGHT = 0.06  # a barrel's hoop band height
+BARREL_HOOPS = 3  # a barrel's hoop bands, the first at the base, the last at the top
 CAP_HEIGHT = 0.1  # a wall's trim cap, the top of the wall height
 CAP_BEVEL = 0.05  # the chamfer on a cap's two long top edges
 CIRCLE_SEGMENTS = 32
@@ -91,49 +107,150 @@ def ring_faces(lower, upper, count):
     ]
 
 
-def rect_obstacle(bm, ob):
-    height = ob["height"]
-    hx, hy = ob["w"] / 2, ob["h"] / 2
-    # Three rings: the base, the shoulder where the chamfer starts, the top.
-    rings = (
-        (0.0, hx, hy),
-        (height - BEVEL, hx, hy),
-        (height, hx - BEVEL, hy - BEVEL),
-    )
-    points = []
-    for z, x, y in rings:
-        points += [(-x, -y, z), (x, -y, z), (x, y, z), (-x, y, z)]
-    faces = [(0, 1, 2, 3), (8, 9, 10, 11)]
-    faces += ring_faces(0, 4, 4) + ring_faces(4, 8, 4)
-    add_solid(bm, points, faces)
+def prism(bm, z0, z1, hx, hy, material_index=0):
+    """An axis-aligned box from z0 to z1, its footprint +-hx by +-hy."""
+    assert z0 < z1, "a band with no height"
+    assert hx > 0.0 and hy > 0.0, "a band with no footprint"
+    assert z0 >= 0.0, "a band below the base"
+    points = [
+        (-hx, -hy, z0),
+        (hx, -hy, z0),
+        (hx, hy, z0),
+        (-hx, hy, z0),
+        (-hx, -hy, z1),
+        (hx, -hy, z1),
+        (hx, hy, z1),
+        (-hx, hy, z1),
+    ]
+    faces = [(0, 1, 2, 3), (4, 5, 6, 7)]
+    faces += ring_faces(0, 4, 4)
+    add_solid(bm, points, faces, material_index)
 
 
-def circle_obstacle(bm, ob):
-    height = ob["height"]
-    r = ob["r"]
-    rings = ((0.0, r), (height - BEVEL, r), (height, r - BEVEL))
+def cylinder(bm, z0, z1, radius, material_index=0):
+    """A solid cylinder from z0 to z1 at `radius`, CIRCLE_SEGMENTS sides.
+
+    A solid band, not an annulus: the concentric steps a stacked profile makes
+    read as rings from the top-down camera, and add_solid's convex-only
+    winding test is left alone (the `add_ring_inlay` annulus is the one place
+    that needed hand-wound faces).
+    """
+    assert z0 < z1, "a band with no height"
+    assert radius > 0.0, "a band with no radius"
+    assert z0 >= 0.0, "a band below the base"
     n = CIRCLE_SEGMENTS
     points = []
-    for z, radius in rings:
+    for z in (z0, z1):
         for k in range(n):
             angle = 2 * math.pi * k / n
             points.append((radius * math.cos(angle), radius * math.sin(angle), z))
-    faces = [tuple(range(n)), tuple(range(2 * n, 3 * n))]
-    faces += ring_faces(0, n, n) + ring_faces(n, 2 * n, n)
-    add_solid(bm, points, faces)
+    faces = [tuple(range(n)), tuple(range(n, 2 * n))]
+    faces += ring_faces(0, n, n)
+    add_solid(bm, points, faces, material_index)
+
+
+def rect_obstacle(bm, ob):
+    """A blocking rect: a wall segment, mirroring `build_wall`'s stack.
+
+    A full-footprint base course, a body inset by OBSTACLE_INSET and a cap
+    back out to the footprint, so the top face is the JSON footprint at the
+    JSON height. The three bands share edges, so each z-slice is one value.
+    """
+    height = ob["height"]
+    hx, hy = ob["w"] / 2, ob["h"] / 2
+    assert hx - OBSTACLE_INSET > 0.0 and hy - OBSTACLE_INSET > 0.0, "a wall segment too thin for its body"
+    assert BASE_COURSE + TOP_COURSE < height, "a wall segment too short for base and cap"
+    prism(bm, 0.0, BASE_COURSE, hx, hy)
+    prism(bm, BASE_COURSE, height - TOP_COURSE, hx - OBSTACLE_INSET, hy - OBSTACLE_INSET)
+    prism(bm, height - TOP_COURSE, height, hx, hy)
+
+
+def circle_obstacle(bm, ob):
+    """A blocking circle: a column with a base ring and a capital.
+
+    Full-radius bands top and bottom, an inset shaft between, so the top face
+    is the JSON radius at the JSON height.
+    """
+    height = ob["height"]
+    r = ob["r"]
+    assert r - OBSTACLE_INSET > 0.0, "a column too thin for its shaft"
+    assert BASE_RING_HEIGHT + CAPITAL_HEIGHT < height, "a column too short for base ring and capital"
+    cylinder(bm, 0.0, BASE_RING_HEIGHT, r)
+    cylinder(bm, BASE_RING_HEIGHT, height - CAPITAL_HEIGHT, r - OBSTACLE_INSET)
+    cylinder(bm, height - CAPITAL_HEIGHT, height, r)
+
+
+def crate_obstacle(bm, ob):
+    """A non-blocking rect: a crate whose top is divided by slat grooves.
+
+    The body runs to `height - GROOVE_DEPTH`; slats on top reach exactly
+    `height`, span the short axis fully and are separated by GROOVE_WIDTH
+    gaps, whose floors are the body's own top.
+    """
+    height = ob["height"]
+    hx, hy = ob["w"] / 2, ob["h"] / 2
+    top = height - GROOVE_DEPTH
+    assert top > 0.0, "a crate shorter than its groove depth"
+    prism(bm, 0.0, top, hx, hy)
+    long_axis = 0 if ob["w"] >= ob["h"] else 1
+    long_half = hx if long_axis == 0 else hy
+    short_half = hy if long_axis == 0 else hx
+    slats = CRATE_GROOVES + 1
+    width = (2 * long_half - GROOVE_WIDTH * CRATE_GROOVES) / slats
+    assert width > 0.0, "a crate too short for its grooves"
+    for k in range(slats):
+        centre = [0.0, 0.0, top + GROOVE_DEPTH / 2]
+        centre[long_axis] = -long_half + k * (width + GROOVE_WIDTH) + width / 2
+        size = [0.0, 0.0, GROOVE_DEPTH]
+        size[long_axis] = width
+        size[1 - long_axis] = 2 * short_half
+        common.add_box(bm, tuple(centre), tuple(size))
+
+
+def barrel_obstacle(bm, ob):
+    """A non-blocking circle: a barrel whose hoops alternate with its body.
+
+    Hoop bands at the JSON radius, body bands inset by HOOP_INSET, from the
+    base to the JSON height, so the top face is the JSON radius at that
+    height. The barrel is the fourth kind the schema allows: no committed
+    arena has a non-blocking circle, so this builder is unexercised until one
+    does. It is dispatched like the others, so that arena needs no edit here.
+    """
+    height = ob["height"]
+    r = ob["r"]
+    assert r - HOOP_INSET > 0.0, "a barrel too thin for its hoops"
+    body_count = BARREL_HOOPS - 1
+    body_height = (height - BARREL_HOOPS * HOOP_HEIGHT) / body_count
+    assert body_height > 0.0, "a barrel too short for its hoops"
+    z = 0.0
+    for band in range(BARREL_HOOPS):
+        cylinder(bm, z, z + HOOP_HEIGHT, r)
+        z += HOOP_HEIGHT
+        if band < body_count:
+            cylinder(bm, z, z + body_height, r - HOOP_INSET)
+            z += body_height
+    assert abs(z - height) < 1e-9, "the barrel bands do not reach the height"
+
+
+# The profile each obstacle kind gets, keyed by (type, blocksProjectiles).
+# A new arena picks its profiles from the JSON, so it needs no edit here.
+OBSTACLE_PROFILES = {
+    ("rect", True): rect_obstacle,
+    ("circle", True): circle_obstacle,
+    ("rect", False): crate_obstacle,
+    ("circle", False): barrel_obstacle,
+}
 
 
 def build_obstacle(index, ob, materials):
     name = "Obstacle_%d" % index
     material = materials["blocking" if ob["blocksProjectiles"] else "open"]
     location = (ob["x"], ob["y"], 0.0)
-    # Origin at the base: the mesh runs from z = 0 up to height, its footprint
-    # unchanged and its top edge chamfered by BEVEL.
+    # Origin at the base: the mesh runs from z = 0 up to height, inside the
+    # footprint, with the profile its kind names.
+    profile = OBSTACLE_PROFILES[(ob["type"], bool(ob["blocksProjectiles"]))]
     bm = bmesh.new()
-    if ob["type"] == "rect":
-        rect_obstacle(bm, ob)
-    else:
-        circle_obstacle(bm, ob)
+    profile(bm, ob)
     return common.new_object(name, bm, [material], location)
 
 
