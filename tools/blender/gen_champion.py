@@ -4,9 +4,9 @@ Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
     --champion placeholder --out assets/models/champions/placeholder.glb
 
 The ids are placeholder (the generic model), hargrim, quillon, lumeth, skerrow,
-ondrel, brimwick and durnhal. They share the placeholder's body and accent and
-differ only in the body colour and one cue, Durnhal's in parts on both arms,
-listed in tools/blender/README.md.
+ondrel, brimwick, durnhal and wrenna. They share the placeholder's body and
+accent and differ only in the body colour and one cue, Durnhal's and Wrenna's in
+parts on more than one bone, listed in tools/blender/README.md.
 
 The glb holds a node `Rig` with the six bones as joints and the skinned mesh
 node `Champion`. The mesh origin is at the feet and it faces +X in both Blender
@@ -41,6 +41,7 @@ BODY_COLOURS = {
     "ondrel": (0.03, 0.30, 0.03),  # moss green
     "brimwick": (0.74, 0.12, 0.00),  # burnt orange
     "durnhal": (0.19, 0.18, 0.00),  # olive brass
+    "wrenna": (0.445, 0.093, 0.175),  # plum, about #b25674
 }
 
 # The shared rig in Blender coordinates: (name, parent, head, tail). Every part
@@ -327,6 +328,19 @@ def add_shield_and_hammer(bm):  # durnhal, guardian tank, a shield and a hammer 
     carry(bm, "Arm_R", common.add_box, (0, -0.41, 0.33), (0.22, 0.14, 0.14), BODY)  # head
 
 
+def add_bow_and_quiver(bm):  # wrenna, bow archer, a bow in the left hand and a quiver on the back
+    # The bow rides Arm_L at y 0.45, so it shows from the 55 degree camera and
+    # stays inside the 0.5 m ground radius, like Durnhal's shield. It is a grip
+    # with two limbs angled off it by 30 degrees, and the limbs stop well under
+    # the head so the posed top holds (Cast raises Arm_L to -85 degrees). The
+    # quiver is one box on the back, lower than Ondrel's reed bundle and at
+    # x < 0, so it does not read as that cue.
+    carry(bm, "Arm_L", common.add_box, (0.0, 0.45, 0.88), (0.05, 0.05, 0.34), BODY)
+    carry(bm, "Arm_L", common.add_box, (0.0, 0.45, 1.16), (0.05, 0.05, 0.30), BODY, (0.0, 30.0, 0.0))
+    carry(bm, "Arm_L", common.add_box, (0.0, 0.45, 0.68), (0.05, 0.05, 0.24), BODY, (0.0, -30.0, 0.0))
+    carry(bm, "Spine", common.add_box, (-0.10, 0.0, 1.30), (0.08, 0.10, 0.44), BODY, (0.0, -8.0, 0.0))
+
+
 CUES = {
     "placeholder": None,
     "hargrim": add_shoulder_blocks,
@@ -336,6 +350,7 @@ CUES = {
     "ondrel": add_reed_bundle,
     "brimwick": add_fuse_cap,
     "durnhal": add_shield_and_hammer,
+    "wrenna": add_bow_and_quiver,
 }
 
 
