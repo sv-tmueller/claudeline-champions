@@ -56,13 +56,16 @@ An arena gets two views, both 1280x720:
 | `<id>_quarter.png` | A free three-quarter view from 35 degrees off the client's axis and 40 degrees up, framing the whole arena |
 
 A champion gets `<id>_rest.png` at 720x720 in the bind pose, plus one strip per
-clip at 360x360 per key, stitched left to right into `<id>_<clip>.png`. The
-strips follow the six clips of the Clips table below (`Idle`, `Run`, `Attack`,
-`Cast`, `Hit`, `Death`), and the keys come from the imported action's own
-fcurves, so a moved key is followed rather than shadowed by a hardcoded list.
-That is 27 key renders plus the rest render per champion. The camera is a
-three-quarter view framing the ~1.9 m model, so a cue is checked at the pose
-that moves it.
+clip at 360x360 per key, stitched left to right into `<id>_<clip>.png`, the
+clip in lower case (`placeholder_run.png`). The strips follow the six clips of
+the Clips table below (`Idle`, `Run`, `Attack`, `Cast`, `Hit`, `Death`), and
+the keys come from the imported action's own fcurves, so a moved key is
+followed rather than shadowed by a hardcoded list: 27 key renders plus the rest
+render per champion. The camera is a three-quarter view framing the ~1.9 m
+model, so a cue is checked at the pose that moves it.
+
+A full run is 60 PNGs: two arenas at two views each and eight champions at
+seven files each.
 
 ## Files
 
