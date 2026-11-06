@@ -205,6 +205,10 @@ class CommittedArenaTests(unittest.TestCase):
         # line's own top row from the ring and the mark.
         line = at_height(trim, LINE_HEIGHT)
         self.assertTrue(line, "no centre-line vertices")
+        # 0.008 is unique to the line, so this set is its top row alone.
+        lo, hi = extent(line, UP)
+        self.assertNear(lo, LINE_HEIGHT, "line top row")
+        self.assertNear(hi, LINE_HEIGHT, "line top row")
         for axis, low, high, name in (
             (X, -LINE_WIDTH / 2, LINE_WIDTH / 2, "line x"),
             (Z, -half_d, half_d, "line z"),
