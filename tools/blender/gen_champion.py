@@ -368,7 +368,7 @@ CUES = {
 def add_hargrim_helm(bm):  # hargrim, bruiser: a flat-topped helm with cheek guards
     carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.735), (0.34, 0.34, 0.13), BODY)
     for side in (-1, 1):
-        carry(bm, "Spine", common.add_box, (0.0, side * 0.18, 1.69), (0.16, 0.06, 0.18), BODY)
+        carry(bm, "Spine", common.add_box, (0.0, side * 0.18, 1.71), (0.16, 0.06, 0.18), BODY)
 
 
 def add_quillon_hat(bm):  # quillon, ranged: a wide-brimmed hat, a thin brim and a crown
@@ -384,16 +384,20 @@ def add_lumeth_cowl(bm):  # lumeth, healer: a cowl under the halo, a band and a 
 
 
 def add_skerrow_hood(bm):  # skerrow, assassin: a hood, a close crown and a back peak
-    # The peak is a box turned about Y so it reads as a point from above.
+    # The peak is a box turned -25 degrees about Y and pushed behind x = 0. Two
+    # numbers are fixed by the shared Death clip, where the body lies on its
+    # back: a steeper turn or a deeper peak sinks a rear corner under the floor
+    # (at -35 degrees and centre (-0.13, 0, 1.70) the lowest corner is 34.4 mm
+    # under, past the 0.1 mm tolerance).
     carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.72), (0.34, 0.34, 0.14), BODY)
     carry(
         bm,
         "Spine",
         common.add_box,
-        (-0.10, 0.0, 1.68),
-        (0.12, 0.24, 0.20),
+        (-0.11, 0.0, 1.745),
+        (0.12, 0.24, 0.15),
         BODY,
-        (0.0, -35.0, 0.0),
+        (0.0, -25.0, 0.0),
     )
 
 

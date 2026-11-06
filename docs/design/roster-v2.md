@@ -87,7 +87,8 @@ The four champions of [roster v1](roster-v1.md) are unchanged.
 - **Models (built).** `assets/models/champions/ondrel.glb` and
   `assets/models/champions/brimwick.glb`, built by `tools/blender` (#149) as
   roster-v1 section 0 describes: the shared body in the champion's body
-  colour, one cue, the shared rig and the six clips. Ondrel's colour is the
+  colour, one cue and one head piece, the shared rig and the six clips.
+  Ondrel's colour is the
   one decision 2 of batch #134 reserved. Brimwick's moved, by decision 1 of
   batch #147, and her model paragraph says why. The committed
   `test_champion_models.py` checks both files, and the figures in the model
@@ -280,15 +281,23 @@ shorter and higher than the first draft (x from -0.25 m to -0.15 m, 1.00 m to
 on its back (`Hips` turned -85 degrees and 0.64 m down), and the draft's
 lowest corner would be 71.6 mm under the floor, where the tolerance is 0.1
 mm. The clips are shared and the four existing models must not move, so the
-cue moved. At key 30 the bundle's lowest point is 4.3 mm above the floor. The
-clip tops with it are 1.8364 m (Idle), 1.8758 m (Run), 1.8339 m (Attack),
-1.8359 m (Cast), 1.8200 m (Hit) and 1.8200 m (Death), all under 1.90 m.
+cue moved. At key 30 the bundle's lowest point is 4.3 mm above the floor. With
+the head piece below, the clip tops are 1.8364 m (Idle), 1.8758 m (Run),
+1.8339 m (Attack), 1.8359 m (Cast), 1.8266 m (Hit) and 1.8361 m (Death), all
+under 1.90 m. The head piece (issue #239) is a conical reed hat, two boxes on
+`Spine` in the body material: a wider lower box 0.40 m by 0.40 m by 0.10 m
+centred at (0, 0, 1.67) and a narrower upper box 0.22 m by 0.22 m by 0.11 m
+centred at (0, 0, 1.765), so the pair reads as a cone. The top is 1.82 m, at
+most the 1.85 m rest bound (Run lifts `Hips` 0.035 m, so 1.885 m posed, under
+1.90 m), and the lower box's bottom of 1.62 m stays above the visor, which ends
+at 1.61 m. Treated alone, the lower box's ground radius is 0.2828 m and the
+upper box's 0.1556 m, inside the 0.5 m footprint.
 
 Body colour: moss green, linear (0.03, 0.30, 0.03), about `#309530`. In 8-bit
 sRGB b minus g is -101, so the overlay rule holds (`overlay None`). The
 nearest colours are the dead grey `#5a6070` at 93.1, Skerrow at 101.0 and
 Quillon at 101.1, so the minimum distance is 93.1, above the 80 the test
-asks for. The model is 37 544 bytes and 264 triangles.
+asks for. The model is 600 vertices, 288 triangles and 39 800 bytes.
 
 ## 3. Brimwick, the burst caster
 
@@ -399,7 +408,10 @@ is hidden from the 55 degree camera. At the shared `Death` clip's key 30 its
 lowest point is 105 mm above the floor. The clip tops are 1.8340 m (Idle),
 1.8636 m (Run), 1.8278 m (Attack), 1.8285 m (Cast), 1.8244 m (Hit) and
 1.8327 m (Death), all under 1.90 m. The model is 37 524 bytes and 264
-triangles.
+triangles. The fuse cap is also her head piece (issue #239): it is the one
+piece that is both a cue and a head piece, so it carries the `head` tag alone
+in the contract test's table and adds no geometry. Its top of 1.82 m is under
+the 1.85 m rest bound, and the regenerated glb is byte-identical.
 
 Body colour: burnt orange, linear (0.74, 0.12, 0.00), about `#df6100`. In
 8-bit sRGB b minus g is -97, so the overlay rule holds (`overlay None`). The

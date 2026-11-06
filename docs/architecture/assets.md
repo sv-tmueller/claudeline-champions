@@ -124,12 +124,12 @@ The commands and file list are in `tools/blender/README.md`.
   the client plays through its own sampler ([client](client.md#animation)).
 - Each of the eight roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
-  in body colour and one cue that stays below 1.9 m, Durnhal's and Wrenna's in
-  parts on more than one bone. The client registers and loads seven of the
-  eight (batch #177, package C, then #212 for Durnhal); Wrenna's model waits
-  for roadmap step 3.4.
+  in body colour, one cue and one head piece that stay below 1.9 m, Durnhal's,
+  Wrenna's and the head pieces in parts on more than one bone. The client
+  registers and loads seven of the eight (batch #177, package C, then #212 for
+  Durnhal); Wrenna's model waits for roadmap step 3.4.
   `placeholder.glb` stays the generic model and has the same rig and clips, so
-  every champion id has them. The ids, colours and cues are in
+  every champion id has them. The ids, colours, cues and head pieces are in
   [`tools/blender/README.md`](../../tools/blender/README.md).
 - The scene lists one node, `Rig`. Its children are `Hips` and the skinned mesh
   `Champion`, and neither `Rig` nor `Champion` has a translation, rotation or
@@ -150,7 +150,7 @@ it faces +X. The validator checks the names and the parents.
 | Bone | Parent | Head | Tail | Carries (rigid, weight 1.0) |
 |------|--------|------|------|-----------------------------|
 | `Hips` | node `Rig` | (0, 0, 0.80) | (0, 0, 0.90) | nothing; the root that moves the whole body |
-| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap, Wrenna's quiver |
+| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, every champion's head piece, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap, Wrenna's quiver |
 | `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box, Durnhal's shield, Wrenna's bow |
 | `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade, Durnhal's hammer |
 | `Leg_L` | `Hips` | (0, 0.12, 0.80) | (0, 0.12, 0.00) | the left leg box |
@@ -219,17 +219,26 @@ In the Channels column a bare bone name means that bone's rotation.
 - `Death` jolts `Hips` up 0.035 m at key 10 (R2, 0.100 m per radian), sinks it
   at key 20 and lies on the floor at key 30 (the lowest vertex 0.6 mm up). The
   client holds the last frame.
-- The cue meshes ride the bones that move them: Hargrim's shoulder blocks,
-  Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap and Wrenna's quiver
-  on `Spine` (the `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's
-  blade and Durnhal's hammer on `Arm_R` (the `Attack` swing, the `Hit` lift)
-  and Durnhal's shield and Wrenna's bow on `Arm_L` (the `Cast` raise). All
-  clips are shared, with no per-champion poses.
+- The cue and head-piece meshes ride the bones that move them: Hargrim's
+  shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap,
+  Wrenna's quiver and every champion's head piece on `Spine` (the `Attack` yaw,
+  the `Hit` lean), Quillon's staff, Skerrow's blade and Durnhal's hammer on
+  `Arm_R` (the `Attack` swing, the `Hit` lift) and Durnhal's shield and
+  Wrenna's bow on `Arm_L` (the `Cast` raise). All clips are shared, with no
+  per-champion poses.
+- A head piece tops out at 1.85 m at rest, below the whole-model 1.90 m bound,
+  because `Run` lifts `Hips` 0.035 m: a 1.85 m rest top is 1.885 m posed,
+  under the 1.90 m clip limit with room for the `Hit` lean. The bound is per
+  head-piece box, not a whole-model rule (Quillon's staff already reaches
+  exactly 1.85 m at rest), and no head piece hides the accent visor (z 1.55 to
+  1.61 m, x from 0.11 m). A head piece is one to three boxes on `Spine`, in the
+  body colour, like a cue.
 
 ### Export
 
 The exporter writes the keys as authored, not sampled at every frame, and only
-the channels each clip keys, which keeps each file under 46 KB. Every skin and
+the channels each clip keys, which keeps each file under 47 KiB (the largest,
+Lumeth's two-box cowl, is 46.8 KiB). Every skin and
 animation flag of the exporter that bears on the output is set by name in
 `blender_common.export_glb(out, rigged=True)`, so a changed default in a later
 Blender cannot move the bytes unseen. That includes

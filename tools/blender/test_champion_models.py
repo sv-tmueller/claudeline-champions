@@ -703,9 +703,10 @@ BOXES = {
         ("cue", ("Spine", (0.0, -0.34, 1.46), (0.28, 0.22, 0.14))),
         ("cue", ("Spine", (0.0, 0.34, 1.46), (0.28, 0.22, 0.14))),
         # A flat-topped helm: a crown box and two cheek guards flanking the head.
+        # The guards' bottoms are 1.62 m, clear of the visor below.
         ("head", ("Spine", (0.0, 0.0, 1.735), (0.34, 0.34, 0.13))),
-        ("head", ("Spine", (0.0, -0.18, 1.69), (0.16, 0.06, 0.18))),
-        ("head", ("Spine", (0.0, 0.18, 1.69), (0.16, 0.06, 0.18))),
+        ("head", ("Spine", (0.0, -0.18, 1.71), (0.16, 0.06, 0.18))),
+        ("head", ("Spine", (0.0, 0.18, 1.71), (0.16, 0.06, 0.18))),
     ),
     "quillon": (
         ("cue", ("Arm_R", (0.04, -0.44, 0.95), (0.07, 0.07, 1.80))),
@@ -721,9 +722,13 @@ BOXES = {
     ),
     "skerrow": (
         ("cue", ("Arm_R", (0.18, -0.34, 0.86), (0.28, 0.05, 0.10))),
-        # A hood: a close crown and a back peak, the peak a box turned about Y.
+        # A hood: a close crown and a back peak, the peak a box turned -25
+        # degrees about Y and pushed behind x = 0. Two numbers are fixed by the
+        # shared Death clip, where the body lies on its back: a steeper turn or
+        # a deeper peak sinks a rear corner under the floor (at -35 degrees and
+        # centre (-0.13, 0, 1.70) the lowest corner is 34.4 mm under).
         ("head", ("Spine", (0.0, 0.0, 1.72), (0.34, 0.34, 0.14))),
-        ("head", ("Spine", (-0.10, 0.0, 1.68), (0.12, 0.24, 0.20), (0.0, -35.0, 0.0))),
+        ("head", ("Spine", (-0.11, 0.0, 1.745), (0.12, 0.24, 0.15), (0.0, -25.0, 0.0))),
     ),
     "ondrel": (
         ("cue", ("Spine", (-0.16, 0.0, 1.56), (0.08, 0.16, 0.52))),
@@ -911,14 +916,16 @@ class CueTests(unittest.TestCase):
                         )
 
     def test_no_head_piece_hides_the_accent_visor(self):
-        # The accent visor spans z 1.55 to 1.61 m and x from 0.11 m: a head
-        # piece must sit above it or behind x = 0.11 m.
+        # The accent visor spans z 1.55 to 1.61 m and x from 0.11 m. The design
+        # rule (issue #239) is conservative: a head piece must sit at or above
+        # about 1.62 m, or lie behind x = 0, so it cannot occlude the front
+        # mark from the 55 degree camera.
         for champion in BOXES:
             for _, box in boxes_of(champion, "head"):
                 with self.subTest(champion=champion, box=box):
                     corners = box_corners(box)
-                    if min(c[1] for c in corners) < 1.61:
-                        self.assertLessEqual(max(c[0] for c in corners), 0.11 + CUE_TOLERANCE)
+                    if min(c[1] for c in corners) < 1.62 - CUE_TOLERANCE:
+                        self.assertLessEqual(max(c[0] for c in corners), CUE_TOLERANCE)
 
     def test_the_accent_is_the_placeholders(self):
         placeholder_doc, placeholder_bin = self.placeholder
