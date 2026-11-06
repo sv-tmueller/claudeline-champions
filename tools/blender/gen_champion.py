@@ -358,7 +358,7 @@ CUES = {
 # body material on Spine so the Attack yaw and the Hit lean carry it, and so
 # the accent still marks only the front. From the top-down camera the head is
 # the most visible part, so this is where a roster reads at a glance. Every
-# piece sits at or above about 1.62 m or behind x = 0.11, so none of them hides
+# piece sits at or above about 1.62 m or behind x = 0, so none of them hides
 # the accent visor (z 1.55 to 1.61 m, x from 0.11 m), and every box tops out at
 # or under the 1.85 m rest bound: Run lifts Hips 0.035 m, so 1.885 m stays
 # under the 1.90 m clip limit. Brimwick's fuse cap is already his cue, so a

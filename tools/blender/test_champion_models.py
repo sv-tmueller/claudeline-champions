@@ -696,7 +696,7 @@ def rounded(position):
 # The head pieces (issue #239) are one to three boxes on Spine. Every one tops
 # out at or under 1.85 m at rest -- the Run clip lifts Hips 0.035 m and the
 # shared clips must stay under the 1.90 m limit -- and every corner stays inside
-# the 0.5 m ground radius. Each sits at or above about 1.62 m or has x <= 0.11,
+# the 0.5 m ground radius. Each sits at or above about 1.62 m or behind x = 0,
 # so none of them hides the accent visor (z 1.55 to 1.61 m, x from 0.11 m).
 BOXES = {
     "hargrim": (
