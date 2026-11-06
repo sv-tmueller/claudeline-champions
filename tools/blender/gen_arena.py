@@ -8,7 +8,8 @@ client mapping (x, 0, -y), so no axis conversion happens here.
 
 The visual pass lives inside the existing nodes, so the node set is the
 validator's: the Floor mesh holds a trim border, the spawn discs and the
-field, and each Wall_* mesh holds the wall and its trim cap. Every added
+field, plus the floor inlays (the end circle, the centre line and the orb
+mark), and each Wall_* mesh holds the wall and its trim cap. Every added
 shape is built from explicit vertices and faces (or `create_cone`, the op
 main's circle obstacles used), never from an op whose face order can vary
 between runs: `bmesh.ops.bevel` is not used.
@@ -18,6 +19,7 @@ import json
 import math
 import os
 import sys
+from pathlib import Path
 
 sys.dont_write_bytecode = True  # keep __pycache__ out of tools/blender
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,10 +35,18 @@ WALL_HEIGHT = 1.0
 TRIM_WIDTH = 1.0  # the floor's border, from the wall's inner face inwards
 DISC_RADIUS = 0.6  # a spawn disc
 DISC_HEIGHT = 0.01  # the disc stands this far above the slab top at z = 0
+RING_INLAY_WIDTH = 0.1  # the end circle's band, centred on ring.endRadius
+LINE_WIDTH = 0.1  # the centre line's width, matching the ring's band
+LINE_HEIGHT = 0.008  # the line's top, under DISC_HEIGHT so no faces are coplanar
+MARK_RADIUS = 0.3  # the orb mark's radius
 BEVEL = 0.08  # the chamfer on an obstacle's top edge, in both directions
 CAP_HEIGHT = 0.1  # a wall's trim cap, the top of the wall height
 CAP_BEVEL = 0.05  # the chamfer on a cap's two long top edges
 CIRCLE_SEGMENTS = 32
+
+# The orb table sits at the repo root, named by the README's command lines,
+# which pass only --arena and --out.
+DEFAULT_ORBS = Path(__file__).resolve().parents[2] / "data" / "orbs.json"
 
 COLOURS = {
     "floor": (0.30, 0.32, 0.36),
@@ -127,7 +137,7 @@ def build_obstacle(index, ob, materials):
     return common.new_object(name, bm, [material], location)
 
 
-def add_disc(bm, x, y, material_index):
+def add_disc(bm, x, y, material_index, radius=DISC_RADIUS):
     # The op may reuse the slots of faces it freed, so the new faces are not
     # always the last ones in `bm.faces`. Take them from the new vertices.
     made = bmesh.ops.create_cone(
@@ -135,8 +145,8 @@ def add_disc(bm, x, y, material_index):
         cap_ends=True,
         cap_tris=False,
         segments=CIRCLE_SEGMENTS,
-        radius1=DISC_RADIUS,
-        radius2=DISC_RADIUS,
+        radius1=radius,
+        radius2=radius,
         depth=DISC_HEIGHT,
         matrix=Matrix.Translation((x, y, DISC_HEIGHT / 2)),
     )
@@ -145,7 +155,42 @@ def add_disc(bm, x, y, material_index):
             face.material_index = material_index
 
 
-def build_floor(arena, materials):
+def add_ring_inlay(bm, end_radius, material_index):
+    """The end circle: an annulus of RING_INLAY_WIDTH centred on `end_radius`.
+
+    add_solid is not used here: its winding computes each face's outward
+    direction against the solid's centroid and promises a convex solid. An
+    annulus is neither, and the centroid test would point the inner wall the
+    wrong way (its face centres are still at a positive radius from the
+    origin, so the "outward" direction there is the ring's, not the hole's).
+    The four face groups are hand-wound instead, and the vertices are
+    explicit, so the face order is fixed between runs.
+    """
+    inner = end_radius - RING_INLAY_WIDTH / 2
+    outer = end_radius + RING_INLAY_WIDTH / 2
+    n = CIRCLE_SEGMENTS
+    # Four rings of n vertices, so ring k spans [k*n, (k+1)*n).
+    points = []
+    for z, r in ((0.0, inner), (0.0, outer), (DISC_HEIGHT, inner), (DISC_HEIGHT, outer)):
+        for k in range(n):
+            angle = 2 * math.pi * k / n
+            points.append((r * math.cos(angle), r * math.sin(angle), z))
+    faces = ring_faces(3 * n, 2 * n, n)  # the top, wound anticlockwise from +z
+    faces += ring_faces(0, n, n)  # the base, wound clockwise from +z
+    faces += ring_faces(n, 3 * n, n)  # the outer wall, facing outwards
+    faces += ring_faces(2 * n, 0, n)  # the inner wall, facing inwards
+    verts = [bm.verts.new(point) for point in points]
+    for indices in faces:
+        face = bm.faces.new([verts[i] for i in indices])
+        face.material_index = material_index
+
+
+def add_centre_line(bm, half_d, material_index):
+    """The mirror axis: a LINE_WIDTH band on x = 0, wall to wall."""
+    common.add_box(bm, (0.0, 0.0, LINE_HEIGHT / 2), (LINE_WIDTH, 2 * half_d, LINE_HEIGHT), material_index)
+
+
+def build_floor(arena, materials, orbs):
     half_w = arena["size"]["width"] / 2
     half_d = arena["size"]["height"] / 2
     x_cuts = (-half_w, -half_w + TRIM_WIDTH, half_w - TRIM_WIDTH, half_w)
@@ -170,6 +215,22 @@ def build_floor(arena, materials):
             assert abs(x) + DISC_RADIUS <= half_w - TRIM_WIDTH, "spawn %s disc leaves the field" % ((x, y),)
             assert abs(y) + DISC_RADIUS <= half_d - TRIM_WIDTH, "spawn %s disc leaves the field" % ((x, y),)
             add_disc(bm, x, y, 1)
+    # The inlays, after the discs and in a fixed order: the face order drives
+    # the exported bytes. The ring and the mark stand DISC_HEIGHT above the
+    # slab, exactly like the discs; the line stands LINE_HEIGHT, under both, so
+    # their top faces are never coplanar where the line crosses them.
+    end_radius = arena["ring"]["endRadius"]
+    assert end_radius + RING_INLAY_WIDTH / 2 <= half_w - TRIM_WIDTH, "the end circle leaves the field"
+    assert end_radius + RING_INLAY_WIDTH / 2 <= half_d - TRIM_WIDTH, "the end circle leaves the field"
+    add_ring_inlay(bm, end_radius, 1)
+    add_centre_line(bm, half_d, 1)
+    # An arena with no row in the orb table gets no mark.
+    orb = orbs.get(arena["id"])
+    if orb is not None:
+        assert abs(orb["x"]) + MARK_RADIUS <= half_w - TRIM_WIDTH, "the orb mark leaves the field"
+        assert abs(orb["y"]) + MARK_RADIUS <= half_d - TRIM_WIDTH, "the orb mark leaves the field"
+        assert abs(orb["y"]) + MARK_RADIUS <= end_radius - RING_INLAY_WIDTH / 2, "the orb mark meets the end circle"
+        add_disc(bm, orb["x"], orb["y"], 1, MARK_RADIUS)
     common.new_object("Floor", bm, [materials["floor"], materials["trim"]])
 
 
@@ -207,15 +268,15 @@ def build_wall(name, centre, size, materials):
     common.new_object(name, bm, [materials["wall"], materials["trim"]])
 
 
-def build_arena(arena):
+def build_arena(arena, orbs):
     width = arena["size"]["width"]
     depth = arena["size"]["height"]  # extent along Y, not vertical
     half_w, half_d = width / 2, depth / 2
     t = WALL_THICKNESS
     materials = {key: common.make_material(key, rgb) for key, rgb in COLOURS.items()}
 
-    # The floor top sits at z = 0; the discs stand DISC_HEIGHT above it.
-    build_floor(arena, materials)
+    # The floor top sits at z = 0; the discs and the inlays stand above it.
+    build_floor(arena, materials, orbs)
     # Inner faces sit on x = +-half_w and y = +-half_d. N and S are longer by
     # two wall thicknesses so the corners close.
     walls = {
@@ -230,16 +291,30 @@ def build_arena(arena):
         build_obstacle(index, ob, materials)
 
 
+def read_orbs(path):
+    """The orb table, or an empty one when the file is missing.
+
+    The server reads a missing table as empty (packages/server/src/data.ts), so
+    an arena with no row gets no mark. The point itself is not validated here:
+    the sim's checkOrbPoint owns that at load.
+    """
+    if not os.path.isfile(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
 def main():
     parser = argparse.ArgumentParser(prog="gen_arena.py")
     parser.add_argument("--arena", required=True, help="path to data/arenas/<id>.json")
     parser.add_argument("--out", required=True, help="path of the glb to write")
+    parser.add_argument("--orbs", default=str(DEFAULT_ORBS), help="the orb table (default data/orbs.json)")
     args = parser.parse_args(common.script_args())
 
     with open(args.arena) as f:
         arena = json.load(f)
     common.clear_scene()
-    build_arena(arena)
+    build_arena(arena, read_orbs(args.orbs))
     common.export_glb(args.out)
 
 
