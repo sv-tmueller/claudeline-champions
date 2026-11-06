@@ -89,15 +89,37 @@ The commands and file list are in `tools/blender/README.md`.
 - `Wall_N` is at +y and `Wall_E` is at +x. `Wall_N` and `Wall_S` are longer by
   two wall thicknesses (31 m for arena 1) so the corners close.
 - Obstacle models use a different flat material for blocking and non-blocking
-  obstacles, so a viewer can see which obstacles stop projectiles. The top
-  edge of each is chamfered by 0.08 m, in height and inwards, from explicit
-  vertices. The footprint, the height and the origin are unchanged.
+  obstacles, so a viewer can see which obstacles stop projectiles. Each reads
+  as a silhouette from the top-down camera, one profile per kind (issue
+  #237), all built from explicit vertices as stacked convex bands, so every
+  vertex stays inside the footprint prism and nothing stands above `height`:
+  - a blocking rect is a wall segment, mirroring the walls: a full-footprint
+    base course to `BASE_COURSE = 0.15`, a body inset by
+    `OBSTACLE_INSET = 0.1` to `height - TOP_COURSE`, and a cap back out to
+    the full footprint from `TOP_COURSE = 0.15` below the top;
+  - a blocking circle is a column: a full-radius base ring to
+    `BASE_RING_HEIGHT = 0.15`, a shaft at `r - OBSTACLE_INSET`, and a
+    full-radius capital from `CAPITAL_HEIGHT = 0.15` below the top;
+  - a non-blocking rect is a crate: a body to `height - GROOVE_DEPTH`, then
+    slats reaching `height`, spanning the short axis fully and separated by
+    `GROOVE_WIDTH = 0.06` gaps whose floors are `GROOVE_DEPTH = 0.05` below
+    the top;
+  - a non-blocking circle is a barrel: alternating hoop bands at `r`
+    (`HOOP_HEIGHT = 0.06`) and body bands at `r - HOOP_INSET = 0.05`, ending
+    at `height`.
+
+  The footprint, the height and the origin are unchanged. The generator
+  asserts that every inset leaves a positive shaft radius or slat width, so
+  an obstacle smaller than the committed minimum fails loudly. No committed
+  arena has a non-blocking circle, so the barrel is the fourth profile the
+  schema allows and is unexercised until one does; the dispatch is keyed by
+  `(type, blocksProjectiles)`, so such an arena needs no generator edit.
 - The node set does not change: the discs, the inlays and the caps are
   geometry inside the existing meshes with the `trim` material, so
   `validate_glb.py` and [Node naming](#node-naming) stay as they are.
   `test_arena_models.py` checks the discs against the JSON spawns, the
-  inlays against the JSON ring radius and the orb table, the chamfers and
-  the caps from the vertex data.
+  inlays against the JSON ring radius and the orb table, the four obstacle
+  profiles and the caps from the vertex data.
 - Five flat materials: `floor`, `trim`, `wall`, `blocking` and `open`.
 - The visuals come from the same JSON as the collision.
 - Both arenas, `arena01` and `arena02`, have a committed glb and a case in

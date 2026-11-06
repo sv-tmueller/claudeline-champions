@@ -80,7 +80,7 @@ seven files each.
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_preview.py` | Renders the placeholder through `preview.py` into a temporary directory and checks the rest PNG and one strip per clip exist and are non-empty. Needs Blender, skips without it |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
-| `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json` and `data/orbs.json`: the five materials, the floor field and trim border, one trim disc per spawn, the floor inlays (the end circle, the centre line and the orb mark), the chamfered obstacle tops and the wall caps. Standard library only, no Blender |
+| `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json` and `data/orbs.json`: the five materials, the floor field and trim border, one trim disc per spawn, the floor inlays (the end circle, the centre line and the orb mark), the four per-kind obstacle profiles and the wall caps. Standard library only, no Blender |
 | `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel, Brimwick, Durnhal and Wrenna and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names, a champion's rig and clips and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator, one rejection per rig and clip rule against a synthetic rigged document, and a drift test between the two tables in `assets.md` and the validator's constants. The committed-model tests need `assets/models` to exist |
@@ -143,8 +143,25 @@ not vertical.
   `Obstacle_0` to `Obstacle_<n-1>`, matching the obstacle order in the JSON.
 - Five flat materials: floor, trim, wall, blocking obstacle (brown) and
   non-blocking obstacle (blue), so a viewer can see which obstacles stop
-  projectiles. The top edge of every obstacle is chamfered by 0.08 m, with
-  its footprint, height and origin unchanged.
+  projectiles. Each obstacle reads as a silhouette from the top-down camera,
+  one profile per kind, all stacked convex bands from explicit vertices, so
+  every vertex stays inside the footprint prism and nothing stands above
+  `height`:
+  - a blocking rect is a wall segment: a full-footprint base course to
+    `BASE_COURSE = 0.15`, a body inset by `OBSTACLE_INSET = 0.1` to
+    `height - TOP_COURSE`, and a cap back out to the full footprint;
+  - a blocking circle is a column: a full-radius base ring to
+    `BASE_RING_HEIGHT = 0.15`, a shaft at `r - OBSTACLE_INSET`, and a
+    full-radius capital from `CAPITAL_HEIGHT = 0.15` below the top;
+  - a non-blocking rect is a crate: a body to `height - GROOVE_DEPTH`, then
+    slats reaching `height`, separated by `GROOVE_WIDTH = 0.06` gaps whose
+    floors are `GROOVE_DEPTH = 0.05` below the top;
+  - a non-blocking circle is a barrel: alternating hoop bands at `r`
+    (`HOOP_HEIGHT = 0.06`) and body bands at `r - HOOP_INSET = 0.05`.
+
+  The footprint, height and origin are unchanged. No committed arena has a
+  non-blocking circle, so the barrel is unexercised until one does; the
+  dispatch is keyed by `(type, blocksProjectiles)`, so it needs no edit.
 - The discs, the inlays and the caps are geometry inside the existing meshes,
   so the node set and the validator are unchanged. `test_arena_models.py`
   checks them from the vertex data.
