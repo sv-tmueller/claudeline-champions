@@ -384,11 +384,12 @@ def add_lumeth_cowl(bm):  # lumeth, healer: a cowl under the halo, a band and a 
 
 
 def add_skerrow_hood(bm):  # skerrow, assassin: a hood, a close crown and a back peak
-    # The peak is a box turned -25 degrees about Y and pushed behind x = 0. Two
-    # numbers are fixed by the shared Death clip, where the body lies on its
-    # back: a steeper turn or a deeper peak sinks a rear corner under the floor
-    # (at -35 degrees and centre (-0.13, 0, 1.70) the lowest corner is 34.4 mm
-    # under, past the 0.1 mm tolerance).
+    # The peak is a box turned -25 degrees about Y and pushed behind x = 0. The
+    # shared Death clip, where the body lies on its back, is the tightest pose:
+    # at frame 30 the peak's lowest corner is 50.7 mm above the floor and the
+    # crown's is 64.7 mm, both far clear of the 0.1 mm floor tolerance. The x
+    # offset is the number the floor bounds: at this turn and height the corner
+    # reaches the floor just past the centre x = -0.16 m.
     carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.72), (0.34, 0.34, 0.14), BODY)
     carry(
         bm,

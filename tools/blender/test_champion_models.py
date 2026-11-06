@@ -723,10 +723,12 @@ BOXES = {
     "skerrow": (
         ("cue", ("Arm_R", (0.18, -0.34, 0.86), (0.28, 0.05, 0.10))),
         # A hood: a close crown and a back peak, the peak a box turned -25
-        # degrees about Y and pushed behind x = 0. Two numbers are fixed by the
-        # shared Death clip, where the body lies on its back: a steeper turn or
-        # a deeper peak sinks a rear corner under the floor (at -35 degrees and
-        # centre (-0.13, 0, 1.70) the lowest corner is 34.4 mm under).
+        # degrees about Y and pushed behind x = 0. The shared Death clip, where
+        # the body lies on its back, is the tightest pose: at frame 30 the
+        # peak's lowest corner is 50.7 mm above the floor and the crown's is
+        # 64.7 mm, both far clear of the 0.1 mm floor tolerance. The x offset is
+        # the number the floor bounds: at this turn and height the corner
+        # reaches the floor just past the centre x = -0.16 m.
         ("head", ("Spine", (0.0, 0.0, 1.72), (0.34, 0.34, 0.14))),
         ("head", ("Spine", (-0.11, 0.0, 1.745), (0.12, 0.24, 0.15), (0.0, -25.0, 0.0))),
     ),
