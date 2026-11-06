@@ -229,7 +229,9 @@ def stitch(paths, path):
 
 
 def solo_camera(scene, resolution, location, target):
-    camera = make_camera(scene)
+    """Aim the scene's one render camera. Reused across an arena's two views,
+    so the scene ends each model with a single camera and no lights."""
+    camera = scene.camera if scene.camera is not None else make_camera(scene)
     scene.render.resolution_x, scene.render.resolution_y = resolution
     place_camera(camera, location, target)
 
