@@ -21,7 +21,17 @@ RUN = REPO / "tools" / "blender" / "run.sh"
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
 RUNS = 4
 
-CHAMPION_IDS = ("placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal")
+CHAMPION_IDS = (
+    "placeholder",
+    "hargrim",
+    "quillon",
+    "lumeth",
+    "skerrow",
+    "ondrel",
+    "brimwick",
+    "durnhal",
+    "wrenna",
+)
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
 ARENA_IDS = ("arena01", "arena02")

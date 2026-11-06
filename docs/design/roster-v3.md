@@ -1,8 +1,8 @@
 # Roster v3: champions seven to nine
 
 Status: in progress; Durnhal's section is written, his kit is data and his
-model is built, and Wrenna's section is written (her kit, counter and model
-come in her own series); Ysmeer's comes in her series
+model is built, and Wrenna's section is written and her model is built (her
+kit and counter come in her own series); Ysmeer's comes in her series
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -404,7 +404,42 @@ The numbers with no range are tuning values per roster-v1 section 0: the
 cooldowns, the windups, the lifetime of a projectile, the radius and the
 duration of an area and the distance of a dash.
 
-**Model.** Not part of this section. Her model, colour and cue are built in
-step 3.2 of the build order, under the colour rule of v3 spec section 3:
-distinct from the six shipped champions, Durnhal and the HUD's reserved team
-colours.
+**Model.** Cue: a bow and a quiver, four boxes in the body material, so the
+accent still marks only the front. The bow rides `Arm_L` at y 0.45, so from the
+55 degree camera it shows beside the arm as Durnhal's shield does and stays
+inside the 0.5 m ground radius: a grip of 0.05 m by 0.05 m by 0.34 m centred at
+(0, 0.45, 0.88) and two limbs of 0.30 m and 0.24 m centred at (0, 0.45, 1.16)
+and (0, 0.45, 0.68), the boxes turned +30 and -30 degrees about Y so the pair
+reads as a stave. The quiver is one box of 0.08 m by 0.10 m by 0.44 m on
+`Spine` at (-0.10, 0, 1.30), low on the back where Ondrel's reed bundle sits but
+offset to x -0.10 so the two do not read as one cue. Two numbers are fixed, by
+the shared clips and the colour rule. The quiver's x offset must stay small: at
+-0.16 m, on the back of the body as `Death` lays it down (key 30, `Hips` at -85
+degrees and -0.64 m), it sinks 17.3 mm under the floor, and at -0.10 m every key
+and every sample holds at 0. The limbs stop at 1.30 m, so `Cast`'s raise of
+`Arm_L` to -85 degrees keeps the top at 1.7000 m rather than lifting the bow
+over the limit. The pose tables stay shared, with no per-champion pose. The
+model's top is the head's 1.7000 m at rest, and the clip tops are 1.7095 m
+(Idle), 1.7228 m (Run), 1.7000 m (Attack), 1.7000 m (Cast), 1.7000 m (Hit) and
+1.7026 m (Death), all under 1.90 m, with every clip's low at 0.0000 m. The
+ground radius is 0.4847 m. The model is 624 vertices, 300 triangles and 40 924
+bytes, and four builds are byte-identical.
+
+Body colour: plum, linear (0.445, 0.093, 0.175), about `#b25674`. In 8-bit sRGB
+b minus g is 30, so the overlay rule holds (`overlay None`). The distances to
+the bodies are Hargrim 86.7, Brimwick 124.9, the placeholder 126.3, Durnhal
+133.2, Lumeth 140.6, Skerrow 151.6, Ondrel 159.7 and Quillon 190.0; to the
+client colours the enemy bar 85.9, the dead grey 88.7, the enemy projectile
+96.0, the impact ring 155.3, the ally bar 178.6, the debug overlay 180.7, the
+energy orb 191.3, the ally projectile 207.6 and the hit flash 232.0; to the
+arena floor 86.3, the trim 99.2 and the accent 146.3. The HUD, result and menu
+colours are at least 85.9 away (the enemy bar and the menu error, `#ff4d4f`).
+No existing margin is tightened: the roster's tightest pairs stay Skerrow
+against the black panels at 83.1 and Brimwick against Hargrim at 84.7. Three
+natural wren colours were measured and set aside: hunter green
+(0.0, 0.125, 0.0), about `#006300`, 84.3 from Ondrel; deep navy
+(0.0, 0.06, 0.168), about `#004572`, 83.2 from Quillon; and the magenta-rose
+`#b14e7b`, 89.1 from the floor but exactly on the b - g = 45 cap. The natural
+wren hue cannot pass either: every muted brown and leather tried tops out at
+76.6 (against Brimwick), under the 80 rule, and the paler tans that clear the
+rest sit inside 80 of her own plum.

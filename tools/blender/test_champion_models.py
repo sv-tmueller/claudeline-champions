@@ -30,8 +30,18 @@ ARENA_GLBS = {
 CHUNK_JSON = 0x4E4F534A
 CHUNK_BIN = 0x004E4942
 
-IDS = {"placeholder", "hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal"}
-ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal")
+IDS = {
+    "placeholder",
+    "hargrim",
+    "quillon",
+    "lumeth",
+    "skerrow",
+    "ondrel",
+    "brimwick",
+    "durnhal",
+    "wrenna",
+}
+ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal", "wrenna")
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
 MAX_TOP = 1.90
@@ -665,10 +675,13 @@ def rounded(position):
 
 
 # The silhouette cue of each new roster id as a list of boxes in Blender
-# coordinates, (bone, centre, size): ondrel's reed bundle on the back and
-# brimwick's fuse cap on top of the head, each one box on Spine
-# (docs/design/roster-v2.md), and durnhal's shield on Arm_L with his hammer's
-# haft and head on Arm_R (docs/design/roster-v3.md).
+# coordinates, (bone, centre, size[, rotation]): ondrel's reed bundle on the
+# back and brimwick's fuse cap on top of the head, each one box on Spine
+# (docs/design/roster-v2.md); durnhal's shield on Arm_L with his hammer's haft
+# and head on Arm_R; and wrenna's bow on Arm_L with her quiver on Spine
+# (docs/design/roster-v3.md). A 3-tuple is a box with no rotation; a 4-tuple
+# adds an Euler XYZ in degrees applied about the box's centre, the way
+# `blender_common.box_matrix` builds it.
 CUE_BOXES = {
     "ondrel": (("Spine", (-0.16, 0.0, 1.56), (0.08, 0.16, 0.52)),),
     "brimwick": (("Spine", (-0.02, 0.0, 1.74), (0.22, 0.22, 0.16)),),
@@ -677,25 +690,59 @@ CUE_BOXES = {
         ("Arm_R", (0.0, -0.41, 0.60), (0.05, 0.05, 0.40)),
         ("Arm_R", (0.0, -0.41, 0.33), (0.22, 0.14, 0.14)),
     ),
+    "wrenna": (
+        ("Spine", (-0.10, 0.0, 1.30), (0.08, 0.10, 0.44), (0.0, -8.0, 0.0)),
+        ("Arm_L", (0.0, 0.45, 0.88), (0.05, 0.05, 0.34)),
+        ("Arm_L", (0.0, 0.45, 1.16), (0.05, 0.05, 0.30), (0.0, 30.0, 0.0)),
+        ("Arm_L", (0.0, 0.45, 0.68), (0.05, 0.05, 0.24), (0.0, -30.0, 0.0)),
+    ),
 }
 CUE_TOLERANCE = 1e-4
 
 
-def box_corners(centre, size):
+def rotation_matrix(degrees):
+    """The Blender Euler XYZ matrix for `degrees`, the way the generator builds it.
+
+    Blender's `Euler(..., "XYZ").to_matrix()` is `Rz @ Ry @ Rx`, which matches
+    the standard closed form below (checked against Blender 5.2.1).
+    """
+    x, y, z = (math.radians(d) for d in degrees)
+    sx, cx = math.sin(x), math.cos(x)
+    sy, cy = math.sin(y), math.cos(y)
+    sz, cz = math.sin(z), math.cos(z)
+    return [
+        [cy * cz, sx * sy * cz - cx * sz, sy * cx * cz + sx * sz],
+        [cy * sz, sx * sy * sz + cx * cz, sy * cx * sz - sx * cz],
+        [-sy, cy * sx, cy * cx],
+    ]
+
+
+def box_corners(box):
     """The 8 corners of a Blender-coordinate box, as glTF positions.
 
-    Blender (x, y, z) is glTF (x, z, -y).
+    `box` is (bone, centre, size) or (bone, centre, size, rotation), where
+    `rotation` is an Euler XYZ in degrees about the centre. Blender (x, y, z)
+    is glTF (x, z, -y).
     """
-    return [
-        (
-            centre[0] + sx * size[0] / 2,
-            centre[2] + sz * size[2] / 2,
-            -(centre[1] + sy * size[1] / 2),
-        )
-        for sx in (-1, 1)
-        for sy in (-1, 1)
-        for sz in (-1, 1)
-    ]
+    centre, size = box[1], box[2]
+    rotation = rotation_matrix(box[3]) if len(box) > 3 else None
+    corners = []
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            for sz in (-1, 1):
+                local = (sx * size[0] / 2, sy * size[1] / 2, sz * size[2] / 2)
+                if rotation is not None:
+                    local = tuple(
+                        sum(rotation[r][c] * local[c] for c in range(3)) for r in range(3)
+                    )
+                corners.append(
+                    (
+                        centre[0] + local[0],
+                        centre[2] + local[2],
+                        -(centre[1] + local[1]),
+                    )
+                )
+    return corners
 
 
 class CueTests(unittest.TestCase):
@@ -736,8 +783,9 @@ class CueTests(unittest.TestCase):
         for champion, boxes in CUE_BOXES.items():
             with self.subTest(champion=champion):
                 cue, _ = self.cue_vertices(champion)
-                for bone, centre, size in boxes:
-                    for corner in box_corners(centre, size):
+                for box in boxes:
+                    bone = box[0]
+                    for corner in box_corners(box):
                         with self.subTest(champion=champion, bone=bone, corner=corner):
                             here = [
                                 v
