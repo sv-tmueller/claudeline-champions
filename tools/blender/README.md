@@ -22,6 +22,7 @@ tools/blender/run.sh tools/blender/gen_champion.py -- --champion skerrow --out a
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion ondrel --out assets/models/champions/ondrel.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion brimwick --out assets/models/champions/brimwick.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion durnhal --out assets/models/champions/durnhal.glb
+tools/blender/run.sh tools/blender/gen_champion.py -- --champion wrenna --out assets/models/champions/wrenna.glb
 tools/blender/run.sh tools/blender/preview.py -- --out /tmp/champions-preview
 tools/blender/run.sh tools/blender/preview.py -- --champion durnhal --out /tmp/champions-preview
 tools/blender/run.sh tools/blender/preview.py -- --arena arena01 --out /tmp/champions-preview
@@ -64,7 +65,7 @@ followed rather than shadowed by a hardcoded list: 27 key renders plus the rest
 render per champion. The camera is a three-quarter view framing the ~1.9 m
 model, so a cue is checked at the pose that moves it.
 
-A full run is 60 PNGs: two arenas at two views each and eight champions at
+A full run is 67 PNGs: two arenas at two views each and nine champions at
 seven files each.
 
 ## Files
@@ -72,15 +73,15 @@ seven files each.
 | File | Purpose |
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
-| `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
-| `gen_champion.py` | Builds the placeholder or one of the seven roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
-| `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
+| `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02`. It also reads the orb table (`--orbs`, default `data/orbs.json`; a missing file is an empty table) and marks each arena's orb point |
+| `gen_champion.py` | Builds the placeholder or one of the eight roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
+| `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators. `add_box` takes an optional Euler XYZ in degrees about the box's centre, default identity |
 | `preview.py` | Renders committed glbs to PNGs in a given `--out` for local eyeballing: two arena views, a champion rest view and one strip per clip keyed at every key. Needs Blender, never writes under `assets/`, and its renders are not deterministic and not in CI |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_preview.py` | Renders the placeholder through `preview.py` into a temporary directory and checks the rest PNG and one strip per clip exist and are non-empty. Needs Blender, skips without it |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
-| `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json`: the five materials, the floor field and trim border, one trim disc per spawn, the chamfered obstacle tops and the wall caps. Standard library only, no Blender |
-| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel, Brimwick and Durnhal and colour rules. Standard library only, no Blender |
+| `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json` and `data/orbs.json`: the five materials, the floor field and trim border, one trim disc per spawn, the floor inlays (the end circle, the centre line and the orb mark), the chamfered obstacle tops and the wall caps. Standard library only, no Blender |
+| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel, Brimwick, Durnhal and Wrenna and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names, a champion's rig and clips and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator, one rejection per rig and clip rule against a synthetic rigged document, and a drift test between the two tables in `assets.md` and the validator's constants. The committed-model tests need `assets/models` to exist |
 
@@ -123,6 +124,15 @@ not vertical.
   `trim`.
 - One trim disc marks each spawn, part of the `Floor` mesh and not a node:
   0.6 m in radius, 0.01 m above the slab top, wholly on the field.
+- Three trim inlays share the `Floor` mesh: the end circle, an annulus 0.1 m
+  wide centred on `ring.endRadius` with its top at 0.01 m; the centre line, a
+  0.1 m band on x = 0 from wall to wall, its top at 0.008 m; and the orb mark,
+  a 0.3 m disc at the point of `data/orbs.json` for the arena, its top at
+  0.01 m. An arena with no row there gets no mark. The line's 0.008 m top sits
+  under the other two, so their faces are never coplanar where they cross, and
+  nothing is above 0.01 m, so the client's 0.03, 0.04 and 0.05 m overlays stay
+  above. The generator asserts that the ring and the mark fit on the field and
+  that the mark clears the ring's inner edge.
 - The walls are 0.5 m thick and 1.0 m high. They sit outside the playable
   area, with their inner faces on x = +-15 and y = +-10 for both arenas. Each
   is a `wall` box up to 0.9 m and a `trim` cap from 0.9 m to 1.0 m in the same
@@ -135,9 +145,9 @@ not vertical.
   non-blocking obstacle (blue), so a viewer can see which obstacles stop
   projectiles. The top edge of every obstacle is chamfered by 0.08 m, with
   its footprint, height and origin unchanged.
-- The discs and the caps are geometry inside the existing meshes, so the node
-  set and the validator are unchanged. `test_arena_models.py` checks them from
-  the vertex data.
+- The discs, the inlays and the caps are geometry inside the existing meshes,
+  so the node set and the validator are unchanged. `test_arena_models.py`
+  checks them from the vertex data.
 - The visuals come from the same JSON as the collision. The validator checks
   that each `Obstacle_i` translation is `(x_i, 0, -y_i)` within 1e-4, and a
   missing translation counts as zero. A translation that is present must be
@@ -146,7 +156,7 @@ not vertical.
 ### Champion
 
 - `--champion <id>` writes `assets/models/champions/<id>.glb`. The ids are
-  `placeholder`, the generic model, and the seven roster ids below.
+  `placeholder`, the generic model, and the eight roster ids below.
 - One mesh node named `Champion`, built in one bmesh with a material per part.
   The head sphere and the halo ring are built from explicit vertices and
   faces, because `bmesh.ops.create_uvsphere` changes its face vertex order
@@ -156,12 +166,12 @@ not vertical.
   `rotation.y = aimAngle` directly. An accent-coloured visor and chest plate
   mark the front.
 - Body and accent are flat colours.
-- All eight files share the node layout, the origin, the facing, the body
+- All nine files share the node layout, the origin, the facing, the body
   geometry, the rig, the clips and the accent. A roster champion differs only
   in the body colour and one cue, which is in the body colour so the accent
   still marks only the front. A cue can be several boxes: one on Spine for
   Ondrel and Brimwick, two on Spine for Hargrim, and three on the two arms for
-  Durnhal.
+  Durnhal and three on `Arm_L` for Wrenna plus her quiver on Spine.
 - The scene lists `Rig`, whose children are the joint `Hips` and the skinned
   mesh `Champion`. The rest pose is the static geometry, so the bind pose
   equals it and a model with no clip playing looks as it did unrigged. Every
@@ -193,6 +203,7 @@ not vertical.
 | `ondrel` | zone controller | (0.03, 0.30, 0.03) | `#309530` | reed bundle on the back, top at 1.82 m |
 | `brimwick` | burst caster | (0.74, 0.12, 0.00) | `#df6100` | fuse cap on top of the head, top at 1.82 m |
 | `durnhal` | guardian tank | (0.19, 0.18, 0.00) | `#797600` | box shield on the left arm and a hammer in the right hand, top at 1.34 m |
+| `wrenna` | bow archer | (0.445, 0.093, 0.175) | `#b25674` | bow in the left hand and a quiver on the back, top at 1.52 m |
 
 The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
 checked by `test_champion_models.py`. No body has a blue channel more than 45
@@ -219,7 +230,9 @@ client's `hud-palette.test.ts` holds every body 80 from the colours of the HUD,
 the result panel and the menu, so one of the two had to move. The body moved,
 24.1 from the reserved value, and the HUD stayed. Its nearest colours are
 Hargrim at 84.7, the HUD energy colour at 85.2 and the enemy bar at 87.5. The
-nearest to Ondrel are the dead grey at 93.1 and Skerrow at 101.0.
+nearest to Ondrel are the dead grey at 93.1 and Skerrow at 101.0. Wrenna's
+colour decision is the third in this list: it holds the natural wren colours
+aside and gives her the plum, both below.
 
 Durnhal's olive brass, (0.19, 0.18, 0.00), is decision 2 of batch #203. Its
 nearest colours are Hargrim at 91.9, Ondrel at 92.7, Lumeth at 95.0, Brimwick
@@ -234,6 +247,27 @@ and the hammer sits at y = -0.41 for two reasons: at 0.28 m the head sinks
 equals the arm's, so from above it adds only 4 cm strips in front of and
 behind the arm. The model has 600 vertices and 288 triangles, a ground radius of
 0.4924 m and 39 780 bytes.
+
+Wrenna's plum, (0.445, 0.093, 0.175), about `#b25674`, is the lead's decision
+for her model (issue #235). Three decimal places are needed: two give `#b35573`,
+not `#b25674`. In 8-bit sRGB b minus g is 30, so the overlay rule holds
+(`overlay None`). Its nearest colours are the enemy bar and the menu error at
+85.9, the floor of both arenas at 86.3, Hargrim at 86.7, the dead grey at 88.7,
+the enemy projectile at 96.0, the trim of both arenas at 99.2, Brimwick at 124.9
+and the placeholder at 126.3; every pair is at least 85.9, so no existing margin
+moves. Three natural wren colours were measured and set aside. Hunter green
+(0.0, 0.125, 0.0), about `#006300`, is 84.3 from Ondrel, under the rule. Deep
+navy (0.0, 0.06, 0.168), about `#004572`, is 83.2 from Quillon. The magenta-rose
+`#b14e7b` is 89.1 from the floor but exactly on the b - g = 45 cap. The natural
+wren hue itself cannot pass either: every muted brown and leather tried tops out
+at 76.6 (against Brimwick), under the 80 rule, and the paler tans that clear the
+rest sit inside 80 of her own plum. Her cue is a bow of three boxes on `Arm_L`
+at y = 0.45: a grip 0.05 by 0.05 by 0.34 m and two limbs 0.30 and 0.24 m long,
+angled 30 degrees off it, plus one quiver 0.08 by 0.10 by 0.44 m on `Spine` at
+(-0.10, 0, 1.30). The quiver's x offset must stay small: at -0.16 m, on the back
+of the body as it lies at Death key 30, it sinks 7.3 mm under the floor (near
+-0.17 m it sinks 17.2 mm). The model has 624 vertices and 300 triangles, a
+ground radius of 0.4847 m and 40 924 bytes.
 
 That client test keeps its own `BODY_COLOURS` table with the bodies above, so
 change both in the same commit.

@@ -58,6 +58,28 @@ The commands and file list are in `tools/blender/README.md`.
   0.01 m above the slab top and wholly on the field (the generator asserts
   it). The client draws its overlay at 0.02 m, area views at 0.03 m and
   impact rings at 0.04 m, so every one of them stays above a disc.
+- Three trim inlays also sit inside the `Floor` mesh, so the floor tells
+  players where the fight ends and where the orb is:
+  - The end circle marks where sudden death ends: an annulus 0.1 m wide
+    centred on `ring.endRadius` (inner `endRadius - 0.05`, outer
+    `endRadius + 0.05`), 32 segments, from z = 0 to 0.01. It is hand wound
+    from explicit vertices, because `add_solid`'s centroid test would point
+    the inner wall outwards.
+  - The centre line runs along the mirror axis, x = 0, wall to wall (the
+    walls' inner faces at y = `+-size.height / 2`), 0.1 m wide, its top at
+    0.008 m.
+  - The orb mark is a filled disc of 0.3 m radius, 32 segments, at the
+    arena's point in `data/orbs.json`, from z = 0 to 0.01. An arena with no
+    row there gets no mark. The client's orb ring is drawn at 0.05 m, above
+    it.
+  - The heights are stacked on purpose. The ring and the mark stand at 0.01
+    m, like the discs, and the line at 0.008 m, under both, so the line's top
+    face is never coplanar with theirs where it crosses the ring (y ~ 3 in
+    both arenas) or the mark (both orb points are on x = 0). Nothing is above
+    0.01 m, so the 0.03 m area discs, the 0.04 m impact rings and the 0.05 m
+    orb ring all stay above the inlays. The generator asserts that the ring
+    and the mark fit on the field, and that the mark clears the ring's inner
+    edge, so the two equal-height inlays can never meet.
 - The walls are 0.5 m thick and 1.0 m high. They sit outside the playable
   area, with their inner faces on the edge of the rectangle (x = +-15 and
   y = +-10 for arena 1). Each wall is a `wall` box up to 0.9 m and a `trim`
@@ -70,11 +92,12 @@ The commands and file list are in `tools/blender/README.md`.
   obstacles, so a viewer can see which obstacles stop projectiles. The top
   edge of each is chamfered by 0.08 m, in height and inwards, from explicit
   vertices. The footprint, the height and the origin are unchanged.
-- The node set does not change: the discs and the caps are geometry inside
-  the existing meshes with the `trim` material, so `validate_glb.py` and
-  [Node naming](#node-naming) stay as they are. `test_arena_models.py` checks
-  the discs against the JSON spawns, the chamfers and the caps from the
-  vertex data.
+- The node set does not change: the discs, the inlays and the caps are
+  geometry inside the existing meshes with the `trim` material, so
+  `validate_glb.py` and [Node naming](#node-naming) stay as they are.
+  `test_arena_models.py` checks the discs against the JSON spawns, the
+  inlays against the JSON ring radius and the orb table, the chamfers and
+  the caps from the vertex data.
 - Five flat materials: `floor`, `trim`, `wall`, `blocking` and `open`.
 - The visuals come from the same JSON as the collision.
 - Both arenas, `arena01` and `arena02`, have a committed glb and a case in
@@ -99,11 +122,12 @@ The commands and file list are in `tools/blender/README.md`.
   model is about 1.7 m tall.
 - Flat colours only. Every champion model is rigged and has six clips, which
   the client plays through its own sampler ([client](client.md#animation)).
-- Each of the seven roster ids has `champions/<id>.glb` with the placeholder's
+- Each of the eight roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
-  in body colour and one cue that stays below 1.9 m, Durnhal's in parts on
-  both arms. The client registers and loads all seven (batch #177, package
-  C, then #212 for Durnhal).
+  in body colour and one cue that stays below 1.9 m, Durnhal's and Wrenna's in
+  parts on more than one bone. The client registers and loads seven of the
+  eight (batch #177, package C, then #212 for Durnhal); Wrenna's model waits
+  for roadmap step 3.4.
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours and cues are in
   [`tools/blender/README.md`](../../tools/blender/README.md).
@@ -119,15 +143,15 @@ The commands and file list are in `tools/blender/README.md`.
 
 ### Rig
 
-One rig for all eight models, in Blender coordinates (Z up). Every bone has
+One rig for all nine models, in Blender coordinates (Z up). Every bone has
 roll 0 and is not connected to its parent. L is +Y, the champion's left when
 it faces +X. The validator checks the names and the parents.
 
 | Bone | Parent | Head | Tail | Carries (rigid, weight 1.0) |
 |------|--------|------|------|-----------------------------|
 | `Hips` | node `Rig` | (0, 0, 0.80) | (0, 0, 0.90) | nothing; the root that moves the whole body |
-| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap |
-| `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box, Durnhal's shield |
+| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap, Wrenna's quiver |
+| `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box, Durnhal's shield, Wrenna's bow |
 | `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade, Durnhal's hammer |
 | `Leg_L` | `Hips` | (0, 0.12, 0.80) | (0, 0.12, 0.00) | the left leg box |
 | `Leg_R` | `Hips` | (0, -0.12, 0.80) | (0, -0.12, 0.00) | the right leg box |
@@ -196,11 +220,11 @@ In the Channels column a bare bone name means that bone's rotation.
   at key 20 and lies on the floor at key 30 (the lowest vertex 0.6 mm up). The
   client holds the last frame.
 - The cue meshes ride the bones that move them: Hargrim's shoulder blocks,
-  Lumeth's halo, Ondrel's reed bundle and Brimwick's fuse cap on `Spine` (the
-  `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's blade and Durnhal's
-  hammer on `Arm_R` (the `Attack` swing, the `Hit` lift) and Durnhal's shield
-  on `Arm_L` (the `Cast` raise). All clips are shared, with no per-champion
-  poses.
+  Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap and Wrenna's quiver
+  on `Spine` (the `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's
+  blade and Durnhal's hammer on `Arm_R` (the `Attack` swing, the `Hit` lift)
+  and Durnhal's shield and Wrenna's bow on `Arm_L` (the `Cast` raise). All
+  clips are shared, with no per-champion poses.
 
 ### Export
 

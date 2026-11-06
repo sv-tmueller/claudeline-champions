@@ -98,8 +98,9 @@ first.
 - Content: arena01 and arena02 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
   profiles since #165); Durnhal's kit as data (#204) with his bot profile
-  (#211); models for the seven roster ids and the placeholder, each rigged, with
-  six clips (the client registers and plays all seven roster ids).
+  (#211); models for the eight roster ids and the placeholder, each rigged, with
+  six clips (the client registers and plays seven of the eight, and Wrenna's
+  model waits for roadmap step 3.4).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion

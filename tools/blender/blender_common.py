@@ -40,14 +40,24 @@ def make_material(name, rgb):
     return material
 
 
-def box_matrix(center, size):
-    return Matrix.Translation(center) @ Matrix.Diagonal((size[0], size[1], size[2], 1.0))
+def box_matrix(center, size, rotation=(0.0, 0.0, 0.0)):
+    """The cube matrix: translate to `center`, turn, then scale.
+
+    `rotation` is an Euler XYZ in degrees about the centre, between the
+    translation and the scale. It is (0, 0, 0) by default, an unrotated box.
+    """
+    turn = Euler([math.radians(d) for d in rotation], "XYZ").to_matrix().to_4x4()
+    return Matrix.Translation(center) @ turn @ Matrix.Diagonal((size[0], size[1], size[2], 1.0))
 
 
-def add_box(bm, center, size, material_index=0):
-    """Add a box to `bm`. `center` and `size` are (x, y, z) tuples."""
+def add_box(bm, center, size, material_index=0, rotation=(0.0, 0.0, 0.0)):
+    """Add a box to `bm`.
+
+    `center` and `size` are (x, y, z) tuples, `rotation` an Euler XYZ in
+    degrees about the centre.
+    """
     start = len(bm.faces)
-    bmesh.ops.create_cube(bm, size=1.0, matrix=box_matrix(center, size))
+    bmesh.ops.create_cube(bm, size=1.0, matrix=box_matrix(center, size, rotation))
     for face in list(bm.faces)[start:]:
         face.material_index = material_index
 
