@@ -3,8 +3,9 @@
 They read `assets/models/arenas/*.glb` and the matching `data/arenas/*.json`
 and check the geometry gen_arena.py builds from the definition: the five flat
 materials, the two-tone floor (a field and a trim border), one trim disc under
-every spawn, the chamfered obstacle tops and the trim caps on the walls. The
-discs and the caps are geometry inside the existing `Floor` and `Wall_*`
+every spawn, the floor inlays (the end circle, the centre line and the orb
+mark), the chamfered obstacle tops and the trim caps on the walls. The discs,
+the inlays and the caps are geometry inside the existing `Floor` and `Wall_*`
 meshes, not nodes (decision 7 of batch #134), so the vertex data is the only
 place to check them. No Blender is needed, so they run in CI.
 
@@ -12,10 +13,11 @@ The constants below mirror gen_arena.py, which imports bmesh and so cannot be
 imported here. A change to one without the other fails against the committed
 glbs.
 """
+import json
 import math
 import unittest
 
-from test_champion_models import ARENA_GLBS, load, material_name, positions
+from test_champion_models import ARENA_GLBS, REPO, load, material_name, positions
 from test_validate_glb import load_arena
 
 # Every arena definition is checked, so a new arena needs no edit here.
@@ -27,6 +29,10 @@ WALL_HEIGHT = 1.0
 TRIM_WIDTH = 1.0
 DISC_RADIUS = 0.6
 DISC_HEIGHT = 0.01
+RING_INLAY_WIDTH = 0.1
+LINE_WIDTH = 0.1
+LINE_HEIGHT = 0.008
+MARK_RADIUS = 0.3
 BEVEL = 0.08
 CAP_HEIGHT = 0.1
 CAP_BEVEL = 0.05
@@ -40,6 +46,18 @@ X, UP, Z = 0, 1, 2
 
 def arena_glb(arena_id):
     return load(ARENA_GLBS[arena_id])
+
+
+def load_orbs():
+    """The orb point of each arena that has a row in `data/orbs.json`.
+
+    A missing file reads as an empty table, the server's semantics, so an
+    arena without a row gets no mark.
+    """
+    path = REPO / "data" / "orbs.json"
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text())
 
 
 def node_vertices(doc, bin_chunk, node_name):
@@ -75,6 +93,19 @@ def clusters(vertices, gap):
             groups.remove(group)
         groups.append(merged)
     return groups
+
+
+def disc_sized(cluster):
+    """Whether a cluster of top vertices is one of the spawn discs.
+
+    The end ring and the orb mark also top out at DISC_HEIGHT, and the ring's
+    vertices cluster in pairs 0.1 apart, so only a full disc of DISC_RADIUS
+    counts.
+    """
+    centre_x = sum(v[X] for v in cluster) / len(cluster)
+    centre_z = sum(v[Z] for v in cluster) / len(cluster)
+    widest = max(math.hypot(v[X] - centre_x, v[Z] - centre_z) for v in cluster)
+    return abs(widest - DISC_RADIUS) <= 0.05
 
 
 def wall_bounds(arena):
@@ -139,14 +170,87 @@ class CommittedArenaTests(unittest.TestCase):
     @per_arena
     def test_the_border_is_flush_with_the_slab_top(self, arena, doc, bin_chunk):
         trim = node_vertices(doc, bin_chunk, "Floor")["trim"]
-        tops = {round(v[UP], 4) for v in trim if abs(v[UP] - DISC_HEIGHT) > TOLERANCE and v[UP] > -0.1}
+        # The inlay band (0 < up <= DISC_HEIGHT) is excluded: the centre line
+        # tops out at LINE_HEIGHT, under the ring and the mark.
+        tops = {
+            round(v[UP], 4)
+            for v in trim
+            if v[UP] > -0.1 and not (TOLERANCE < v[UP] <= DISC_HEIGHT + TOLERANCE)
+        }
         self.assertEqual(tops, {0.0})
+
+    @per_arena
+    def test_the_end_circle_ring(self, arena, doc, bin_chunk):
+        end = arena["ring"]["endRadius"]
+        inner = end - RING_INLAY_WIDTH / 2
+        outer = end + RING_INLAY_WIDTH / 2
+        trim = node_vertices(doc, bin_chunk, "Floor")["trim"]
+        band = [v for v in trim if inner - TOLERANCE <= radius(v) <= outer + TOLERANCE]
+        radii = [radius(v) for v in band]
+        self.assertTrue(radii, "no ring vertices at the end radius")
+        self.assertNear(min(radii), inner, "ring inner radius")
+        self.assertNear(max(radii), outer, "ring outer radius")
+        lo, hi = extent(at_height(band, DISC_HEIGHT), UP)
+        self.assertNear(lo, DISC_HEIGHT, "ring top row")
+        self.assertNear(hi, DISC_HEIGHT, "ring top row")
+        lo, hi = extent(band, UP)
+        self.assertNear(lo, 0.0, "ring base")
+        self.assertNear(hi, DISC_HEIGHT, "ring top")
+
+    @per_arena
+    def test_the_centre_line_runs_wall_to_wall_under_the_markers(self, arena, doc, bin_chunk):
+        half_d = arena["size"]["height"] / 2
+        trim = node_vertices(doc, bin_chunk, "Floor")["trim"]
+        # LINE_HEIGHT is under the discs and the inlays, so it isolates the
+        # line's own top row from the ring and the mark.
+        line = at_height(trim, LINE_HEIGHT)
+        self.assertTrue(line, "no centre-line vertices")
+        # 0.008 is unique to the line, so this set is its top row alone.
+        lo, hi = extent(line, UP)
+        self.assertNear(lo, LINE_HEIGHT, "line top row")
+        self.assertNear(hi, LINE_HEIGHT, "line top row")
+        for axis, low, high, name in (
+            (X, -LINE_WIDTH / 2, LINE_WIDTH / 2, "line x"),
+            (Z, -half_d, half_d, "line z"),
+        ):
+            lo, hi = extent(line, axis)
+            self.assertNear(lo, low, name + " low")
+            self.assertNear(hi, high, name + " high")
+
+    @per_arena
+    def test_the_orb_mark(self, arena, doc, bin_chunk):
+        orb = load_orbs().get(arena["id"])
+        inner = arena["ring"]["endRadius"] - RING_INLAY_WIDTH / 2
+        trim = node_vertices(doc, bin_chunk, "Floor")["trim"]
+        # The mark stands at DISC_HEIGHT like the discs and inside the ring, so
+        # the spawn discs (well outside) and the ring do not enter the set.
+        inside = [v for v in at_height(trim, DISC_HEIGHT) if radius(v) <= inner - TOLERANCE]
+        if orb is None:
+            self.assertEqual(inside, [], "no row in orbs.json, so no mark")
+            return
+        marks = clusters(inside, MARK_RADIUS)
+        self.assertEqual(len(marks), 1, "one orb mark")
+        mark = marks[0]
+        centre_x = sum(v[X] for v in mark) / len(mark)
+        centre_z = sum(v[Z] for v in mark) / len(mark)
+        self.assertNear(centre_x, orb["x"], "mark x")
+        self.assertNear(centre_z, -orb["y"], "mark z, glTF z is minus y")
+        widest = max(math.hypot(v[X] - centre_x, v[Z] - centre_z) for v in mark)
+        self.assertNear(widest, MARK_RADIUS, "mark radius")
+
+    @per_arena
+    def test_no_inlay_stands_above_the_disc_top(self, arena, doc, bin_chunk):
+        trim = node_vertices(doc, bin_chunk, "Floor")["trim"]
+        above = {round(v[UP], 4) for v in trim if v[UP] > TOLERANCE}
+        self.assertEqual(above, {LINE_HEIGHT, DISC_HEIGHT})
 
     @per_arena
     def test_every_spawn_has_one_trim_disc_centred_on_it(self, arena, doc, bin_chunk):
         spawns = arena["spawns"]["teamA"] + arena["spawns"]["teamB"]
         trim = node_vertices(doc, bin_chunk, "Floor")["trim"]
-        discs = clusters(at_height(trim, DISC_HEIGHT), 0.3)
+        # The ring and the mark also top out at DISC_HEIGHT, so keep only the
+        # disc-sized clusters before matching them to the spawns.
+        discs = [d for d in clusters(at_height(trim, DISC_HEIGHT), 0.3) if disc_sized(d)]
         self.assertEqual(len(discs), len(spawns), "one disc per spawn")
         matched = set()
         for disc in discs:
