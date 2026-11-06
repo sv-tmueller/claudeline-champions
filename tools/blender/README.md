@@ -22,12 +22,47 @@ tools/blender/run.sh tools/blender/gen_champion.py -- --champion skerrow --out a
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion ondrel --out assets/models/champions/ondrel.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion brimwick --out assets/models/champions/brimwick.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion durnhal --out assets/models/champions/durnhal.glb
+tools/blender/run.sh tools/blender/preview.py -- --out /tmp/champions-preview
+tools/blender/run.sh tools/blender/preview.py -- --champion durnhal --out /tmp/champions-preview
+tools/blender/run.sh tools/blender/preview.py -- --arena arena01 --out /tmp/champions-preview
 python3 tools/blender/validate_glb.py assets/models
 python3 -B -m unittest discover -s tools/blender -p 'test_*.py'
 ```
 
 The generators need Blender. The last two commands need only Python 3.9 or
-newer and no packages, so they can run in CI.
+newer and no packages, so they can run in CI. `preview.py` needs Blender too,
+and its test skips without it.
+
+### Preview renders
+
+`preview.py` renders the committed glbs to PNGs in the directory `--out` names.
+With no selection flag it previews every `assets/models/champions/*.glb` and
+every `assets/models/arenas/*.glb`; the file stems are the ids, so a new
+champion or arena needs no change. `--champion <id>` and `--arena <id>` render
+one model and are mutually exclusive. `--out` is required and must not be under
+`assets/`, so a render can never be committed: point it at a scratch directory
+such as `/tmp/champions-preview`.
+
+It renders the glb on disk, so regenerate a model first and preview after, and
+it never builds geometry itself. The engine is Workbench with material colours
+and no lights, so nothing about a render is an asset. The renders are for the
+eye: not byte-deterministic, and no part of CI.
+
+An arena gets two views, both 1280x720:
+
+| View | What it is |
+|------|------------|
+| `<id>_top.png` | Mirror of the client camera: a 55 degree tilt, a 40 degree vertical field of view and a 1.06 margin over the arena corners, fit with the same formula as `fitCameraDistance` in `packages/client/src/camera.ts` (visually, not bit for bit) |
+| `<id>_quarter.png` | A free three-quarter view from 35 degrees off the client's axis and 40 degrees up, framing the whole arena |
+
+A champion gets `<id>_rest.png` at 720x720 in the bind pose, plus one strip per
+clip at 360x360 per key, stitched left to right into `<id>_<clip>.png`. The
+strips follow the six clips of the Clips table below (`Idle`, `Run`, `Attack`,
+`Cast`, `Hit`, `Death`), and the keys come from the imported action's own
+fcurves, so a moved key is followed rather than shadowed by a hardcoded list.
+That is 27 key renders plus the rest render per champion. The camera is a
+three-quarter view framing the ~1.9 m model, so a cue is checked at the pose
+that moves it.
 
 ## Files
 
@@ -37,7 +72,9 @@ newer and no packages, so they can run in CI.
 | `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02` |
 | `gen_champion.py` | Builds the placeholder or one of the seven roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
 | `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators |
+| `preview.py` | Renders committed glbs to PNGs in a given `--out` for local eyeballing: two arena views, a champion rest view and one strip per clip keyed at every key. Needs Blender, never writes under `assets/`, and its renders are not deterministic and not in CI |
 | `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
+| `test_preview.py` | Renders the placeholder through `preview.py` into a temporary directory and checks the rest PNG and one strip per clip exist and are non-empty. Needs Blender, skips without it |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
 | `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json`: the five materials, the floor field and trim border, one trim disc per spawn, the chamfered obstacle tops and the wall caps. Standard library only, no Blender |
 | `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel, Brimwick and Durnhal and colour rules. Standard library only, no Blender |
