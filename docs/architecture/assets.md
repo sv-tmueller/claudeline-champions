@@ -12,6 +12,10 @@
   builds a low-poly rigged humanoid with the six clips the spec names (`Idle`,
   `Run`, `Attack`, `Cast`, `Hit`, `Death`), each keying only the channels it
   moves.
+- `preview.py --out <dir> [--champion <id> | --arena <id>]` renders committed
+  glbs to PNGs in `--out` for local eyeballing: two arena views and a champion
+  rest view plus one strip per clip keyed at every key. `--out` is never under
+  `assets/`, the renders are local-only, not deterministic and not run in CI.
 - `validate_glb.py` uses only the Python standard library: checks the glb
   magic and chunk layout, that required node names are present, and a
   champion's rig and clips. It also checks the arena JSON that an arena model
