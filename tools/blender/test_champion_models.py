@@ -3,9 +3,10 @@
 They read `assets/models/champions/*.glb` and check what the client relies on
 (the `Rig` root with the joints and one skinned `Champion` mesh, a bind pose
 equal to the rest pose, rigid weights, feet at the origin, facing +X, a top
-below the health bar at rest and at every key of every clip) and that the
-roster bodies stay easy to tell apart on screen. No Blender is needed, so they
-run in CI.
+below the health bar at rest and at every key of every clip, the cue and head
+piece boxes of every roster id, the head pieces' 1.85 m rest bound and 0.5 m
+footprint) and that the roster bodies stay easy to tell apart on screen. No
+Blender is needed, so they run in CI.
 """
 import copy
 import json
@@ -45,6 +46,9 @@ ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durn
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
 MAX_TOP = 1.90
+# A head piece box tops out at 1.85 m at rest: Run lifts Hips 0.035 m, so a
+# 1.85 m rest top stays under the 1.90 m clip limit with room for the lean.
+MAX_HEAD_TOP = 1.85
 MAX_GROUND_RADIUS = 0.50
 MAX_BYTES = 48 * 1024
 MAX_TRIANGLES = 600
@@ -674,30 +678,112 @@ def rounded(position):
     return tuple(round(c, 6) for c in position)
 
 
-# The silhouette cue of each new roster id as a list of boxes in Blender
-# coordinates, (bone, centre, size[, rotation]): ondrel's reed bundle on the
-# back and brimwick's fuse cap on top of the head, each one box on Spine
-# (docs/design/roster-v2.md); durnhal's shield on Arm_L with his hammer's haft
-# and head on Arm_R; and wrenna's bow on Arm_L with her quiver on Spine
-# (docs/design/roster-v3.md). A 3-tuple is a box with no rotation; a 4-tuple
-# adds an Euler XYZ in degrees applied about the box's centre, the way
-# `blender_common.box_matrix` builds it.
-CUE_BOXES = {
-    "ondrel": (("Spine", (-0.16, 0.0, 1.56), (0.08, 0.16, 0.52)),),
-    "brimwick": (("Spine", (-0.02, 0.0, 1.74), (0.22, 0.22, 0.16)),),
+# What gives each roster id its silhouette beyond the placeholder body: one cue
+# and one head piece, both in the body material, so the accent still marks only
+# the front. Every entry is (tag, box) with the tag `cue` or `head`, and a box
+# is (bone, centre, size[, rotation]) in Blender coordinates, the shape
+# `blender_common.box_matrix` builds. A 3-tuple is a box with no rotation; a
+# 4-tuple adds an Euler XYZ in degrees applied about the box's centre.
+#
+# The cues: hargrim's two shoulder blocks, quillon's staff, skerrow's blade,
+# ondrel's reed bundle, durnhal's shield on Arm_L with his hammer on Arm_R and
+# wrenna's bow on Arm_L with her quiver on Spine (docs/design/roster-v1.md,
+# roster-v2.md and roster-v3.md). Brimwick's cue is his fuse cap and that same
+# box is his head piece too: it carries the `head` tag alone, so the
+# 24-vertices-per-box count does not count it twice. Lumeth's cue is the one
+# that is not a box -- see RING_CUES below.
+#
+# The head pieces (issue #239) are one to three boxes on Spine. Every one tops
+# out at or under 1.85 m at rest -- the Run clip lifts Hips 0.035 m and the
+# shared clips must stay under the 1.90 m limit -- and every corner stays inside
+# the 0.5 m ground radius. Each sits at or above about 1.62 m or behind x = 0,
+# so none of them hides the accent visor (z 1.55 to 1.61 m, x from 0.11 m).
+BOXES = {
+    "hargrim": (
+        ("cue", ("Spine", (0.0, -0.34, 1.46), (0.28, 0.22, 0.14))),
+        ("cue", ("Spine", (0.0, 0.34, 1.46), (0.28, 0.22, 0.14))),
+        # A flat-topped helm: a crown box and two cheek guards flanking the head.
+        # The guards' bottoms are 1.62 m, clear of the visor below.
+        ("head", ("Spine", (0.0, 0.0, 1.735), (0.34, 0.34, 0.13))),
+        ("head", ("Spine", (0.0, -0.18, 1.71), (0.16, 0.06, 0.18))),
+        ("head", ("Spine", (0.0, 0.18, 1.71), (0.16, 0.06, 0.18))),
+    ),
+    "quillon": (
+        ("cue", ("Arm_R", (0.04, -0.44, 0.95), (0.07, 0.07, 1.80))),
+        # A wide-brimmed hat: a thin brim at brow level and a crown.
+        ("head", ("Spine", (0.0, 0.0, 1.635), (0.40, 0.40, 0.03))),
+        ("head", ("Spine", (0.0, 0.0, 1.715), (0.26, 0.26, 0.13))),
+    ),
+    "lumeth": (
+        # A cowl under the halo: a band and a drape behind. Kept to two boxes:
+        # her file is the tightest against the 48 KiB budget.
+        ("head", ("Spine", (0.0, 0.0, 1.68), (0.32, 0.32, 0.12))),
+        ("head", ("Spine", (-0.12, 0.0, 1.58), (0.06, 0.26, 0.28))),
+    ),
+    "skerrow": (
+        ("cue", ("Arm_R", (0.18, -0.34, 0.86), (0.28, 0.05, 0.10))),
+        # A hood: a close crown and a back peak, the peak a box turned -25
+        # degrees about Y and pushed behind x = 0. The shared Death clip, where
+        # the body lies on its back, is the tightest pose: at frame 30 the
+        # peak's lowest corner is 50.7 mm above the floor and the crown's is
+        # 64.7 mm, both far clear of the 0.1 mm floor tolerance. The x offset is
+        # the number the floor bounds: at this turn and height the corner
+        # reaches the floor just past the centre x = -0.16 m.
+        ("head", ("Spine", (0.0, 0.0, 1.72), (0.34, 0.34, 0.14))),
+        ("head", ("Spine", (-0.11, 0.0, 1.745), (0.12, 0.24, 0.15), (0.0, -25.0, 0.0))),
+    ),
+    "ondrel": (
+        ("cue", ("Spine", (-0.16, 0.0, 1.56), (0.08, 0.16, 0.52))),
+        # A conical reed hat: two boxes, the lower wider. The lower box's bottom
+        # is 1.62 m, above the accent visor (which ends at 1.61 m), so the wide
+        # brim does not hide the front mark.
+        ("head", ("Spine", (0.0, 0.0, 1.67), (0.40, 0.40, 0.10))),
+        ("head", ("Spine", (0.0, 0.0, 1.765), (0.22, 0.22, 0.11))),
+    ),
+    "brimwick": (
+        # The fuse cap is his cue and his head piece: one box, one tag.
+        ("head", ("Spine", (-0.02, 0.0, 1.74), (0.22, 0.22, 0.16))),
+    ),
     "durnhal": (
-        ("Arm_L", (0.0, 0.44, 1.04), (0.30, 0.04, 0.60)),
-        ("Arm_R", (0.0, -0.41, 0.60), (0.05, 0.05, 0.40)),
-        ("Arm_R", (0.0, -0.41, 0.33), (0.22, 0.14, 0.14)),
+        ("cue", ("Arm_L", (0.0, 0.44, 1.04), (0.30, 0.04, 0.60))),
+        ("cue", ("Arm_R", (0.0, -0.41, 0.60), (0.05, 0.05, 0.40))),
+        ("cue", ("Arm_R", (0.0, -0.41, 0.33), (0.22, 0.14, 0.14))),
+        # A visored helm: a crown and a nose ridge at the front. The ridge's
+        # bottom is 1.62 m, above the accent visor (which ends at 1.61 m).
+        ("head", ("Spine", (0.0, 0.0, 1.745), (0.36, 0.36, 0.15))),
+        ("head", ("Spine", (0.19, 0.0, 1.70), (0.06, 0.10, 0.16))),
     ),
     "wrenna": (
-        ("Spine", (-0.10, 0.0, 1.30), (0.08, 0.10, 0.44), (0.0, -8.0, 0.0)),
-        ("Arm_L", (0.0, 0.45, 0.88), (0.05, 0.05, 0.34)),
-        ("Arm_L", (0.0, 0.45, 1.16), (0.05, 0.05, 0.30), (0.0, 30.0, 0.0)),
-        ("Arm_L", (0.0, 0.45, 0.68), (0.05, 0.05, 0.24), (0.0, -30.0, 0.0)),
+        ("cue", ("Spine", (-0.10, 0.0, 1.30), (0.08, 0.10, 0.44), (0.0, -8.0, 0.0))),
+        ("cue", ("Arm_L", (0.0, 0.45, 0.88), (0.05, 0.05, 0.34))),
+        ("cue", ("Arm_L", (0.0, 0.45, 1.16), (0.05, 0.05, 0.30), (0.0, 30.0, 0.0))),
+        ("cue", ("Arm_L", (0.0, 0.45, 0.68), (0.05, 0.05, 0.24), (0.0, -30.0, 0.0))),
+        # The archer's cap with a feather: a low crown and one thin box swept
+        # back, turned -55 degrees about Y (the lead's decision, not a hood).
+        ("head", ("Spine", (0.0, 0.0, 1.72), (0.34, 0.34, 0.12))),
+        ("head", ("Spine", (-0.05, 0.0, 1.72), (0.05, 0.10, 0.24), (0.0, -55.0, 0.0))),
     ),
 }
 CUE_TOLERANCE = 1e-4
+
+# Lumeth's cue: a halo ring (blender_common.add_ring) on Spine, 16 segments and
+# four circles of 16 corners, so 64 positions. The exporter splits every corner
+# into three by the flat-shading normals, the same split that makes a box 24
+# vertices, so the ring is 12 * segments = 192 vertices in the glb.
+RING_CUES = {
+    "lumeth": {"bone": "Spine", "centre": (0.0, 0.0, 1.80), "segments": 16},
+}
+
+
+def ring_vertices(champion):
+    """The glb vertices the champion's ring cue adds (0 when it has none)."""
+    ring = RING_CUES.get(champion)
+    return 12 * ring["segments"] if ring else 0
+
+
+def boxes_of(champion, tag=None):
+    """The (tag, box) entries of a champion, or only those of one tag."""
+    return [entry for entry in BOXES.get(champion, ()) if tag is None or entry[0] == tag]
 
 
 def rotation_matrix(degrees):
@@ -746,18 +832,20 @@ def box_corners(box):
 
 
 class CueTests(unittest.TestCase):
-    """A cue is a list of boxes, each on one bone: add_box takes its faces and
-    vertices as a slice of the bmesh, so a cue that landed in the wrong slot
-    would show here."""
+    """Every roster id's cue and head piece, as the boxes the generator adds.
+
+    `add_box` takes its faces and vertices as a slice of the bmesh, so a box
+    that landed in the wrong slot, on the wrong bone or at the wrong size shows
+    here. A champion's extra geometry is what the model has beyond the
+    placeholder's vertices."""
 
     def setUp(self):
         self.placeholder = load(CHAMPIONS_DIR / "placeholder.glb")
 
     def cue_vertices(self, champion):
-        """The cue as [(position, joint name, weight)], and its position counts.
-
-        The cue is what the model has beyond the placeholder's vertices.
-        """
+        """The cue and head piece as [(position, joint name, weight)], and its
+        position counts. Extra geometry is what the model has beyond the
+        placeholder's vertices."""
         doc, bin_chunk = load(CHAMPIONS_DIR / ("%s.glb" % champion))
         own = skinned_vertices(doc, bin_chunk)
         base = Counter(rounded(p) for p, _, _ in skinned_vertices(*self.placeholder))
@@ -772,18 +860,32 @@ class CueTests(unittest.TestCase):
         ]
         return cue, extra
 
-    def test_the_cue_is_24_vertices_per_box_on_top_of_the_placeholder_body(self):
-        for champion, boxes in CUE_BOXES.items():
+    def test_every_roster_id_has_a_cue_and_a_head_piece(self):
+        self.assertEqual(set(BOXES), set(ROSTER))
+        for champion in ROSTER:
             with self.subTest(champion=champion):
-                cue, extra = self.cue_vertices(champion)
-                self.assertEqual(sum(extra.values()), 24 * len(boxes))
-                self.assertEqual(len(cue), 24 * len(boxes))
+                # Brimwick's fuse cap is his cue and his head piece at once: one
+                # box, tagged `head` alone, so the count test does not double it.
+                has_cue = bool(boxes_of(champion, "cue")) or champion in RING_CUES
+                if champion == "brimwick":
+                    has_cue = bool(boxes_of(champion, "head"))
+                self.assertTrue(has_cue)
+                self.assertTrue(boxes_of(champion, "head"))
 
-    def test_every_box_corner_is_three_cue_vertices_on_the_boxs_bone_at_weight_1(self):
-        for champion, boxes in CUE_BOXES.items():
+    def test_the_boxes_are_24_vertices_per_box_on_top_of_the_placeholder_body(self):
+        for champion in BOXES:
+            with self.subTest(champion=champion):
+                boxes = [box for _, box in boxes_of(champion)]
+                wanted = 24 * len(boxes) + ring_vertices(champion)
+                cue, extra = self.cue_vertices(champion)
+                self.assertEqual(sum(extra.values()), wanted)
+                self.assertEqual(len(cue), wanted)
+
+    def test_every_box_corner_is_three_vertices_on_the_boxs_bone_at_weight_1(self):
+        for champion in BOXES:
             with self.subTest(champion=champion):
                 cue, _ = self.cue_vertices(champion)
-                for box in boxes:
+                for _, box in boxes_of(champion):
                     bone = box[0]
                     for corner in box_corners(box):
                         with self.subTest(champion=champion, bone=bone, corner=corner):
@@ -797,12 +899,42 @@ class CueTests(unittest.TestCase):
                                 self.assertEqual(joint, bone)
                                 self.assertAlmostEqual(weight, 1.0, delta=WEIGHT_TOLERANCE)
 
+    def test_every_head_piece_box_tops_out_at_1_85_m_at_rest(self):
+        # The Run clip lifts Hips 0.035 m, so the head-piece rest bound is
+        # 1.85 m: 1.85 + 0.035 = 1.885 m, under the 1.90 m clip limit.
+        for champion in BOXES:
+            for _, box in boxes_of(champion, "head"):
+                with self.subTest(champion=champion, box=box):
+                    top = max(corner[1] for corner in box_corners(box))
+                    self.assertLessEqual(top, MAX_HEAD_TOP + CUE_TOLERANCE)
+
+    def test_every_head_piece_box_stays_inside_the_ground_radius(self):
+        for champion in BOXES:
+            for _, box in boxes_of(champion, "head"):
+                with self.subTest(champion=champion, box=box):
+                    for x, _, z in box_corners(box):
+                        self.assertLessEqual(
+                            math.sqrt(x * x + z * z), MAX_GROUND_RADIUS + CUE_TOLERANCE
+                        )
+
+    def test_no_head_piece_hides_the_accent_visor(self):
+        # The accent visor spans z 1.55 to 1.61 m and x from 0.11 m. The design
+        # rule (issue #239) is conservative: a head piece must sit at or above
+        # about 1.62 m, or lie behind x = 0, so it cannot occlude the front
+        # mark from the 55 degree camera.
+        for champion in BOXES:
+            for _, box in boxes_of(champion, "head"):
+                with self.subTest(champion=champion, box=box):
+                    corners = box_corners(box)
+                    if min(c[1] for c in corners) < 1.62 - CUE_TOLERANCE:
+                        self.assertLessEqual(max(c[0] for c in corners), CUE_TOLERANCE)
+
     def test_the_accent_is_the_placeholders(self):
         placeholder_doc, placeholder_bin = self.placeholder
         wanted = Counter(
             rounded(p) for p in positions(placeholder_doc, placeholder_bin, accent_primitive(placeholder_doc))
         )
-        for champion in CUE_BOXES:
+        for champion in BOXES:
             with self.subTest(champion=champion):
                 doc, bin_chunk = load(CHAMPIONS_DIR / ("%s.glb" % champion))
                 own = Counter(rounded(p) for p in positions(doc, bin_chunk, accent_primitive(doc)))

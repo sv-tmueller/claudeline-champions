@@ -127,13 +127,13 @@ side. The pose tables stay shared, with no per-champion pose: `Cast` raises the
 shield forward, `Attack` swings the hammer, and `Hit`, `Death` and `Run` throw
 or swing both arms outward without either part touching a leg. The whole cue is
 below the shoulders and reads from the 55 degree camera, not from straight
-above, and anything bulkier breaks the 0.5 m radius. The model's top is the
-head's 1.70 m at rest, and the clip tops are 1.7095 m (Idle), 1.7228 m (Run),
-1.7000 m (Attack), 1.7000 m (Cast), 1.7000 m (Hit) and 1.7026 m (Death), all
-under 1.90 m, with every clip's low at 0.0000 m. At key 30 of `Death` the lowest
-point of the shield is 23.3 mm above the floor and of the hammer 26.6 mm. The
-ground radius is 0.4924 m. The model is 600 vertices, 288 triangles and 39 780
-bytes, and four builds are byte-identical.
+above, and anything bulkier breaks the 0.5 m radius. With the head piece below,
+the model's top is the helm's 1.8200 m at rest, and the clip tops are 1.8357 m
+(Idle), 1.8723 m (Run), 1.8322 m (Attack), 1.8338 m (Cast), 1.8374 m (Hit) and
+1.8512 m (Death), all under 1.90 m, with every clip's low at 0.0000 m. At key 30
+of `Death` the lowest point of the shield is 23.3 mm above the floor and of the
+hammer 26.6 mm. The ground radius is 0.4924 m. The model is 648 vertices, 312
+triangles and 42 036 bytes, and four builds are byte-identical.
 
 Body colour: olive brass, linear (0.19, 0.18, 0.00), about `#797600`
 (decision 2 of batch #203). In 8-bit sRGB b minus g is -118, so the overlay
@@ -147,6 +147,15 @@ away (the energy colour). No existing margin is tightened: the roster's
 tightest pairs stay Skerrow against the black panels at 83.1 and Brimwick
 against Hargrim at 84.7. Bronze, 88.4 from the floor, and verdigris cyan, in
 the ally projectile and ally bar hue family, were measured and set aside.
+
+The head piece (issue #239) is a visored helm: a crown box 0.36 m by 0.36 m by
+0.15 m on `Spine` centred at (0, 0, 1.745) and a nose ridge 0.06 m by 0.10 m by
+0.16 m centred at (0.19, 0, 1.70), both in the body material. The ridge's
+bottom is 1.62 m, above the accent visor (which ends at 1.61 m), so the visor
+stays the front mark. The top is 1.8200 m, under the 1.85 m rest bound (`Run`
+lifts `Hips` 0.035 m, so 1.8550 m posed, under 1.90 m). Treated alone, the crown
+has a ground radius of 0.2546 m and the ridge 0.2256 m, both inside 0.5 m, so
+the model's 0.4924 m footprint does not move.
 
 ## 2. Wrenna, the bow archer
 
@@ -419,11 +428,11 @@ degrees and -0.64 m), it sinks 7.3 mm under the floor (near -0.17 m it sinks
 17.2 mm), and at -0.10 m every key and every sample holds at 0. The limbs stop
 at 1.30 m, so `Cast`'s raise of `Arm_L` to -85 degrees keeps the top at
 1.7000 m rather than lifting the bow over the limit. The pose tables stay
-shared, with no per-champion pose. The
-model's top is the head's 1.7000 m at rest, and the clip tops are 1.7095 m
-(Idle), 1.7228 m (Run), 1.7000 m (Attack), 1.7000 m (Cast), 1.7000 m (Hit) and
-1.7026 m (Death), all under 1.90 m, with every clip's low at 0.0000 m. The
-ground radius is 0.4847 m. The model is 624 vertices, 300 triangles and 40 924
+shared, with no per-champion pose. With the head piece below, the
+model's top is the cap's 1.8093 m at rest, and the clip tops are 1.8234 m
+(Idle), 1.8538 m (Run), 1.8175 m (Attack), 1.8183 m (Cast), 1.8093 m (Hit) and
+1.8100 m (Death), all under 1.90 m, with every clip's low at 0.0000 m. The
+ground radius is 0.4847 m. The model is 672 vertices, 324 triangles and 43 180
 bytes, and four builds are byte-identical.
 
 Body colour: plum, linear (0.445, 0.093, 0.175), about `#b25674`. In 8-bit sRGB
@@ -444,3 +453,15 @@ natural wren colours were measured and set aside: hunter green
 wren hue cannot pass either: every muted brown and leather tried tops out at
 76.6 (against Brimwick), under the 80 rule, and the paler tans that clear the
 rest sit inside 80 of her own plum.
+
+The head piece (issue #239) is an archer's cap with a swept-back feather, the
+lead's decision logged on the issue: Skerrow already has the hood, so a second
+hood would collide with his from the top-down camera. Two boxes on `Spine` in
+the body material: a low crown 0.34 m by 0.34 m by 0.12 m centred at
+(0, 0, 1.72) and a thin feather 0.05 m by 0.10 m by 0.24 m centred at
+(-0.05, 0, 1.72) and turned -55 degrees about Y, so it sweeps back and up
+behind the crown. The top is 1.8093 m, under the 1.85 m rest bound (`Run` lifts
+`Hips` 0.035 m, so 1.8443 m posed, under 1.90 m), and the crown clears the visor
+at 1.66 m. Treated alone, the crown's ground radius is 0.2404 m and the feather
+sweeps to 0.1701 m, both inside 0.5 m, so the model's 0.4847 m footprint does
+not move.

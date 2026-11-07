@@ -5,8 +5,9 @@ Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
 
 The ids are placeholder (the generic model), hargrim, quillon, lumeth, skerrow,
 ondrel, brimwick, durnhal and wrenna. They share the placeholder's body and
-accent and differ only in the body colour and one cue, Durnhal's and Wrenna's in
-parts on more than one bone, listed in tools/blender/README.md.
+accent and differ only in the body colour, one cue and one head piece,
+Durnhal's, Wrenna's and the head pieces in parts on more than one bone, listed
+in tools/blender/README.md.
 
 The glb holds a node `Rig` with the six bones as joints and the skinned mesh
 node `Champion`. The mesh origin is at the feet and it faces +X in both Blender
@@ -353,12 +354,103 @@ CUES = {
     "wrenna": add_bow_and_quiver,
 }
 
+# The head piece is the second half of a champion's silhouette, added in the
+# body material on Spine so the Attack yaw and the Hit lean carry it, and so
+# the accent still marks only the front. From the top-down camera the head is
+# the most visible part, so this is where a roster reads at a glance. Every
+# piece sits at or above about 1.62 m or behind x = 0, so none of them hides
+# the accent visor (z 1.55 to 1.61 m, x from 0.11 m), and every box tops out at
+# or under the 1.85 m rest bound: Run lifts Hips 0.035 m, so 1.885 m stays
+# under the 1.90 m clip limit. Brimwick's fuse cap is already his cue, so a
+# None here leaves it as his head piece too.
+
+
+def add_hargrim_helm(bm):  # hargrim, bruiser: a flat-topped helm with cheek guards
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.735), (0.34, 0.34, 0.13), BODY)
+    for side in (-1, 1):
+        carry(bm, "Spine", common.add_box, (0.0, side * 0.18, 1.71), (0.16, 0.06, 0.18), BODY)
+
+
+def add_quillon_hat(bm):  # quillon, ranged: a wide-brimmed hat, a thin brim and a crown
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.635), (0.40, 0.40, 0.03), BODY)
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.715), (0.26, 0.26, 0.13), BODY)
+
+
+def add_lumeth_cowl(bm):  # lumeth, healer: a cowl under the halo, a band and a drape
+    # Two boxes: her file is the tightest against the 48 KiB budget, where each
+    # box costs about 1.1 KB. The halo (top 1.815 m) stays her tallest point.
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.68), (0.32, 0.32, 0.12), BODY)
+    carry(bm, "Spine", common.add_box, (-0.12, 0.0, 1.58), (0.06, 0.26, 0.28), BODY)
+
+
+def add_skerrow_hood(bm):  # skerrow, assassin: a hood, a close crown and a back peak
+    # The peak is a box turned -25 degrees about Y and pushed behind x = 0. The
+    # shared Death clip, where the body lies on its back, is the tightest pose:
+    # at frame 30 the peak's lowest corner is 50.7 mm above the floor and the
+    # crown's is 64.7 mm, both far clear of the 0.1 mm floor tolerance. The x
+    # offset is the number the floor bounds: at this turn and height the corner
+    # reaches the floor just past the centre x = -0.16 m.
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.72), (0.34, 0.34, 0.14), BODY)
+    carry(
+        bm,
+        "Spine",
+        common.add_box,
+        (-0.11, 0.0, 1.745),
+        (0.12, 0.24, 0.15),
+        BODY,
+        (0.0, -25.0, 0.0),
+    )
+
+
+def add_ondrel_hat(bm):  # ondrel, zone controller: a conical reed hat, lower box wider
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.67), (0.40, 0.40, 0.10), BODY)
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.765), (0.22, 0.22, 0.11), BODY)
+
+
+def add_durnhal_helm(bm):  # durnhal, guardian tank: a visored helm with a nose ridge
+    # The ridge's bottom is 1.62 m, above the accent visor (which ends at 1.61 m),
+    # so the visor stays the front mark.
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.745), (0.36, 0.36, 0.15), BODY)
+    carry(bm, "Spine", common.add_box, (0.19, 0.0, 1.70), (0.06, 0.10, 0.16), BODY)
+
+
+def add_wrenna_cap(bm):  # wrenna, bow archer: an archer's cap with a swept-back feather
+    # The lead's decision (#239): a cap, not a hood, because Skerrow already has
+    # the hood. The feather is a thin box turned -55 degrees about Y to sweep it
+    # back, distinct from all seven other head pieces.
+    carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.72), (0.34, 0.34, 0.12), BODY)
+    carry(
+        bm,
+        "Spine",
+        common.add_box,
+        (-0.05, 0.0, 1.72),
+        (0.05, 0.10, 0.24),
+        BODY,
+        (0.0, -55.0, 0.0),
+    )
+
+
+HEAD_PIECES = {
+    "placeholder": None,
+    "hargrim": add_hargrim_helm,
+    "quillon": add_quillon_hat,
+    "lumeth": add_lumeth_cowl,
+    "skerrow": add_skerrow_hood,
+    "ondrel": add_ondrel_hat,
+    # His fuse cap is his cue, so it is already his head piece.
+    "brimwick": None,
+    "durnhal": add_durnhal_helm,
+    "wrenna": add_wrenna_cap,
+}
+
 
 def build(champion_id):
     bm = bmesh.new()
     add_body(bm)
     if CUES[champion_id]:
         CUES[champion_id](bm)
+    if HEAD_PIECES[champion_id]:
+        HEAD_PIECES[champion_id](bm)
     materials = [
         common.make_material("body", BODY_COLOURS[champion_id]),
         common.make_material("accent", ACCENT_COLOUR),

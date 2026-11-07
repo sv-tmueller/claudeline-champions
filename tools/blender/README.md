@@ -63,7 +63,7 @@ the Clips table below (`Idle`, `Run`, `Attack`, `Cast`, `Hit`, `Death`), and
 the keys come from the imported action's own fcurves, so a moved key is
 followed rather than shadowed by a hardcoded list: 27 key renders plus the rest
 render per champion. The camera is a three-quarter view framing the ~1.9 m
-model, so a cue is checked at the pose that moves it.
+model, so a cue or a head piece is checked at the pose that moves it.
 
 A full run is 67 PNGs: two arenas at two views each and nine champions at
 seven files each.
@@ -81,7 +81,7 @@ seven files each.
 | `test_preview.py` | Renders the placeholder through `preview.py` into a temporary directory and checks the rest PNG and one strip per clip exist and are non-empty. Needs Blender, skips without it |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
 | `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json` and `data/orbs.json`: the five materials, the floor field and trim border, one trim disc per spawn, the floor inlays (the end circle, the centre line and the orb mark), the four per-kind obstacle profiles and the wall caps. Standard library only, no Blender |
-| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue boxes of Ondrel, Brimwick, Durnhal and Wrenna and colour rules. Standard library only, no Blender |
+| `test_champion_models.py` | Contract test for the committed `champions/*.glb`: node layout, bind pose, rigid weights, feet, facing, height at rest and at every clip key, footprint, budgets, the cue and head-piece boxes of all eight roster ids (each head piece at most 1.85 m at rest and inside the 0.5 m radius) and colour rules. Standard library only, no Blender |
 | `validate_glb.py` | Checks glb structure, node names, a champion's rig and clips and the arena JSON. Standard library only |
 | `test_validate_glb.py` | Unit tests for the validator, one rejection per rig and clip rule against a synthetic rigged document, and a drift test between the two tables in `assets.md` and the validator's constants. The committed-model tests need `assets/models` to exist |
 
@@ -185,10 +185,12 @@ not vertical.
 - Body and accent are flat colours.
 - All nine files share the node layout, the origin, the facing, the body
   geometry, the rig, the clips and the accent. A roster champion differs only
-  in the body colour and one cue, which is in the body colour so the accent
-  still marks only the front. A cue can be several boxes: one on Spine for
-  Ondrel and Brimwick, two on Spine for Hargrim, and three on the two arms for
-  Durnhal and three on `Arm_L` for Wrenna plus her quiver on Spine.
+  in the body colour, one cue and one head piece, both in the body colour so
+  the accent still marks only the front. A cue can be several boxes: one on
+  Spine for Ondrel and Brimwick, two on Spine for Hargrim, and three on the two
+  arms for Durnhal and three on `Arm_L` for Wrenna plus her quiver on Spine. A
+  head piece is one to three boxes on Spine, so the `Attack` yaw and the `Hit`
+  lean carry it. Brimwick's fuse cap is his cue and his head piece at once.
 - The scene lists `Rig`, whose children are the joint `Hips` and the skinned
   mesh `Champion`. The rest pose is the static geometry, so the bind pose
   equals it and a model with no clip playing looks as it did unrigged. Every
@@ -200,7 +202,8 @@ not vertical.
   The pose values are constant tables in `gen_champion.py`, and `key_clip`
   asserts that a channel a clip does not key is at rest at every key.
 - The export writes the keys as authored, and only the channels each clip
-  keys, so each file stays at most 46 KB. `export_glb(out, rigged=True)` sets
+  keys, so each file stays under 47 KiB (the largest, Lumeth's, is 46.8 KiB).
+  `export_glb(out, rigged=True)` sets
   by name every skin and animation flag of the exporter that bears on the
   output. That includes `export_optimize_animation_size` (off, so no key is
   dropped as a duplicate) and the other animation flags at their 5.2 defaults.
@@ -209,18 +212,25 @@ not vertical.
 - The top of every model is at most 1.90 m, because the health bar starts
   above 1.97 m, and the ground radius is at most 0.50 m. Each file is at most
   48 KiB and 600 triangles.
+- A head piece tops out at 1.85 m at rest, not 1.90 m: the `Run` clip lifts
+  `Hips` 0.035 m, so a 1.85 m rest top is 1.885 m posed, under the 1.90 m clip
+  limit with room for the `Hit` lean. The 1.85 m bound is per head-piece box
+  and not a whole-model rule: Quillon's staff already reaches exactly 1.85 m at
+  rest and the whole-model checks stay at 1.90 m. No head piece hides the
+  accent visor (z 1.55 to 1.61 m, x from 0.11 m): each sits at or above about
+  1.62 m or behind x = 0.
 
-| id | archetype | body colour (linear) | about | cue |
-|----|-----------|----------------------|-------|-----|
-| `placeholder` | generic | (0.20, 0.35, 0.60) | `#7ca0cb` | none |
-| `hargrim` | bruiser | (0.38, 0.03, 0.02) | `#a63027` | two shoulder blocks, top at 1.53 m |
-| `quillon` | ranged | (0.00, 0.30, 0.25) | `#009589` | staff in the right hand, top at 1.85 m |
-| `lumeth` | healer | (0.30, 0.58, 0.02) | `#95c827` | halo ring above the head, top at 1.815 m |
-| `skerrow` | assassin | (0.03, 0.03, 0.03) | `#303030` | short blade forward from the right hand |
-| `ondrel` | zone controller | (0.03, 0.30, 0.03) | `#309530` | reed bundle on the back, top at 1.82 m |
-| `brimwick` | burst caster | (0.74, 0.12, 0.00) | `#df6100` | fuse cap on top of the head, top at 1.82 m |
-| `durnhal` | guardian tank | (0.19, 0.18, 0.00) | `#797600` | box shield on the left arm and a hammer in the right hand, top at 1.34 m |
-| `wrenna` | bow archer | (0.445, 0.093, 0.175) | `#b25674` | bow in the left hand and a quiver on the back, top at 1.52 m |
+| id | archetype | body colour (linear) | about | cue | head piece |
+|----|-----------|----------------------|-------|-----|------------|
+| `placeholder` | generic | (0.20, 0.35, 0.60) | `#7ca0cb` | none | none |
+| `hargrim` | bruiser | (0.38, 0.03, 0.02) | `#a63027` | two shoulder blocks, top at 1.53 m | flat-topped helm with cheek guards, top at 1.80 m |
+| `quillon` | ranged | (0.00, 0.30, 0.25) | `#009589` | staff in the right hand, top at 1.85 m | wide-brimmed hat, top at 1.78 m |
+| `lumeth` | healer | (0.30, 0.58, 0.02) | `#95c827` | halo ring above the head, top at 1.815 m | cowl under the halo, top at 1.74 m |
+| `skerrow` | assassin | (0.03, 0.03, 0.03) | `#303030` | short blade forward from the right hand | hood with a back peak, top at 1.84 m |
+| `ondrel` | zone controller | (0.03, 0.30, 0.03) | `#309530` | reed bundle on the back, top at 1.82 m | conical reed hat, top at 1.82 m |
+| `brimwick` | burst caster | (0.74, 0.12, 0.00) | `#df6100` | fuse cap on top of the head, top at 1.82 m | the same fuse cap, top at 1.82 m |
+| `durnhal` | guardian tank | (0.19, 0.18, 0.00) | `#797600` | box shield on the left arm and a hammer in the right hand, top at 1.34 m | visored helm with a nose ridge, top at 1.82 m |
+| `wrenna` | bow archer | (0.445, 0.093, 0.175) | `#b25674` | bow in the left hand and a quiver on the back, top at 1.52 m | archer's cap with a swept-back feather, top at 1.81 m |
 
 The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
 checked by `test_champion_models.py`. No body has a blue channel more than 45
