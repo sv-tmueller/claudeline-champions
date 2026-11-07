@@ -1095,8 +1095,9 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   with the committed one except for the head line. It exits 1 on a difference.
   Run it after any change to a kit, the sim or the bots.
 - The report was reproduced with `--check` on macOS (Apple silicon) with Node
-  22.23.2 (`played 17640 matches in 1246.0 s`, the three-arena check of the
-  committed block; the two-arena block was 11760 matches in 842.7 s)
+  22.23.2 (`played 17640 matches in 1230.1 s`, the three-arena check of the
+  committed block; the generating run before it took 1246.0 s, and the
+  two-arena block was 11760 matches in 842.7 s)
   and, for the four-kit report, Node 26.7.0. The linux/amd64 reproduction is the
   manual workflow `.github/workflows/balance.yml` (`workflow_dispatch` only,
   never on pull requests or pushes): trigger it with
