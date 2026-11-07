@@ -538,10 +538,10 @@ describe('a run', () => {
 });
 
 describe('a run of one mode', () => {
-  // 36 matches with the third arena (#238): 2.7 s locally (Apple M5 Pro, Node 22.23.2), about 6.7 s projected on
-  // the runner (ubuntu-latest, Node 22 at 2.7 s for 1.8 s locally). Timeout: twice that is 13.4 s, so 10 s stays
-  // thin, so 15 s (testing.md, Check suite; it was 10 s).
-  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 15_000 }, () => {
+  // 36 matches with the third arena (#238): 2.7 s locally (Apple M5 Pro, Node 22.23.2); 4.0 s projected on the
+  // runner (ubuntu-latest, Node 22 at 2.7 s for 1.8 s locally). Twice that is 8.1 s, so the 10 s of the
+  // 24-match row this one grew from stands (testing.md, Check suite).
+  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 10_000 }, () => {
     const cells = playCells(V1, { '2v2': 1 });
     // 6 pairings on 3 arenas; one seed on each of the 2 fills.
     expect(cells).toHaveLength(18);
@@ -554,9 +554,9 @@ describe('a run of the 3v3 mode alone', () => {
   // Replaces the 3v3 row of the CLI test (run.test.ts), which at six kits plays 360 matches: 34 s locally and
   // about 75 s on a runner (#195). This plays the same path on the four v1 kits, 36 matches with the third
   // arena (#238): the 3v3 cells of a one-seed schedule and their rendering, with no 2v2 row.
-  // 4.9 s locally (Apple M5 Pro, Node 22.23.2); 12.3 s on the runner (ubuntu-latest, Node 22; unit job
-  // 122091170207 at 8.2 s on two arenas). Twice that is 24.6 s, so the timeout is 30 s (testing.md, Check suite;
-  // it was 20 s).
+  // 5.0 s locally (Apple M5 Pro, Node 22.23.2); about 12.4 s projected on the runner (ubuntu-latest, Node 22,
+  // unit job 122091170207 at 8.2 s for 3.3 s locally). Twice that is 24.9 s, so the timeout is 30 s
+  // (testing.md, Check suite; it was 20 s).
   it('plays and renders the 3v3 cells of a one-seed schedule, and no 2v2 cell', { timeout: 30_000 }, () => {
     const seeds = { '3v3': 1 };
     const cells = playCells(V1, seeds);

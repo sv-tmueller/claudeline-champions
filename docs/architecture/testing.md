@@ -161,10 +161,10 @@ v1 kits) has a 200 s timeout (150 s before arena03 of #238, and 120 s before the
 dodge of #137), and it is the
 thinnest margin in the suite: 30.7 s locally with the third arena (22.4 s on two,
 18.6 s before the dodge), 47.3 to 59.6 s on
-the runner before the dodge and 62.4 s after it (job 117369238607), so about 92 s
-with the arena's third more. By the rule,
-twice the slowest runner time is 184 s, so the timeout is 200 s, which is 16 s
-over it; the test sits at 46 percent of its timeout.
+the runner before the dodge and 62.4 s after it (job 117369238607), so about 85.5 s
+with the arena's third more (62.4 x 30.7 / 22.4). By the rule,
+twice the slowest runner time is 171 s, so the timeout is 200 s, which is 29 s
+over it; the test sits at 43 percent of its timeout.
 
 The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells),
 `brimwick.test.ts` (eight) and `durnhal.test.ts` (twelve, #211) play each cell to matchEnd under the press oracle and
@@ -258,10 +258,11 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
   report; only the CLI row plays six-kit cells (180 matches, one seed of the 2v2
-  mode, 9.9 s locally and 35.4 s on the runner, timeout 90 s, unit job
-  122091170207 measured 23.6 s on two arenas), the 3v3 success path is a
-  36-match row on the four v1 kits (4.9 s locally and 12.3 s on the runner,
-  timeout 30 s; the CLI's 3v3 row at six
+  mode, 9.5 s locally and about 34 s projected on the runner, timeout 90 s, unit
+  job 122091170207 measured 23.6 s for 6.6 s locally on two arenas), the 3v3
+  success path is a
+  36-match row on the four v1 kits (5.0 s locally and about 12.4 s projected on
+  the runner, timeout 30 s; the CLI's 3v3 row at six
   kits is 360 matches, 34 s locally and projected at about 75 s on a runner, so
   it was replaced, not given a longer timeout). The CLI's error rows pin the
   message of each rule, so a parser that rejects `--mode 3v3` fails them. Two
