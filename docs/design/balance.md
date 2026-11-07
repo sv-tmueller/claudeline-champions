@@ -4,8 +4,9 @@
 
 Status: the harness and the baseline of batch #105 (issue #109), its first
 tuning pass (issue #121), the Hargrim and Quillon pass (issue #124), the
-six-kit report of batch 15 (issue #189, section 5.9) and the melee presses of
-batch 16 (issue #186, section 5.10). The
+six-kit report of batch 15 (issue #189, section 5.9), the melee presses of
+batch 16 (issue #186, section 5.10) and the melee stand of batch 17 (issue
+#213, section 5.11). The
 first pass moved two numbers, one of Skerrow's and one of Lumeth's (section 6),
 and the second moved none: each of its 20 candidates was dropped, by a
 pre-check or by its full run (section 6.2). Sections 5 and 6 record the report
@@ -14,11 +15,13 @@ had 1, which is also the report of #124's head, since no kit changed. Every
 cell is in band or accepted with its reason there. The report in section 4 was
 regenerated after the bots began to dodge (issue #137): 5 of 24 cells in band
 (the note of section 4). The six-kit report added Ondrel and Brimwick to the
-harness: the block of section 4 is its 60 cells, and section 5.9 reads the one
-generated at 3704221 (8 of them in band). The block was regenerated after the
-bots stopped refusing a melee press the sim lands (issue #186): 7 of 60 in
-band, read in section 5.10. Sections 5.1 to 5.8 and 6 stay the record of the
-four-kit report at 9a9c653 and of the passes made on it.
+harness, and section 5.9 reads the block it generated at 3704221 (60 cells, 8
+of them in band). The block was regenerated after the bots stopped refusing a
+melee press the sim lands (issue #186): 7 of 60 in band, read in section 5.10.
+Arena03 (#238) then extended that block into the three-arena one of section 4:
+90 cells and 11 in band.
+Sections 5.1 to 5.8 and 6 stay the record of the four-kit report at 9a9c653 and
+of the passes made on it.
 
 Sources:
 
@@ -51,8 +54,9 @@ Sources:
 ## 2. The bands
 
 - A cell is one mode (2v2 or 3v3), one arena and one pairing, so there are
-  60 cells with the six kits of the harness roster and two arenas, 15 pairings
-  a mode and arena (the 24 of the four v1 kits are among them).
+  90 cells with the six kits of the harness roster and three arenas, 15 pairings
+  a mode and arena (the 24 of the four v1 kits on the first two arenas are among
+  them).
 - The band is 40 to 60 percent inclusive on X's win rate in the cell. The test
   is on the exact rate (wins times 100 against 40 and 60 times the decided
   matches), not on the rounded figure in the table.
@@ -74,8 +78,9 @@ Sources:
   and Brimwick (#148) joined the four v1 kits in the six-kit report (#189;
   [decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
   so the 90 cells, the 17 640 matches and the block of section 4 are those of
-  six kits on three arenas (arena03 of #238). Durnhal's kit is in `data/kits` since #204 and is not in the
-  harness roster until step 1.3 of roadmap #176, so the block does not move.
+  six kits on three arenas (arena03 of #238). Durnhal's kit is in `data/kits`
+  since #204 and is not in the harness roster until step 1.3 of roadmap #176, so
+  the block does not move.
   "Pairing" is read as the matchup of two champions, as decision 6
   words it, and not as the duo of roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
@@ -354,8 +359,9 @@ Win rate in percent over the cells the champion is in, as X or as Y.
 ## 5. The cells after the tuning passes
 
 Sections 5.1 to 5.8 read the four-kit report at 9a9c653; 5.9 reads the six-kit
-block of #189 (generated at 3704221), and 5.10 the block of section 4, which
-replaced it after #186.
+block of #189 (generated at 3704221), 5.10 the block of #186, and 5.11 the
+block of #213, which #238 then extended with arena03 into the three-arena block
+of section 4.
 
 After the tuning passes of #121 and #124 three cells are in the band and 21 are
 outside. Each is in band or accepted with its reason, with its reading. The
@@ -583,7 +589,7 @@ so it is not regenerated.
 
 ### 5.9 The six-kit report (batch 15, #189 and #188)
 
-The block of section 4 plays six kits: 60 cells, 11 760 matches, each cell about
+The block read here plays six kits: 60 cells, 11 760 matches, each cell about
 200 (section 3). The old rates below are those of the four-kit block after the
 dodge of #137 (section 4), which no later change moved. Ondrel and Brimwick
 (#148, with the bot profiles of #165) are in the harness for the first time. Of
@@ -786,8 +792,9 @@ package changes no kit and no bots rule.
 
 Note (2026-10-27, #186): the open question above, whether the profiles or the
 kits move first, is read in section 5.10 on a measurement. The figures of this
-section stay those of the block of #189, which the block of section 4 replaced
-after #186; section 5.10 lists what moved.
+section stay those of the block of #189, which the #186 block replaced; section
+5.10 lists what moved, and #238 extended that block with arena03 into the block
+of section 4.
 
 ### 5.10 The melee presses of #186 (batch 16)
 
