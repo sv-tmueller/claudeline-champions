@@ -112,8 +112,9 @@ first.
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
   22.15 or later. It plays six of the seven kits of `data/kits`, the
-  `HARNESS_KITS` of `tools/balance/inputs.ts`: 60 cells and 11 760 matches,
-  about 14 minutes on Apple silicon (the report of batch 15, #189).
+  `HARNESS_KITS` of `tools/balance/inputs.ts`: 90 cells and 17 640 matches over
+  three arenas, about 21 minutes on Apple silicon (the report of batch 15, #189,
+  with arena03 of #238).
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test

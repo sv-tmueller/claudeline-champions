@@ -159,11 +159,11 @@ before.
 `tools/balance/harness.test.ts` "plays 36 cells over the shipped data" (the four
 v1 kits) has a 200 s timeout (150 s before arena03 of #238, and 120 s before the
 dodge of #137), and it is the
-thinnest margin in the suite: 44.5 s locally with the third arena (22.4 s on two,
+thinnest margin in the suite: 30.7 s locally with the third arena (22.4 s on two,
 18.6 s before the dodge), 47.3 to 59.6 s on
 the runner before the dodge and 62.4 s after it (job 117369238607), so about 92 s
 with the arena's third more. By the rule,
-twice the slowest runner time is 185 s, so the timeout is 200 s, which is 15 s
+twice the slowest runner time is 184 s, so the timeout is 200 s, which is 16 s
 over it; the test sits at 46 percent of its timeout.
 
 The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells),

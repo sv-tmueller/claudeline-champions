@@ -507,8 +507,8 @@ describe('the report', () => {
 describe('a run', () => {
   // Runner (ubuntu-latest, Node 22): 47.3 to 59.6 s before the dodge of #137, 62.4 s on 787cd0c (unit job
   // 117369238607); 22.4 s locally (Apple M5 Pro, Node 22.23.2; 18.6 s before). arena03 (#238) appends one third
-  // more cells: measured at 44.5 s locally, so about 92 s on the runner. Timeout: twice the slowest runner time
-  // is 185 s (testing.md, Check suite; it was 150 s).
+  // more cells: measured at 30.7 s locally, so about 92 s projected on the runner. Timeout: twice that is 184 s
+  // (testing.md, Check suite; it was 150 s).
   it('plays 36 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 200_000 }, () => {
     const run = () => {
       const cells = playCells(V1, TWO);
@@ -538,9 +538,10 @@ describe('a run', () => {
 });
 
 describe('a run of one mode', () => {
-  // 36 matches with the third arena (#238): 2.7 s locally (Apple M5 Pro, Node 22.23.2), 4.0 s on the runner
-  // (ubuntu-latest, Node 22). Timeout: twice the runner time is 8.1 s, so 10 s stands (testing.md, Check suite).
-  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 10_000 }, () => {
+  // 36 matches with the third arena (#238): 2.7 s locally (Apple M5 Pro, Node 22.23.2), about 6.7 s projected on
+  // the runner (ubuntu-latest, Node 22 at 2.7 s for 1.8 s locally). Timeout: twice that is 13.4 s, so 10 s stays
+  // thin, so 15 s (testing.md, Check suite; it was 10 s).
+  it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 15_000 }, () => {
     const cells = playCells(V1, { '2v2': 1 });
     // 6 pairings on 3 arenas; one seed on each of the 2 fills.
     expect(cells).toHaveLength(18);

@@ -21,9 +21,10 @@ function balance(...args: string[]) {
 }
 
 describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
-  // 180 matches in a spawned process (six kits: 15 pairings on 3 arenas, 4 fills, 1 seed): 9.9 s locally
-  // (Apple M5 Pro, Node 22.23.2); 35.4 s on the runner (ubuntu-latest, Node 22; unit job 122091170207 measured
-  // 23.6 s on two arenas). Twice that is 71 s, so the timeout is 90 s (testing.md, Check suite; it was 60 s).
+  // 180 matches in a spawned process (six kits: 15 pairings on 3 arenas, 4 fills, 1 seed): 9.5 s locally
+  // (Apple M5 Pro, Node 22.23.2), projecting to about 34 s on the runner (ubuntu-latest, Node 22; unit job
+  // 122091170207 measured 23.6 s on two arenas for 6.6 s locally). Twice that is 68 s, so the timeout is 90 s
+  // (testing.md, Check suite; it was 60 s on two arenas).
   it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 90_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), 'balance-'));
     try {
