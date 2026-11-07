@@ -4,7 +4,7 @@ They read `assets/models/arenas/*.glb` and the matching `data/arenas/*.json`
 and check the geometry gen_arena.py builds from the definition: the five flat
 materials, the two-tone floor (a field and a trim border), one trim disc under
 every spawn, the floor inlays (the end circle, the centre line and the orb
-mark), the chamfered obstacle tops and the trim caps on the walls. The discs,
+mark), the per-kind obstacle profiles and the trim caps on the walls. The discs,
 the inlays and the caps are geometry inside the existing `Floor` and `Wall_*`
 meshes, not nodes (decision 7 of batch #134), so the vertex data is the only
 place to check them. No Blender is needed, so they run in CI.
@@ -33,7 +33,18 @@ RING_INLAY_WIDTH = 0.1
 LINE_WIDTH = 0.1
 LINE_HEIGHT = 0.008
 MARK_RADIUS = 0.3
-BEVEL = 0.08
+# The four obstacle profiles replace the old 0.08 m chamfer (issue #237).
+OBSTACLE_INSET = 0.1  # a wall segment's body or a column's shaft, inwards
+BASE_COURSE = 0.15  # a wall segment's base course, full footprint
+TOP_COURSE = 0.15  # a wall segment's cap, full footprint
+BASE_RING_HEIGHT = 0.15  # a column's base ring, full radius
+CAPITAL_HEIGHT = 0.15  # a column's capital, full radius
+GROOVE_DEPTH = 0.05  # a crate's slat grooves, below the height
+GROOVE_WIDTH = 0.06  # the gap between two crate slats
+CRATE_GROOVES = 2  # the gaps across a crate's long axis
+HOOP_INSET = 0.05  # a barrel's hoop bands, outwards of the body
+HOOP_HEIGHT = 0.06  # a barrel's hoop band height
+BARREL_HOOPS = 3  # a barrel's hoop bands, the first at the base, the last at the top
 CAP_HEIGHT = 0.1
 CAP_BEVEL = 0.05
 
@@ -80,6 +91,41 @@ def at_height(vertices, up):
 
 def radius(vertex):
     return math.hypot(vertex[X], vertex[Z])
+
+
+def radii_at(vertices, up):
+    """The distinct radii of the vertices at one height."""
+    return {round(radius(v), 4) for v in at_height(vertices, up)}
+
+
+def barrel_band_levels(height):
+    """The z levels a barrel's bands meet at.
+
+    BARREL_HOOPS hoop bands of HOOP_HEIGHT, the first at the base and the last
+    at the top, with BARREL_HOOPS - 1 body bands of the rest between them. The
+    generator lays the bands out with the same sums, so the returned upper
+    bounds are the mesh's own z values, and a single-radius cylinder (no
+    boundary rows at all) or a different count or inset cannot match.
+    """
+    body_height = (height - BARREL_HOOPS * HOOP_HEIGHT) / (BARREL_HOOPS - 1)
+    levels = {0.0}
+    z = 0.0
+    for band in range(BARREL_HOOPS):
+        z += HOOP_HEIGHT
+        levels.add(round(z, 4))
+        if band < BARREL_HOOPS - 1:
+            z += body_height
+            levels.add(round(z, 4))
+    return levels
+
+
+def xz_extents(vertices, up):
+    """The distinct (|x| max, |z| max) footprints of the vertices at one height.
+
+    A stacked profile repeats a height where two bands meet, so this returns a
+    set: the shared ring's two footprints are both present there.
+    """
+    return {(round(abs(v[X]), 4), round(abs(v[Z]), 4)) for v in at_height(vertices, up)}
 
 
 def clusters(vertices, gap):
@@ -286,19 +332,124 @@ class CommittedArenaTests(unittest.TestCase):
                 self.assertNear(max(radius(v) for v in vertices), ob["r"], "obstacle %d radius" % i)
 
     @per_arena
-    def test_each_obstacle_top_is_inset_by_the_chamfer(self, arena, doc, bin_chunk):
+    def test_every_obstacle_vertex_sits_inside_the_footprint_and_below_the_height(self, arena, doc, bin_chunk):
         for i, ob in enumerate(arena["obstacles"]):
             (vertices,) = node_vertices(doc, bin_chunk, "Obstacle_%d" % i).values()
+            for v in vertices:
+                self.assertGreaterEqual(v[UP], -TOLERANCE, "obstacle %d vertex below the base" % i)
+                self.assertLessEqual(v[UP], ob["height"] + TOLERANCE, "obstacle %d vertex above the height" % i)
+                if ob["type"] == "rect":
+                    self.assertLessEqual(abs(v[X]), ob["w"] / 2 + TOLERANCE, "obstacle %d x outside" % i)
+                    self.assertLessEqual(abs(v[Z]), ob["h"] / 2 + TOLERANCE, "obstacle %d z outside" % i)
+                else:
+                    self.assertLessEqual(radius(v), ob["r"] + TOLERANCE, "obstacle %d radius outside" % i)
+            self.assertTrue(at_height(vertices, ob["height"]), "obstacle %d has no top face at its height" % i)
+
+    @per_arena
+    def test_a_blocking_rect_is_a_wall_segment_with_an_inset_body(self, arena, doc, bin_chunk):
+        for i, ob in enumerate(arena["obstacles"]):
+            if ob["type"] != "rect" or not ob["blocksProjectiles"]:
+                continue
+            (vertices,) = node_vertices(doc, bin_chunk, "Obstacle_%d" % i).values()
+            hx, hz = ob["w"] / 2, ob["h"] / 2
+            full = (round(hx, 4), round(hz, 4))
+            body = (round(hx - OBSTACLE_INSET, 4), round(hz - OBSTACLE_INSET, 4))
+            # Base course and cap keep the full footprint; the body between
+            # them is inset by OBSTACLE_INSET on both axes.
+            self.assertEqual(xz_extents(vertices, 0.0), {full}, "obstacle %d base" % i)
+            self.assertEqual(xz_extents(vertices, BASE_COURSE), {full, body}, "obstacle %d base course" % i)
+            self.assertEqual(
+                xz_extents(vertices, ob["height"] - TOP_COURSE), {body, full}, "obstacle %d cap" % i
+            )
+            self.assertEqual(xz_extents(vertices, ob["height"]), {full}, "obstacle %d top" % i)
+
+    @per_arena
+    def test_a_blocking_circle_is_a_column_with_a_base_ring_and_a_capital(self, arena, doc, bin_chunk):
+        for i, ob in enumerate(arena["obstacles"]):
+            if ob["type"] != "circle" or not ob["blocksProjectiles"]:
+                continue
+            (vertices,) = node_vertices(doc, bin_chunk, "Obstacle_%d" % i).values()
+            r = ob["r"]
+            full = round(r, 4)
+            shaft = round(r - OBSTACLE_INSET, 4)
+            self.assertEqual(radii_at(vertices, 0.0), {full}, "obstacle %d base" % i)
+            self.assertEqual(radii_at(vertices, BASE_RING_HEIGHT), {full, shaft}, "obstacle %d base ring" % i)
+            self.assertEqual(
+                radii_at(vertices, ob["height"] - CAPITAL_HEIGHT), {full, shaft}, "obstacle %d capital" % i
+            )
+            self.assertEqual(radii_at(vertices, ob["height"]), {full}, "obstacle %d top" % i)
+
+    @per_arena
+    def test_a_non_blocking_rect_is_a_crate_with_slat_grooves(self, arena, doc, bin_chunk):
+        for i, ob in enumerate(arena["obstacles"]):
+            if ob["type"] != "rect" or ob["blocksProjectiles"]:
+                continue
+            (vertices,) = node_vertices(doc, bin_chunk, "Obstacle_%d" % i).values()
+            long_axis, short_axis = (X, Z) if ob["w"] >= ob["h"] else (Z, X)
+            long_half = max(ob["w"], ob["h"]) / 2
+            short_half = min(ob["w"], ob["h"]) / 2
             top = at_height(vertices, ob["height"])
-            shoulder = at_height(vertices, ob["height"] - BEVEL)
-            self.assertTrue(top and shoulder, "obstacle %d has no chamfer rows" % i)
-            if ob["type"] == "rect":
-                for axis, half in ((X, ob["w"] / 2), (Z, ob["h"] / 2)):
-                    self.assertNear(max(abs(v[axis]) for v in top), half - BEVEL, "obstacle %d top" % i)
-                    self.assertNear(max(abs(v[axis]) for v in shoulder), half, "obstacle %d shoulder" % i)
-            else:
-                self.assertNear(max(radius(v) for v in top), ob["r"] - BEVEL, "obstacle %d top" % i)
-                self.assertNear(max(radius(v) for v in shoulder), ob["r"], "obstacle %d shoulder" % i)
+            self.assertTrue(top, "obstacle %d has no top face" % i)
+            # The grooves are gaps of GROOVE_WIDTH in the top face's long
+            # axis, so the top reads as more than one slat.
+            values = sorted({round(v[long_axis], 4) for v in top})
+            grooves = [b - a for a, b in zip(values, values[1:]) if abs((b - a) - GROOVE_WIDTH) <= TOLERANCE]
+            # Pin the count and the span as well as the width: CRATE_GROOVES
+            # gaps of GROOVE_WIDTH divide the long axis into CRATE_GROOVES + 1
+            # slats, so a single gap (half the long axis) or a slat count that
+            # drifts from the generator's fails here.
+            self.assertEqual(len(grooves), CRATE_GROOVES, "obstacle %d slat grooves" % i)
+            self.assertNear(values[0], -long_half, "obstacle %d first slat edge" % i)
+            self.assertNear(values[-1], long_half, "obstacle %d last slat edge" % i)
+            # Every slat spans the short axis fully.
+            lo, hi = extent(top, short_axis)
+            self.assertNear(lo, -short_half, "obstacle %d slat short axis" % i)
+            self.assertNear(hi, short_half, "obstacle %d slat short axis" % i)
+            # The body's top, one groove deep, is the floors the gaps show.
+            floor = at_height(vertices, ob["height"] - GROOVE_DEPTH)
+            self.assertTrue(floor, "obstacle %d has no groove floors" % i)
+            for axis, half in ((X, ob["w"] / 2), (Z, ob["h"] / 2)):
+                lo, hi = extent(floor, axis)
+                self.assertNear(lo, -half, "obstacle %d body floor" % i)
+                self.assertNear(hi, half, "obstacle %d body floor" % i)
+
+    @per_arena
+    def test_a_non_blocking_circle_is_a_barrel_with_hoop_bands(self, arena, doc, bin_chunk):
+        # No committed arena has a non-blocking circle: the barrel is the
+        # fourth profile the schema allows, and this loop is empty against
+        # today's data. It is written data-driven so the builder is checked
+        # the moment a future arena adds one, with no edit here. The checks
+        # are tighter than a plain cylinder's because that is the shape they
+        # must reject: a single-radius cylinder has one radius, two z rows and
+        # no band boundaries, so it fails the radius set, the band levels and
+        # the joins between them.
+        for i, ob in enumerate(arena["obstacles"]):
+            if ob["type"] != "circle" or ob["blocksProjectiles"]:
+                continue
+            (vertices,) = node_vertices(doc, bin_chunk, "Obstacle_%d" % i).values()
+            r = ob["r"]
+            full = round(r, 4)
+            body = round(r - HOOP_INSET, 4)
+            # Two radii only, both of them the profile's: absence of the body
+            # radius is the collapsed shape, presence of a third is a bug.
+            self.assertEqual({round(radius(v), 4) for v in vertices}, {full, body}, "obstacle %d radius" % i)
+            top = at_height(vertices, ob["height"])
+            self.assertTrue(top, "obstacle %d has no top face" % i)
+            self.assertNear(max(radius(v) for v in top), r, "obstacle %d top radius" % i)
+            # The z rows are exactly the generator's band boundaries: the base,
+            # BARREL_HOOPS hoop tops and the body bands between them. A plain
+            # cylinder has only the first two rows of the set.
+            rows = sorted({round(v[UP], 4) for v in vertices})
+            self.assertEqual(set(rows), barrel_band_levels(ob["height"]), "obstacle %d band levels" % i)
+            # The base and the top are hoop bands, so they are at the full
+            # radius; every row between them joins a hoop to a body band, so
+            # it carries both radii.
+            self.assertEqual(radii_at(vertices, 0.0), {full}, "obstacle %d base hoop" % i)
+            self.assertEqual(radii_at(vertices, ob["height"]), {full}, "obstacle %d top hoop" % i)
+            for level in rows[1:-1]:
+                self.assertEqual(
+                    radii_at(vertices, level), {full, body}, "obstacle %d band join at %s" % (i, level)
+                )
 
     @per_arena
     def test_each_wall_keeps_its_bounds_and_splits_into_a_wall_and_a_trim_cap(self, arena, doc, bin_chunk):
