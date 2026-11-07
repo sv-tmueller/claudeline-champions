@@ -34,7 +34,7 @@ CHAMPION_IDS = (
 )
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 
-ARENA_IDS = ("arena01", "arena02")
+ARENA_IDS = ("arena01", "arena02", "arena03")
 ARENAS_DIR = REPO / "assets" / "models" / "arenas"
 ARENA_DATA_DIR = REPO / "data" / "arenas"
 

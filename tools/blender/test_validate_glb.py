@@ -16,7 +16,7 @@ from unittest import mock
 import validate_glb
 
 REPO = Path(__file__).resolve().parents[2]
-ARENA_IDS = ("arena01", "arena02")
+ARENA_IDS = ("arena01", "arena02", "arena03")
 ARENAS_DIR = REPO / "assets" / "models" / "arenas"
 ARENA_GLB = ARENAS_DIR / "arena01.glb"
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
