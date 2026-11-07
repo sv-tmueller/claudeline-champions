@@ -341,9 +341,10 @@ pull request or a push). It can be dispatched with
 `gh workflow run balance.yml --ref <branch>` once the file is on the default
 branch. The whole run was 12 to 16 minutes at four kits; at six kits and three
 arenas it is about
-21 minutes locally (2v2 8.0, 3v3 13.4) and projects to about 24 (2v2) and 40
-(3v3) on a runner, so the jobs have `timeout-minutes` of 60 and 105, twice the
-projected check time (the failure step plays the mode again) and a margin. The
+21 minutes locally (2v2 8.0, 3v3 13.4) and projects to about 23 to 25 (2v2) and
+39 to 42 (3v3) on a runner, so the jobs have `timeout-minutes` of 60 and 105,
+twice the projected check time (the failure step plays the mode again) and a
+margin. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 
