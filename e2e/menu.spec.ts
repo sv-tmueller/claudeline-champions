@@ -198,7 +198,7 @@ test('goes back to the select from the menu and relaunches on another arena', as
     await page.locator('[data-menu="panel"] [data-action="select"]').click();
     await expectMenu(page, true, 'select');
 
-    // The select of the menu: the champion links stay on this arena, and both arenas are offered.
+    // The select of the menu: the champion links stay on this arena, and every arena is offered.
     const links = await page.evaluate(() => ({
       champions: [...document.querySelectorAll<HTMLElement>('[data-menu="panel"] [data-champion]')].map((entry) => [
         entry.getAttribute('data-champion'),
@@ -221,6 +221,7 @@ test('goes back to the select from the menu and relaunches on another arena', as
     expect(links.arenas).toEqual([
       ['arena01', 'true', '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2'],
       ['arena02', 'false', '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=2'],
+      ['arena03', 'false', '?champion=hargrim&difficulty=normal&arena=arena03&teamsize=2'],
     ]);
     // The team row: 2v2 is being played, and each link writes the whole setup with its own size.
     expect(links.teams).toEqual([
