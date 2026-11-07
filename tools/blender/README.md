@@ -14,6 +14,7 @@ Run these from the repo root. Each must exit 0.
 ```
 tools/blender/run.sh tools/blender/gen_arena.py -- --arena data/arenas/arena01.json --out assets/models/arenas/arena01.glb
 tools/blender/run.sh tools/blender/gen_arena.py -- --arena data/arenas/arena02.json --out assets/models/arenas/arena02.glb
+tools/blender/run.sh tools/blender/gen_arena.py -- --arena data/arenas/arena03.json --out assets/models/arenas/arena03.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion placeholder --out assets/models/champions/placeholder.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion hargrim --out assets/models/champions/hargrim.glb
 tools/blender/run.sh tools/blender/gen_champion.py -- --champion quillon --out assets/models/champions/quillon.glb
@@ -65,7 +66,7 @@ followed rather than shadowed by a hardcoded list: 27 key renders plus the rest
 render per champion. The camera is a three-quarter view framing the ~1.9 m
 model, so a cue or a head piece is checked at the pose that moves it.
 
-A full run is 67 PNGs: two arenas at two views each and nine champions at
+A full run is 69 PNGs: three arenas at two views each and nine champions at
 seven files each.
 
 ## Files
@@ -73,11 +74,11 @@ seven files each.
 | File | Purpose |
 |------|---------|
 | `run.sh` | Runs a script in Blender background mode |
-| `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for `arena01` and `arena02`. It also reads the orb table (`--orbs`, default `data/orbs.json`; a missing file is an empty table) and marks each arena's orb point |
+| `gen_arena.py` | Builds an arena glb from `data/arenas/<id>.json`, for every arena. It also reads the orb table (`--orbs`, default `data/orbs.json`; a missing file is an empty table) and marks each arena's orb point |
 | `gen_champion.py` | Builds the placeholder or one of the eight roster champion glbs: the body, the six-bone rig and the six clips from constant pose tables, each keying only the channels it moves |
 | `blender_common.py` | Scene clearing, materials, the armature and clip helpers and export, shared by the generators. `add_box` takes an optional Euler XYZ in degrees about the box's centre, default identity |
 | `preview.py` | Renders committed glbs to PNGs in a given `--out` for local eyeballing: two arena views, a champion rest view and one strip per clip keyed at every key. Needs Blender, never writes under `assets/`, and its renders are not deterministic and not in CI |
-| `test_export_determinism.py` | Regenerates each model, both arenas included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
+| `test_export_determinism.py` | Regenerates each model, every arena included, four times and compares it to the committed glb. Needs Blender, skips without it. Two tests, without Blender, check that every committed champion glb and the arena glbs, arena definitions and cases are the same set |
 | `test_preview.py` | Renders the placeholder through `preview.py` into a temporary directory and checks the rest PNG and one strip per clip exist and are non-empty. Needs Blender, skips without it |
 | `test_arena_principles.py` | Checks every `data/arenas/*.json` against `docs/design/arenas.md`, sections 3 to 7: spawns, heights, cover, gaps, reach and the end circle. It pins arena01's two grandfathered deviations. Standard library only, no Blender |
 | `test_arena_models.py` | Contract test for the committed `arenas/*.glb` against `data/arenas/*.json` and `data/orbs.json`: the five materials, the floor field and trim border, one trim disc per spawn, the floor inlays (the end circle, the centre line and the orb mark), the four per-kind obstacle profiles and the wall caps. Standard library only, no Blender |
@@ -134,11 +135,11 @@ not vertical.
   above. The generator asserts that the ring and the mark fit on the field and
   that the mark clears the ring's inner edge.
 - The walls are 0.5 m thick and 1.0 m high. They sit outside the playable
-  area, with their inner faces on x = +-15 and y = +-10 for both arenas. Each
+  area, with their inner faces on x = +-15 and y = +-10 for every arena. Each
   is a `wall` box up to 0.9 m and a `trim` cap from 0.9 m to 1.0 m in the same
   mesh, with the long top edges of the cap chamfered by 0.05 m.
 - `Wall_N` is at +y and `Wall_E` is at +x. `Wall_N` and `Wall_S` are longer by
-  two wall thicknesses (31 m for both arenas) so the corners close.
+  two wall thicknesses (31 m for every arena) so the corners close.
 - Node names are exactly `Floor`, `Wall_N`, `Wall_S`, `Wall_E`, `Wall_W` and
   `Obstacle_0` to `Obstacle_<n-1>`, matching the obstacle order in the JSON.
 - Five flat materials: floor, trim, wall, blocking obstacle (brown) and
@@ -237,7 +238,7 @@ checked by `test_champion_models.py`. No body has a blue channel more than 45
 above its green channel in 8-bit sRGB, so nothing reads as the magenta debug
 overlay. Each roster body is at least 80 away, as an RGB distance, from the
 other roster bodies, the placeholder body, the accent, the floor and the trim
-of both arenas and the colours the client draws near a champion (bars,
+of every arena and the colours the client draws near a champion (bars,
 projectiles, impact ring, hit flash, dead grey and the magenta debug overlay
 `#ff00ff`).
 
@@ -279,8 +280,8 @@ Wrenna's plum, (0.445, 0.093, 0.175), about `#b25674`, is the lead's decision
 for her model (issue #235). Three decimal places are needed: two give `#b35573`,
 not `#b25674`. In 8-bit sRGB b minus g is 30, so the overlay rule holds
 (`overlay None`). Its nearest colours are the enemy bar and the menu error at
-85.9, the floor of both arenas at 86.3, Hargrim at 86.7, the dead grey at 88.7,
-the enemy projectile at 96.0, the trim of both arenas at 99.2, Brimwick at 124.9
+85.9, the floor of every arena at 86.3, Hargrim at 86.7, the dead grey at 88.7,
+the enemy projectile at 96.0, the trim of every arena at 99.2, Brimwick at 124.9
 and the placeholder at 126.3; every pair is at least 85.9, so no existing margin
 moves. Three natural wren colours were measured and set aside. Hunter green
 (0.0, 0.125, 0.0), about `#006300`, is 84.3 from Ondrel, under the rule. Deep

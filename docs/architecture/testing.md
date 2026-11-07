@@ -156,12 +156,15 @@ the file read 16.1 to 30.8 s on the runner in the five jobs of the branch
 (runs 41514425270 and 41516291837 read 17.9 and 16.1 s) against 17.0 to 32.6 s
 before.
 
-`tools/balance/harness.test.ts` "plays 24 cells over the shipped data" (the four
-v1 kits) has a 150 s timeout (120 s before the dodge of #137), and it is the
-thinnest margin in the suite: 22.4 s locally (18.6 s before), 47.3 to 59.6 s on
-the runner before the dodge and 62.4 s after it (job 117369238607). By the rule,
-twice the slowest runner time is 124.8 s, so the timeout is 150 s, which is 25 s
-over it; the test sits at 42 percent of its timeout.
+`tools/balance/harness.test.ts` "plays 36 cells over the shipped data" (the four
+v1 kits) has a 200 s timeout (150 s before arena03 of #238, and 120 s before the
+dodge of #137), and it is the
+thinnest margin in the suite: 44.5 s locally with the third arena (22.4 s on two,
+18.6 s before the dodge), 47.3 to 59.6 s on
+the runner before the dodge and 62.4 s after it (job 117369238607), so about 92 s
+with the arena's third more. By the rule,
+twice the slowest runner time is 185 s, so the timeout is 200 s, which is 15 s
+over it; the test sits at 46 percent of its timeout.
 
 The seeded matches of `packages/bots/test/ondrel.test.ts` (ten cells),
 `brimwick.test.ts` (eight) and `durnhal.test.ts` (twelve, #211) play each cell to matchEnd under the press oracle and
@@ -249,14 +252,16 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
   pairings, fills and the seed schedule, the cell plan (a six-name kit list
-  gives 15 pairings and 60 cells with 4 and 12 fills, played by nothing),
+  gives 15 pairings and 90 cells over three arenas, with 4 and 12 fills, played
+  by nothing),
   `playMatch` against a reference loop, the aggregation and the report text, the
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report; only the CLI row plays six-kit cells (120 matches, one seed of the 2v2
-  mode, 6.6 s locally and 23.6 s on the runner, timeout 60 s, unit job
-  122091170207), the 3v3 success path is a 24-match row on the four v1 kits
-  (3.3 s locally and 8.2 s on the runner, timeout 20 s; the CLI's 3v3 row at six
+  report; only the CLI row plays six-kit cells (180 matches, one seed of the 2v2
+  mode, 9.9 s locally and 35.4 s on the runner, timeout 90 s, unit job
+  122091170207 measured 23.6 s on two arenas), the 3v3 success path is a
+  36-match row on the four v1 kits (4.9 s locally and 12.3 s on the runner,
+  timeout 30 s; the CLI's 3v3 row at six
   kits is 360 matches, 34 s locally and projected at about 75 s on a runner, so
   it was replaced, not given a longer timeout). The CLI's error rows pin the
   message of each rule, so a parser that rejects `--mode 3v3` fails them. Two
@@ -312,7 +317,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
 
 ## Balance reproduction
 
-`npm run balance` plays all 11 760 matches of the report in
+`npm run balance` plays all 17 640 matches of the report in
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
@@ -323,7 +328,7 @@ it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
 and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: a full run plays 11 760 matches and takes about 14 minutes on
+`npm run check`: a full run plays 17 640 matches and takes about 21 minutes on
 Apple silicon. It plays the six kits of `HARNESS_KITS` in
 `tools/balance/inputs.ts` (six of the seven files of `data/kits`, so a kit added
 to the directory joins the report by being listed there; Durnhal's file is not
@@ -333,9 +338,10 @@ until step 1.3).
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
 pull request or a push). It can be dispatched with
 `gh workflow run balance.yml --ref <branch>` once the file is on the default
-branch. The whole run was 12 to 16 minutes at four kits; at six kits it is about
-14 minutes locally (2v2 5.3, 3v3 8.9) and projects to about 16 (2v2) and 27
-(3v3) on a runner, so the jobs have `timeout-minutes` of 45 and 75, twice the
+branch. The whole run was 12 to 16 minutes at four kits; at six kits and three
+arenas it is about
+21 minutes locally (2v2 8.0, 3v3 13.4) and projects to about 24 (2v2) and 40
+(3v3) on a runner, so the jobs have `timeout-minutes` of 60 and 105, twice the
 projected check time (the failure step plays the mode again) and a margin. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
@@ -473,14 +479,15 @@ other spec.
   in-game look at his model. A row on `/?arena=arena02`
   (`scene-arena02.png`) checks `data-arena` and the human's position,
   (-1100, 200), which proves the sim got arena02 and not only the hook, and
-  the arena links. A row on
+  the arena links; the row on `/?arena=arena03` (`scene-arena03.png`) does the
+  same for the third arena, whose spawns match arena02's. A row on
   `/?teamsize=3` reads `data-bar0` to `data-bar5` at 100 and no `data-bar6`, the
   human at (-1200, 200), 3v3 current and the links carrying `teamsize=3`. The
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard` (eleven links:
-  seven champions, two arenas, two team sizes), and `/?difficulty=brutal` reads
+  and every link of the other three rows carrying `difficulty=hard` (twelve links:
+  seven champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
   normal as current. The default test lists eight `data-hud` elements (the
   eighth is `scoreboard`, hidden and not displayed) and reads
   `data-silenced="false"` on all seven slots, while only F reads

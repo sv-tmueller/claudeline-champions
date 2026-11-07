@@ -1,6 +1,6 @@
 # Arena design principles
 
-Status: v1 principles, checked by `tools/blender/test_arena_principles.py`. Two arenas: arena01 (grandfathered, see section 8) and arena02
+Status: v1 principles, checked by `tools/blender/test_arena_principles.py`. Three arenas: arena01 (grandfathered, see section 8), arena02 and arena03
 Source of truth for numbers: [design spec](../superpowers/specs/2026-10-01-claudeline-champions-design.md), sections 4.1, 4.7, 8.1 and 10
 Companion document: [game rules and controls](rules.md)
 
@@ -88,8 +88,9 @@ Every obstacle also has a `height` and a `blocksProjectiles` flag.
 |----|------|--------|
 | `arena01` | Arena 1 | A fight around a central pillar. The pillar sits inside the end circle, and the lanes beside it are open, so a round opens with a long-range duel. |
 | `arena02` | Arena 2 | The reverse. The centre is open floor, so the whole end circle is walkable and sudden death is fought in the open. Two walls in front of the spawns cut every sightline between them, so a round opens with movement, not a duel. Pillars and posts give flank and lane cover. Low walls fence the centre for movement only. |
+| `arena03` | Arena 3 | A short centred divider splits the field into a north and a south lane, and a pillar at each lane mouth makes the choice between them a commitment. Two champions start split across the two lanes and meet at the walls, so a round opens with a lane fight, not a duel. Quadrant pillars give flank cover, low crates fence the lanes and two barrels flank the divider; the divider's whole length lies in the end circle, so sudden death is fought across it. |
 
-Layouts are in `data/arenas/<id>.json`, and both use the ring values of section 7.
+Layouts are in `data/arenas/<id>.json`, and each uses the ring values of section 7.
 
 `arena01` breaks two rules of this document, and it is grandfathered. Six of its blocking obstacles are 1.5 m high, where section 5 asks for at least 1.8 m. Its corners are 10.7 m from the nearest blocking obstacle, where section 6 asks for at most 8 m. It cannot change, because every sim fixture checksums `state.arena`, so a new height or a new obstacle would move every checksum. No other arena may break a rule.
 
@@ -99,8 +100,9 @@ Layouts are in `data/arenas/<id>.json`, and both use the ring values of section 
 
 Added 2026-10-31 by #218 (v3 design section 6). Each arena has at most one orb point, the place of the energy orb of rules.md section 3.3.
 
-- The points live in `data/orbs.json`, a table keyed by arena id: `{ "arena01": { "x": 0, "y": 2.5 }, "arena02": { "x": 0, "y": 0 } }`. They are kept out of the arena files because every sim fixture checksums `state.arena` and arena01 cannot change (section 8). The table sits beside `data/arenas`, not in it, because the client, the server, the balance tool and the Blender test parse every file in `data/arenas` as an arena.
+- The points live in `data/orbs.json`, a table keyed by arena id: `{ "arena01": { "x": 0, "y": 2.5 }, "arena02": { "x": 0, "y": 0 }, "arena03": { "x": 0, "y": 2.5 } }`. They are kept out of the arena files because every sim fixture checksums `state.arena` and arena01 cannot change (section 8). The table sits beside `data/arenas`, not in it, because the client, the server, the balance tool and the Blender test parse every file in `data/arenas` as an arena.
 - An arena with no row has no orb.
 - A point lies on the mirror axis (x = 0), so neither team is closer. A disc of 0.5 m around it lies inside the ring's end circle (|y| + 0.5 at most `endRadius`), so the orb stays contested in sudden death, and inside the arena boundary. It overlaps no obstacle, whatever the obstacle's `blocksProjectiles`, because every obstacle blocks walking. Touching an obstacle is allowed.
 - arena01 uses (0, 2.5). The pillar (radius 1.5 at the origin) needs |y| of at least 2.0 and the end circle needs |y| of at most 2.5, so 2.5 is the far edge of the band beside the pillar and 2.0 the near edge. arena02 uses the centre (0, 0), which is open floor.
+- arena03 uses (0, 2.5), at the north tip of its centred divider. The point is on the mirror axis, so the divider's half-width leaves no clearance in x: the disc touches the divider's north face exactly at |y| = 2.5 and clear of it above, but the end circle allows |y| of at most 2.5, so 2.5 is the only legal point. It also caps the divider at 4 m: a centred divider any longer would reach past |y| = 2.5 at every legal axis point on the end circle and leave no place for the orb.
 - The switch is the match's. `MatchConfig.energyOrb` is the point itself, and having the key turns the orb on. A caller reads the point with `orbPointFor(table, arena)` from the sim, which throws on a row that breaks the rules above and gives undefined for an arena with no row. `createMatch` runs the same check and throws `Invalid match: energyOrb ...`. The committed replay fixtures and the existing tests leave the key out, so they keep their checksums.

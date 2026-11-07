@@ -51,7 +51,7 @@ The commands and file list are in `tools/blender/README.md`.
 - `Floor` covers exactly `size.width` by `size.height`, 0.2 m thick, with its
   slab top at z = 0. It is a floor-coloured field inside a 1 m trim border,
   cut as a 3 by 3 grid of boxes that share whole edges. The cuts are at
-  x = -15, -14, 14, 15 and y = -10, -9, 9, 10 for both arenas. The centre
+  x = -15, -14, 14, 15 and y = -10, -9, 9, 10 for every arena. The centre
   cell is `floor` and the other eight are `trim`.
 - One trim disc marks each spawn, teamA then teamB in JSON order. It is part
   of the `Floor` mesh, not a node: 0.6 m in radius, 32 segments, standing
@@ -75,7 +75,7 @@ The commands and file list are in `tools/blender/README.md`.
   - The heights are stacked on purpose. The ring and the mark stand at 0.01
     m, like the discs, and the line at 0.008 m, under both, so the line's top
     face is never coplanar with theirs where it crosses the ring (y ~ 3 in
-    both arenas) or the mark (both orb points are on x = 0). Nothing is above
+    every arena) or the mark (every orb point is on x = 0). Nothing is above
     0.01 m, so the 0.03 m area discs, the 0.04 m impact rings and the 0.05 m
     orb ring all stay above the inlays. The generator asserts that the ring
     and the mark fit on the field, and that the mark clears the ring's inner
@@ -122,11 +122,11 @@ The commands and file list are in `tools/blender/README.md`.
   profiles and the caps from the vertex data.
 - Five flat materials: `floor`, `trim`, `wall`, `blocking` and `open`.
 - The visuals come from the same JSON as the collision.
-- Both arenas, `arena01` and `arena02`, have a committed glb and a case in
-  `test_export_determinism.py`, and `ArenaCoverageTests` fails if an arena glb,
-  an arena definition or a case is missing. The walls sit at x = +-15 and
-  y = +-10 in both. `arena02` needed no generator change: `gen_arena.py` is
-  driven by the JSON.
+- Every arena, `arena01`, `arena02` and `arena03`, has a committed glb and a
+  case in `test_export_determinism.py`, and `ArenaCoverageTests` fails if an
+  arena glb, an arena definition or a case is missing. The walls sit at
+  x = +-15 and y = +-10 in each. `arena02` and `arena03` needed no generator
+  change: `gen_arena.py` is driven by the JSON.
 - The client loads every arena under `data/arenas` by id: `?arena=<id>` picks
   the model (`arena02.glb` for `arena02`), `arena01` is the default and the
   sandbox's arena, and the arena select links to each.
