@@ -110,10 +110,10 @@ The commands and file list are in `tools/blender/README.md`.
 
   The footprint, the height and the origin are unchanged. The generator
   asserts that every inset leaves a positive shaft radius or slat width, so
-  an obstacle smaller than the committed minimum fails loudly. No committed
-  arena has a non-blocking circle, so the barrel is the fourth profile the
-  schema allows and is unexercised until one does; the dispatch is keyed by
-  `(type, blocksProjectiles)`, so such an arena needs no generator edit.
+  an obstacle smaller than the committed minimum fails loudly. `arena03` ships
+  two non-blocking circles, the barrels at (5, 0) and (-5, 0), so the fourth
+  profile the schema allows is live in committed data; the dispatch is keyed
+  by `(type, blocksProjectiles)` and needed no generator edit.
 - The node set does not change: the discs, the inlays and the caps are
   geometry inside the existing meshes with the `trim` material, so
   `validate_glb.py` and [Node naming](#node-naming) stay as they are.

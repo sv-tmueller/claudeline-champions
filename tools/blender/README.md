@@ -160,9 +160,10 @@ not vertical.
   - a non-blocking circle is a barrel: alternating hoop bands at `r`
     (`HOOP_HEIGHT = 0.06`) and body bands at `r - HOOP_INSET = 0.05`.
 
-  The footprint, height and origin are unchanged. No committed arena has a
-  non-blocking circle, so the barrel is unexercised until one does; the
-  dispatch is keyed by `(type, blocksProjectiles)`, so it needs no edit.
+  The footprint, height and origin are unchanged. `arena03` ships two
+  non-blocking circles, the barrels at (5, 0) and (-5, 0), so the barrel is
+  live in committed data; the dispatch is keyed by
+  `(type, blocksProjectiles)` and needed no edit.
 - The discs, the inlays and the caps are geometry inside the existing meshes,
   so the node set and the validator are unchanged. `test_arena_models.py`
   checks them from the vertex data.
