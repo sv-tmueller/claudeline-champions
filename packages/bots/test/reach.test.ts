@@ -140,6 +140,15 @@ describe('abilityReach', () => {
     ).toBeNull();
   });
 
+  it('gives the counter spend marker no band of its own', () => {
+    expect(abilityReach(ability({ type: 'consumeCounter', bonusDamagePerStack: 2 }))).toBeNull();
+    expect(abilityReach(ability({ type: 'consumeCounter', cooldownTicksPerStack: 30, slot: 'Q' }))).toBeNull();
+    // It adds nothing to the hull of the effects around it.
+    expect(
+      abilityReach(ability({ type: 'consumeCounter', bonusDamagePerStack: 2 }, arc(2), bolt(24, 45))),
+    ).toEqual({ min: 0, max: 18 });
+  });
+
   it('takes the hull of the effects: the smallest min and the largest max', () => {
     expect(
       abilityReach(ability(area({ type: 'ahead', distance: 5 }, 1), arc(2), { type: 'heal', amount: 1 })),
