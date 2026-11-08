@@ -639,13 +639,16 @@ locked windup. They are step 3f of the tick.
 
 `champion.dash` is `null` or `{ dirX, dirY, stepLength, ticksLeft, castId, then
 }`: the cast that started it (`null` for a direct call) and the effects that
-fire where it ends. `startDash(state, id, { dirX, dirY, distance, ticks })` sets
-it with `stepLength = distance / ticks`, emits `dashStarted` and ends a running
-dash as `replaced`, which drops that dash's `then`. A dash first moves in step
-3f of the holder's next turn, or of the same turn when a cast starts it, and
-moves `stepLength` meters a tick for `ticks` ticks. Its
-distance is at least 1e-6 m and its ticks at most 36000, so `stepLength` is
-always above 0 and the tick count always counts down to the end.
+fire where it ends. A dash a spending cast started (rules 2.6) also carries
+`bonusDamage`, the cast's per-cast damage bonus, so its deferred `then` hits land
+with it exactly as the rooted-at-fire path does; the key is left out, and is never
+`undefined`, when there is no bonus. `startDash(state, id, { dirX, dirY,
+distance, ticks })` sets the record with `stepLength = distance / ticks`, emits
+`dashStarted` and ends a running dash as `replaced`, which drops that dash's
+`then`. A dash first moves in step 3f of the holder's next turn, or of the same
+turn when a cast starts it, and moves `stepLength` meters a tick for `ticks`
+ticks. Its distance is at least 1e-6 m and its ticks at most 36000, so
+`stepLength` is always above 0 and the tick count always counts down to the end.
 
 Each tick, in step 3f:
 
@@ -1010,11 +1013,14 @@ every committed fixture keeps its checksum. Both numbers are in the checksum.
   When the ability fires, `fire` scans its effects for the marker, calls
   `spendCounter` (`counter.ts`) to take the whole count, and applies the verb to
   that same cast: the damage verb adds `perStack * spent` to each `damage` effect
-  the cast lands (`bonusDamage`, on the projectile, area or arc, read back by
-  `applyEffects`), and the cooldown verb subtracts `perStack * spent` from the
-  named slot's cooldown, clamped at 0. At 0 stacks it spends nothing and the cast
-  is unchanged. The marker is a no-op in `runEffects`, and `validateKit` rejects
-  a second marker and any `consumeCounter` on a kit without a counter.
+  the cast lands (`bonusDamage`, on the projectile, area, arc or dash record,
+  read back by `applyEffects`), and the cooldown verb subtracts `perStack *
+  spent` from the named slot's cooldown, clamped at 0. At 0 stacks it spends
+  nothing and the cast is unchanged. The marker is a no-op in `runEffects`, and
+  `validateKit` rejects a second marker and any `consumeCounter` on a kit without
+  a counter. A `dash` stores the bonus on its record so `fireDashThen` lands it
+  on the deferred `then` hits, the same way the rooted-at-fire path threads it
+  through `runEffects`.
 
 `counter.ts` follows the orb: no arrow function, indexed loops, no per-tick
 allocation, integer operations only, and no import of `cast.ts` (the cycle cast,

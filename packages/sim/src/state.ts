@@ -306,6 +306,12 @@ export interface DashState {
   castId: number | null;
   /** Effects that fire where the dash ends, unless a stun, a death or a new dash ends it. */
   then: ThenEffect[];
+  /**
+   * The spend verb's damage bonus of the cast that started it (rules 2.6, v3 design 4.4b): the
+   * deferred `then` effects are hits of that cast too, so they land with the same per-cast bonus.
+   * The key is missing, not undefined, when there is none.
+   */
+  bonusDamage?: number;
 }
 
 /** A cast in its windup. A cast with no windup fires at once and is never stored. */

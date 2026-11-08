@@ -657,6 +657,48 @@ describe('spending the counter', () => {
     expect(champion(state, 2).health).toBe(120 - 22);
   });
 
+  it('carries the bonus on the then arc of a dash, rooted at fire and deferred alike', () => {
+    // The then-arc is a hit of the spending cast (its slot is the cast's, its hit is credited to
+    // the cast), so it must see the 3-stack bonus on both paths: the rooted-at-fire one, where
+    // `runEffects` threads the bonus into `then`, and the deferred one, where `fireDashThen` runs
+    // the arc where the dash ends. Its hit also rebuilds the from-Q counter after the spend.
+    const thenArc: AbilityEffect = {
+      type: 'meleeArc',
+      radius: 8,
+      cosHalfAngle: -1,
+      effects: [{ type: 'damage', amount: 10 }],
+    };
+    const dashing = (windupTicks: number): KitDef => {
+      const q: SlotSpec = {
+        cooldownTicks: 1200,
+        windupTicks,
+        movement: 'free',
+        effects: [bonus(), { type: 'dash', distance: 6, ticks: 12, then: [thenArc] }],
+      };
+      return { ...kitWith('arch', { Q: q }), counter: { from: 'Q', cap: 3, windowTicks: 360 } };
+    };
+    const run = (windupTicks: number, rootAtFire: boolean): GameState => {
+      const state = createMatch(CONFIG, openArena(), 1, [dashing(windupTicks), kitWith('dps')]);
+      place(state, 0, -3, 0);
+      place(state, 2, 3, 2);
+      // Out of the arc's reach, so only one from-Q hit rebuilds the counter.
+      place(state, 3, 12, -8);
+      setCount(state, 3);
+      step(state, [input(0, 0, 300, 0, Button.Q)]);
+      if (rootAtFire) applyStatus(state, 0, { type: 'root', ticks: 300 }, { sourceId: 2, slot: null });
+      for (let i = 0; i < 40; i++) step(state, []);
+      return state;
+    };
+    // Rooted at the fire tick: the then fires at once and its arc takes the cast's bonus.
+    const rooted = run(3, true);
+    expect(champion(rooted, 2).health).toBe(120 - 22);
+    expect(counterOf(rooted)?.count).toBe(1);
+    // Deferred: the dash runs to its end, and the arc there must take the same bonus.
+    const deferred = run(0, false);
+    expect(champion(deferred, 2).health).toBe(120 - 22);
+    expect(counterOf(deferred)?.count).toBe(1);
+  });
+
   it('cuts the named slot cooldown by the verb per stack, and clamps at 0', () => {
     const state = spent([{ type: 'consumeCounter', cooldownTicksPerStack: 30, slot: 'SPACE' }, bolt()]);
     setCount(state, 3);
