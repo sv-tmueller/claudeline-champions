@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checksum, createMatch, step } from '../src/index';
-import type { AbilityEffect, KitDef, MatchConfig, Slot } from '../src/index';
+import type { AbilityEffect, KitDef, MatchConfig, Slot, ThenEffect } from '../src/index';
 import { validateKit } from '../src/kit';
 import { arena01, champion, input, openArena } from './helpers';
 import { MENDER_ID, STRIKER_ID, kitWith, quiet, quietEx, testMender, testStriker } from './kits';
@@ -173,6 +173,121 @@ describe('validateKit and the on-hit counter', () => {
         'Invalid kit: test-striker.counter: expected an object',
       );
     }
+  });
+});
+
+describe('validateKit and the spend verbs of the counter (rules 2.6, v3 4.4b)', () => {
+  const COUNTER = { from: 'Q', cap: 3, windowTicks: 180 };
+  const BONUS = { type: 'consumeCounter', bonusDamagePerStack: 4 };
+  const CUT = { type: 'consumeCounter', cooldownTicksPerStack: 120, slot: 'SPACE' };
+
+  /** The striker with a counter (unless `counted` is false) and `effects` in slot `slot`. */
+  function spending(effects: unknown[], slot: Slot = 'M1', counted = true): KitDef {
+    const kit = testStriker() as KitDef & { counter?: object };
+    if (counted) kit.counter = { ...COUNTER };
+    (kit.slots[slot] as { effects: unknown[] }).effects = effects;
+    return kit;
+  }
+
+  it('accepts each verb alone on a kit that declares a counter, and copies it exactly', () => {
+    for (const verb of [BONUS, CUT]) {
+      const kit = spending([verb]);
+      const copy = validateKit(kit);
+      expect(copy, verb.type).toStrictEqual(kit);
+      const [given] = kit.slots.M1.effects;
+      const [taken] = copy.slots.M1.effects;
+      expect(taken).not.toBe(given);
+      expect(JSON.parse(JSON.stringify(copy))).toStrictEqual(copy);
+    }
+  });
+
+  it('takes each bound exactly, for both verbs', () => {
+    for (const bonusDamagePerStack of [1, 30]) {
+      expect(() => validateKit(spending([{ type: 'consumeCounter', bonusDamagePerStack }]))).not.toThrow();
+    }
+    for (const cooldownTicksPerStack of [1, 600]) {
+      expect(() =>
+        validateKit(spending([{ type: 'consumeCounter', cooldownTicksPerStack, slot: 'F' }])),
+      ).not.toThrow();
+    }
+  });
+
+  it('accepts one in each ability spec separately, and drops unknown keys beside the verb', () => {
+    const kit = testStriker() as KitDef & { counter?: object };
+    kit.counter = { ...COUNTER };
+    kit.slots.M1.effects = [{ type: 'consumeCounter', bonusDamagePerStack: 4, stray: 1 } as never];
+    kit.slots.M2.ex = { windupTicks: 0, movement: 'free', effects: [{ type: 'consumeCounter', bonusDamagePerStack: 2 }] };
+    const copy = validateKit(kit);
+    expect(copy.slots.M1.effects[0]).toStrictEqual({ type: 'consumeCounter', bonusDamagePerStack: 4 });
+    expect(copy.slots.M2.ex?.effects[0]).toStrictEqual({ type: 'consumeCounter', bonusDamagePerStack: 2 });
+  });
+
+  it('rejects it on a kit that declares no counter', () => {
+    for (const verb of [BONUS, CUT]) {
+      expect(() => validateKit(spending([verb], 'M1', false))).toThrow(
+        'Invalid kit: test-striker.slots.M1.effects[0]: consumeCounter needs the kit to declare a counter',
+      );
+    }
+  });
+
+  it('rejects a consumeCounter with both verbs or with neither', () => {
+    const both = { type: 'consumeCounter', bonusDamagePerStack: 4, cooldownTicksPerStack: 120, slot: 'SPACE' };
+    for (const effects of [[both], [{ type: 'consumeCounter' }], [{ type: 'consumeCounter', slot: 'SPACE' }]]) {
+      expect(() => validateKit(spending(effects))).toThrow(
+        'Invalid kit: test-striker.slots.M1.effects[0]: a consumeCounter has exactly one verb: bonusDamagePerStack or cooldownTicksPerStack',
+      );
+    }
+  });
+
+  it('rejects a bonusDamagePerStack outside 1 to 30, whole numbers only', () => {
+    for (const value of [0, 31, 2.5, '4', null, NaN, -1]) {
+      expect(() =>
+        validateKit(spending([{ type: 'consumeCounter', bonusDamagePerStack: value }])),
+        String(value),
+      ).toThrow(
+        `Invalid kit: test-striker.slots.M1.effects[0].bonusDamagePerStack: ${String(value)} is not an integer from 1 to 30`,
+      );
+    }
+    // A key that is present but `undefined` reads as absent, like every optional key in the kit.
+    expect(() =>
+      validateKit(spending([{ type: 'consumeCounter', bonusDamagePerStack: undefined }])),
+    ).toThrow(
+      'Invalid kit: test-striker.slots.M1.effects[0]: a consumeCounter has exactly one verb: bonusDamagePerStack or cooldownTicksPerStack',
+    );
+  });
+
+  it('rejects a cooldownTicksPerStack outside 1 to 600, whole numbers only', () => {
+    for (const value of [0, 601, 120.5, '120', null, NaN]) {
+      expect(() =>
+        validateKit(spending([{ type: 'consumeCounter', cooldownTicksPerStack: value, slot: 'SPACE' }])),
+        String(value),
+      ).toThrow(
+        `Invalid kit: test-striker.slots.M1.effects[0].cooldownTicksPerStack: ${String(value)} is not an integer from 1 to 600`,
+      );
+    }
+  });
+
+  it('rejects an unknown slot for the cooldown verb', () => {
+    for (const slot of ['X', 'm1', 3, null, undefined]) {
+      expect(() =>
+        validateKit(spending([{ type: 'consumeCounter', cooldownTicksPerStack: 120, slot }])),
+        String(slot),
+      ).toThrow(`Invalid kit: test-striker.slots.M1.effects[0].slot: unknown slot ${String(slot)}`);
+    }
+  });
+
+  it('rejects a second consumeCounter in one ability spec', () => {
+    expect(() => validateKit(spending([BONUS, CUT]))).toThrow(
+      'Invalid kit: test-striker.slots.M1.effects[1]: a second consumeCounter (one per ability)',
+    );
+  });
+
+  it('rejects one inside a dash then', () => {
+    const inThen: ThenEffect[] = [{ type: 'heal', amount: 1 }, BONUS as ThenEffect];
+    const kit = spending([{ type: 'dash', distance: 3, ticks: 3, then: inThen }], 'M1');
+    expect(() => validateKit(kit)).toThrow(
+      'Invalid kit: test-striker.slots.M1.effects[0].then[1]: consumeCounter cannot be inside then',
+    );
   });
 });
 
