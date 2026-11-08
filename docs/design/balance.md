@@ -1074,10 +1074,12 @@ a ranged kit's reach is 9 to 13 m, so a champion that kites in and out of an
 enemy's reach flips the threat test that starts and stops the contest, and
 Lumeth's cells read 0 to 46 flips an orb round, the widest of the six. Here her
 30 shared cells move by 0.2 point on the mean (87.2 to 87.0), the smallest move
-of the six, and 26 of the 30 move by less than 3 points; the four that move by
-more are 2v2 on arena02 Quillon v Lumeth (65.5 to 56.5, her cell that entered the
-band), 2v2 on arena03 Brimwick v Lumeth (88.5 to 91.5), 3v3 on arena01 Brimwick v
-Lumeth (95.3 to 91.5) and 3v3 on arena03 Lumeth v Ondrel (69.8 to 77.0). So the
+of the six, and 23 of the 30 move by less than 3 points; the seven that move by
+3 points or more are 2v2 on arena02 Lumeth v Quillon (65.5 to 56.5, her cell
+that entered the band), 3v3 on arena03 Lumeth v Ondrel (69.8 to 77.0), 2v2 on
+arena01 Lumeth v Ondrel (84.0 to 88.0), 2v2 on arena03 Lumeth v Quillon (55.0 to
+51.0), 3v3 on arena01 Brimwick v Lumeth (95.3 to 91.5), 2v2 on arena03 Brimwick v
+Lumeth (88.5 to 91.5) and 2v2 on arena01 Lumeth v Quillon (69.5 to 66.5). So the
 flips, which the single-cell measurement is large enough to see, average out
 over her 30 cells: the orb moves her standing by 0.2 of a point, and one of her
 cells swaps band membership (Lumeth v Quillon in 2v2 on arena02 enters it and
