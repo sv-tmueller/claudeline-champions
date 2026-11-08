@@ -1013,19 +1013,18 @@ Hargrim 65.6, Lumeth 0.3, Ondrel 1.8, Quillon 2.7 and Skerrow 49.1.
 | 3v3 | arena03 | durnhal v quillon | 4.5 | outside, 35.5 from the band |
 | 3v3 | arena03 | durnhal v skerrow | 65.5 | outside, 5.5 from the band |
 
-The one pairing the web has right is Skerrow (roots and shields stop the dive):
-the cell is in band on two of the three arenas in 2v2 and on two of the three in
-3v3, and they split the pairing 49.1 to Durnhal. Every other pairing is inverted.
+The one pairing the web has nearly right is Skerrow (roots and shields stop the
+dive): the cell is in band on two of the three arenas in each mode, and the
+pairing is a near-even split (Durnhal 49.1). Every other pairing is inverted.
 Against Lumeth the web expects the `wound` anti-heal (#158) to press her healing
 down; instead she takes all six of their cells (Durnhal's rate 0.0, 0.0, 0.0,
-1.0, 0.5 and 0.0), three of them without a loss, the widest of his six inversions
+1.0, 0.5 and 0.0), four of them without a loss, the widest of his six inversions
 and the same shape as her stand against Hargrim and Skerrow (5.2, 5.4). Against
 Quillon the web expects him to be kited from 13 m, and he is: 2.7 means Durnhal
 takes 1 cell of 36, and Quillon's own overall rate rises to 78.3. Against
-Brimwick the web expects her burst to ignore his shields; she takes 92.9 to his
-7.1, so that is right in direction
-though it, too, is inverted by the band's terms (Brimwick is the one 30-plus
-points over it). Against Ondrel (1.8) the web has no line at all, because
+Brimwick the web expects her burst to ignore his shields; she takes all six of
+their cells (Durnhal 7.1 to her 92.9, 32.9 points over the band), so that is
+right in direction. Against Ondrel (1.8) the web has no line at all, because
 roster-v3.md section 1 fixes his counter web against the seven existing kits and
 his own row against Ysmeer waits for her series; the measured cell is a rout for
 Ondrel. Hargrim (65.6) is the one where Durnhal is ahead, and the only pairing
@@ -1056,12 +1055,12 @@ on arena03 (60.0 to 62.5) and Ondrel v Quillon in 3v3 on arena02 (43.2 to 38.0).
 Entered: Lumeth v Quillon in 2v2 on arena02 (65.5 to 56.5), Brimwick v Ondrel in
 2v2 on arena03 (37.5 to 43.0) and 3v3 on arena02 (37.0 to 44.5), and Hargrim v
 Skerrow in 3v3 on arena03 (68.8 to 55.5). The summed distance of the shared 90
-rises from 2205.9 to 2296.5 points: the orb and the Durnhal fill push the melee
-kits (Hargrim and Skerrow, the two that were nearest the band) down and the
-ranged kits (Lumeth, Quillon, Ondrel and Brimwick) up. Per champion over its 30
-cells within the shared 90: Brimwick 50.3 to 52.1, Hargrim 13.7 to 10.7, Lumeth
-87.2 to 87.0, Ondrel 62.2 to 60.3, Quillon 71.8 to 74.5 and Skerrow 14.7 to
-15.4. Every
+rises from 2205.9 to 2296.5 points. Per champion over its 30
+cells within the shared 90: Brimwick 50.3 to 52.1 (+1.7), Hargrim 13.7 to 10.7
+(-3.0), Lumeth 87.2 to 87.0 (-0.2), Ondrel 62.2 to 60.3 (-1.9), Quillon 71.8 to
+74.5 (+2.6) and Skerrow 14.7 to 15.4 (+0.7): the two kits that were nearest the
+band, Hargrim and Skerrow, move apart, the melee one down and the other up, while
+the ranged kits rise except Ondrel. Every
 out-of-band cell of the six-kit block that was already accepted stays accepted as
 it was; the five that left the band are named above, and their reasons are those
 of 5.9 and 5.11 (the melee kits' standing on the approach, the ranged kits'
@@ -1073,13 +1072,15 @@ a ranged kit's reach is 9 to 13 m, so a champion that kites in and out of an
 enemy's reach flips the threat test that starts and stops the contest, and
 Lumeth's cells read 0 to 46 flips an orb round, the widest of the six. Here her
 30 shared cells move by 0.2 point on the mean (87.2 to 87.0), the smallest move
-of the six, and 26 of the 30 move by less than 3 points; the four that move more
-are 2v2 on arena02 Quillon v Lumeth (65.5 to 56.5, her cell that entered the
+of the six, and 26 of the 30 move by less than 3 points; the four that move by
+more are 2v2 on arena02 Quillon v Lumeth (65.5 to 56.5, her cell that entered the
 band), 2v2 on arena03 Brimwick v Lumeth (88.5 to 91.5), 3v3 on arena01 Brimwick v
 Lumeth (95.3 to 91.5) and 3v3 on arena03 Lumeth v Ondrel (69.8 to 77.0). So the
 flips, which the single-cell measurement is large enough to see, average out
-over her 30 cells: the orb moves her standing by 0.2 of a point and her band
-membership by one cell, and the effect is recorded, not fixed. No bots rule
+over her 30 cells: the orb moves her standing by 0.2 of a point, and one of her
+cells swaps band membership (Lumeth v Quillon in 2v2 on arena02 enters it and
+Lumeth v Ondrel in 2v2 on arena03 leaves it), so her count is two either way. The
+effect is recorded, not fixed. No bots rule
 changes: the contest, the threat range (`rangeMax`, `enemyInReach`) and the
 delay ring stay as #225 built them, and no hysteresis is added for the flips
 (bots.md, "Not built yet").
