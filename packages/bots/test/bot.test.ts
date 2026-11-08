@@ -21,7 +21,7 @@ import {
   roundAim,
 } from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, clearShotOracle, config2v2, configMirror, configSix, jsonKits, sixKits } from './helpers';
+import { arena01, clearShotOracle, config2v2, configBrimwick, configMirror, configSix, jsonKits, sixKits } from './helpers';
 import { hargrimKit, quillonFastExKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -824,6 +824,50 @@ describe('aim lead', () => {
     for (const speed of [12, 14, 15, 16, 18, 20, 22, 24, 25]) {
       expect([...seen.speeds], `speed ${speed}`).toContain(speed);
     }
+  });
+
+  // The cap of #187 pins the capped lead to the centimetre on one frozen windup state, and shows
+  // the capped aim differ from the nominal one: the cheapest deterministic red-when-dropped proof.
+  // Brimwick champion 1 has pressed Firecracker (M2, r 1.5, cap 0.75) and is 10 m west of a target
+  // strafing north at 5.5 m/s. The nominal lead is 5, 2.86 (the target plus its own walk over the
+  // 20 m/s flight), 2.86 m above the target, so the cap pulls the aim point back to the circle edge;
+  // the capped turn reads 499, 90 and the nominal 495, 301. Red when the cap is dropped: the pin
+  // then reads the nominal pair.
+  it('caps the lead of a one-hit aim-placed area, to the centimetre', () => {
+    const state = createMatch(configBrimwick(), open, 1, sixKits());
+    kill(state, 0, 2, 3);
+    const me = put(state, 1, -5, 0);
+    const target = ch(state, 2);
+    target.alive = true;
+    target.x = 5;
+    target.y = 0;
+    target.vx = 0;
+    target.vy = 5.5;
+    me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 24, windupLeft: 10 };
+    const seed = 3;
+    const bot = createBot(1, 'hard', seed);
+    const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
+
+    // The bot's first aim draw, replayed from the same seed, is the one error in force.
+    const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
+    const spec = sixKits().find((k) => k.id === 'brimwick')?.slots['M2'];
+    const cap = leadCapOf(spec);
+    expect(cap).toBe(1.5 * AREA_LEAD_CAP_FRACTION);
+    expect(cap).toBe(0.75);
+    const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, NOMINAL_PROJECTILE_SPEED);
+    const capped = clampLead(lead, target, cap);
+    const turned = rotateByHalfTangent(capped.x - me.x, capped.y - me.y, u);
+    expect(input.aimX).toBe(roundAim(me.x + turned.x));
+    expect(input.aimY).toBe(roundAim(me.y + turned.y));
+    // The cap bit: the aim sits on the cap circle above the target, not on the nominal lead.
+    expect([input.aimX, input.aimY]).toEqual([499, 90]);
+    const nominal = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+    expect([input.aimX, input.aimY]).not.toEqual([
+      roundAim(me.x + nominal.x),
+      roundAim(me.y + nominal.y),
+    ]);
+    expect(input.aimY).toBeLessThan(roundAim(me.y + nominal.y));
   });
 
   // The rounding of the inline form turns -0 into 0 without an integer test: `Math.round` of a

@@ -73,7 +73,8 @@ others.
   timeout stays 15 s (twice 6.9 s is 13.8 s). With the two orb scenes of #225 (21
   scenes) the unit job reads 8.2 s (job 125568510485, 8152 ms), twice which is 16.3 s,
   so the timeout is 20 s; on a loaded machine (load average 25 on 6 CPUs) it read 16.4 s
-  and failed the old 15 s.
+  and failed the old 15 s. The "brimwick windup" scene of #187 (the 22nd) adds 1.2 s
+  locally for the one window, well inside the budget.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (eight models): 2.5 to 4.0 s locally, 3.3 to
   7.2 s green, 3.3 to 8.0 s red, timeout 20 s.
