@@ -37,8 +37,9 @@ first.
   (projectiles, areas, melee arcs, statuses, forced motion), with projectile
   ally effects since #69, the self-cast rule (an ally projectile aimed at its
   caster lands on her at 60 percent heal) since #191 and the `wound` status (10
-  percent less healing per stack, up to 3 stacks) since #158 and the fuse on
-  areas (delayed detonation, `fuseTicks`, rules 2.7) since #159; kits with casting,
+  percent less healing per stack, up to 3 stacks) since #158, the fuse on
+  areas (delayed detonation, `fuseTicks`, rules 2.7) since #159 and the area a
+  projectile leaves where it ends (`endArea`, rules 2.8) since #160; kits with casting,
   cooldowns, windups and energy; match flow with rounds and the sudden-death
   ring, opt-in through `roundsToWin`; the energy orb, opt-in through
   `energyOrb` (the point from `data/orbs.json`, #218); the on-hit counter a kit

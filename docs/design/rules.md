@@ -174,6 +174,20 @@ An `area` effect may carry `fuseTicks`, an integer number of ticks. It is a dela
 - **The client** draws an armed area from the area entity, with no new event kind. The first `areaTick` of the area is the end of the fuse.
 - No shipped kit has a fuse yet. The Ysmeer kit of roster-v3 is the first that will.
 
+### 2.8 A projectile that leaves an area where it ends `[tuned]`
+
+A `projectile` effect may carry `endArea`: an `area` effect whose `placement` is ignored. The projectile spawns that area at its final position. The design is spec `2026-10-24-blc-feel-roster-v3-design.md` section 4.3.
+
+- **When it spawns.** When the projectile reaches the end of its `lifetimeTicks`, and when it stops on an obstacle with `blocksProjectiles: true` or on the arena edge. The area is placed at the centre position the projectile reached on that tick, the same position the `projectileExpired` event carries.
+- **When it does not.** When the projectile hits a champion. The hit effects fire as today, and no area is left. Keeping the two disjoint keeps both readable.
+- **Pierce.** A projectile with `pierce` and an `endArea` is rejected by the validator: a piercing shot has no single end to leave an area at.
+- **The area rules all hold.** The spawned area obeys every area rule, the fuse of an `endArea` (section 2.7) included, and the linger rules of roster-v2 section 0. It counts as an area of the projectile's slot, so the one-live-area rule holds across a slot's `area` and its projectile `endArea`.
+- **Who owns it.** The area is the projectile owner's and carries the projectile's cast, so its hits earn energy for that cast as the projectile's own hits do; a caster who died since firing still spawns the area, since a dead caster's projectile already lands its hit effects.
+- **Round end.** A projectile cleared when the round is decided leaves no area: the round end pause takes the projectile away without an end tick.
+- **The client** draws the spawned area from the existing `areaSpawned` event and the area entity, with no new event kind and no client source change.
+- **Pulse timing.** An area spawned where a projectile stops on an obstacle or the edge pulses on the tick it spawns; one spawned at a lifetime end first pulses the next tick. Nothing else differs.
+- No shipped kit has an `endArea` yet. The Ysmeer kit of roster-v3 is the first that will.
+
 ## 3. Energy economy
 
 - Energy goes from 0 to 100 `[spec]`. Gains above the cap are lost.

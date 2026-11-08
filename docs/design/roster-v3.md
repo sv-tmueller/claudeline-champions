@@ -40,6 +40,11 @@ unchanged.
 - Statuses and mechanics a kit needs that the catalog does not have yet are
   named in the champion's section. Each is built in its own package with a
   rules entry before the kit that uses it.
+- The `endArea` of a projectile (v3 spec section 4.3, [rules](rules.md)
+  section 2.8) is in the toolkit since #160, so the roster-v2 section 0 list of
+  what is not in the toolkit no longer holds for it. No kit of this document
+  uses it yet; Wrenna's section 2 names where hers would and why her
+  Heartseeker EX carries none.
 
 ## 1. Durnhal, the guardian tank
 
