@@ -177,7 +177,7 @@ describe('validateKit and the on-hit counter', () => {
 });
 
 describe('validateKit and the spend verbs of the counter (rules 2.6, v3 4.4b)', () => {
-  const COUNTER = { from: 'Q', cap: 3, windowTicks: 180 };
+  const COUNTER = { from: 'Q' as const, cap: 3, windowTicks: 180 };
   const BONUS = { type: 'consumeCounter', bonusDamagePerStack: 4 };
   const CUT = { type: 'consumeCounter', cooldownTicksPerStack: 120, slot: 'SPACE' };
 
