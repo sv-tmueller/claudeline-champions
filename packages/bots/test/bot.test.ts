@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, hasLineOfSight, step } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
+import type { AbilitySpec, ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
 import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
@@ -11,7 +11,15 @@ import { buildNavGrid, cellIndexAt } from '../src/grid';
 import type { Vec2 } from '../src/grid';
 import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
-import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
+import {
+  AREA_LEAD_CAP_FRACTION,
+  NOMINAL_PROJECTILE_SPEED,
+  clampLead,
+  leadCapOf,
+  leadPoint,
+  rotateByHalfTangent,
+  roundAim,
+} from '../src/aim';
 import { createRng } from '../src/rng';
 import { arena01, clearShotOracle, config2v2, configMirror, configSix, jsonKits, sixKits } from './helpers';
 import { hargrimKit, quillonFastExKit } from './kits';
@@ -721,7 +729,7 @@ describe('aim lead', () => {
       { kits: sixKits, config: (i: number) => configSix(Math.floor(i / 12) % 2 === 1) },
     ];
     const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
-    const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, speeds: new Set<number>() };
+    const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, capped: 0, speeds: new Set<number>() };
     let checked = 0;
     for (let i = 0; i < 4000; i++) {
       const set = kitSets[Math.floor(i / 4) % kitSets.length] as (typeof kitSets)[number];
@@ -740,18 +748,26 @@ describe('aim lead', () => {
       target.vx = Math.cos(heading) * speedOfTarget;
       target.vy = Math.sin(heading) * speedOfTarget;
 
-      // Half the states have a cast winding up, which sets the speed the aim leads with.
+      // Half the states have a cast winding up, which sets the speed the aim leads with. The same
+      // spec resolves the cap of a one-hit aim-placed area (#187): `leadCapOf` reads its first
+      // `aim`-placed one-hit area, as `aim` does once no projectile is found.
       let speed = NOMINAL_PROJECTILE_SPEED;
+      let spec: AbilitySpec | undefined;
       if (i % 2 === 1) {
         const slot = slots[Math.floor(rng.next() * slots.length)] as (typeof slots)[number];
         const kit = kits.find((k) => k.id === me.championId);
         const base = kit?.slots[slot];
         const variant = base?.ex !== undefined && rng.next() < 0.5;
-        const spec = variant ? base?.ex : base;
+        spec = variant ? base?.ex : base;
         const first = spec?.effects[0];
         if (first !== undefined && first.type === 'projectile') speed = first.speed;
         me.cast = { castId: 1, slot, ex: variant, windupTicks: 30, windupLeft: 10 };
       }
+      // `aim` resolves the cap from the same spec, and only when the spec has no projectile.
+      const cap =
+        spec !== undefined && spec.effects.every((e) => e.type !== 'projectile')
+          ? leadCapOf(spec)
+          : Number.POSITIVE_INFINITY;
 
       // The edges of the lead, on a line with the shooter, in three variants: a target that stands
       // still (b is 0), one closing at exactly the speed of the projectile (a is 0), and one
@@ -772,10 +788,16 @@ describe('aim lead', () => {
 
       const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
       const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, speed);
-      const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+      // The cap clamps the lead offset (measured from the subject) before the error turn, exactly
+      // as `aim` writes it out: the same `clampLead` of aim.ts.
+      const capped = clampLead(lead, target, cap);
+      const turned = rotateByHalfTangent(capped.x - me.x, capped.y - me.y, u);
       const expected = [roundAim(me.x + turned.x), roundAim(me.y + turned.y)];
       expect([input.aimX, input.aimY], `state ${i}, speed ${speed}, seed ${seed}`).toEqual(expected);
       checked++;
+      if (cap !== Number.POSITIVE_INFINITY && Math.hypot(lead.x - target.x, lead.y - target.y) > cap) {
+        seen.capped++;
+      }
 
       const dx = target.x - me.x;
       const dy = target.y - me.y;
@@ -792,6 +814,10 @@ describe('aim lead', () => {
     expect(seen.retreat).toBeGreaterThan(300);
     expect(seen.fast).toBeGreaterThan(300);
     expect(seen.zero).toBeGreaterThan(100);
+    // The capped branch of #187 is reached, so it is not vacuous: 23 of the 4000 states wind up a
+    // one-hit aim area (Brimwick's Firecracker or Lumeth's Binding Sigil) and put the nominal lead
+    // past its cap. The bar is 15.
+    expect(seen.capped).toBeGreaterThan(15);
     // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25,
     // the fixture's: 15 for its base M2 and 18 for its EX, and the 16 of Undertow and the 24 of
     // Flash Powder.

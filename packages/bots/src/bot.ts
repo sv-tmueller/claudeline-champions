@@ -1,6 +1,6 @@
 import { SLOTS } from '@claudeline/sim';
 import type { ChampionState, GameState, KitDef, PlayerInput } from '@claudeline/sim';
-import { NOMINAL_PROJECTILE_SPEED } from './aim';
+import { AREA_LEAD_CAP_FRACTION, NOMINAL_PROJECTILE_SPEED } from './aim';
 import {
   abilityFor,
   buttonsOf,
@@ -401,10 +401,13 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
   /**
    * Writes the aim into `input`, at `subject`: the acted target, or the ally a bolt is pressed at
    * or winds up for. The aim draw of a think is here (a dodge coin, dodge.ts, follows it). The
-   * lead and the error turn are `leadPoint` and `rotateByHalfTangent` of aim.ts written out over
-   * locals, with the same operations in the same order (the tests compare the two bit for bit): a
-   * call with a double argument that V8 does not inline boxes it, and the aim made a dozen of
-   * them. The finite tests are `x - x === 0`, true for a finite x only: in the Chromium of
+   * lead, the cap and the error turn are `leadPoint`, `clampLead` and `rotateByHalfTangent` of
+   * aim.ts written out over locals, with the same operations in the same order (the tests compare
+   * the two bit for bit): a call with a double argument that V8 does not inline boxes it, and the
+   * aim made a dozen of them. A one-hit aim-placed area caps the lead offset at
+   * `AREA_LEAD_CAP_FRACTION` of its radius, from the subject's position; a lingering area, or one
+   * placed `self` or `ahead`, is uncapped (`Infinity`), so the nominal lead stands for it. The
+   * finite tests are `x - x === 0`, true for a finite x only: in the Chromium of
    * Playwright 1.63 and in V8 14.6 (Node 26) the Maglev tier calls `Number.isFinite` with its
    * argument boxed, one allocation a think; Node 22's V8 12.4 does not reproduce that. The
    * `bots-heap-maglev` project of vitest.heap.config.ts checks it (allocation.test.ts; see
@@ -432,8 +435,14 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     aimAge = (aimAge + 1) % AIM_ERROR_HOLD;
 
     // The speed the aim leads with: the first projectile of the ability winding up, or else of
-    // the one pressed on this think, or else the nominal speed.
+    // the one pressed on this think, or else the nominal speed. The same spec, once it has no
+    // projectile, gives the cap of a one-hit aim-placed area (#187): its first `area` effect that
+    // is `placement.type === 'aim'` and `durationTicks <= intervalTicks`, capped at
+    // `AREA_LEAD_CAP_FRACTION` of its radius. Infinity when there is none, and for a `self` or
+    // `ahead` area, which does not follow the aim point (so capping it would move the recorded
+    // aim for no gain; see aim.ts, `leadCapOf`).
     let speed = NOMINAL_PROJECTILE_SPEED;
+    let leadCap = Number.POSITIVE_INFINITY;
     if (kit !== undefined) {
       const spec =
         me.cast !== null
@@ -442,11 +451,27 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
             ? abilityFor(kit, choice.slot, choice.ex)
             : undefined;
       if (spec !== undefined) {
+        let hasProjectile = false;
         for (let i = 0; i < spec.effects.length; i++) {
           const effect = spec.effects[i];
           if (effect !== undefined && effect.type === 'projectile') {
             speed = effect.speed;
+            hasProjectile = true;
             break;
+          }
+        }
+        if (!hasProjectile) {
+          for (let i = 0; i < spec.effects.length; i++) {
+            const effect = spec.effects[i];
+            if (
+              effect !== undefined &&
+              effect.type === 'area' &&
+              effect.placement.type === 'aim' &&
+              effect.durationTicks <= effect.intervalTicks
+            ) {
+              leadCap = effect.radius * AREA_LEAD_CAP_FRACTION;
+              break;
+            }
           }
         }
       }
@@ -469,6 +494,18 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         leadX = subject.x + vx * t;
         leadY = subject.y + vy * t;
       }
+    }
+
+    // clampLead: the offset of the lead point from the subject, pulled to the cap when it is
+    // farther (the `clampLead` of aim.ts, operation for operation: `sqrt` only on the capped path,
+    // and no `Math.hypot`, which allocates in V8 by design).
+    const odx = leadX - subject.x;
+    const ody = leadY - subject.y;
+    const dd = odx * odx + ody * ody;
+    if (dd > leadCap * leadCap) {
+      const scale = leadCap / Math.sqrt(dd);
+      leadX = subject.x + odx * scale;
+      leadY = subject.y + ody * scale;
     }
 
     // rotateByHalfTangent: the vector to the lead point turns by 2 atan(u).
