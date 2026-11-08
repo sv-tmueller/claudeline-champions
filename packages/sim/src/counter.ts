@@ -59,3 +59,19 @@ export function stepCounters(state: GameState): void {
     }
   }
 }
+
+/**
+ * The spend verb (rules 2.6, v3 design 4.4b): takes the caster's whole counter and returns the
+ * stacks spent, or 0 when the caster has no counter or it is at 0 (the 0-stack no-op, which touches
+ * nothing). The window stamp is cleared with the count. `fire` in `cast.ts` calls it before the
+ * cast's effects run, so the bonus rides on every entity the cast makes and the cooldown cut applies
+ * to the value as it stands at that moment. This allocates nothing and does not import `cast.ts`.
+ */
+export function spendCounter(state: GameState, caster: ChampionState): number {
+  const counter = caster.counter;
+  if (counter === undefined || counter.count <= 0) return 0;
+  const spent = counter.count;
+  counter.count = 0;
+  counter.lastHitTick = 0;
+  return spent;
+}

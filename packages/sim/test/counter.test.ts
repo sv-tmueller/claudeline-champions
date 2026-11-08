@@ -2,9 +2,10 @@
 // by hand and call `landHit`, as energy.test.ts does; the decay, the pause and the round reset run
 // through `step`. No shipped kit declares a counter, so every kit here is a test kit.
 import { describe, expect, it } from 'vitest';
-import { checksum, cloneState, createMatch, debug, step } from '../src/index';
-import type { Effect, GameState, KitDef, MatchConfig, PlayerInput, Slot } from '../src/index';
+import { Button, checksum, cloneState, createMatch, debug, step } from '../src/index';
+import type { AbilityEffect, Effect, GameState, KitDef, MatchConfig, PlayerInput, Slot, SlotSpec } from '../src/index';
 import { spawnArea } from '../src/area';
+import { spendCounter } from '../src/counter';
 import { landHit } from '../src/energy';
 import { applyDamage } from '../src/health';
 import { meleeArc } from '../src/melee';
@@ -12,7 +13,7 @@ import { spawnProjectile } from '../src/projectile';
 import { nextRandom } from '../src/rng';
 import { nextId } from '../src/state';
 import { applyShield, applyStatus } from '../src/status';
-import { arena01, checkAbilityInvariants, champion, openArena, place } from './helpers';
+import { arena01, checkAbilityInvariants, champion, input, openArena, place } from './helpers';
 import { STRIKER_ID, kitWith, testStriker } from './kits';
 
 // Champion 0 is the archer with a counter (Q builds it, cap 3, window 120); champion 1 is its
@@ -537,5 +538,244 @@ describe('a counter that changes nothing else', () => {
     expect(b.built).toBeGreaterThan(0);
     expect(a.built).toBe(0);
     expect(b.frames).toEqual(a.frames);
+  });
+});
+
+describe('spending the counter', () => {
+  const BONUS = 4;
+  const SLOT_INDEX = (slot: Slot) => (['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as Slot[]).indexOf(slot);
+  const bolt = (amount = 10): AbilityEffect => ({
+    type: 'projectile',
+    speed: 20,
+    radius: 0.4,
+    lifetimeTicks: 40,
+    pierce: false,
+    effects: [{ type: 'damage', amount }],
+  });
+  const bonus = (n = BONUS): AbilityEffect => ({ type: 'consumeCounter', bonusDamagePerStack: n });
+
+  /** A kit whose M1 builds the counter and whose Q holds `effects` (and `exEffects` as the EX). */
+  function spender(effects: AbilityEffect[], exEffects?: AbilityEffect[]): KitDef {
+    // A long cooldown keeps a single cast to one in the tests that step past its flight and dots.
+    const q: SlotSpec = { cooldownTicks: 1200, windupTicks: 0, movement: 'free', effects };
+    if (exEffects) q.ex = { windupTicks: 0, movement: 'free', effects: exEffects };
+    return { ...kitWith('arch', { Q: q }), counter: { from: 'M1', cap: 3, windowTicks: 360 } };
+  }
+
+  function spent(effects: AbilityEffect[], exEffects?: AbilityEffect[]): GameState {
+    const state = createMatch(CONFIG, openArena(), 1, [spender(effects, exEffects), kitWith('dps')]);
+    place(state, 0, -3, 0);
+    place(state, 1, -3, 5);
+    place(state, 2, 3, 0);
+    place(state, 3, 3, 5);
+    return state;
+  }
+
+  const setCount = (state: GameState, count: number, lastHitTick = 0, id = 0): void => {
+    (champion(state, id) as { counter: unknown }).counter = { count, lastHitTick };
+  };
+
+  /** Holds `buttons` for `ticks` steps, aiming at champion 2's position (3, 0). */
+  function cast(state: GameState, buttons: number, ticks: number, ex = false): void {
+    const held = buttons | (ex ? Button.SHIFT : 0);
+    for (let i = 0; i < ticks; i++) step(state, [input(0, 0, 300, 0, held)]);
+  }
+
+  it('spends the whole counter, zeroes it and clears the window stamp', () => {
+    const state = spent([bonus(), bolt()]);
+    state.tick = 7;
+    setCount(state, 3, 7);
+    expect(spendCounter(state, champion(state, 0))).toBe(3);
+    expect(counterOf(state)).toEqual({ count: 0, lastHitTick: 0 });
+  });
+
+  it('returns 0 and touches nothing when the counter is 0', () => {
+    const state = spent([bonus(), bolt()]);
+    setCount(state, 0, 0);
+    const before = checksum(state);
+    expect(spendCounter(state, champion(state, 0))).toBe(0);
+    expect(counterOf(state)).toEqual({ count: 0, lastHitTick: 0 });
+    expect(checksum(state)).toBe(before);
+  });
+
+  it('deals the bonus per stack to the damage effects of the cast, which lands with the hit', () => {
+    const state = spent([bonus(), bolt(10)]);
+    setCount(state, 3);
+    cast(state, Button.Q, 30);
+    // 10 base + 4 per stack x 3 = 22, and the counter is spent.
+    expect(champion(state, 2).health).toBe(120 - 22);
+    expect(counterOf(state)).toEqual({ count: 0, lastHitTick: 0 });
+  });
+
+  it('gives the same cast no bonus at 0 stacks, and the base damage only', () => {
+    const state = spent([bonus(), bolt(10)]);
+    setCount(state, 0);
+    cast(state, Button.Q, 30);
+    expect(champion(state, 2).health).toBe(120 - 10);
+  });
+
+  it('adds the bonus to each damage effect in the hit list', () => {
+    const state = spent([
+      bonus(),
+      { type: 'projectile', speed: 20, radius: 0.4, lifetimeTicks: 40, pierce: false, effects: [{ type: 'damage', amount: 6 }, { type: 'damage', amount: 5 }] },
+    ]);
+    setCount(state, 2);
+    cast(state, Button.Q, 30);
+    expect(champion(state, 2).health).toBe(120 - (6 + 8) - (5 + 8));
+  });
+
+  it('adds the bonus to every enemy a piercing projectile of the cast hits', () => {
+    const state = spent([bonus(), { ...bolt(10), pierce: true } as AbilityEffect]);
+    place(state, 3, 6, 0);
+    setCount(state, 3);
+    cast(state, Button.Q, 40);
+    expect(champion(state, 2).health).toBe(120 - 22);
+    expect(champion(state, 3).health).toBe(120 - 22);
+  });
+
+  it('rides an area and adds the bonus to every pulse', () => {
+    const state = spent([
+      bonus(),
+      { type: 'area', placement: { type: 'ahead', distance: 3 }, radius: 2, durationTicks: 3, intervalTicks: 1, targets: 'enemies', effects: [{ type: 'damage', amount: 5 }] },
+    ]);
+    // The area centre is 3 m ahead of the caster at (-3, 0), so (0, 0); the enemy must be inside 2.5 m.
+    place(state, 2, 2, 0);
+    setCount(state, 3);
+    cast(state, Button.Q, 5);
+    // 5 + 12 = 17 a pulse, three pulses.
+    expect(champion(state, 2).health).toBe(120 - 17 * 3);
+  });
+
+  it('carries the bonus on the immediate hits of a melee arc of the spending cast', () => {
+    const state = spent([
+      bonus(),
+      { type: 'meleeArc', radius: 2.5, cosHalfAngle: -1, effects: [{ type: 'damage', amount: 10 }] },
+    ]);
+    place(state, 2, -1, 0);
+    setCount(state, 3);
+    cast(state, Button.Q, 1);
+    expect(champion(state, 2).health).toBe(120 - 22);
+  });
+
+  it('cuts the named slot cooldown by the verb per stack, and clamps at 0', () => {
+    const state = spent([{ type: 'consumeCounter', cooldownTicksPerStack: 30, slot: 'SPACE' }, bolt()]);
+    setCount(state, 3);
+    champion(state, 0).cooldowns[SLOT_INDEX('SPACE')] = 100;
+    cast(state, Button.Q, 1);
+    // 100 ticked down to 99 before the cast, then cut by 30 x 3 = 90.
+    expect(champion(state, 0).cooldowns[SLOT_INDEX('SPACE')]).toBe(99 - 90);
+    expect(champion(state, 0).cooldowns[SLOT_INDEX('R')]).toBe(0);
+  });
+
+  it('clamps the cut at 0 and never touches another slot', () => {
+    const state = spent([{ type: 'consumeCounter', cooldownTicksPerStack: 600, slot: 'SPACE' }, bolt()]);
+    setCount(state, 3);
+    champion(state, 0).cooldowns[SLOT_INDEX('SPACE')] = 100;
+    champion(state, 0).cooldowns[SLOT_INDEX('R')] = 200;
+    cast(state, Button.Q, 1);
+    expect(champion(state, 0).cooldowns[SLOT_INDEX('SPACE')]).toBe(0);
+    expect(champion(state, 0).cooldowns[SLOT_INDEX('R')]).toBe(199);
+  });
+
+  it('spends nothing for the base cast of a kit whose only spend is on its EX', () => {
+    const state = spent([bolt(10)], [bonus(), bolt(10)]);
+    setCount(state, 3);
+    cast(state, Button.Q, 30);
+    expect(champion(state, 2).health).toBe(120 - 10);
+    // The base cast spends nothing, so the counter is still 3.
+    expect(counterOf(state)?.count).toBe(3);
+    setCount(state, 3);
+    place(state, 2, 3, 0);
+    champion(state, 2).health = 120;
+    champion(state, 0).cooldowns[SLOT_INDEX('Q')] = 0;
+    champion(state, 0).energy = 25;
+    cast(state, Button.Q, 30, true);
+    expect(champion(state, 2).health).toBe(120 - 22);
+    expect(counterOf(state)).toEqual({ count: 0, lastHitTick: 0 });
+  });
+
+  it('spends on the fire tick of a windup cast, not when the cast starts', () => {
+    const q: SlotSpec = {
+      cooldownTicks: 60,
+      windupTicks: 3,
+      movement: 'free',
+      effects: [bonus(), bolt(10)],
+    };
+    const state = createMatch(CONFIG, openArena(), 1, [
+      { ...kitWith('arch', { Q: q }), counter: { from: 'M1', cap: 3, windowTicks: 360 } },
+      kitWith('dps'),
+    ]);
+    place(state, 0, -3, 0);
+    place(state, 2, 3, 0);
+    setCount(state, 3);
+    // The cast starts on this step (cooldown set), but the windup has not ended.
+    step(state, [input(0, 0, 300, 0, Button.Q)]);
+    expect(counterOf(state)?.count).toBe(3);
+    // Three more steps end the windup, and the cast fires then.
+    for (let i = 0; i < 3; i++) step(state, []);
+    expect(counterOf(state)).toEqual({ count: 0, lastHitTick: 0 });
+    for (let i = 0; i < 30; i++) step(state, []);
+    expect(champion(state, 2).health).toBe(120 - 22);
+  });
+
+  it('spends before the decay of the same tick: a spend in the tick the window ends still sees the stacks', () => {
+    const state = spent([{ type: 'consumeCounter', cooldownTicksPerStack: 30, slot: 'SPACE' }, bolt()]);
+    // The window (360) has run out, so step 6d would zero the count this tick; the spend runs first.
+    setCount(state, 3, state.tick - 360);
+    champion(state, 0).cooldowns[SLOT_INDEX('SPACE')] = 100;
+    cast(state, Button.Q, 1);
+    expect(champion(state, 0).cooldowns[SLOT_INDEX('SPACE')]).toBe(99 - 90);
+    expect(counterOf(state)).toEqual({ count: 0, lastHitTick: 0 });
+  });
+
+  it('spends before the cast own hits: a from-slot arc rebuilds the counter after the spend', () => {
+    const q: SlotSpec = {
+      cooldownTicks: 60,
+      windupTicks: 0,
+      movement: 'free',
+      effects: [bonus(), { type: 'meleeArc', radius: 2.5, cosHalfAngle: -1, effects: [{ type: 'damage', amount: 10 }] }],
+    };
+    const state = createMatch(CONFIG, openArena(), 1, [
+      { ...kitWith('arch', { Q: q }), counter: { from: 'Q', cap: 3, windowTicks: 360 } },
+      kitWith('dps'),
+    ]);
+    place(state, 0, -3, 0);
+    place(state, 2, -1, 0);
+    setCount(state, 3);
+    cast(state, Button.Q, 1);
+    // The arc sees the 3-stack bonus (22), then its hit rebuilds the counter to 1.
+    expect(champion(state, 2).health).toBe(120 - 22);
+    expect(counterOf(state)).toEqual({ count: 1, lastHitTick: 0 });
+  });
+
+  it('does not hand the bonus to a damage over time pulse, and leaves the counter spent', () => {
+    const state = spent([
+      bonus(),
+      {
+        type: 'projectile',
+        speed: 20,
+        radius: 0.4,
+        lifetimeTicks: 40,
+        pierce: false,
+        effects: [{ type: 'damage', amount: 10 }, { type: 'applyStatus', status: { type: 'dot', perPulse: 3, ticks: 90 } }],
+      },
+    ]);
+    setCount(state, 3);
+    cast(state, Button.Q, 120);
+    // 22 lands with the hit; the dot pulses 3 x 3 = 9 more, with no bonus.
+    expect(champion(state, 2).health).toBe(120 - 22 - 9);
+  });
+
+  it('leaves a cast with no bonus key, and a kit with no spend verb, byte-identical in the state', () => {
+    const state = spent([bonus(), bolt()]);
+    const plain = spent([bolt()]);
+    expect(Object.keys(state.projectiles).length).toBe(0);
+    for (let i = 0; i < 30; i++) {
+      step(state, []);
+      step(plain, []);
+    }
+    for (const p of plain.projectiles) expect('bonusDamage' in p).toBe(false);
+    for (const p of state.projectiles) expect('bonusDamage' in p).toBe(false);
+    expect(state.champions.map((c) => c.health)).toEqual(plain.champions.map((c) => c.health));
   });
 });

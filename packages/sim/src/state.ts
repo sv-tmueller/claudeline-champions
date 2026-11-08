@@ -100,6 +100,11 @@ export interface ProjectileState {
    * With it, a projectile with empty `effects` passes enemies.
    */
   allyEffects?: Effect[];
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect of
+   * this projectile's hit lists. The key is missing, not undefined, when there is none.
+   */
+  bonusDamage?: number;
   /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;
 }
@@ -125,6 +130,11 @@ export interface AreaState {
    */
   fuseTicks?: number;
   effects: Effect[];
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect of the
+   * pulses. The key is missing, not undefined, when there is none.
+   */
+  bonusDamage?: number;
   /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;
 }
