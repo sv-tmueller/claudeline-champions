@@ -127,6 +127,12 @@ function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, out: Vis
     }
     if (effect.type === 'projectile') {
       effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit }));
+      // Spec 4.3 and rules 2.8: the endArea obeys every area rule, so its leaves are held to the
+      // same catalogue ranges as a plain `area` leaf at the same path (finding 2 of the round-2
+      // report: they were never visited).
+      effect.endArea?.effects.forEach((hit, i) =>
+        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit }),
+      );
     }
     if (effect.type === 'dash') effect.then.forEach((t, i) => visit(t, `${path}.then[${i}]`));
   };
@@ -210,6 +216,61 @@ function catalogProblems(kit: KitDef): string[] {
   }
   if (kit.moveSpeed !== 5.5) bad(`${kit.id}.moveSpeed`, `${kit.moveSpeed} is not 5.5`);
   if (kit.slots.F.cooldownTicks !== 600) bad(`${kit.id}.slots.F.cooldownTicks`, 'the ultimate cooldown is not 600');
+
+  // The one-live-area rule is per slot, not per effect (finding 1 of the round-2 report). Each
+  // area-producing effect of a slot keeps an area of that slot live for its own area-lifetime:
+  // `duration + fuse` for an `area`, `lifetime + duration + fuse` for a projectile `endArea`. A slot
+  // may carry more than one such effect (a plain `area` beside an `endArea`, or two `endArea`s), and
+  // the per-effect bound below only holds each one under the cooldown on its own, so two of them can
+  // still hold two live areas of the slot at once.
+  //
+  // The fix is per slot: at most one area-producing effect of a slot may leave a *lingering* area,
+  // one that outlives the step it spawns. Two non-lingering (one-hit, unfused) areas are gone by the
+  // step's end and never counted twice, which is why the shipped Lumeth F may carry two of them.
+  // A lone lingering effect stays under the cooldown (the per-effect bound below), so one lingering
+  // effect per slot is exactly the one-live-area rule (roster-v2 section 0, rules 2.8). A sum of the
+  // lifetimes under the cooldown is not enough: two bolts that each fly 100 ticks and leave a
+  // 79-tick area sum to 358 against the 360 cooldown yet their areas appear on the same tick and
+  // overlap, holding two live areas of the slot.
+  const areaLifetime = (effect: AbilityEffect): number => {
+    if (effect.type === 'area') return (effect.fuseTicks ?? 0) + effect.durationTicks;
+    if (effect.type === 'projectile' && effect.endArea !== undefined) {
+      // The area spawns where the projectile ends: its flight, then the area's own fuse + duration.
+      return effect.lifetimeTicks + (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks;
+    }
+    return 0;
+  };
+  const lingers = (effect: AbilityEffect): boolean => {
+    if (effect.type === 'area') return effect.fuseTicks !== undefined || effect.durationTicks > 1;
+    if (effect.type === 'projectile' && effect.endArea !== undefined) {
+      return effect.endArea.fuseTicks !== undefined || effect.endArea.durationTicks > 1;
+    }
+    return false;
+  };
+  const lingeringLifetimes = (ability: AbilitySpec): number[] => {
+    const out: number[] = [];
+    const walk = (effects: readonly AbilityEffect[]): void => {
+      for (const effect of effects) {
+        if (areaLifetime(effect) > 0 && lingers(effect)) out.push(areaLifetime(effect));
+        if (effect.type === 'dash') walk(effect.then);
+      }
+    };
+    walk(ability.effects);
+    return out;
+  };
+  for (const slot of SLOTS) {
+    const spec = kit.slots[slot];
+    const abilities: { ability: AbilitySpec; base: string }[] = [{ ability: spec, base: `${kit.id}.slots.${slot}` }];
+    if (spec.ex) abilities.push({ ability: spec.ex, base: `${kit.id}.slots.${slot}.ex` });
+    for (const { ability, base } of abilities) {
+      const lifetimes = lingeringLifetimes(ability);
+      if (lifetimes.length < 2) continue;
+      bad(
+        `${base}.effects`,
+        `a slot keeps one live area of its own, but ${lifetimes.length} of its area-producing effects linger (${lifetimes.join(' + ')} ticks)`,
+      );
+    }
+  }
 
   for (const { path, slot, effect } of visitKit(kit)) {
     switch (effect.type) {
@@ -941,6 +1002,95 @@ describe('the endArea rules', () => {
       live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
     }
     expect(live).toBe(1);
+  });
+
+  it('E5 keeps one live area per slot when a slot carries two area-producing effects', () => {
+    // Finding 1 of the round-2 report: the one-live-area rule is per slot, not per effect. A slot
+    // that carries an `area` beside a projectile `endArea` (rules 2.8's named case), or two `endArea`
+    // projectiles, can hold two live areas of that slot even when each effect's own area-lifetime is
+    // under the cooldown. The per-effect bound the walker already had is not enough, and a sum of
+    // the lifetimes under the cooldown is not enough either (see the third shape below), so a slot
+    // may carry at most one area-producing effect that leaves a *lingering* area.
+    const shape = (effects: unknown[]): KitDef => {
+      const copy = copyOf(quillon);
+      (copy.slots.M2 as unknown as { effects: unknown[] }).effects = effects;
+      return copy;
+    };
+    const plain = { type: 'area', radius: 2, durationTicks: 340, intervalTicks: 340, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 20 }] };
+    const shot = (lifetimeTicks: number, area: ReturnType<typeof endArea>) => ({
+      type: 'projectile', speed: 25, radius: 0.2, lifetimeTicks, pierce: false, effects: [{ type: 'damage', amount: 10 }], endArea: area,
+    });
+    const message = (lifetimes: number[]) =>
+      `quillon.slots.M2.effects: a slot keeps one live area of its own, but ${lifetimes.length} of its area-producing effects linger (${lifetimes.join(' + ')} ticks)`;
+
+    // An `area` (340) beside a projectile `endArea` (flight 20 + 320): ids 5 and 7 in the tester's
+    // repro, two live areas of the slot.
+    expect(catalogProblems(shape([plain, shot(20, endArea(320))]))).toEqual([message([340, 340])]);
+    // Two `endArea` projectiles (flight 20 + 338, and flight 1 + 358).
+    expect(catalogProblems(shape([shot(20, endArea(338)), shot(1, endArea(358))]))).toEqual([message([358, 359])]);
+    // The sum-defeating shape the tester's lesson predicts: two bolts that each fly 100 ticks and
+    // leave a 79-tick area sum to 358 against the 360 cooldown, yet both areas appear on the same
+    // tick and the slot holds two live areas (probed in the sim). A sum-only bound admits it.
+    const twoBolts = shape([shot(100, endArea(79)), shot(100, endArea(79))]);
+    expect(catalogProblems(twoBolts)).toEqual([message([179, 179])]);
+
+    // A lingering area beside a one-hit area is fine: the one-hit area is gone in the step it
+    // spawns (shipped Lumeth F carries two one-hit areas), so only one area of the slot lingers.
+    const oneHit = { type: 'area', radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 20 }] };
+    expect(catalogProblems(shape([plain, oneHit]))).toEqual([]);
+    // Two one-hit areas, the shipped Lumeth F shape, linger neither.
+    expect(catalogProblems(shape([oneHit, oneHit]))).toEqual([]);
+    // A lingering area beside a bolt whose endArea is a one-hit area: only the plain area lingers.
+    expect(catalogProblems(shape([plain, shot(300, endArea(1))]))).toEqual([]);
+
+    // The admitted shape keeps max live = 1 in the sim, over three cooldowns: one lingering area
+    // (100 ticks) whose effect is a plain area, and a bolt whose 300-tick flight ends in a one-hit
+    // area long after the slot's own area has gone.
+    const fits = shape([
+      { type: 'area', radius: 2, durationTicks: 100, intervalTicks: 100, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 10 }] },
+      shot(300, endArea(1)),
+    ]);
+    expect(catalogProblems(fits)).toEqual([]);
+    const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(fits)]);
+    let live = 0;
+    for (let i = 0; i < 1080; i++) {
+      step(state, [input(0, 0, 0, 0, Button.M2)]);
+      live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+    }
+    expect(live).toBe(1);
+  });
+
+  it('E6 holds an endArea inner effect leaf to the same catalogue ranges as a plain area leaf', () => {
+    // Finding 2 of the round-2 report: the walker never descended into `endArea.effects`, so a leaf
+    // escaped the catalogue ranges a plain `area` leaf at the same path is held to. The stun, shield
+    // and one-hit damage values are the tester's round-2 repro.
+    const stun = copyOf(quillon);
+    shot(stun).endArea = { ...endArea(30), effects: [{ type: 'applyStatus', status: { type: 'stun', ticks: 500 } }] };
+    expect(catalogProblems(stun)).toEqual([
+      `${M2}.endArea.effects[0].status.ticks: stun of 500 ticks is outside 30 to 120`,
+    ]);
+
+    const shield = copyOf(quillon);
+    shot(shield).endArea = { ...endArea(30), effects: [{ type: 'shield', absorb: 999, ticks: 240 }] };
+    expect(catalogProblems(shield)).toEqual([
+      `${M2}.endArea.effects[0].absorb: shield absorb 999 is not 20 to 60`,
+    ]);
+
+    const oneHit = copyOf(quillon);
+    shot(oneHit).endArea = { ...endArea(1), effects: [{ type: 'damage', amount: 999 }] };
+    expect(catalogProblems(oneHit)).toEqual([
+      `${M2}.endArea.effects[0].amount: damage 999 is not 8 to 30`,
+    ]);
+
+    // The same three values on a plain `area` at the same path are flagged the same way: the ranges
+    // are the catalogue's, not the endArea's own.
+    const plainStun = copyOf(quillon);
+    plainStun.slots.M2.effects = [
+      { type: 'area', radius: 2, durationTicks: 30, intervalTicks: 30, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'applyStatus', status: { type: 'stun', ticks: 500 } }] },
+    ];
+    expect(catalogProblems(plainStun)).toEqual([
+      'quillon.slots.M2.effects[0].effects[0].status.ticks: stun of 500 ticks is outside 30 to 120',
+    ]);
   });
 });
 
