@@ -44,9 +44,23 @@ export const arena02: ArenaDef = parseArenaDef(arena02Json);
  */
 export const MELEE_STAND_FRACTION = 0.8;
 
+/**
+ * The share of rangeMax at which a champion with rangeMin 0 measures the deadlock reach (#222),
+ * literal: the pin of `LATCH_FRACTION` in profile.ts.
+ */
+export const MELEE_LATCH_FRACTION = 1.25;
+
 /** The profile `profileFor` returns for these two ranges: the stand reach is rangeMax for a ranged champion. */
-export function profileOf(rangeMin: number, rangeMax: number): { rangeMin: number; rangeMax: number; standReach: number } {
-  return { rangeMin, rangeMax, standReach: rangeMin === 0 ? rangeMax * MELEE_STAND_FRACTION : rangeMax };
+export function profileOf(
+  rangeMin: number,
+  rangeMax: number,
+): { rangeMin: number; rangeMax: number; standReach: number; latchReach: number } {
+  return {
+    rangeMin,
+    rangeMax,
+    standReach: rangeMin === 0 ? rangeMax * MELEE_STAND_FRACTION : rangeMax,
+    latchReach: rangeMin === 0 ? rangeMax * MELEE_LATCH_FRACTION : rangeMax,
+  };
 }
 
 /**

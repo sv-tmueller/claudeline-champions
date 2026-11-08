@@ -334,3 +334,39 @@ describe('the stand reach (#213)', () => {
     }
   });
 });
+
+describe('the deadlock reach (#222)', () => {
+  const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
+
+  it('is 1.25 of rangeMax for the two champions that never kite, with a kit and without', () => {
+    expect(profileFor('hargrim', hargrimKit()).latchReach).toBe(2 * 1.25);
+    expect(profileFor('skerrow', skerrow).latchReach).toBe(1.5 * 1.25);
+    expect(profileFor('hargrim').latchReach).toBe(3 * 1.25);
+    expect(profileFor('skerrow').latchReach).toBe(2.5 * 1.25);
+    // The table applies for a kit of another id or with no M1 band, and its deadlock reach with it.
+    expect(profileFor('hargrim', quillonKit()).latchReach).toBe(3 * 1.25);
+    expect(profileFor('skerrow', quietKit('skerrow')).latchReach).toBe(2.5 * 1.25);
+  });
+
+  it('is rangeMax for every champion that keeps its range, with a kit and without', () => {
+    const roster = sixKits();
+    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick']) {
+      const kit = roster.find((k) => k.id === id) as KitDef;
+      expect(profileFor(id, kit).latchReach, id).toBe(profileFor(id, kit).rangeMax);
+      expect(profileFor(id).latchReach, `${id} without a kit`).toBe(profileFor(id).rangeMax);
+    }
+    expect(profileFor('dummy').latchReach).toBe(8);
+  });
+
+  it('stays inside the melee M1 band, so a latched bot stands where it can still cast', () => {
+    // The melee kits' base M1 band top is exactly rangeMax + RANGE_MARGIN (1 m): a reach above that
+    // would let the latched stand leave the band, so the bot stands and cannot cast.
+    const roster = sixKits();
+    for (const id of ['hargrim', 'skerrow']) {
+      const kit = roster.find((k) => k.id === id) as KitDef;
+      const profile = profileFor(id, kit);
+      expect(profile.latchReach, id).toBeGreaterThan(profile.rangeMax);
+      expect(profile.latchReach, id).toBeLessThan(profile.rangeMax + 1);
+    }
+  });
+});

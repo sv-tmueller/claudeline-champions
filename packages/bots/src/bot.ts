@@ -150,6 +150,24 @@ function teamAhead(state: GameState, me: ChampionState): boolean {
   return own > enemy;
 }
 
+/** Whether an alive enemy is within `reach` of the bot with a clear shot of 0.5 m. */
+function enemyWithin(
+  state: GameState,
+  me: ChampionState,
+  reach: number,
+  sight: SightScratch,
+  dist: Measure,
+): boolean {
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (!c.alive || c.team === me.team) continue;
+    distanceInto(dist, me, c);
+    if (dist.metres > reach) continue;
+    if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) return true;
+  }
+  return false;
+}
+
 /** Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. */
 function enemyInReach(
   state: GameState,
@@ -158,14 +176,7 @@ function enemyInReach(
   sight: SightScratch,
   dist: Measure,
 ): boolean {
-  for (let i = 0; i < state.champions.length; i++) {
-    const c = state.champions[i] as ChampionState;
-    if (!c.alive || c.team === me.team) continue;
-    distanceInto(dist, me, c);
-    if (dist.metres > profile.rangeMax) continue;
-    if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) return true;
-  }
-  return false;
+  return enemyWithin(state, me, profile.rangeMax, sight, dist);
 }
 
 /**
@@ -319,9 +330,11 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
 
   /**
    * The sight logic of a bot that wants a shot at its target, the one a kite uses beyond rangeMin:
-   * stand while the target has a clear shot (and, with `requireRange`, is within rangeMax), else
-   * walk to the nearest cell that has one at a distance in [rangeMin, rangeMax], else along the
-   * path to the target, which ends in line of sight. Reads the distance to the target from `dist`.
+   * stand while the target has a clear shot (and, with `requireRange`, is within the deadlock reach,
+   * `latchReach`), else walk to the nearest cell that has one at a distance in [rangeMin, rangeMax],
+   * else along the path to the target, which ends in line of sight. Reads the distance to the target
+   * from `dist`. Only the latched deadlock advance passes `requireRange` (#222): its stand reads the
+   * deadlock reach, the sight cell search below keeps the kit's `rangeMax` (#213).
    */
   function seekShot(
     state: GameState,
@@ -331,10 +344,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     profile: BotProfile,
     requireRange: boolean,
   ): void {
-    if (
-      (!requireRange || dist.metres <= profile.rangeMax) &&
-      standShot(state, me, target)
-    ) {
+    if ((!requireRange || dist.metres <= profile.latchReach) && standShot(state, me, target)) {
       return stand();
     }
     sight.rangeMin = profile.rangeMin;
@@ -383,7 +393,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         // so its cast run starts over on every other think and nothing lands.
         const ahead = teamAhead(state, me);
         if (advancing && (acted.targetId !== advanceTargetId || ahead)) advancing = false;
-        if (!advancing && !ahead && !enemyInReach(state, me, profile, sight, dist)) {
+        if (!advancing && !ahead && !enemyWithin(state, me, profile.latchReach, sight, dist)) {
           advancing = true;
           advanceTargetId = acted.targetId;
         }
