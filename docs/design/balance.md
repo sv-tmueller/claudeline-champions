@@ -211,8 +211,8 @@ at e5c29a4, see 5.10) had 7 in band, 1552.9 points (882.7 and
 670.2) and Brimwick 51.9, Hargrim 11.7, Lumeth 89.3, Ondrel 60.2, Quillon 73.0 and
 Skerrow 13.9; the block of #189 (generated at 3704221) had 8 in band, 1561.3
 points (883.9 and 677.4) and Brimwick 52.3, Hargrim 11.4, Lumeth 89.1, Ondrel
-60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in sections 5.10 and
-5.12. The four-kit report that the six-kit report replaced is the block
+60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in sections 5.10, 5.11
+and 5.12. The four-kit report that the six-kit report replaced is the block
 regenerated after the dodge of #137, and nothing between it and #189 moved a
 four-kit cell: #155, #165, #191 and #158 landed after it, and PR #185 and PR
 #196 each reproduced that block with `--check` on main (PR #196 after #191, #158
