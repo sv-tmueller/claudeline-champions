@@ -11,13 +11,14 @@ export const NOMINAL_PROJECTILE_SPEED = 20;
  * The half of the area radius a one-hit aim-placed area caps the lead offset at (#187). The lead
  * of an ability with no projectile is the nominal 20 m/s intercept, which passes the area centre
  * over the target when the target keeps its velocity. A one-hit area fires a single pulse at the
- * centre, so the lead only pays when the pulse lands the target inside the circle; a full-radius
- * cap did gain on the re-measure (Firecracker 93.4 to 98.3 percent, Binding Sigil 95.6 to 96.4,
- * both clean sets) but half the radius gains more (99.3 and 97.3), because the circle covers the
- * whole walk of the target over the cast in one direction and half its width in the other. The
- * cap is measured from the target's position (the issue's "offset"), plain radius and not radius
- * plus `CHAMPION_RADIUS`. The lingering areas stay nominal: their pulses walk the circle over the
- * whole duration, so the nominal lead measured within a point of the best (#165, bots.md Aim).
+ * centre, so the lead only pays when the pulse lands the target inside the circle; on the #187
+ * re-measure a full-radius cap gained on every one-hit area (Firecracker 94.5 to 98.3 percent,
+ * Firecracker EX 95.2 to 97.4, Binding Sigil 95.6 to 96.4, clean set) but half the radius gained
+ * more (99.3, 98.1 and 97.3), because the circle covers the whole walk of the target over the
+ * cast in one direction and half its width in the other. The cap is measured from the target's
+ * position (the issue's "offset"), plain radius and not radius plus `CHAMPION_RADIUS`. The
+ * lingering areas stay nominal: their pulses walk the circle over the whole duration, so the
+ * nominal lead measured within a point of the best (#165, bots.md Aim).
  */
 export const AREA_LEAD_CAP_FRACTION = 0.5;
 

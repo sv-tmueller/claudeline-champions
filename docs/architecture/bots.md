@@ -1273,11 +1273,12 @@ error.
   | doubled                        | 567 of 804 (70.5) | 9 of 13 (69.2)      | 401 of 422 (95.0)   | 420 of 441 (95.2)    | 323 of 338 (95.6)   |
 
   The nominal lead is within a point of the best for the lingering areas (the
-  Mire and Drowned Ground, which pulse three and five times): a cap at the
-  radius reads 0.2 and 1.6 points above it on the #185 set, a cap at half the
-  radius the same, and no lead identical, so a kit-derived lead would add
-  arithmetic on doubles to `aim` (the boxing hazard of the Allocation section)
-  for nothing, and the lingering areas stay nominal. The one-hit areas read the
+  Mire and Drowned Ground, which pulse three and five times): on the #185 set a
+  cap at the radius reads 0.2 below it on the Mire and 1.6 above on Drowned
+  Ground (77.6 against 77.4; 82.1 against 83.7), a cap at half the radius the
+  same pair, and no lead identical, so a kit-derived lead would add arithmetic
+  on doubles to `aim` (the boxing hazard of the Allocation section) for nothing,
+  and the lingering areas stay nominal. The one-hit areas read the
   other way, and a cap gains on every one of the three: Firecracker 94.5 to 99.3
   on the clean set (93.4 to 99.1 on the #185 one), Firecracker EX 95.2 to 98.1
   and Binding Sigil 95.6 to 97.3. Half the radius is at least as good as the
