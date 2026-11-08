@@ -15,9 +15,9 @@ const CELLS = [
   cellOf('ondrel', 'hargrim', 'arena01', 3403, 1305),
   cellOf('ondrel', 'hargrim', 'arena02', 5573, 1444),
   cellOf('ondrel', 'quillon', 'arena01', 5126, 1470),
-  cellOf('ondrel', 'quillon', 'arena02', 5533, 1023),
+  cellOf('ondrel', 'quillon', 'arena02', 4610, 1103),
   cellOf('ondrel', 'lumeth', 'arena01', 4924, 1607),
-  cellOf('ondrel', 'lumeth', 'arena02', 6725, 1313),
+  cellOf('ondrel', 'lumeth', 'arena02', 5757, 1645),
   cellOf('ondrel', 'skerrow', 'arena01', 3281, 1105),
   cellOf('ondrel', 'skerrow', 'arena02', 5468, 1204),
   cellOf('ondrel', 'brimwick', 'arena01', 3703, 1027),
@@ -47,11 +47,11 @@ describe('a match of bots with Ondrel, played to matchEnd', () => {
       configOf(cell.mine, cell.other).players.every((p) => !others.includes(p.championId)),
     );
     expect(own).toHaveLength(8);
-    // Since #213 (a melee champion stands inside its reach, not on the edge of it) the match of
-    // Ondrel against Quillon on arena02 ends at tick 2969 with no dash escape (`glides` 0, it had
-    // some before). The other seven cells escape by dashing.
+    // Since #222 (the deadlock reach moved the latched stand outward) the match of Ondrel against
+    // Brimwick on arena02 ends with no dash escape (`glides` 0; it was Ondrel against Quillon on
+    // arena02, glides 0, before). The other seven cells escape by dashing.
     for (const cell of own) {
-      if (cell.name === 'ondrel against quillon on arena02') continue;
+      if (cell.name === 'ondrel against brimwick on arena02') continue;
       expect(playCell(cell).glides, cell.name).toBeGreaterThan(0);
     }
   });

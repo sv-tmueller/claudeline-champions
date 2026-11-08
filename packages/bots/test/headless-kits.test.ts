@@ -78,17 +78,17 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
   }, 30_000);
 });
 
-// Free play of the same 3v3 on the shipped kits with no start edit, seeds 738 to 743 (#146, and #213:
-// the seeds were 648 to 653, whose tick 341 Skip ended 2.0 m from the standing landing, until the
-// melee stand moved the run and it displaced none; no window of six seeds from 640 to 699 does, and
-// the first from 700 up that does is 738). On tick 541 champion 2's Skip ends 0.08 m from the standing
-// landing (-6.5076, 3.2184 to -6.5672, 3.2669): a champion ahead of it in the step's turn order
-// walked first, and the teleport then pushed champion 2's end out of where that champion now
+// Free play of the same 3v3 on the shipped kits with no start edit, seeds 768 to 773 (#146; #213
+// moved 648 to 653 to 738; #222 moved 738 to 768, since the deadlock reach moved the run and no
+// window of six seeds from 600 to 767 displaced it). On tick 366 champion 2's Skip ends 0.12 m from
+// the standing landing (-5.7349, 3.6860 to -5.6317, 3.6332): a champion ahead of it in the step's turn
+// order walked first, and the teleport then pushed champion 2's end out of where that champion now
 // stands, which the oracle's own clone does not see. The
 // oracle models the walks of the champions ahead. The seeds are pinned for that alone: a miss
 // after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3.
-describe('a headless 3v3 free play on the shipped kits, seeds 738 to 743', () => {
+describe('a headless 3v3 free play on the shipped kits, seeds 768 to 773', () => {
   const set = KIT_SETS[1] as KitSet;
+  const DISPLACED_SEEDS = [768, 769, 770, 771, 772, 773];
 
   it('every escape teleport passes the oracle, one displaced by a champion ahead of it in turn order', () => {
     const run = createRun(DISPLACED_SEEDS, ULTIMATE_TIERS, 7, { config: config3v3(), kits: set.kits() });
