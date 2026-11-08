@@ -970,9 +970,10 @@ Lumeth 89.2, Ondrel 66.6, Quillon 78.3 and Skerrow 21.3.
 **Durnhal's 36 cells.** 5 are in band and 31 are out, the summed distance 953.0
 points, 26.5 a cell, second only to Lumeth's 29.5. Against the web of roster-v3.md
 section 1, which has him beat Lumeth, Skerrow and Hargrim and lose to Quillon
-and Brimwick, the measured cells are almost the reverse. The mean over his six
-cells (the two modes on the three arenas), Durnhal's own rate: Brimwick 7.1,
-Hargrim 65.6, Lumeth 0.3, Ondrel 1.8, Quillon 2.7 and Skerrow 49.1.
+and Brimwick, four of the five hold in direction and one is inverted. The mean
+over his six cells (the two modes on the three arenas), Durnhal's own rate:
+Brimwick 7.1, Hargrim 65.6, Lumeth 0.3, Ondrel 1.8, Quillon 2.7 and Skerrow
+49.1.
 
 | Mode | Arena | X v Y | Durnhal's rate | Standing |
 |------|-------|-------|----------------|----------|
@@ -1013,22 +1014,23 @@ Hargrim 65.6, Lumeth 0.3, Ondrel 1.8, Quillon 2.7 and Skerrow 49.1.
 | 3v3 | arena03 | durnhal v quillon | 4.5 | outside, 35.5 from the band |
 | 3v3 | arena03 | durnhal v skerrow | 65.5 | outside, 5.5 from the band |
 
-The one pairing the web has nearly right is Skerrow (roots and shields stop the
+The one pairing left open by the web is Skerrow (roots and shields stop the
 dive): the cell is in band on two of the three arenas in each mode, and the
-pairing is a near-even split (Durnhal 49.1). Every other pairing is inverted.
+pairing is a near-even split (Durnhal 49.1), where the web expects him ahead.
 Against Lumeth the web expects the `wound` anti-heal (#158) to press her healing
 down; instead she takes all six of their cells (Durnhal's rate 0.0, 0.0, 0.0,
-1.0, 0.5 and 0.0), four of them without a loss, the widest of his six inversions
-and the same shape as her stand against Hargrim and Skerrow (5.2, 5.4). Against
+1.0, 0.5 and 0.0), four of them without a loss, the widest of his six results
+and the one line of the web that is reversed. Against
 Quillon the web expects him to be kited from 13 m, and he is: 2.7 means Durnhal
-takes 1 cell of 36, and Quillon's own overall rate rises to 78.3. Against
+takes none of their six cells, and Quillon's own overall rate rises to 78.3. Against
 Brimwick the web expects her burst to ignore his shields; she takes all six of
 their cells (Durnhal 7.1 to her 92.9, 32.9 points over the band), so that is
 right in direction. Against Ondrel (1.8) the web has no line at all, because
 roster-v3.md section 1 fixes his counter web against the seven existing kits and
 his own row against Ysmeer waits for her series; the measured cell is a rout for
-Ondrel. Hargrim (65.6) is the one where Durnhal is ahead, and the only pairing
-the web leaves open. The pattern is what the bots play, not the intent: Durnhal
+Ondrel. Hargrim (65.6) is the one the web gives Durnhal, and he takes it, the
+most positive of his six. What every line shares is that the measured cell sits
+further from the band than the intent: the pattern is what the bots play. Durnhal
 stands at 2.4 m (`rangeMin` 0, his profile of #211) and throws Breaker Throw at a
 target walking away, so a melee tank of 160 health walks into the range of the
 kits that out-reach him, and his two fixed numbers (`wound` at 10 percent a
