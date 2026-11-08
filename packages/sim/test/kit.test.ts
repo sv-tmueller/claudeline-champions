@@ -178,7 +178,6 @@ describe('validateKit and the on-hit counter', () => {
 
 describe('validateKit and the consumeCounter spend verbs', () => {
   const counter = { from: 'Q', cap: 3, windowTicks: 180 };
-  const withCounter = (value: unknown): unknown => ({ ...testStriker(), counter: value });
   /** The striker with a counter, and `effects` put on the M1 ability. */
   const spending = (effects: AbilityEffect[], ex = false, withTheCounter = true): unknown => {
     const kit = testStriker();

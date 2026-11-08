@@ -43,9 +43,9 @@ function effectReach(effect: AbilityEffect | ThenEffect, offset: number): Reach 
     case 'applyStatus':
     case 'shield':
     case 'heal':
-    // A spend verb has no reach of its own; the damage it boosts rides the projectile, area or arc
-    // that already has a band.
     case 'consumeCounter':
+      // A spend verb has no reach of its own; the damage it boosts rides the projectile, area or
+      // arc that already has a band.
       return null;
   }
 }
