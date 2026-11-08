@@ -30,6 +30,8 @@ export interface ProjectileSpec {
   effects: readonly Effect[];
   /** Lands on the owner's team instead of `effects`; when given, `effects` may be empty. */
   readonly allyEffects?: readonly Effect[];
+  /** Added to each `damage` effect of a hit (rules 2.6); left out of the entity when undefined. */
+  readonly bonusDamage?: number;
 }
 
 /** Smallest direction component, in magnitude, that `length` measures without underflow. */
@@ -111,6 +113,7 @@ export function spawnProjectile(
   };
   // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
   if (allyEffects !== undefined) projectile.allyEffects = allyEffects;
+  if (spec.bonusDamage !== undefined) projectile.bonusDamage = spec.bonusDamage;
   state.projectiles.push(projectile);
   state.events.push({
     type: 'projectileSpawned',

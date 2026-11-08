@@ -14,6 +14,7 @@ import { meleeArc } from './melee';
 import { startDash, teleport } from './motion';
 import { spawnProjectile } from './projectile';
 import { nextId } from './state';
+import { spendCounter } from './counter';
 import type {
   AreaState,
   CastRecord,
@@ -119,6 +120,10 @@ interface CastRef {
  * whose aim lies within the caster's own circle (inclusive) spawns nothing: its ally effects land
  * on her instead, a heal and each heal over time pulse at 60 percent (the self-cast rule, rules.md
  * section 2.5). No energy is paid and no hit is credited; a `then` projectile follows the rule too.
+ *
+ * `bonus`, the spend verb's flat damage addition (rules 2.6), rides on each entity this run
+ * creates, so it lands with every hit of the cast, whenever that hit lands. A `consumeCounter` in
+ * the list is a marker `fire` has already read: it does nothing here.
  */
 function runEffects(
   state: GameState,
@@ -126,10 +131,14 @@ function runEffects(
   cast: CastRef,
   effects: readonly AbilityEffect[],
   then: { x: number; y: number } | null,
+  bonus = 0,
 ): void {
   const source = { sourceId: champion.id, slot: cast.slot };
   for (const effect of effects) {
     switch (effect.type) {
+      case 'consumeCounter':
+        // A fire-time marker: `fire` scanned for it, spent the counter and passes `bonus` in.
+        break;
       case 'projectile': {
         if (effect.allyEffects !== undefined && aimsAtSelf(champion)) {
           // Self-cast: nothing is spawned; the ally effects land on the caster at once. The heal
@@ -164,6 +173,7 @@ function runEffects(
             effects: effect.effects,
             // `spawnProjectile` leaves the key out of the entity when this is undefined.
             allyEffects: effect.allyEffects,
+            bonusDamage: bonus === 0 ? undefined : bonus,
           },
           cast.castId,
         );
@@ -184,6 +194,7 @@ function runEffects(
             effects: effect.effects,
             // `spawnArea` leaves the key out of the entity when this is undefined.
             fuseTicks: effect.fuseTicks,
+            bonusDamage: bonus === 0 ? undefined : bonus,
           },
           cast.castId,
         );
@@ -201,6 +212,7 @@ function runEffects(
           cosHalfAngle: effect.cosHalfAngle,
           effects: effect.effects,
           castId: cast.castId,
+          bonusDamage: bonus,
         });
         break;
       }
@@ -209,7 +221,7 @@ function runEffects(
         if (then) break;
         const fire = fireFrom(champion, null);
         if (hasStatus(champion, 'root')) {
-          runEffects(state, champion, cast, effect.then, { x: fire.dirX, y: fire.dirY });
+          runEffects(state, champion, cast, effect.then, { x: fire.dirX, y: fire.dirY }, bonus);
         } else {
           startDash(
             state,
@@ -244,6 +256,33 @@ function runEffects(
   }
 }
 
+/**
+ * Spends the caster's counter for a `consumeCounter` in an ability's top-level effects (rules 2.6,
+ * v3 4.4b) and applies the one verb, before any effect of the cast lands. At most one verb is in
+ * the list (the validator holds that), so the first found is the only one; the spend of the whole
+ * counter is `spendCounter`. The damage bonus `bonusDamagePerStack * stacks` is returned for the
+ * effects run to hand to the entities; the cooldown verb cuts the named slot's cooldown by
+ * `cooldownTicksPerStack * stacks`, clamped at 0, and returns 0. A spend at 0 stacks changes
+ * nothing and returns 0. A plain loop: it makes no closure on the casting path.
+ */
+function spendAtFire(champion: ChampionState, effects: readonly AbilityEffect[]): number {
+  for (let i = 0; i < effects.length; i++) {
+    const effect = effects[i] as AbilityEffect;
+    if (effect.type !== 'consumeCounter') continue;
+    const stacks = spendCounter(champion);
+    if (stacks === 0) return 0;
+    if (effect.bonusDamagePerStack !== undefined) return effect.bonusDamagePerStack * stacks;
+    // The validator guarantees `slot` beside `cooldownTicksPerStack`.
+    const slot = effect.slot as Slot;
+    const index = SLOTS.indexOf(slot);
+    const cut = (effect.cooldownTicksPerStack as number) * stacks;
+    champion.cooldowns[index] = Math.max(0, (champion.cooldowns[index] as number) - cut);
+    // The spend shows in the cooldown value; it emits no event of its own.
+    return 0;
+  }
+  return 0;
+}
+
 /** The cast fires: the windup is over (or there was none), so it is no longer in progress. */
 function fire(state: GameState, champion: ChampionState, cast: CastRef & { ex: boolean }): void {
   const kit = findKit(state, champion);
@@ -255,7 +294,11 @@ function fire(state: GameState, champion: ChampionState, cast: CastRef & { ex: b
     ex: cast.ex,
   });
   if (!kit) return;
-  runEffects(state, champion, cast, abilityOf(kit, cast.slot, cast.ex).effects, null);
+  const { effects } = abilityOf(kit, cast.slot, cast.ex);
+  // The spend runs first, before any effect of the cast lands (rules 2.6): the counter is spent
+  // on this tick and the damage bonus rides into every hit the effects run creates.
+  const bonus = spendAtFire(champion, effects);
+  runEffects(state, champion, cast, effects, null, bonus);
 }
 
 /** Step 3c: a windup in progress loses a turn and fires at 0. */

@@ -163,6 +163,30 @@ describe('checksum of combat state', () => {
     expect(() => checksum(state)).toThrow('non-finite');
   });
 
+  it('changes with the bonusDamage of a projectile and an area, and with the key alone', () => {
+    const carried = (bonus: number | undefined): GameState => {
+      const state = fresh();
+      spawnProjectile(state, {
+        ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2, lifetimeTicks: 60,
+        pierce: true, effects: [{ type: 'damage', amount: 10 }], bonusDamage: bonus,
+      });
+      spawnArea(state, {
+        ownerId: 0, x: 3, y: 4, radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies',
+        effects: [{ type: 'damage', amount: 5 }], bonusDamage: bonus,
+      });
+      return state;
+    };
+    const base = checksum(carried(8));
+    expect(checksum(carried(8))).toBe(base);
+    expect(checksum(carried(9))).not.toBe(base);
+    // The key absent (0, the spend at 0 stacks) is different from the key present at any value.
+    const keyless = carried(undefined);
+    expect(keyless.projectiles[0]).not.toHaveProperty('bonusDamage');
+    expect(keyless.areas[0]).not.toHaveProperty('bonusDamage');
+    expect(checksum(keyless)).not.toBe(base);
+    expect(checksum(cloneState(carried(8)))).toBe(base);
+  });
+
   it('survives a clone with live projectiles and areas', () => {
     const state = armed();
     expect(checksum(cloneState(state))).toBe(checksum(state));
@@ -351,6 +375,35 @@ describe('checksum of the on-hit counter', () => {
     expect(cloneState(state)).toEqual(state);
     expect(checksum(cloneState(state))).toBe(checksum(state));
     expect('counter' in cloneState(fresh()).champions[0]!).toBe(false);
+  });
+
+  it('changes with a spend verb in the kit, and with each of its fields', () => {
+    const spending = (): GameState =>
+      createMatch(config2v2(), arena01, 1337, [
+        {
+          ...testStriker(),
+          id: 'hargrim',
+          counter: { from: 'M1', cap: 5, windowTicks: 60 },
+          slots: {
+            ...testStriker().slots,
+            M1: {
+              ...testStriker().slots.M1,
+              effects: [{ type: 'consumeCounter', bonusDamagePerStack: 4 }],
+            },
+          },
+        },
+      ]);
+    const base = checksum(spending());
+    const mutations: [string, (s: GameState) => void][] = [
+      ['verb removed', (s) => void (s.kits[0]!.slots.M1.effects = [{ type: 'heal', amount: 1 }])],
+      ['field value', (s) => void ((s.kits[0]!.slots.M1.effects[0] as { bonusDamagePerStack: number }).bonusDamagePerStack = 5)],
+      ['slot named', (s) => void (s.kits[0]!.slots.M1.effects[0] = { type: 'consumeCounter', cooldownTicksPerStack: 120, slot: 'SPACE' })],
+    ];
+    for (const [name, mutate] of mutations) {
+      const state = spending();
+      mutate(state);
+      expect(checksum(state), name).not.toBe(base);
+    }
   });
 });
 

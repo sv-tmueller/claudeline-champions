@@ -20,6 +20,8 @@ export interface AreaSpec {
    * until then. The key is left out of the entity when this is undefined.
    */
   fuseTicks?: number | undefined;
+  /** The spend verb's damage bonus (rules 2.6); the key is left out of the entity when undefined. */
+  bonusDamage?: number | undefined;
 }
 
 function fail(problem: string): never {
@@ -89,6 +91,8 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
     area.ticksToNextApply = spec.fuseTicks;
     area.remainingTicks = spec.fuseTicks + spec.durationTicks;
   }
+  // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
+  if (spec.bonusDamage !== undefined) area.bonusDamage = spec.bonusDamage;
   state.areas.push(area);
   state.events.push({
     type: 'areaSpawned',
