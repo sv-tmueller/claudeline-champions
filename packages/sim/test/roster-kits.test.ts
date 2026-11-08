@@ -148,6 +148,9 @@ function visitKit(kit: KitDef): Visit[] {
  * every lingering area that breaks one of the three rules of roster-v2.md section 0 (the damage or
  * heal total over its pulses, no stun, root or silence on a pulse, a duration under the slot cooldown),
  * and every fused area outside the fuse range of 15 to 120 ticks or whose fuse plus duration reaches the cooldown.
+ *
+ * Spec 4.3: a projectile `endArea` counts as an area of its slot, so its duration (plus a fuse) also
+ * stays under the slot cooldown.
  */
 function catalogProblems(kit: KitDef): string[] {
   const problems: string[] = [];
@@ -250,6 +253,20 @@ function catalogProblems(kit: KitDef): string[] {
       case 'projectile':
         if (!within(effect.speed, 12, 25)) bad(`${path}.speed`, `projectile speed ${effect.speed} is not 12 to 25`);
         if (!within(effect.radius, 0.2, 0.6)) bad(`${path}.radius`, `projectile radius ${effect.radius} is not 0.2 to 0.6`);
+        // Spec 4.3: the endArea counts as an area of the projectile's slot, so its duration (with
+        // its fuse) stays under the cooldown, as for an `area` effect (rules 2.7 and roster-v2 0).
+        if (effect.endArea !== undefined) {
+          const { fuseTicks, durationTicks } = effect.endArea;
+          const cooldown = kit.slots[slot].cooldownTicks;
+          if ((fuseTicks ?? 0) + durationTicks >= cooldown) {
+            bad(
+              `${path}.endArea.durationTicks`,
+              fuseTicks === undefined
+                ? `${durationTicks} ticks is not under the ${slot} cooldown of ${cooldown}`
+                : `fuse of ${fuseTicks} + ${durationTicks} ticks is not under the ${slot} cooldown of ${cooldown}`,
+            );
+          }
+        }
         break;
       default:
         break;
@@ -824,6 +841,39 @@ describe('the fuse rules', () => {
     // The pulse hit the champion at the fire-step aim, and not the one at the later aim.
     expect(rig.events('damage').map(({ e }) => e.targetId)).toEqual([2]);
     rig.clean();
+  });
+});
+
+describe('the endArea rules', () => {
+  // Spec 4.3: no shipped kit has an endArea yet, so each row puts one on a projectile of a copy of
+  // Quillon, whose M2 projectile slot is a 360-tick cooldown. The endArea counts as an area of that
+  // slot, so its duration (plus a fuse) stays under the cooldown.
+  const M2 = 'quillon.slots.M2.effects[0]';
+  const shot = (copy: KitDef): Extract<AbilityEffect, { type: 'projectile' }> => {
+    const effect = copy.slots.M2.effects[0];
+    if (effect?.type !== 'projectile') throw new Error('Quillon M2 does not start with a projectile');
+    return effect;
+  };
+  const ending = (durationTicks: number, fuseTicks?: number): KitDef => {
+    const copy = copyOf(quillon);
+    const area = { radius: 2, durationTicks, intervalTicks: durationTicks, targets: 'enemies' as const, effects: [{ type: 'damage' as const, amount: 10 }] };
+    shot(copy).endArea = fuseTicks === undefined ? area : { ...area, fuseTicks };
+    return copy;
+  };
+
+  it('E1 wants the duration of an endArea under the slot cooldown: 360 against 360 is red and 359 is not', () => {
+    expect(catalogProblems(ending(359))).toEqual([]);
+    expect(catalogProblems(ending(360))).toEqual([
+      `${M2}.endArea.durationTicks: 360 ticks is not under the M2 cooldown of 360`,
+    ]);
+  });
+
+  it('E2 counts the fuse of an endArea with its duration: 100 + 260 against 360 is red, and a one-hit area is fine', () => {
+    expect(catalogProblems(ending(260, 100))).toEqual([
+      `${M2}.endArea.durationTicks: fuse of 100 + 260 ticks is not under the M2 cooldown of 360`,
+    ]);
+    expect(catalogProblems(ending(259, 100))).toEqual([]);
+    expect(catalogProblems(ending(1, 120))).toEqual([]);
   });
 });
 
