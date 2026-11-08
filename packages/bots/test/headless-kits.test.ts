@@ -14,8 +14,6 @@ const TIERS = ['easy', 'normal', 'hard', 'normal'] as const;
 // The 3v3 that must start an ultimate: seeds and tiers pinned for that alone (see its test).
 const ULTIMATE_SEEDS = [101, 102, 103, 104, 105, 106];
 const ULTIMATE_TIERS = ['hard', 'hard', 'hard', 'hard', 'hard', 'hard'] as const;
-// The 3v3 free play whose tick 541 Skip is displaced by a walk ahead of it, at ULTIMATE_TIERS (hard for all six; see its test).
-const DISPLACED_SEEDS = [738, 739, 740, 741, 742, 743];
 
 /** Hargrim and two Quillons on each team. */
 function config3v3(): MatchConfig {
