@@ -257,6 +257,14 @@ describe('shield and silence (hud.css)', () => {
     expect(value("[data-part='shield-fill']", 'background')).toBe('var(--hud-text)');
   });
 
+  it('draws the counter pips in the HUD text colour, so they add no colour', () => {
+    expect(value("[data-part='pips'] [data-pip]", 'background')).toBe('var(--hud-text)');
+    // An empty slot is the same colour, dimmed; a filled one is the text colour at full.
+    expect(value("[data-part='pips'] [data-pip]", 'opacity')).toBe('0.3');
+    expect(value("[data-part='pips'] [data-pip][data-filled='true']", 'opacity')).toBe('1');
+    expect(value("[data-part='pips'][data-visible='false']", 'display')).toBe('none');
+  });
+
   it('draws the silenced slots dim with the enemy colour border', () => {
     expect(value("[data-slot][data-silenced='true']", 'border-color')).toBe('var(--hud-enemy)');
     expect(value("[data-slot][data-silenced='true']", 'opacity')).toBe('0.35');

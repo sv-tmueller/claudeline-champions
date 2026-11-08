@@ -136,6 +136,37 @@
   opacity: 1;
 }
 
+/*
+ * Counter pips (rules.md section 2.6): one circle per slot of the local champion's cap,
+ * under the energy bar and centred on it. The container is hidden for a kit with no
+ * counter. A filled pip is the HUD text colour, an empty one dimmed, so the row adds no
+ * colour and follows the shield-segment precedent.
+ */
+#hud [data-part='pips'] {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--hud-u) * -0.5);
+  transform: translateX(-50%);
+  display: flex;
+  gap: calc(var(--hud-u) * 0.4);
+}
+
+#hud [data-part='pips'][data-visible='false'] {
+  display: none;
+}
+
+#hud [data-part='pips'] [data-pip] {
+  width: calc(var(--hud-u) * 0.8);
+  height: calc(var(--hud-u) * 0.8);
+  border-radius: 50%;
+  background: var(--hud-text);
+  opacity: 0.3;
+}
+
+#hud [data-part='pips'] [data-pip][data-filled='true'] {
+  opacity: 1;
+}
+
 /* Cooldown icons: seven in a row above the health bar. */
 #hud [data-hud='cooldown-icons'] {
   left: 50%;

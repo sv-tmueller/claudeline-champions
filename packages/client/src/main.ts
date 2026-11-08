@@ -33,7 +33,7 @@ import { createHealthBars } from './health-bars';
 import { cmText, facingKey, facingText, intText, percentText } from './hook-text';
 import { Hud } from './hud';
 import { buildHud } from './hud-dom';
-import { primeStatusReads } from './hud-views';
+import { counterCap, primeStatusReads } from './hud-views';
 import { createImpactRings } from './impact-rings';
 import { createKillFeed } from './kill-feed';
 import { ORB_TEXTS, createOrbView } from './orb-view';
@@ -125,10 +125,15 @@ scene.add(overlay.group);
 
 const human = state.champions[HUMAN_ID];
 if (!human) throw new Error('match has no human champion');
+// The per-champion pip slots of the on-hit counter (rules.md section 2.6). The cap is kit
+// data, fixed for the match, so it is read once here and passed into the two views; the
+// frame path only reads the count out of the state. Champion 0 is the local one.
+const counterCaps = state.champions.map((champion) => counterCap(state.kits, champion.championId));
+const localCounterCap = counterCaps[HUMAN_ID] ?? 0;
 const projectileViews = createProjectileViews(human.team);
 const areaViews = createAreaViews(human.team);
 const impactRings = createImpactRings();
-const healthBars = createHealthBars(state.champions, human.team);
+const healthBars = createHealthBars(state.champions, human.team, counterCaps);
 const killFeed = createKillFeed();
 // The state of each champion's clips: the event pass writes its triggers, draw plays it.
 const anims = createAnims(state.champions.length);
@@ -138,7 +143,7 @@ const feedback = new CombatFeedback(state.champions, human.team, impactRings, ki
 scene.add(areaViews.group, projectileViews.group, impactRings.group, healthBars.group, orbView.group);
 
 // Built before the models load, so the HUD shows while they do.
-const hud = new Hud(buildHud(hudRoot, roundsToWin), state.champions, HUMAN_ID, killFeed, roundsToWin);
+const hud = new Hud(buildHud(hudRoot, roundsToWin, localCounterCap), state.champions, HUMAN_ID, killFeed, roundsToWin, localCounterCap);
 // The scoreboard shows while Tab is held (bindScoreboard, below). It reads the tallies of the feedback.
 // The status readers see every shape of a status before the first frame (hud-views.ts).
 primeStatusReads();
