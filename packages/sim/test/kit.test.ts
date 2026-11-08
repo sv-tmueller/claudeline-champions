@@ -581,8 +581,8 @@ describe('validateKit and the endArea of a projectile (spec 4.3)', () => {
     radius: 2,
     durationTicks: 30,
     intervalTicks: 30,
-    targets: 'enemies',
-    effects: [{ type: 'heal', amount: 5 }],
+    targets: 'enemies' as const,
+    effects: [{ type: 'heal' as const, amount: 5 }],
   };
 
   it('accepts an endArea with a full payload and copies it deep, leaving it off otherwise', () => {
