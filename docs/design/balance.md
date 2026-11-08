@@ -968,7 +968,7 @@ over all of its cells the block reads Brimwick 58.9, Durnhal 21.1, Hargrim 14.7,
 Lumeth 89.2, Ondrel 66.6, Quillon 78.3 and Skerrow 21.3.
 
 **Durnhal's 36 cells.** 5 are in band and 31 are out, the summed distance 953.0
-points, 26.5 a cell, the widest of any kit. Against the web of roster-v3.md
+points, 26.5 a cell, second only to Lumeth's 29.5. Against the web of roster-v3.md
 section 1, which has him beat Lumeth, Skerrow and Hargrim and lose to Quillon
 and Brimwick, the measured cells are almost the reverse. The mean over his six
 cells (the two modes on the three arenas), Durnhal's own rate: Brimwick 7.1,
