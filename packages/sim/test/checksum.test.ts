@@ -163,25 +163,43 @@ describe('checksum of combat state', () => {
     expect(() => checksum(state)).toThrow('non-finite');
   });
 
-  it('changes with the bonusDamage of a projectile and an area, and with the key alone', () => {
+  // Each carry gets its own state with only that entity in it, so disabling one carry alone
+  // (the `if` in projectile.ts or area.ts) turns exactly one row red instead of the other
+  // entity still distinguishing the two states.
+  it('changes with the bonusDamage of a projectile alone, and with the key alone', () => {
     const carried = (bonus: number | undefined): GameState => {
       const state = fresh();
       spawnProjectile(state, {
         ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2, lifetimeTicks: 60,
         pierce: true, effects: [{ type: 'damage', amount: 10 }], bonusDamage: bonus,
       });
-      spawnArea(state, {
-        ownerId: 0, x: 3, y: 4, radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies',
-        effects: [{ type: 'damage', amount: 5 }], bonusDamage: bonus,
-      });
       return state;
     };
+    expect(carried(8).areas).toHaveLength(0);
     const base = checksum(carried(8));
     expect(checksum(carried(8))).toBe(base);
     expect(checksum(carried(9))).not.toBe(base);
     // The key absent (0, the spend at 0 stacks) is different from the key present at any value.
     const keyless = carried(undefined);
     expect(keyless.projectiles[0]).not.toHaveProperty('bonusDamage');
+    expect(checksum(keyless)).not.toBe(base);
+    expect(checksum(cloneState(carried(8)))).toBe(base);
+  });
+
+  it('changes with the bonusDamage of an area alone, and with the key alone', () => {
+    const carried = (bonus: number | undefined): GameState => {
+      const state = fresh();
+      spawnArea(state, {
+        ownerId: 0, x: 3, y: 4, radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies',
+        effects: [{ type: 'damage', amount: 5 }], bonusDamage: bonus,
+      });
+      return state;
+    };
+    expect(carried(8).projectiles).toHaveLength(0);
+    const base = checksum(carried(8));
+    expect(checksum(carried(8))).toBe(base);
+    expect(checksum(carried(9))).not.toBe(base);
+    const keyless = carried(undefined);
     expect(keyless.areas[0]).not.toHaveProperty('bonusDamage');
     expect(checksum(keyless)).not.toBe(base);
     expect(checksum(cloneState(carried(8)))).toBe(base);
@@ -256,6 +274,27 @@ describe('checksum of status and dash state', () => {
       mutate(state);
       expect(checksum(state), name).not.toBe(base);
     }
+  });
+
+  it('changes with the bonusDamage of a dash, and with the key alone', () => {
+    const carried = (bonus: number | undefined): GameState => {
+      const state = fresh();
+      startDash(
+        state,
+        0,
+        { dirX: 1, dirY: 0, distance: 3, ticks: 6 },
+        { castId: null, then: [{ type: 'heal', amount: 4 }], bonusDamage: bonus },
+      );
+      return state;
+    };
+    const base = checksum(carried(8));
+    expect(checksum(carried(8))).toBe(base);
+    expect(checksum(carried(9))).not.toBe(base);
+    // The key absent (0, the spend at 0 stacks) is different from the key present at any value.
+    const keyless = carried(undefined);
+    expect(keyless.champions[0]?.dash).not.toHaveProperty('bonusDamage');
+    expect(checksum(keyless)).not.toBe(base);
+    expect(checksum(cloneState(carried(8)))).toBe(base);
   });
 
   it('survives a clone with live statuses and a dash', () => {
