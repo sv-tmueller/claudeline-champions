@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COUNTER_MAX_BONUS_PER_STACK,
   COUNTER_MAX_CAP,
+  COUNTER_MAX_COOLDOWN_PER_STACK,
   COUNTER_MAX_WINDOW_TICKS,
   COUNTER_MIN_WINDOW_TICKS,
   DEFAULT_ROUNDS_TO_WIN,
@@ -104,5 +106,10 @@ describe('on-hit counter constants', () => {
     expect(COUNTER_MAX_CAP).toBe(5);
     expect(COUNTER_MIN_WINDOW_TICKS).toBe(60);
     expect(COUNTER_MAX_WINDOW_TICKS).toBe(600);
+  });
+
+  it('holds the v3 design section 4.4b spend bounds: 30 damage, 600 ticks per stack', () => {
+    expect(COUNTER_MAX_BONUS_PER_STACK).toBe(30);
+    expect(COUNTER_MAX_COOLDOWN_PER_STACK).toBe(600);
   });
 });

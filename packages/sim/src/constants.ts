@@ -70,6 +70,14 @@ export const COUNTER_MAX_CAP = 5;
 export const COUNTER_MIN_WINDOW_TICKS = 60;
 export const COUNTER_MAX_WINDOW_TICKS = 600;
 
+/**
+ * The spend verbs of the counter, rules.md section 2.6 and v3 design section 4.4b. One stack can
+ * give at most a whole non-F hit of bonus damage (30, the catalog ceiling), and one stack can cut
+ * at most a whole ultimate cooldown (600 ticks, the window's top bound).
+ */
+export const COUNTER_MAX_BONUS_PER_STACK = 30;
+export const COUNTER_MAX_COOLDOWN_PER_STACK = 600;
+
 /** Match flow, rules.md section 1: the lengths of the phases, in ticks. */
 export const WARMUP_TICKS = 180;
 /** The round clock, 90 s; sudden death starts when it is used up. */
