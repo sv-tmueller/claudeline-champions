@@ -2207,19 +2207,20 @@ and the reserve holds the EX variants at 75 energy or more with the target withi
 the damage read from the kit is the 30 of its one area, so the hold would wait for a
 target at 30 health or in a corner; no wait, no `escapeWithin`, no allies, no Q opener.
 
-Bulwark Charge is an escape only (decision 8 of batch #223). A new field of the row,
-`escapeOnly: ['SPACE']`, a subset of `escapes` (pinned in `profile.test.ts`), makes
-`refreshKitCache` zero `hasBase` for the slot, as it already does for an area on
-allies (`allyKind` 2); Aegis Line is an area on allies and has no band. The dash has a band of its own, the knock-away area at its end
-(1.5 m plus 0.5 m, so 7 m less the margin), and with rangeMin 0 that band would cover
-every engage: the walk would press it at 1 to 6 m, and the knock-away of 2 m would push
-the target out of the 2.4 m stand reach and start the re-close that #213 reduced. The
-field is read on the kit-cache rebuild only, so no think path changed (the heap check
-reads 0 B and `bot.ts` is untouched). The other champions have an empty list. Q
-(Grounding Slam) has an in-reach of 2.0 m (2.5 m plus 0.5, less the margin) while he
-stands at 2.4 m, so a target that stays at the stand reach is outside Q's reach and Q
-starts only when it is closer (it starts in all 12 cells below); that is recorded and
-not changed.
+Bulwark Charge is an escape only (decision 8 of batch #223). A new field
+of the row, `escapeOnly: ['SPACE']`, a subset of `escapes` (pinned in
+`profile.test.ts`), makes `refreshKitCache` zero `hasBase` for the slot, as
+it already does for an area on allies (`allyKind` 2); Aegis Line is an area on
+allies and has no band. The dash has a band of its own, the knock-away area at
+its end (1.5 m plus 0.5 m, so 7 m less the margin), and with rangeMin 0 that
+band would cover every engage: the walk would press it at 1 to 6 m, and the
+knock-away of 2 m would push the target out of the 2.4 m stand reach and start
+the re-close that #213 reduced. The field is read on the kit-cache rebuild only,
+so no think path changed (the heap check reads 0 B and `bot.ts` is untouched).
+The other champions have an empty list. Q (Grounding Slam) has an in-reach of
+2.0 m (2.5 m plus 0.5, less the margin) while he stands at 2.4 m, so a target
+that stays at the stand reach is outside Q's reach and Q starts only when it
+is closer (it starts in all 12 cells below); that is recorded and not changed.
 
 Pins, each alone (restored after): the `PROFILES` row, the `KIT_RULES` row or the `RULES`
 row dropped, rangeMin moved to 1 in either table; the motion of Breaker Throw dropped or

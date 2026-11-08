@@ -350,12 +350,13 @@ Ysmeer's section is in.
 
 Her band sits above Quillon's 9 to 13 m on purpose, and her M1 reaches 14.00 m
 against Rod Bolt's 13.93 m, the longest basic shot of the roster. Its start at
-10 m clears Hargrim's 9 m hook, Durnhal's 9 m throw, every melee strike and the
-end of Ondrel's Clod Toss (10 m). It does not clear everything. Still
-reaching into the band, among others, are Ondrel's Mire (10.5 m), Mire EX (11
-m) and Drowned Ground (12.5 m), and Brimwick's Spark (11 m), Firecracker (11
-m, 11.5 m as the EX) and Grand Finale (12 m); the web lines above weigh each
-against her.
+10 m clears Hargrim's 9 m hook, Durnhal's 9 m throw, every melee swing from
+where it stands and the end of Ondrel's Clod Toss (10 m). It does not clear
+everything. Still reaching into the band, among others, are Ondrel's Mire (10.5
+m), Mire EX (11 m) and Drowned Ground (12.5 m), Brimwick's Spark (11 m),
+Firecracker (11 m, 11.5 m as the EX) and Grand Finale (12 m), and Skerrow's
+Lunge EX (10.5 m) and Reaper's Dance (11 m), which close before they swing; the
+web lines above weigh each against her.
 
 Every number of this section that a catalog range binds has one row. The
 sources are the approved spec section 10 and section 4.6, rules sections 4.1
