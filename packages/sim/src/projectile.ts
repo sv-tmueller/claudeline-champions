@@ -1,4 +1,5 @@
 import type { Obstacle } from './arena';
+import { spawnArea } from './area';
 import { isPositiveInteger } from './area';
 import { CHAMPION_RADIUS, DT } from './constants';
 import { clamp, length, sweepCircleAt, sweepRectAt } from './geometry';
@@ -14,6 +15,7 @@ import type {
   ProjectileEndReason,
   ProjectileState,
 } from './state';
+import type { EndAreaSpec } from './kit';
 
 export interface ProjectileSpec {
   ownerId: number;
@@ -30,6 +32,8 @@ export interface ProjectileSpec {
   effects: readonly Effect[];
   /** Lands on the owner's team instead of `effects`; when given, `effects` may be empty. */
   readonly allyEffects?: readonly Effect[];
+  /** Spec 4.3: the area spawned where the projectile ends. */
+  readonly endArea?: EndAreaSpec;
 }
 
 /** Smallest direction component, in magnitude, that `length` measures without underflow. */
@@ -41,6 +45,69 @@ function fail(problem: string): never {
 
 function failAlly(problem: string): never {
   return fail(`allyEffects: ${problem}`);
+}
+
+function failEnd(problem: string): never {
+  return fail(`endArea ${problem}`);
+}
+
+/** The endArea the projectile carries, validated and copied, or undefined. */
+function readEndArea(spec: EndAreaSpec | undefined): EndAreaSpec | undefined {
+  if (spec === undefined) return undefined;
+  if (typeof spec !== 'object' || spec === null || Array.isArray(spec)) {
+    return failEnd('must be an object');
+  }
+  if (!Number.isFinite(spec.radius) || spec.radius <= 0) {
+    return failEnd('radius must be above 0');
+  }
+  if (!isPositiveInteger(spec.durationTicks)) {
+    return failEnd('durationTicks must be a positive integer');
+  }
+  if (!isPositiveInteger(spec.intervalTicks)) {
+    return failEnd('intervalTicks must be a positive integer');
+  }
+  if (spec.fuseTicks !== undefined && !isPositiveInteger(spec.fuseTicks)) {
+    return failEnd('fuseTicks must be a positive integer');
+  }
+  if (spec.targets !== 'enemies' && spec.targets !== 'allies' && spec.targets !== 'all') {
+    return failEnd(`unknown targets ${String(spec.targets)}`);
+  }
+  const area: EndAreaSpec = {
+    radius: spec.radius,
+    durationTicks: spec.durationTicks,
+    intervalTicks: spec.intervalTicks,
+    targets: spec.targets,
+    effects: copyEffects(spec.effects, failEnd),
+  };
+  // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
+  if (spec.fuseTicks !== undefined) area.fuseTicks = spec.fuseTicks;
+  return area;
+}
+
+/**
+ * Spec 4.3: spawns the projectile's endArea at (x, y), when it has one. Never called on a champion
+ * hit or at round end. The area takes the projectile's `castId`, so its hits keep earning energy
+ * for the cast.
+ */
+function spawnEndArea(state: GameState, p: ProjectileState, x: number, y: number): void {
+  const area = p.endArea;
+  if (area === undefined) return;
+  spawnArea(
+    state,
+    {
+      ownerId: p.ownerId,
+      x,
+      y,
+      radius: area.radius,
+      durationTicks: area.durationTicks,
+      intervalTicks: area.intervalTicks,
+      targets: area.targets,
+      effects: area.effects,
+      // `spawnArea` leaves the key out of the entity when this is undefined.
+      fuseTicks: area.fuseTicks,
+    },
+    p.castId,
+  );
 }
 
 /**
@@ -82,6 +149,7 @@ export function spawnProjectile(
     }
     allyEffects = copyEffects(spec.allyEffects, failAlly);
   }
+  const endArea = readEndArea(spec.endArea);
   if (castId !== null) {
     // A plain loop: a closure over `castId` here would allocate on every spawn.
     const { casts } = state;
@@ -111,6 +179,7 @@ export function spawnProjectile(
   };
   // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
   if (allyEffects !== undefined) projectile.allyEffects = allyEffects;
+  if (endArea !== undefined) projectile.endArea = endArea;
   state.projectiles.push(projectile);
   state.events.push({
     type: 'projectileSpawned',
@@ -174,20 +243,24 @@ function hitAt(state: GameState, p: ProjectileState, t: number, targetId: number
   landHit(state, p, targetId, ally ? (p.allyEffects as Effect[]) : p.effects, pos);
 }
 
-/** Ends the projectile at time t along `seg`. */
+/** Ends the projectile at time t along `seg`. Spawns its endArea unless it ended on a hit. */
 function expireAt(
   state: GameState,
   p: ProjectileState,
   reason: ProjectileEndReason,
   t: number,
 ): void {
+  const x = seg.x + t * seg.dx + 0;
+  const y = seg.y + t * seg.dy + 0;
   state.events.push({
     type: 'projectileExpired',
     projectileId: p.id,
     reason,
-    x: seg.x + t * seg.dx + 0,
-    y: seg.y + t * seg.dy + 0,
+    x,
+    y,
   });
+  // Spec 4.3: never on a champion hit ('hit'), and never at round end, which does not come here.
+  if (reason !== 'hit') spawnEndArea(state, p, x, y);
 }
 
 /**
@@ -310,6 +383,8 @@ export function expireProjectiles(state: GameState): void {
       x: p.x,
       y: p.y,
     });
+    // Spec 4.3: a lifetime end spawns the endArea too, at the projectile's final position.
+    spawnEndArea(state, p, p.x, p.y);
     return false;
   });
 }
