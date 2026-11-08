@@ -150,25 +150,13 @@ function teamAhead(state: GameState, me: ChampionState): boolean {
   return own > enemy;
 }
 
-/** Whether an alive enemy is within `reach` of the bot with a clear shot of 0.5 m. */
-function enemyWithin(
-  state: GameState,
-  me: ChampionState,
-  reach: number,
-  sight: SightScratch,
-  dist: Measure,
-): boolean {
-  for (let i = 0; i < state.champions.length; i++) {
-    const c = state.champions[i] as ChampionState;
-    if (!c.alive || c.team === me.team) continue;
-    distanceInto(dist, me, c);
-    if (dist.metres > reach) continue;
-    if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) return true;
-  }
-  return false;
-}
-
-/** Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. */
+/**
+ * Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. The reach test
+ * is written out here rather than shared with the deadlock entry as a helper that takes the reach:
+ * a call with a double argument that V8 does not inline boxes it, 16 B a think in Maglev (the same
+ * box the aim writes out; see `aim` and bots.md, Allocation). The deadlock entry writes the same
+ * loop out over `latchReach` in `move`, so neither call site passes a double.
+ */
 function enemyInReach(
   state: GameState,
   me: ChampionState,
@@ -176,7 +164,14 @@ function enemyInReach(
   sight: SightScratch,
   dist: Measure,
 ): boolean {
-  return enemyWithin(state, me, profile.rangeMax, sight, dist);
+  for (let i = 0; i < state.champions.length; i++) {
+    const c = state.champions[i] as ChampionState;
+    if (!c.alive || c.team === me.team) continue;
+    distanceInto(dist, me, c);
+    if (dist.metres > profile.rangeMax) continue;
+    if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) return true;
+  }
+  return false;
 }
 
 /**
@@ -393,7 +388,23 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         // so its cast run starts over on every other think and nothing lands.
         const ahead = teamAhead(state, me);
         if (advancing && (acted.targetId !== advanceTargetId || ahead)) advancing = false;
-        if (!advancing && !ahead && !enemyWithin(state, me, profile.latchReach, sight, dist)) {
+        // The entry's reach test, enemyInReach's loop with the deadlock reach: written out here
+        // because a call passing `latchReach` as a double boxes it under Maglev (see enemyInReach).
+        // `inReach` is true when an alive enemy is within `latchReach` with a clear shot of 0.5 m.
+        let inReach = false;
+        if (!advancing && !ahead) {
+          for (let i = 0; i < state.champions.length; i++) {
+            const c = state.champions[i] as ChampionState;
+            if (!c.alive || c.team === me.team) continue;
+            distanceInto(dist, me, c);
+            if (dist.metres > profile.latchReach) continue;
+            if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) {
+              inReach = true;
+              break;
+            }
+          }
+        }
+        if (!advancing && !ahead && !inReach) {
           advancing = true;
           advanceTargetId = acted.targetId;
         }
