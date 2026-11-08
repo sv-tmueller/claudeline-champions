@@ -52,8 +52,11 @@ function failEnd(problem: string): never {
 }
 
 /** The endArea the projectile carries, validated and copied, or undefined. */
-function readEndArea(spec: EndAreaSpec | undefined): EndAreaSpec | undefined {
+function readEndArea(spec: EndAreaSpec | undefined, pierce: boolean): EndAreaSpec | undefined {
   if (spec === undefined) return undefined;
+  // Spec 4.3: the two are disjoint. `validateKit` rejects the combination, but a dev tool spawns
+  // through here, so the same rule holds at this boundary.
+  if (pierce) return failEnd('a piercing projectile cannot carry an endArea');
   if (typeof spec !== 'object' || spec === null || Array.isArray(spec)) {
     return failEnd('must be an object');
   }
@@ -149,7 +152,7 @@ export function spawnProjectile(
     }
     allyEffects = copyEffects(spec.allyEffects, failAlly);
   }
-  const endArea = readEndArea(spec.endArea);
+  const endArea = readEndArea(spec.endArea, spec.pierce);
   if (castId !== null) {
     // A plain loop: a closure over `castId` here would allocate on every spawn.
     const { casts } = state;

@@ -938,4 +938,17 @@ describe('a projectile that spawns an endArea where it ends (spec 4.3)', () => {
       'Invalid projectile: endArea fuseTicks must be a positive integer',
     );
   });
+
+  it('rejects pierce together with an endArea at the spawnProjectile boundary too', () => {
+    // `validateKit` rejects the combination, but a dev tool spawns straight through here, so the
+    // rule is enforced at this boundary as well (finding 3 of the round-1 report).
+    const state = open();
+    expect(() => spawnProjectile(state, spec({ pierce: true, endArea }))).toThrow(
+      'Invalid projectile: endArea a piercing projectile cannot carry an endArea',
+    );
+    expect(state.projectiles).toHaveLength(0);
+    // Pierce alone and an endArea alone stay valid.
+    expect(() => spawnProjectile(open(), spec({ pierce: true }))).not.toThrow();
+    expect(() => spawnProjectile(open(), spec({ endArea }))).not.toThrow();
+  });
 });
