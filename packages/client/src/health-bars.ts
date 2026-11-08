@@ -49,8 +49,6 @@ export class HealthBars {
   private readonly backs: Sprite[] = [];
   // One row per champion, in id order, empty for a champion without a counter.
   private readonly pips: Sprite[][];
-  // The cap of each row, so `update` walks its own slots with no scan of the kits.
-  private readonly caps: number[];
 
   constructor(champions: readonly { team: TeamId }[], localTeam: TeamId, caps: readonly number[] = []) {
     const back = barMaterial(BAR_BACK_COLOUR, BACK_OPACITY);
@@ -60,7 +58,6 @@ export class HealthBars {
     this.changes = champions.map(() => 0);
     this.counts = champions.map(() => -2);
     this.counterChanges = champions.map(() => 0);
-    this.caps = champions.map((_, id) => caps[id] ?? 0);
     // The bars come first, back then fill per champion, so `children[id * 2]` and
     // `children[id * 2 + 1]` stay the back and the fill of champion `id`.
     for (const champion of champions) {
@@ -79,7 +76,7 @@ export class HealthBars {
     this.pips = [];
     for (let id = 0; id < champions.length; id++) {
       const row: Sprite[] = [];
-      const cap = this.caps[id] as number;
+      const cap = caps[id] ?? 0;
       for (let slot = 0; slot < cap; slot++) {
         // An empty slot starts on the bar back; a filled one takes the champion's material.
         const pip = new Sprite(back);

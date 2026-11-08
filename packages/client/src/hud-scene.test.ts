@@ -59,6 +59,7 @@ function scene(): Scene {
     exMark: fake(),
     ultimateMark: fake(),
     shield,
+    pips: { root: fake(), slots: [] },
     slots,
     score: fake(),
     timer: fake(),

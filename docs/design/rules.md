@@ -354,7 +354,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Element | Content |
 |---------|---------|
 | Health bar | Current and max health of the local champion, in detail. A shield shows as an extra segment. |
-| Energy bar | Energy from 0 to 100. Marks at 25 (EX ready) and 100 (ultimate ready). |
+| Energy bar | Energy from 0 to 100. Marks at 25 (EX ready) and 100 (ultimate ready). A champion with an on-hit counter (section 2.6) shows it as pips under the bar: one slot per point of the kit's cap, the first `count` filled. A kit with no counter shows none. |
 | Cooldown icons | One icon per slot: M1, M2, SPACE, Q, E, R, F. Each shows the remaining cooldown, and whether it is blocked by silence or low energy. |
 | Round score | Round wins of both teams, with the 3 needed to win the match. |
 | Round timer | Time left in the round. After it reaches 0 it shows sudden death. |
@@ -362,7 +362,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Kill feed | A line per death, showing the killer (or "ring") and the victim, and a line per orb pickup, showing the taker and "Energy orb" (amended 2026-11-02 by #224). Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
 | Debug overlay | Draws collision circles, obstacles, projectiles and line of sight `[spec]`. Off by default. |
 
-Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. The HUD health bar is the detailed view of the local champion only.
+Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. A champion whose kit declares an on-hit counter (section 2.6) shows that counter as a row of pips under the same bar, one slot per point of the cap, the first `count` filled. The row follows the bar: it shows while the champion is alive and hides, with the bar, when the champion dies. The HUD health bar is the detailed view of the local champion only.
 
 ## 9. 2v2 and 3v3
 
