@@ -290,14 +290,14 @@ the two spend verbs, which belong to the counter.
   and builds, decays and resets the count. Only M1 builds it, on a hit on an
   enemy that is not invulnerable. Her other projectiles, Barbed Arrow,
   Pinning Shot and Heartseeker, build nothing, and neither does Arrow Storm.
-- **Spend (later):** the two verbs are their own package (v3 spec section
-  4.4b, step 3.2). `consumeCounter` is a top-level effect with `{
-  bonusDamagePerStack: 4 }` on Heartseeker and with `{ cooldownTicksPerStack:
-  120, slot: 'SPACE' }` on Fade Step. It spends the whole counter on the tick
-  the cast fires and does nothing at 0, so Fade Step with no Focus is a plain
-  shield of 25. 120 ticks per stack is 2 s, so 3 stacks cut 360 of Tumble's
-  540 ticks, and a cooldown never goes below 0. The damage range applies to
-  the total: 16 + 4 times 3 is 28, under 30.
+- **Spend:** the two verbs are in the sim (v3 spec section 4.4b, step 3.2,
+  #245), and rules.md section 2.6 is their rule: `consumeCounter` is a
+  top-level effect with `{ bonusDamagePerStack: 4 }` on Heartseeker and with
+  `{ cooldownTicksPerStack: 120, slot: 'SPACE' }` on Fade Step. It spends the
+  whole counter on the tick the cast fires and does nothing at 0, so Fade Step
+  with no Focus is a plain shield of 25. 120 ticks per stack is 2 s, so 3
+  stacks cut 360 of Tumble's 540 ticks, and a cooldown never goes below 0. The
+  damage range applies to the total: 16 + 4 times 3 is 28, under 30.
 
 **Kit data (not built yet).** `data/kits/wrenna.json` is step 3.3 of the build
 order, after the on-hit counter (step 3.1, #227) and the spend verbs (step
