@@ -43,7 +43,7 @@ first.
   ring, opt-in through `roundsToWin`; the energy orb, opt-in through
   `energyOrb` (the point from `data/orbs.json`, #218); the on-hit counter a kit
   may declare, built by the hits of one slot, decayed by a window and reset each
-  round (#227; no shipped kit has one, and the spend verbs are #161); angles through `dmath.ts`; the sweep's
+  round, and its two spend verbs (#227, #245; no shipped kit has one); angles through `dmath.ts`; the sweep's
   heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot test

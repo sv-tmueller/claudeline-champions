@@ -155,7 +155,10 @@ and the same input stream, `checksum` after N ticks is identical on every run.
   already hit (`hitIds`, in hit order), an inline `effects` list, an optional
   `allyEffects` list (the key is missing, not `undefined`, when the projectile
   has none) and `castId` (the cast that fired it, or `null` for a dev tool
-  spawn).
+  spawn). A projectile or area of a cast that spent its counter with the damage
+  verb (rules 2.6) also carries `bonusDamage`, the amount added to each `damage`
+  effect it lands; the key is left out when there is no bonus and is never
+  `undefined`.
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
   the next application, an inline `effects` list and `castId` as for a
@@ -422,9 +425,9 @@ them from inside the sim, through `cast.ts`.
 | `status.ts` | `applyKnockback(state, targetId, { dirX, dirY, distance, ticks }, source)` | whether a push was added |
 | `motion.ts` | `startDash(state, championId, { dirX, dirY, distance, ticks }, cast = { castId: null, then: [] })` | whether the dash started |
 | `motion.ts` | `teleport(state, championId, toX, toY)` | false when blocked |
-| `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null)` | `applyEffects` returns the health its `heal` effects restored |
-| `energy.ts` | `landHit(state, { ownerId, castId }, targetId, effects, origin)` | |
-| `counter.ts` | `buildCounter(state, caster, slot)`, `stepCounters(state)` | what `landHit` and `step` call, see [The on-hit counter](#the-on-hit-counter) |
+| `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null, bonusDamage = 0)` | `applyEffects` returns the health its `heal` effects restored; `bonusDamage` is added to each `damage` effect |
+| `energy.ts` | `landHit(state, { ownerId, castId, bonusDamage? }, targetId, effects, origin)` | |
+| `counter.ts` | `buildCounter(state, caster, slot)`, `stepCounters(state)`, `spendCounter(state, caster)` | what `landHit`, `step` and `fire` call, see [The on-hit counter](#the-on-hit-counter) |
 | `cast.ts` | `tickCooldowns`, `advanceWindup`, `startCast`, `fireDashThen`, `dropUnusedCasts`, `resetAbilityState` | what `step` calls, see [Abilities](#abilities-and-the-effects-toolkit) |
 | `flow.ts` | `stepLocked`, `stepSuddenDeathAndDecision` | what `step` calls for match flow, see [Match flow](#match-flow) |
 
@@ -454,7 +457,8 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
   with a bad field (an amount at or below 0, a status spec that `applyStatus`
   would reject, a shield with an absorb not above 0 and at most 1e6 or ticks
   outside 1 to 36000, a knockback with a distance not above 0 and at most 1e6,
-  ticks outside 1 to 36000 or a direction other than `away` or `toward`). A dead
+  ticks outside 1 to 36000 or a direction other than `away` or `toward`; a spec
+  `bonusDamage` that is given and is not a finite number). A dead
   owner may still spawn.
 - `meleeArc` hits every alive enemy of `ownerId` whose body overlaps the circle
   of `radius` around `(x, y)`, `dist <= radius + 0.5` inclusive, and whose
@@ -785,7 +789,8 @@ Each kit defines exactly two EX variants.
   rule during windup (free, slowed, locked), and a list of effects.
 - Effects toolkit (the only primitives kits may use): `projectile`, `dash`,
   `meleeArc`, `area`, `applyStatus`, `heal`, `shield`, `teleport`,
-  `knockback`, `energyGain`. New primitives are added to the toolkit through
+  `knockback`, `energyGain`, and the top-level `consumeCounter` marker of the
+  on-hit counter (rules 2.6). New primitives are added to the toolkit through
   the design doc first, then the sim.
 - No global cooldown. Casting is blocked while another windup is in progress,
   while stunned, and while silenced (mobility slot included).
@@ -825,6 +830,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
 | `teleport` | `range`, `fixed` | goes exactly `range` m along the fire direction, or only as far as the aim when not `fixed` |
 | `applyStatus`, `shield`, `heal` | as the toolkit calls | land on the caster, never give energy |
+| `consumeCounter` | exactly one of `bonusDamagePerStack` (1 to 30) or `cooldownTicksPerStack` (1 to 600) with `slot` | top-level only, one per ability; spends the caster's whole counter when the cast fires (see [The on-hit counter](#the-on-hit-counter)) |
 
 `effects` inside a projectile, area or arc are hit effects (the `Effect` union,
 including `energyGain`) that land on each champion the entity touches.
@@ -860,7 +866,9 @@ kit has one counter, not a list`) whose `from` is a known slot, whose `cap` is a
 integer from 1 to 5 (`COUNTER_MAX_CAP`) and whose `windowTicks` is an integer from
 60 to 600 (`COUNTER_MIN_WINDOW_TICKS`, `COUNTER_MAX_WINDOW_TICKS`); unknown keys
 inside it are dropped, and a `counter` key inside a slot is a stray key like any
-other. Only the bounds above are checked here. Catalog ranges (a
+other. An ability may hold one top-level `consumeCounter` with exactly one verb
+(a second one, or a verb missing or doubled, fails) and only on a kit that
+declares a `counter`. Only the bounds above are checked here. Catalog ranges (a
 stun of 30 to 120 ticks, 8 to 30 damage), the fuse range of 15 to 120 ticks among
 them, the fuse-aware linger rule and the one-hit control exception are checked by
 the roster tests (`catalogProblems`). The bounds keep `step` from throwing, not
@@ -969,7 +977,7 @@ lastHitTick: 0 }` and emits nothing. It is not in the index.
 ### The on-hit counter
 
 A kit may declare one counter (`KitDef.counter`, rules.md section 2.6, v3 design
-section 4.4a; the spend verbs of 4.4b are not in the sim yet). A champion whose
+sections 4.4a and 4.4b). A champion whose
 kit declares it carries `counter: { count, lastHitTick }` from `createMatch` on,
 at `{ 0, 0 }`; any other champion has no `counter` key at all (never
 `undefined`, so `checksum` does not throw), and no shipped kit declares one, so
@@ -996,6 +1004,17 @@ every committed fixture keeps its checksum. Both numbers are in the checksum.
   never runs step 6d, so the count stays frozen through it, and the last count
   stays at the match end.
 - **Reset.** `resetAbilityState` (above) at each round start.
+- **Spend.** An ability may carry one top-level `consumeCounter` marker with
+  exactly one verb (`{ bonusDamagePerStack }` or `{ cooldownTicksPerStack,
+  slot }`, bounded in `constants.ts`; rules.md section 2.6, v3 design 4.4b).
+  When the ability fires, `fire` scans its effects for the marker, calls
+  `spendCounter` (`counter.ts`) to take the whole count, and applies the verb to
+  that same cast: the damage verb adds `perStack * spent` to each `damage` effect
+  the cast lands (`bonusDamage`, on the projectile, area or arc, read back by
+  `applyEffects`), and the cooldown verb subtracts `perStack * spent` from the
+  named slot's cooldown, clamped at 0. At 0 stacks it spends nothing and the cast
+  is unchanged. The marker is a no-op in `runEffects`, and `validateKit` rejects
+  a second marker and any `consumeCounter` on a kit without a counter.
 
 `counter.ts` follows the orb: no arrow function, indexed loops, no per-tick
 allocation, integer operations only, and no import of `cast.ts` (the cycle cast,
