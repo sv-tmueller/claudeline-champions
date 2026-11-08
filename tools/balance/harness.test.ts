@@ -105,9 +105,9 @@ describe('the pairings, the fills and the configs', () => {
 });
 
 describe('the shipped data', () => {
-  it('has the six kits, sorted, and both arenas', () => {
+  it('has the six kits, sorted, and every arena', () => {
     expect(KIT_IDS).toEqual(['brimwick', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
-    expect(DATA.arenas.map((a) => a.id)).toEqual(['arena01', 'arena02']);
+    expect(DATA.arenas.map((a) => a.id)).toEqual(['arena01', 'arena02', 'arena03']);
     expect(pairings(KIT_IDS)).toHaveLength(15);
     // 4 fills in each 2v2 pairing and 12 in each 3v3 pairing.
     expect(configs(KIT_IDS)).toHaveLength(15 * (4 + 12));
@@ -158,20 +158,20 @@ describe('the seed schedule', () => {
 
 describe('the cell plan', () => {
   const SIX = ['a', 'b', 'c', 'd', 'e', 'f'];
-  const ARENAS = ['arena01', 'arena02'];
+  const ARENAS = ['arena01', 'arena02', 'arena03'];
   // Nothing is played here: the shape of a six-kit run, which no unit test plays.
   const plan = planCells(SIX, ARENAS, seedSchedule(6));
 
-  it('has 15 pairings and 60 cells over six kits and two arenas', () => {
+  it('has 15 pairings and 90 cells over six kits and three arenas', () => {
     expect(pairings(SIX)).toHaveLength(15);
-    expect(plan).toHaveLength(60);
+    expect(plan).toHaveLength(90);
   });
 
   it('has 4 fills in each 2v2 cell and 12 in each 3v3 cell', () => {
     expect(plan.filter((c) => c.mode === '2v2').every((c) => c.configs.length === 4)).toBe(true);
     expect(plan.filter((c) => c.mode === '3v3').every((c) => c.configs.length === 12)).toBe(true);
-    expect(plan.filter((c) => c.mode === '2v2')).toHaveLength(30);
-    expect(plan.filter((c) => c.mode === '3v3')).toHaveLength(30);
+    expect(plan.filter((c) => c.mode === '2v2')).toHaveLength(45);
+    expect(plan.filter((c) => c.mode === '3v3')).toHaveLength(45);
     // A cell holds the configs of its own pairing and mode only.
     const cell = plan.find((c) => c.mode === '3v3' && c.x === 'b' && c.y === 'e');
     expect(cell?.configs.map((c) => c.fill.join('+'))).toEqual([
@@ -183,21 +183,22 @@ describe('the cell plan', () => {
     expect(new Set(plan.filter((c) => c.mode === '2v2').map((c) => c.seeds))).toEqual(new Set([50]));
     expect(new Set(plan.filter((c) => c.mode === '3v3').map((c) => c.seeds))).toEqual(new Set([16]));
     const matches = (c: (typeof plan)[number]) => c.configs.length * c.seeds;
-    expect(plan.filter((c) => c.mode === '2v2').map(matches)).toEqual(Array<number>(30).fill(200));
-    expect(plan.filter((c) => c.mode === '3v3').map(matches)).toEqual(Array<number>(30).fill(192));
+    expect(plan.filter((c) => c.mode === '2v2').map(matches)).toEqual(Array<number>(45).fill(200));
+    expect(plan.filter((c) => c.mode === '3v3').map(matches)).toEqual(Array<number>(45).fill(192));
   });
 
   it('orders the cells by mode, then arena, then pairing', () => {
     const name = (c: (typeof plan)[number]) => `${c.mode} ${c.arena} ${c.x} v ${c.y}`;
     expect(plan.slice(0, 3).map(name)).toEqual(['2v2 arena01 a v b', '2v2 arena01 a v c', '2v2 arena01 a v d']);
     expect(plan.slice(14, 17).map(name)).toEqual(['2v2 arena01 e v f', '2v2 arena02 a v b', '2v2 arena02 a v c']);
-    expect(plan.slice(29, 32).map(name)).toEqual(['2v2 arena02 e v f', '3v3 arena01 a v b', '3v3 arena01 a v c']);
-    expect(name(plan[59] as (typeof plan)[number])).toBe('3v3 arena02 e v f');
+    expect(plan.slice(29, 32).map(name)).toEqual(['2v2 arena02 e v f', '2v2 arena03 a v b', '2v2 arena03 a v c']);
+    expect(plan.slice(44, 47).map(name)).toEqual(['2v2 arena03 e v f', '3v3 arena01 a v b', '3v3 arena01 a v c']);
+    expect(name(plan[89] as (typeof plan)[number])).toBe('3v3 arena03 e v f');
   });
 
   it('plans one mode only when the schedule names one', () => {
     const only = planCells(SIX, ARENAS, { '3v3': 16 });
-    expect(only).toHaveLength(30);
+    expect(only).toHaveLength(45);
     expect(only.every((c) => c.mode === '3v3')).toBe(true);
   });
 
@@ -205,8 +206,8 @@ describe('the cell plan', () => {
     expect(() => planCells(['a', 'b', 'c'], ARENAS, { '2v2': 2, '3v3': 2 })).toThrow(/no fill/);
     expect(() => planCells(['a', 'b'], ARENAS, { '2v2': 2 })).toThrow(/no fill/);
     expect(() => planCells(['a'], ARENAS, { '2v2': 2 })).toThrow(/no pairing/);
-    // Three kits have every fill of 2v2, so a 2v2-only plan is fine there.
-    expect(planCells(['a', 'b', 'c'], ARENAS, { '2v2': 2 })).toHaveLength(6);
+    // Three kits have every fill of 2v2, so a 2v2-only plan is fine there: three pairings on three arenas.
+    expect(planCells(['a', 'b', 'c'], ARENAS, { '2v2': 2 })).toHaveLength(9);
   });
 });
 
@@ -505,9 +506,10 @@ describe('the report', () => {
 
 describe('a run', () => {
   // Runner (ubuntu-latest, Node 22): 47.3 to 59.6 s before the dodge of #137, 62.4 s on 787cd0c (unit job
-  // 117369238607); 22.4 s locally (Apple M5 Pro, Node 22.23.2; 18.6 s before). Timeout: twice the slowest runner
-  // time is 124.8 s, so 150 s (testing.md, Check suite; it was 120 s).
-  it('plays 24 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 150_000 }, () => {
+  // 117369238607); 22.4 s locally (Apple M5 Pro, Node 22.23.2; 18.6 s before). arena03 (#238) appends one third
+  // more cells: measured at 30.7 s locally, so about 92 s projected on the runner. Timeout: twice that is 184 s
+  // (testing.md, Check suite; it was 150 s).
+  it('plays 36 cells over the shipped data, and two 2-seed runs render the same bytes', { timeout: 200_000 }, () => {
     const run = () => {
       const cells = playCells(V1, TWO);
       return { cells, text: renderReport({ head: 'abc1234', seeds: TWO, kitIds: V1_IDS, cells }) };
@@ -515,7 +517,7 @@ describe('a run', () => {
     const first = run();
     const second = run();
     expect(second.text).toBe(first.text);
-    expect(first.cells).toHaveLength(24);
+    expect(first.cells).toHaveLength(36);
     // The order: the modes, then the arenas, then the pairings.
     expect(first.cells.slice(0, 7).map((c) => `${c.mode} ${c.arena} ${c.x} v ${c.y}`)).toEqual([
       '2v2 arena01 hargrim v lumeth',
@@ -528,20 +530,21 @@ describe('a run', () => {
     ]);
     // Two seeds on each of the two fills of a 2v2, and on the two orders of the fill of a 3v3.
     expect(first.cells.map((c) => c.played.length)).toEqual([
-      ...Array<number>(12).fill(4),
-      ...Array<number>(12).fill(4),
+      ...Array<number>(18).fill(4),
+      ...Array<number>(18).fill(4),
     ]);
     expect(first.cells.flatMap((c) => c.played).every((p) => !p.record.budgetHit)).toBe(true);
   });
 });
 
 describe('a run of one mode', () => {
-  // 24 matches: 1.8 s locally (Apple M5 Pro, Node 22.23.2), 2.7 s on the runner (ubuntu-latest, Node 22).
-  // Timeout: twice the runner time is 5.4 s, so 10 s (testing.md, Check suite).
+  // 36 matches with the third arena (#238): 2.7 s locally (Apple M5 Pro, Node 22.23.2); 4.0 s projected on the
+  // runner (ubuntu-latest, Node 22 at 2.7 s for 1.8 s locally). Twice that is 8.1 s, so the 10 s of the
+  // 24-match row this one grew from stands (testing.md, Check suite).
   it('plays only the cells of the mode the schedule names, with its seed count', { timeout: 10_000 }, () => {
     const cells = playCells(V1, { '2v2': 1 });
-    // 6 pairings on 2 arenas; one seed on each of the 2 fills.
-    expect(cells).toHaveLength(12);
+    // 6 pairings on 3 arenas; one seed on each of the 2 fills.
+    expect(cells).toHaveLength(18);
     expect(cells.every((c) => c.mode === '2v2' && c.played.length === 2)).toBe(true);
     expect(cells.flatMap((c) => c.played).every((p) => p.seed === 1)).toBe(true);
   });
@@ -549,18 +552,19 @@ describe('a run of one mode', () => {
 
 describe('a run of the 3v3 mode alone', () => {
   // Replaces the 3v3 row of the CLI test (run.test.ts), which at six kits plays 360 matches: 34 s locally and
-  // about 75 s on a runner (#195). This plays the same path on the four v1 kits, 24 matches: the 3v3 cells of a
-  // one-seed schedule and their rendering, with no 2v2 row.
-  // 3.3 s locally (Apple M5 Pro, Node 22.23.2); 8.2 s on the runner (ubuntu-latest, Node 22; unit job
-  // 122091170207). Twice that is 16.5 s, so the timeout is 20 s (testing.md, Check suite).
-  it('plays and renders the 3v3 cells of a one-seed schedule, and no 2v2 cell', { timeout: 20_000 }, () => {
+  // about 75 s on a runner (#195). This plays the same path on the four v1 kits, 36 matches with the third
+  // arena (#238): the 3v3 cells of a one-seed schedule and their rendering, with no 2v2 row.
+  // 5.0 s locally (Apple M5 Pro, Node 22.23.2); about 12.4 s projected on the runner (ubuntu-latest, Node 22,
+  // unit job 122091170207 at 8.2 s for 3.3 s locally). Twice that is 24.9 s, so the timeout is 30 s
+  // (testing.md, Check suite; it was 20 s).
+  it('plays and renders the 3v3 cells of a one-seed schedule, and no 2v2 cell', { timeout: 30_000 }, () => {
     const seeds = { '3v3': 1 };
     const cells = playCells(V1, seeds);
-    // 6 pairings on 2 arenas; 2 ordered fills and one seed each.
-    expect(cells).toHaveLength(12);
+    // 6 pairings on 3 arenas; 2 ordered fills and one seed each.
+    expect(cells).toHaveLength(18);
     expect(cells.every((c) => c.mode === '3v3' && c.played.length === 2)).toBe(true);
     const lines = renderReport({ head: 'abc1234', seeds, kitIds: V1_IDS, cells }).split('\n');
-    expect(lines.filter((line) => /^\| 3v3 \|/.test(line))).toHaveLength(12);
+    expect(lines.filter((line) => /^\| 3v3 \|/.test(line))).toHaveLength(18);
     expect(lines.filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(0);
   });
 });

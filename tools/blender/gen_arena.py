@@ -212,9 +212,10 @@ def barrel_obstacle(bm, ob):
 
     Hoop bands at the JSON radius, body bands inset by HOOP_INSET, from the
     base to the JSON height, so the top face is the JSON radius at that
-    height. The barrel is the fourth kind the schema allows: no committed
-    arena has a non-blocking circle, so this builder is unexercised until one
-    does. It is dispatched like the others, so that arena needs no edit here.
+    height. The barrel is the fourth kind the schema allows, live in the
+    committed data since arena03's two non-blocking circles, the barrels at
+    (5, 0) and (-5, 0). It is dispatched like the others, so adding one needs
+    no edit here.
     """
     height = ob["height"]
     r = ob["r"]

@@ -22,15 +22,16 @@ npm run typecheck                # tsc for sim, bots, protocol, server, client a
 npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # arena.png, arena-overlay.png, walk.png,
                                  # combat.png, death.png, match.png, result.png,
-                                 # ring.png, scene-arena02.png, scene-durnhal.png,
+                                 # ring.png, scene-arena02.png,
+                                 # scene-arena03.png, scene-durnhal.png,
                                  # match-arena02.png, match-3v3.png,
                                  # match-3v3-arena02.png, menu.png,
                                  # scoreboard.png, select.png, lingering.png,
                                  # orb.png, fuse.png
                                  # in test-results/*/
-npm run balance                  # bot-versus-bot win-rate report: plays 11760
+npm run balance                  # bot-versus-bot win-rate report: plays 17640
                                  # matches (six kits) and writes the block of
-                                 # docs/design/balance.md, about 14 minutes on
+                                 # docs/design/balance.md, about 21 minutes on
                                  # Apple silicon. Flags after `--`: --check
                                  # compares a fresh run with the committed
                                  # block, --out <file> writes there instead,

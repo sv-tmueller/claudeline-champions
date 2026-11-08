@@ -415,10 +415,10 @@ class CommittedArenaTests(unittest.TestCase):
 
     @per_arena
     def test_a_non_blocking_circle_is_a_barrel_with_hoop_bands(self, arena, doc, bin_chunk):
-        # No committed arena has a non-blocking circle: the barrel is the
-        # fourth profile the schema allows, and this loop is empty against
-        # today's data. It is written data-driven so the builder is checked
-        # the moment a future arena adds one, with no edit here. The checks
+        # arena03 ships the only non-blocking circles, the barrels at (5, 0)
+        # and (-5, 0), so this loop runs for arena03 and is empty for arena01
+        # and arena02. It is written data-driven so the builder is checked for
+        # any arena that adds one, with no edit here. The checks
         # are tighter than a plain cylinder's because that is the shape they
         # must reject: a single-radius cylinder has one radius, two z rows and
         # no band boundaries, so it fails the radius set, the band levels and

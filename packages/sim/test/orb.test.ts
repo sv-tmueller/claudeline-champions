@@ -4,12 +4,14 @@
 import { describe, expect, it } from 'vitest';
 import orbsJson from '../../../data/orbs.json';
 import arena02Json from '../../../data/arenas/arena02.json';
+import arena03Json from '../../../data/arenas/arena03.json';
 import { createMatch, orbPointFor, parseArenaDef, step } from '../src/index';
 import type { ArenaDef, GameState, MatchConfig, SimEvent } from '../src/index';
 import { nextRandom } from '../src/rng';
 import { arena01, champion, config2v2, openArena, place } from './helpers';
 
 const arena02 = parseArenaDef(arena02Json);
+const arena03 = parseArenaDef(arena03Json);
 const POINT = { x: 0, y: 2.5 };
 
 function orbConfig(extra: Partial<MatchConfig> = {}): MatchConfig {
@@ -383,8 +385,8 @@ describe('the orb point', () => {
 
 describe('data/orbs.json and orbPointFor', () => {
   it('holds a row that passes for every arena file, and nothing else', () => {
-    expect(Object.keys(orbsJson).sort()).toEqual(['arena01', 'arena02']);
-    for (const arena of [arena01, arena02]) {
+    expect(Object.keys(orbsJson).sort()).toEqual(['arena01', 'arena02', 'arena03']);
+    for (const arena of [arena01, arena02, arena03]) {
       const point = orbPointFor(orbsJson, arena);
       expect(point).toEqual((orbsJson as Record<string, unknown>)[arena.id]);
       expect(() =>
@@ -393,6 +395,7 @@ describe('data/orbs.json and orbPointFor', () => {
     }
     expect(orbPointFor(orbsJson, arena01)).toEqual({ x: 0, y: 2.5 });
     expect(orbPointFor(orbsJson, arena02)).toEqual({ x: 0, y: 0 });
+    expect(orbPointFor(orbsJson, arena03)).toEqual({ x: 0, y: 2.5 });
   });
 
   it('gives undefined for an arena with no row, and does not read the prototype', () => {

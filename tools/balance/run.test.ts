@@ -21,21 +21,22 @@ function balance(...args: string[]) {
 }
 
 describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
-  // 120 matches in a spawned process (six kits: 15 pairings on 2 arenas, 4 fills, 1 seed): 6.6 s locally
-  // (Apple M5 Pro, Node 22.23.2); 23.6 s on the runner (ubuntu-latest, Node 22; unit job 122091170207).
-  // Twice that is 47 s, so the 60 s of the 48-match row this one replaced stands (testing.md, Check suite).
-  it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 60_000 }, () => {
+  // 180 matches in a spawned process (six kits: 15 pairings on 3 arenas, 4 fills, 1 seed): 9.5 s locally
+  // (Apple M5 Pro, Node 22.23.2), projecting to about 34 s on the runner (ubuntu-latest, Node 22; unit job
+  // 122091170207 measured 23.6 s on two arenas for 6.6 s locally). Twice that is 68 s, so the timeout is 90 s
+  // (testing.md, Check suite; it was 60 s on two arenas).
+  it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 90_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), 'balance-'));
     try {
       const file = join(dir, 'report.md');
       const run = balance('--mode', '2v2', '--seeds', '1', '--out', file);
       expect(run.status, run.stderr).toBe(0);
-      // Six kits: 15 pairings on 2 arenas, each with 4 fills and 1 seed.
-      expect(run.stdout).toMatch(/played 120 matches in \d+\.\d s/);
+      // Six kits: 15 pairings on 3 arenas, each with 4 fills and 1 seed.
+      expect(run.stdout).toMatch(/played 180 matches in \d+\.\d s/);
       const text = readFileSync(file, 'utf8');
       expect(text.startsWith(`${REPORT_START}\n`)).toBe(true);
       expect(text.endsWith(`${REPORT_END}\n`)).toBe(true);
-      expect(text.split('\n').filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(30);
+      expect(text.split('\n').filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(45);
       expect(text.split('\n').filter((line) => /^\| 3v3 \|/.test(line))).toHaveLength(0);
       expect(text).toContain('Seeds 1 to 1 for each config');
       expect(text).not.toMatch(/\d+\.\d s\b/);

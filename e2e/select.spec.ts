@@ -67,7 +67,7 @@ test('opens on the select at a bare address, with the defaults current and no ca
     for (const row of read.champions) expect(row.available, `${row.key} is available`).toBe('true');
     expect(current(read.champions)).toEqual(['hargrim']);
     expect(current(read.arenas)).toEqual(['arena01']);
-    expect(read.arenas.map((row) => row.key)).toEqual(['arena01', 'arena02']);
+    expect(read.arenas.map((row) => row.key)).toEqual(['arena01', 'arena02', 'arena03']);
     expect(current(read.teams)).toEqual(['2']);
     expect(current(read.difficulties)).toEqual(['normal']);
     expect(read.start).toBe(DEFAULT_MATCH.slice(1));

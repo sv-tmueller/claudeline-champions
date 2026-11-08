@@ -185,8 +185,8 @@ must not reach a production file (the dist grep).
 - `?difficulty=easy|normal|hard`: the tier of every bot. Anything else
   reads as normal. The select offers the three tiers and every link writes
   the one it keeps (see Result screen and champion select).
-- `?arena=<id>`: the arena of the match, an id with a loaded definition (arena01
-  and arena02); anything else reads as arena01, or as the first loaded id when
+- `?arena=<id>`: the arena of the match, an id with a loaded definition (arena01,
+  arena02 and arena03); anything else reads as arena01, or as the first loaded id when
   arena01 is missing. The sandbox ignores it and always plays arena01, since the
   walk spec and the heap probe stand on its coordinates.
 - `?teamsize=2|3`: the team size of the match, 2v2 or 3v3. Only the exact

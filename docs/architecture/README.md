@@ -95,7 +95,7 @@ first.
   (champion, arena, team size and difficulty), and any launch key plays a match
   as before. Not built: music, the other three `Platform` methods (`identity`,
   `unlockAchievement`, `openUrl`).
-- Content: arena01 and arena02 (JSON and committed models); the Hargrim,
+- Content: arena01, arena02 and arena03 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
   profiles since #165); Durnhal's kit as data (#204) with his bot profile
   (#211); models for the eight roster ids and the placeholder, each rigged, with
@@ -104,7 +104,7 @@ first.
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion
-  pairing bot against bot, in 2v2 and 3v3 on both arenas, over a seed set and
+  pairing bot against bot, in 2v2 and 3v3 on every arena, over a seed set and
   writes the win-rate report into [balance.md](../design/balance.md); `--check`
   compares a fresh run with the committed block. Each cell plays about 200
   matches (seeds per config from the cell's fills, per mode), and
@@ -112,8 +112,9 @@ first.
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
   22.15 or later. It plays six of the seven kits of `data/kits`, the
-  `HARNESS_KITS` of `tools/balance/inputs.ts`: 60 cells and 11 760 matches,
-  about 14 minutes on Apple silicon (the report of batch 15, #189).
+  `HARNESS_KITS` of `tools/balance/inputs.ts`: 90 cells and 17 640 matches over
+  three arenas, about 21 minutes on Apple silicon (the report of batch 15, #189,
+  with arena03 of #238).
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test

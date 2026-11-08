@@ -157,7 +157,7 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     // The result panel exists and stays hidden until the match ends. Its select
     // lists the roster in order: the champions with a kit link to a relaunch on the
     // arena being played, the others are greyed and have no link. The arena row
-    // lists both arenas in id order, each linking with the current champion. Every
+    // lists every arena in id order, each linking with the current champion. Every
     // link writes the team size, 2 included, and the team row has 2v2 as the current. The
     // difficulty row lists the three tiers with normal as the current, each link writing
     // the whole setup with its own tier.
@@ -174,6 +174,7 @@ test('renders the scene and the HUD', async ({ page }, testInfo) => {
     expect(hud.result.arenas).toEqual([
       { id: 'arena01', current: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: 'Arena 1' },
       { id: 'arena02', current: 'false', href: '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=2', text: 'Arena 2' },
+      { id: 'arena03', current: 'false', href: '?champion=hargrim&difficulty=normal&arena=arena03&teamsize=2', text: 'Arena 3' },
     ]);
     expect(hud.result.teams).toEqual([
       { size: '2', current: 'true', available: 'true', href: '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2', text: '2v2' },
@@ -280,8 +281,40 @@ test('starts on arena02 from the launch address', async ({ page }, testInfo) => 
     expect(hud.result.arenas.map((entry) => [entry.id, entry.current])).toEqual([
       ['arena01', 'false'],
       ['arena02', 'true'],
+      ['arena03', 'false'],
     ]);
     await page.screenshot({ path: testInfo.outputPath('scene-arena02.png') });
+  } finally {
+    expect(problems).toEqual([]);
+  }
+});
+
+test('starts on arena03 from the launch address', async ({ page }, testInfo) => {
+  const { problems, failed } = watchProblems(page);
+  try {
+    await page.goto('/?arena=arena03');
+    await orFail(page.waitForSelector('canvas[data-arena="arena03"]'), failed);
+    // The sim got arena03, not only the hook: the human stands on its first team A spawn, (-11, 2).
+    const canvas = page.locator('canvas');
+    expect(Number(await canvas.getAttribute('data-p0x'))).toBe(-1100);
+    expect(Number(await canvas.getAttribute('data-p0y'))).toBe(200);
+    // The select carries the arena: the champion links stay on it, and arena03 is the current one.
+    const hud = await readHud(page);
+    expect(hud.result.entries.map((entry) => entry.href)).toEqual([
+      '?champion=hargrim&difficulty=normal&arena=arena03&teamsize=2',
+      '?champion=quillon&difficulty=normal&arena=arena03&teamsize=2',
+      '?champion=lumeth&difficulty=normal&arena=arena03&teamsize=2',
+      '?champion=skerrow&difficulty=normal&arena=arena03&teamsize=2',
+      '?champion=ondrel&difficulty=normal&arena=arena03&teamsize=2',
+      '?champion=brimwick&difficulty=normal&arena=arena03&teamsize=2',
+      '?champion=durnhal&difficulty=normal&arena=arena03&teamsize=2',
+    ]);
+    expect(hud.result.arenas.map((entry) => [entry.id, entry.current])).toEqual([
+      ['arena01', 'false'],
+      ['arena02', 'false'],
+      ['arena03', 'true'],
+    ]);
+    await page.screenshot({ path: testInfo.outputPath('scene-arena03.png') });
   } finally {
     expect(problems).toEqual([]);
   }
@@ -319,6 +352,7 @@ test('starts a 3v3 from the launch address', async ({ page }) => {
     expect(hud.result.arenas.map((entry) => entry.href)).toEqual([
       '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=3',
       '?champion=hargrim&difficulty=normal&arena=arena02&teamsize=3',
+      '?champion=hargrim&difficulty=normal&arena=arena03&teamsize=3',
     ]);
     expect(hud.result.teams.map((entry) => entry.href)).toEqual([
       '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2',
@@ -343,7 +377,7 @@ test('starts on the hard tier from the launch address, and reads an unknown tier
       ['hard', 'true'],
     ]);
     const outside = [...hud.result.entries, ...hud.result.arenas, ...hud.result.teams].map((entry) => entry.href);
-    expect(outside).toHaveLength(11);
+    expect(outside).toHaveLength(12);
     for (const href of outside) expect(href, 'a link keeps the tier').toContain('difficulty=hard');
     // The difficulty row's own links write each tier, with the champion, the arena and the size kept.
     expect(hud.result.difficulties.map((entry) => entry.href)).toEqual([
