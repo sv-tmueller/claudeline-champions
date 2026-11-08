@@ -919,20 +919,21 @@ was screened on seeds 1 to 8 (2v2) and 1 to 2 (3v3) of the 36 cells of #213 and
 confirmed on the full cap (the tables are in bots.md); the value is the smallest
 reach above 1.0 that lowers both melee kits' latch deaths and `retreatAdvance`
 damage taken, and it stays inside the raw M1 arc so the latched bot keeps casting.
-14 of the 16 identity rows of the bots tests move (the first diff ticks are 140 to
+11 of the 16 identity rows of the bots tests move (the first diff ticks are 140 to
 1 965; five rows never latch within their length), the seeded runs re-record, and
 the block was regenerated on the committed head (decision 1 on #213: a bot change
 is measured whole; `npm run balance` on Node 22.23.2: 17 640 matches, 1264.4 s).
 
 **The block against the block of 5.11 and #238.** Cells in band: 12 of 90 (11),
-a net of one. The summed distance falls from 2205.9 to 2228.5 points, the first
+a net of one. The summed distance rises from 2205.9 to 2228.5 points, the first
 regeneration under which it rises: 847.2 to 856.3 in the 36 new-kit cells of the
 first two arenas, 644.8 to 654.2 in their 24 four-kit cells, 389.0 to 389.7 in
 the 18 new-kit arena03 cells and 324.9 to 328.3 in the 12 four-kit arena03 cells.
 77 of the 90 rates move, none by more than the 6.0 points of 2v2 arena01 Brimwick
 v Ondrel (50.5 to 44.5, after the #213 stand had already taken it from 52.5 to
-43.0 and back); 3v3 arena03 hargrim v skerrow moves 68.8 to 66.1 and 2v2 arena03
-brimwick v ondrel 37.5 to 41.5. Three verdicts change, all in arena03: 2v2
+43.0 and back; the next largest are 3v3 arena03 Hargrim v Skerrow, 68.8 to 66.1,
+and 2v2 arena03 Brimwick v Ondrel, 37.5 to 41.5). Three
+verdicts change, all in arena03: 2v2
 Brimwick v Ondrel in (37.5 to 41.5), 2v2 Lumeth v Ondrel out (60.0 to 61.5, 1.5
 points over) and 3v3 Brimwick v Quillon in (37.5 to 41.1), so two cells come in
 and one goes out. No match hit the budget. Per champion over all of its cells:
