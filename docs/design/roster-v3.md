@@ -2,7 +2,8 @@
 
 Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written and her model is built (her
-kit and counter come in her own series); Ysmeer's comes in her series
+kit and counter come in her own series); Ysmeer's section is written and her
+kit, her fuse and end area and her model come in her own series
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -29,14 +30,14 @@ unchanged.
   data rules and the model rules.
 - The names are the spec's proposal. The "-like" tags are the mechanical
   inspiration only; every name, look and colour is original (ADR-005).
-- One section per champion. Durnhal's is section 1 and Wrenna's is section 2.
-  Ysmeer's section is added by its own series (roadmap issue
+- One section per champion. Durnhal's is section 1, Wrenna's section 2 and
+  Ysmeer's section 3 (roadmap issue
   [#176](https://github.com/sv-tmueller/claudeline-champions/issues/176),
-  step 4.1), and the counter web over all nine and the range table come when
-  the three are in (spec section 5.4). Wrenna's section already holds her own
-  web line against the seven champions that exist and her own range row, so
-  for Wrenna that closing step only adds her cell against Ysmeer. It does not
-  cover Durnhal's line against Ondrel or his range row.
+  step 4.1). Section 3 closes the counter web over all nine (spec section
+  5.4), with Wrenna's cell against Ysmeer, and adds the range table over all
+  nine. Durnhal's line against Ondrel closes in section 1, where his web is.
+  Each section keeps the web line it wrote against the champions that
+  existed when it was written.
 - Statuses and mechanics a kit needs that the catalog does not have yet are
   named in the champion's section. Each is built in its own package with a
   rules entry before the kit that uses it.
@@ -65,7 +66,17 @@ and makes every heal worth less. His own name, look and colours.
 
 **Counter web (intent).** Beats Lumeth (`wound` on her targets), Skerrow
 (roots and shields stop the dive), Hargrim (outlasts the bruiser). Loses to
-Quillon (kited from 13 m) and Brimwick (her burst ignores shields' timing).
+Quillon (kited from 13 m), Brimwick (her burst ignores shields' timing) and
+Ondrel (section 3, the closing cell: her ground outslows and outranges him).
+
+The Ondrel line closes the one Durnhal cell the #226 report left open.
+Ondrel's Mire (30 percent), Reed Screen's field (30 percent) and Undertow's
+slow (40 percent) add past the 70 percent cap and cut his 5.5 m/s walk to
+1.65 m/s, against Reed Fence's 3 m/s push, so walking in is closed and his
+Bulwark Charge is 5 m every 8 s against a fence that keeps shoving him back.
+Her ground places at 8 m and Drowned Ground reaches 12.5 m, further than his
+9 m Breaker Throw, so the fight happens at a range he cannot answer. His
+shields survive the chip but not the hold.
 
 **Statuses the kit needs.** One, `wound`, an anti-heal (#158). Durnhal is the
 champion that brings it, and every other effect in his table is in the
@@ -218,13 +229,13 @@ so it ties the base shot at 1 Focus (16 + 4 = 20), beats it at 0, and is worth
 less than it at 2 or 3 Focus (24 or 28). It costs 25 energy and buys the
 line, not the damage.
 
-**Counter web (intent).** Beats Hargrim, Quillon, Brimwick and Durnhal. Loses
-to Skerrow, Ondrel and Lumeth. Her record over the seven champions that exist
-is 4 wins and 3 losses, and Ysmeer's section adds the ninth.
+**Counter web (intent).** Beats Hargrim, Quillon, Brimwick, Durnhal and
+Ysmeer. Loses to Skerrow, Ondrel and Lumeth. Her record over the eight other
+champions is 5 wins and 3 losses; section 3 records the Ysmeer cell below.
 
-| | Hargrim | Quillon | Lumeth | Skerrow | Ondrel | Brimwick | Durnhal |
-|---|---|---|---|---|---|---|---|
-| Wrenna | beats | beats | loses | loses | loses | beats | beats |
+| | Hargrim | Quillon | Lumeth | Skerrow | Ondrel | Brimwick | Durnhal | Ysmeer |
+|---|---|---|---|---|---|---|---|---|
+| Wrenna | beats | beats | loses | loses | loses | beats | beats | beats |
 
 - Beats Hargrim (spec). His hook reaches 9 m and Rush closes 5 m, and her
   band begins at 10 m. Barbed Arrow EX and Pinning Shot slow and root what
@@ -341,8 +352,7 @@ the same change. Wrenna joins the balance harness in the last step of her
 series (v3 spec section 9.3).
 
 **Range table.** The intended range of this section, in the shape of
-[roster v2](roster-v2.md) section 1. The table over all nine comes when
-Ysmeer's section is in.
+[roster v2](roster-v2.md) section 1. The table over all nine is in section 3.
 
 | Champion | Intended range | Source |
 |----------|----------------|--------|
@@ -465,3 +475,286 @@ behind the crown. The top is 1.8093 m, under the 1.85 m rest bound (`Run` lifts
 at 1.66 m. Treated alone, the crown's ground radius is 0.2404 m and the feather
 sweeps to 0.1701 m, both inside 0.5 m, so the model's 0.4847 m footprint does
 not move.
+
+## 3. Ysmeer, the star caster
+
+Ysmeer is Astronomer-like and brings the fuse (#159) and the end area (#160),
+steps 4.1 of the roadmap
+[#176](https://github.com/sv-tmueller/claudeline-champions/issues/176). She
+is the last of the three, so this section also closes the counter web over
+all nine and writes the range table (spec section 5.4).
+
+**Fantasy.** A caster who calls falling stars a moment before they land, so
+the skill is in reading where the enemy will be. Her own name, look and
+colours.
+
+**Role and range.** Area control by prediction. Intended range 8 to 12 m,
+with a Starbolt that reaches 11 m. Max health 120.
+
+**Abilities.** This package fixes the numbers of v3 spec section 5.3, so the
+`[draft]` marker is dropped from the column. The numbers marked `[tuned]` in
+the kit data below are the ones the table leaves open, and the fuse and the
+end area are cited by the spec that defines them (v3 spec sections 4.2 and
+4.3), not by a sim package, so this section does not wait for them.
+
+| Slot | Name | What it does |
+|---|---|---|
+| M1 | Starbolt | Projectile, speed 20, range 11 m: 10 damage. Cooldown 0.7 s. |
+| M2 | Falling Star | Placed area at aim (range 11 m), radius 2 m, fuse 0.75 s, one hit: 20 damage. Cooldown 5 s. **EX:** radius 2.5 m and stun 0.75 s. |
+| SPACE | Drift | Dash 4 m and haste 30 percent for 1.5 s. Cooldown 9 s. |
+| Q | Gravity Well | Slow projectile, speed 12, range 10 m: 9 damage on a hit; at its end leaves an area, radius 2 m, 3 pulses of 8 every 0.5 s (24 total) and slow 30 percent. Cooldown 10 s. |
+| E | Comet | Projectile, speed 18, range 12 m: 18 damage and knockback 2 m. Cooldown 7 s. **EX:** at its end leaves a one-hit area, radius 2 m, of 14 damage. |
+| R | Eclipse | Self shield 30 for 4 s and a self area, radius 3 m, one hit: knockback 2.5 m away. Cooldown 13 s. |
+| F | Supernova | Placed area at aim (range 12 m), radius 3.5 m, fuse 1.5 s, one hit: 55 damage and stun 1 s. Windup 0.4 s, slowed. |
+
+**Deviations from the draft.** The draft's two reaches of 11 m and 12 m for
+M1 and E come out exact: 20 m/s for 33 ticks is 11 m and 18 m/s for 40 ticks
+is 12 m (roster-v1 section 0, "reach"), so no number moves for a rounding.
+The draft's Q reach of 10 m at 12 m/s is 50 ticks and 10 m exactly. The one
+addition is the number the draft leaves open on every slot: the windups, the
+radii and the ticks, chosen in the kit data below, each by the precedent of a
+kit that has the same shape. The fuse and the end area are the draft's own
+numbers, held here as written: they are the catalog's to bound (rules 2.7 and
+v3 spec 4.3), not this section's to move.
+
+**The fuse.** Falling Star and Supernova are `area` effects with a
+`fuseTicks`, defined by v3 spec section 4.2 and rules 2.7. While armed an
+area is visible and inert and stays where the cast aimed it, so the whole
+skill is reading where the target will be when the fuse burns. A fuse of
+0.75 s is 45 ticks and 1.5 s is 90 ticks, both inside the catalog's 15 to 120
+`[tuned]`. The linger rule counts the fuse, so 45 plus the one-hit duration
+of 1 stays under Falling Star's 300 tick cooldown, and 90 plus 1 stays under
+Supernova's 600. A fused one-hit area may carry control (rules 2.7), which is
+what lets Supernova stun and let the Falling Star EX stun on its own radius:
+one delayed hit gives the target the fuse to walk out, and neither area
+pulses more than once, so the ban on a pulsing control carries no weight here.
+
+**The end area.** Q's Gravity Well and the E EX of Comet carry an `endArea`,
+defined by v3 spec section 4.3. The projectile spawns the area where it ends,
+so the area lands at the end of the projectile's `lifetimeTicks` (50 and 40
+ticks), or where it stops on an obstacle or the arena edge, and never where it
+hits a champion: the hit effects fire as today. A projectile with `pierce` is
+rejected with an `endArea`, and neither carries `pierce` here. The spawned
+area obeys every area rule, the linger rules included, and counts as an area
+of the projectile's slot, so Gravity Well's 3-pulse slow field is bound the
+same way a placed area would be.
+
+**Counter web (intent).** Beats Durnhal, Ondrel and Lumeth. Loses to Skerrow,
+Wrenna, Quillon, Hargrim and Brimwick. Her record over the eight other
+champions is 3 wins and 5 losses. With this row the web closes over all
+nine: section 2 adds Wrenna's cell against her, section 1 adds Durnhal's line
+against Ondrel, and the range table below has a row per champion. The three
+were the items the #226 report left open.
+
+| | Durnhal | Ondrel | Lumeth | Hargrim | Quillon | Brimwick | Skerrow | Wrenna |
+|---|---|---|---|---|---|---|---|---|
+| Ysmeer | beats | beats | beats | loses | loses | loses | loses | loses |
+
+- Beats Durnhal (spec). The slow tank has to walk to 3.5 m to reach her, and
+  his one ranged tool, Breaker Throw, reaches 9 m against her band's 8 to 12
+  m. Every metre he walks is a Falling Star aimed where he will be, and a
+  160-health champion who cannot close is a rock she keeps dropping stars
+  on. His `wound` and shields are worth nothing to him here: she is the one
+  with the range.
+- Beats Ondrel (spec). Her star falls at 11 m and Ondrel's Mire, Mire EX and
+  Drowned Ground all place at 8 m, so Ysmeer ranges the ground and Ondrel has
+  to walk into hers. Her M2 is the answer to the zones: a fused one-hit area
+  of 20 at 2 m, and the Supernova of 55 with a 1.5 s fuse is the biggest hit
+  in her kit, so an Ondrel who stands in a Reed Fence to hold the middle eats
+  the F. Gravity Well slows Ondrel out of her own ground and its end area
+  keeps the slow on the ground she wanted. She has 130 health to Ysmeer's
+  120, so the fight is close only until one star lands.
+- Beats Lumeth (spec). Lumeth's allies stand still to be healed, and a still
+  target is a landed star: Falling Star's 0.75 s fuse and Supernova's 1.5 s
+  both hit a champion who holds position. Her M1 reaches 12 m, 1 m more than
+  Ysmeer's Starbolt, but Ysmeer's M2, Q and F all reach 10 to 12 m and none
+  of them needs her to be closer. Mend Bolt's single-target heal cannot
+  outpace a 20 damage star and a 55 damage ultimate landing on a target that
+  will not move.
+- Loses to Hargrim (this section, not the spec). His hook reaches 9 m and
+  Rush closes 5 m, so he crosses her band in one dash and she has no root or
+  slow to stop him before he is inside Maul Swing's 2.5 m. Her only
+  disengage is Drift, a 4 m dash on a 9 s cooldown, and her shields are on R
+  at 13 s. A fused area cannot save her against a target already on top of
+  her: the fuse is the time she does not have. It is written as a loss so
+  that Hargrim has a win against the three new champions.
+- Loses to Quillon (this section, not the spec). Both have 120 health, and
+  Rod Bolt at 13.93 m and Lance at 17.92 m both outrange her 11 to 12 m.
+  Skip is a 4 m teleport on a 9 s cooldown and Hush Ward hastes her 30
+  percent, so she holds the range Ysmeer needs to close, and the Lance of 28
+  at 25 m/s is faster than any of Ysmeer's projectiles. Ysmeer's answer is
+  her own area play, which needs the target to come to her.
+- Loses to Brimwick (this section, not the spec). Flare Step brings a 6 m
+  teleport, and at 7 m her Flash Powder stun (0.75 s) cancels a placed-area
+  windup while her Firecracker, the same kind of placed area as Ysmeer's M2,
+  lands the tick it fires instead of after a fuse. Brimwick's Grand Finale
+  reaches 12 m and stuns 1.0 s, and her Starshell of 26 is well above
+  Ysmeer's 20 star, so the burst beats the prediction in a straight trade.
+- Loses to Skerrow (spec). Lunge closes 6 m in 0.2 s, inside the 0.4 s slowed
+  windup of Supernova, and Quiet Dart silences Ysmeer for 1.5 s so no star
+  lands. A rooted champion can still cast, but a silenced one cannot, and her
+  whole kit is casts. She has 120 health against Rend's 14 plus a damage over
+  time, and Drift's 4 m does not outrun an 8 m Lunge EX.
+- Loses to Wrenna (spec). Wrenna holds her 10 to 14 m band, her Longbow
+  reaches 14.00 m against Ysmeer's 12 m, and her Heartseeker of 28 is above
+  Ysmeer's 20 star with a 0.5 s slowed windup. Ysmeer's whole kit lands at
+  10 to 12 m, so a Wrenna who keeps 2 m more of gap takes every trade. This
+  is also the closing cell Wrenna's section 2 points to: her record over the
+  eight is 5 wins and 3 losses.
+
+The web stays intent, and balance measures the truth.
+
+**Statuses the kit needs.** None. The two mechanics her kit needs that the
+catalog does not have yet are the fuse on an area and the end area on a
+projectile, and she brings both. They are defined in the v3 spec, sections
+4.2 and 4.3, and in rules 2.7, and nothing is copied here but the numbers her
+kit gives them. Every effect of her table is in the toolkit plus those two.
+
+- **The fuse (data):** `fuseTicks` on an `area` of M2, 45 (0.75 s), and of
+  F, 90 (1.5 s). Both inside the catalog's 15 to 120 (rules 2.7). The area
+  is placed on the tick the cast fires and pulses once at the fuse's end.
+- **The end area (data):** `endArea` on the projectile of Q and of the E EX,
+  each a one-hit area of the projectile's slot, spawned where the projectile
+  ends. No `pierce`, per v3 spec section 4.3.
+
+**Kit data (not built yet).** `data/kits/ysmeer.json` is step 4.2 of the
+build order, after the fuse (#159) and `endArea` (#160) land in the sim. This
+section fixes the numbers it will use. The conversions are ticks = seconds x
+60, one hit = `durationTicks` 1 and `intervalTicks` 1, and "N pulses of I s"
+is an `area` with `intervalTicks` I times 60 and `durationTicks` N times
+that. The table leaves these numbers open, each `[tuned]` and chosen by the
+precedent of a kit that has the same shape:
+
+- M1 windup 6 ticks, free, and projectile radius 0.25 m (Quillon's Rod Bolt,
+  the same fast basic shot). Lifetime 33 ticks, reach 11.00 m.
+- M2 windup 24 ticks, slowed (Hargrim's Ground Slam and Ondrel's Mire, the
+  same placed M2 circle), radius 2 m as the table gives. The fuse is 45
+  ticks and the area is one hit: `durationTicks` 1, `intervalTicks` 1. The
+  EX copies the windup, the fuse and the movement, takes radius 2.5 m, and
+  adds a stun of 45 ticks (0.75 s), the catalog minimum (Brimwick's Flash
+  Powder), allowed on a fused one-hit area (rules 2.7).
+- SPACE windup 0, free, like every SPACE: the dash is 4 m in 12 ticks
+  (Lumeth's Glide), and the haste is 30 percent for 90 ticks as the table
+  gives, inside the catalog's 20 to 50 percent and 60 to 240 ticks.
+- Q windup 24 ticks, slowed, and projectile radius 0.5 m (Ondrel's Undertow,
+  the same slow projectile). Speed 12 m/s, lifetime 50 ticks, reach 10.00 m.
+  The `endArea` is a radius 2 m circle, `durationTicks` 90 and
+  `intervalTicks` 30: 3 pulses at 0, 30 and 60 ticks, each 8 damage and a
+  slow of 30 percent for 60 ticks, so the next pulse refreshes it. Total 24,
+  inside 8 to 30 (roster-v2 section 0). The area lands where the projectile
+  ends, so the field reaches as far as the 10.00 m of the shot.
+- E windup 18 ticks, slowed, and projectile radius 0.4 m (Durnhal's Breaker
+  Throw). Speed 18 m/s, lifetime 40 ticks, reach 12.00 m, and the knockback
+  is 2 m in 8 ticks, `away` (Lumeth's Lantern Burst). The EX copies the
+  windup, the movement and the lifetime, radius 0.4 m, and adds a one-hit
+  `endArea` of radius 2 m and 14 damage.
+- R windup 0, free, like every R: the shield is 30 for 240 ticks (Lumeth's
+  Aegis Veil), and the self area is radius 3 m, one hit, with a knockback of
+  2.5 m in 10 ticks `away` (Brimwick's Starshell push, scaled).
+- F windup 24 ticks, slowed (the table's 0.4 s and its slowed rule), radius
+  3.5 m as the table gives, fuse 90 ticks and one hit. The stun is 60 ticks
+  (1.0 s), the same as Hargrim's Quarry Break, allowed on a fused one-hit
+  area. `durationTicks` 1, `intervalTicks` 1.
+- The EX variants copy the windup, the movement and the fuse of their base.
+- Cooldowns in ticks: M1 42, M2 300, SPACE 540, Q 600, E 420, R 780, F 600.
+
+The effects are listed in the order the table names them: damage first, then
+the statuses and pushes (the knockback, then the slow or the stun). Every
+damaging slot (M1, M2, Q, E and F) carries a `damage`, so each earns energy
+by rules 3.1. SPACE and R carry none and earn none: R has a shield on self
+and a knockback, and a shield or a push alone gives nothing (rules 3.1). EX
+variants sit on M2 and E, never on F, at 25 energy, and F costs 100. A number
+changes in the file, here and in the scripted fixture in the same change.
+Ysmeer joins the balance harness in the last step of her series (v3 spec
+section 9.3).
+
+**Range table.** The intended range of every champion, in the shape of
+[roster v2](roster-v2.md) section 1 and the closing step of spec section 5.4.
+
+| Champion | Intended range | Source |
+|----------|----------------|--------|
+| Hargrim | 0 to 3 m, hook 9 m | roster v1 |
+| Skerrow | 0 to 2.5 m, closing from 6 to 8 m | roster v1 |
+| Durnhal | 0 to 3.5 m, throw 9 m | section 1 |
+| Ondrel | 5 to 9 m | roster v2 |
+| Lumeth | 6 to 10 m | roster v1 |
+| Brimwick | 7 to 10 m | roster v2 |
+| Ysmeer | 8 to 12 m, Supernova 12 m | section 3 |
+| Quillon | 9 to 13 m | roster v1 |
+| Wrenna | 10 to 14 m, Heartseeker 15.83 m | section 2 |
+
+Every band is a range, not a point, and the order above runs from the melee
+pair to the longest shot: Hargrim and Skerrow at the front, Durnhal behind
+them with a 9 m throw, Ondrel in the middle where her ground lies, Lumeth
+close enough to heal, Brimwick and Ysmeer the two mid-range casters, and
+Quillon and Wrenna the two back-liners. Ysmeer's 8 to 12 m sits above
+Brimwick's 7 to 10 m on purpose: she is the prediction caster who needs the
+target to commit, so she stands behind the burst and calls stars into the
+ground the enemy has to cross. Her M1 reaches 11.00 m and her F 12 m, so her
+band top is her ultimate, and her band start of 8 m clears every melee swing
+from where it stands and Durnhal's 3.5 m, and stays inside Ondrel's ground
+(8 to 12.5 m), which is exactly the fight this section reads.
+
+Every number of this section that a catalog range binds has one row. The
+sources are the approved spec section 10 and section 4.6, rules sections 4.1,
+2.7 and 5, roster-v1 section 0, roster-v2 section 0 and the v3 spec sections
+4.3 and 4.4.
+
+| Where (slot / EX / effect) | Number | Value | Range | Source | In range |
+|----------------------------|--------|-------|-------|--------|----------|
+| stats | `maxHealth` | 120 | 120 to 160, steps of 10 | approved spec 10, rules 5 | yes |
+| stats | `moveSpeed` | 5.5 m/s | 5.5 m/s | approved spec 10 | yes |
+| M1 | projectile speed | 20 m/s | 12 to 25 m/s | approved spec 10 | yes |
+| M1 | projectile radius | 0.25 m | 0.2 to 0.6 m | approved spec 10 | yes |
+| M1 | damage | 10 | 8 to 30 | approved spec 10 | yes |
+| M2 | area radius | 2 m | areas are tuning | roster-v1 §0 | yes |
+| M2 | damage | 20 | 8 to 30 | approved spec 10 | yes |
+| M2 | fuse | 45 ticks (0.75 s) | 15 to 120 ticks | rules 2.7 | yes |
+| M2 | fuse plus duration against cooldown | 46 ticks against 300 | below the cooldown | rules 2.7 | yes |
+| M2 EX | area radius | 2.5 m | areas are tuning | roster-v1 §0 | yes |
+| M2 EX | damage | 20 | 8 to 30 | approved spec 10 | yes |
+| M2 EX | stun ticks | 45 (0.75 s) | 30 to 120 | rules 4.1 | yes |
+| M2 EX | fuse plus duration against cooldown | 46 ticks against 300 | below the cooldown | rules 2.7 | yes |
+| SPACE | haste percent | 30 | 20 to 50 | rules 4.1 | yes |
+| SPACE | haste ticks | 90 (1.5 s) | 60 to 240 | rules 4.1 | yes |
+| Q | projectile speed | 12 m/s | 12 to 25 m/s | approved spec 10 | yes |
+| Q | projectile radius | 0.5 m | 0.2 to 0.6 m | approved spec 10 | yes |
+| Q | damage on hit | 9 | 8 to 30 | approved spec 10 | yes |
+| Q, end area, per pulse | damage | 8 | 8 to 30 | approved spec 10 | yes |
+| Q, end area | total over 3 pulses | 24 (8 times 3) | 8 to 30 | roster-v2 §0 | yes |
+| Q, end area, each pulse | slow percent | 30 | 20 to 60 | rules 4.1 | yes |
+| Q, end area, each pulse | slow ticks | 60 (1 s) | 60 to 180 | rules 4.1 | yes |
+| Q, end area | duration against cooldown | 90 ticks against 600 | below the cooldown | roster-v2 §0 | yes |
+| Q, end area | stun, root or silence on a pulse | none | none on a pulsing area | roster-v2 §0 | yes |
+| E | projectile speed | 18 m/s | 12 to 25 m/s | approved spec 10 | yes |
+| E | projectile radius | 0.4 m | 0.2 to 0.6 m | approved spec 10 | yes |
+| E | damage | 18 | 8 to 30 | approved spec 10 | yes |
+| E | knockback distance | 2 m | 1 to 4 m | rules 4.1 | yes |
+| E | knockback ticks | 8 | 6 to 15 | rules 4.1 | yes |
+| E EX, end area | damage | 14 | 8 to 30 | approved spec 10 | yes |
+| E EX, end area | radius, one hit | 2 m, `durationTicks` 1 | areas are tuning | roster-v1 §0 | yes |
+| E EX | `endArea` with `pierce` | no `pierce` | no `endArea` on a piercing projectile | v3 spec 4.3 | yes |
+| R | shield absorb | 30 | 20 to 60 | rules 4.1 | yes |
+| R | shield ticks | 240 (4 s) | 180 to 360 | rules 4.1 | yes |
+| R, area | knockback distance | 2.5 m | 1 to 4 m | rules 4.1 | yes |
+| R, area | knockback ticks | 10 | 6 to 15 | rules 4.1 | yes |
+| F | area radius | 3.5 m | areas are tuning | roster-v1 §0 | yes |
+| F | damage | 55 | 8 to 60 | approved spec 10 | yes |
+| F | fuse | 90 ticks (1.5 s) | 15 to 120 ticks | rules 2.7 | yes |
+| F | fuse plus duration against cooldown | 91 ticks against 600 | below the cooldown | rules 2.7 | yes |
+| F | stun ticks | 60 (1.0 s) | 30 to 120 | rules 4.1 | yes |
+| F | duration against cooldown | 1 tick against 600 | below the cooldown | roster-v2 §0 | yes |
+| EX | EX variants | 2, on M2 and E | exactly 2, never F | approved spec 4.6, roster-v1 §0 | yes |
+| EX | EX cost | 25 energy | 25 energy | approved spec 10 | yes |
+| F | ultimate cost | 100 energy | 100 energy | approved spec 10 | yes |
+| all | `energyGain` effects | none | none | roster-v2 §0 | yes |
+
+The numbers with no range are tuning values per roster-v1 section 0: the
+cooldowns, the windups, the lifetime of a projectile, the radius and the
+duration of an area, the length of a fuse chosen inside the catalog, and the
+distance of a dash.
+
+**Model.** Not part of this section. Her model, colour and cue are built in
+step 4.2 of the build order, under the colour rule of v3 spec section 3:
+distinct from the six shipped champions, Durnhal, Wrenna and the HUD's
+reserved team colours.
