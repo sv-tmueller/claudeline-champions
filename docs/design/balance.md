@@ -21,7 +21,7 @@ melee press the sim lands (issue #186): 7 of 60 in band, read in section 5.10.
 Arena03 (#238) then extended that block into the three-arena one of section 4:
 90 cells and 11 in band. The seven-kit report (issue #244) then added Durnhal
 and turned the energy orb on in every cell, regenerating the block on the
-committed head: 126 cells and the band reading of section 5.12, which reads
+committed head: 126 cells and 15 in band, read in section 5.12, which reads
 Durnhal's 36 cells against roster-v3.md section 1 and lists what the orb moved.
 Sections 5.1 to 5.8 and 6 stay the record of the four-kit report at 9a9c653 and
 of the passes made on it.
