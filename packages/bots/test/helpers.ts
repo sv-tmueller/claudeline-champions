@@ -537,7 +537,9 @@ function waitsForLunge(state: GameState, c: ChampionState, d: number): boolean {
  * True when the intent in `acted` is a stand that bots.md documents. A retreating bot holds at its
  * own spawn only while its team is ahead or an enemy is in its reach: otherwise the rule of the
  * bot says advance, and a stand there is a stall. A retreating bot that stands in reach of its
- * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts. An
+ * target with a clear shot, wherever it is, holds: that is the latched advance, and it casts. Its
+ * reach is the deadlock reach `latchReach` (#222), the same the bot's own entry test and latched
+ * stand read; the reach of `enemyInReach` (rangeMax) is the orb threat test and the finisher. An
  * engaging bot holds in its range, and Skerrow in her wait for Lunge.
  */
 export function holding(
@@ -545,21 +547,21 @@ export function holding(
   c: ChampionState,
   acted: { intent: Intent; targetId: number },
 ): boolean {
-  const { rangeMin, rangeMax } = profileFor(c.championId, kitOf(state, c));
+  const { rangeMin, rangeMax, latchReach } = profileFor(c.championId, kitOf(state, c));
   if (acted.intent === 'retreat') {
     const target = state.champions[acted.targetId];
     if (
       target !== undefined &&
       target.alive &&
       target.team !== c.team &&
-      Math.hypot(c.x - target.x, c.y - target.y) <= rangeMax &&
+      Math.hypot(c.x - target.x, c.y - target.y) <= latchReach &&
       clearShotOracle(state, c, target, CHAMPION_RADIUS)
     ) {
       return true;
     }
     const spawn = ownSpawnOf(state, c);
     const atSpawn = spawn !== undefined && Math.hypot(c.x - spawn.x, c.y - spawn.y) <= 0.5;
-    return atSpawn && (teamAheadOracle(state, c) || enemyInReachOracle(state, c, rangeMax));
+    return atSpawn && (teamAheadOracle(state, c) || enemyInReachOracle(state, c, latchReach));
   }
   const target = state.champions[acted.targetId];
   if (target === undefined || !target.alive || target.team === c.team) return false;
