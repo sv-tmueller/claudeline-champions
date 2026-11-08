@@ -227,7 +227,8 @@ function runEffects(
             state,
             champion.id,
             { dirX: fire.dirX, dirY: fire.dirY, distance: effect.distance, ticks: effect.ticks },
-            { castId: cast.castId, then: effect.then },
+            // The bonus rides the dash record: its `then` fires `effect.ticks` ticks later.
+            { castId: cast.castId, then: effect.then, bonusDamage: bonus === 0 ? undefined : bonus },
           );
         }
         break;
@@ -388,10 +389,16 @@ export function fireDashThen(state: GameState, champion: ChampionState, dash: Da
   for (let i = 0; i < casts.length; i++) {
     const record = casts[i] as CastRecord;
     if (record.id !== castId) continue;
-    runEffects(state, champion, { castId, slot: record.slot }, dash.then, {
-      x: dash.dirX,
-      y: dash.dirY,
-    });
+    // The bonus the cast's spend verb set rides the dash record, so a `then` hit lands it exactly
+    // as the rooted branch (which fires inline with the bonus) does.
+    runEffects(
+      state,
+      champion,
+      { castId, slot: record.slot },
+      dash.then,
+      { x: dash.dirX, y: dash.dirY },
+      dash.bonusDamage ?? 0,
+    );
     return;
   }
 }

@@ -22,11 +22,16 @@ export interface DashSpec {
   ticks: number;
 }
 
-/** What a cast adds to a dash; a direct `startDash` has neither. */
+/** What a cast adds to a dash; a direct `startDash` has none of it. */
 export interface DashCast {
   castId: number | null;
   /** Copied. Effects that fire where the dash ends. */
   then: readonly ThenEffect[];
+  /**
+   * The spend verb's damage bonus (rules 2.6) that the `then` effects must land, carried on the
+   * dash record because they fire on a later tick. The key is left out when there is none.
+   */
+  bonusDamage?: number;
 }
 
 function fail(what: 'dash' | 'teleport', problem: string): never {
@@ -71,7 +76,7 @@ export function startDash(
   if (!target.alive) return false;
 
   endDash(state, target, 'replaced');
-  target.dash = {
+  const dash: DashState = {
     dirX: dir.x,
     dirY: dir.y,
     stepLength: spec.distance / spec.ticks,
@@ -79,6 +84,9 @@ export function startDash(
     castId: cast.castId,
     then: [...cast.then],
   };
+  // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
+  if (cast.bonusDamage !== undefined) dash.bonusDamage = cast.bonusDamage;
+  target.dash = dash;
   state.events.push({
     type: 'dashStarted',
     championId,

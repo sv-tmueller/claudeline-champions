@@ -639,8 +639,10 @@ A dash and knockback impulses move a champion regardless of stun, root and a
 locked windup. They are step 3f of the tick.
 
 `champion.dash` is `null` or `{ dirX, dirY, stepLength, ticksLeft, castId, then
-}`: the cast that started it (`null` for a direct call) and the effects that
-fire where it ends. `startDash(state, id, { dirX, dirY, distance, ticks })` sets
+[, bonusDamage] }`: the cast that started it (`null` for a direct call) and the
+effects that fire where it ends, plus the spend verb's `bonusDamage` (rules
+2.6) when the cast that started it had one, since a `then` fires on a later
+tick; the key is left out when there is none. `startDash(state, id, { dirX, dirY, distance, ticks })` sets
 it with `stepLength = distance / ticks`, emits `dashStarted` and ends a running
 dash as `replaced`, which drops that dash's `then`. A dash first moves in step
 3f of the holder's next turn, or of the same turn when a cast starts it, and
@@ -1015,10 +1017,13 @@ every committed fixture keeps its checksum. Both numbers are in the checksum.
   of the same tick's hits and decay. `spendCounter` returns the stacks and sets
   `{ 0, 0 }`; at 0 stacks it returns 0 and touches nothing. `{ bonusDamagePerStack }`
   hands `n * stacks` to the effects run, which passes it as `bonusDamage` on each
-  projectile, area or arc it creates; `landHit` reads it off the `HitSource` and
+  projectile, area or arc it creates, and on the `DashState` it starts when the
+  ability holds a `dash`, so the dash's `then` effects — which fire on a later
+  tick — land it exactly as the rooted branch, which fires them inline with the
+  bonus; `landHit` reads it off the `HitSource` and
   `applyEffects` adds it to each `damage` effect's amount. The key is left out of
-  `ProjectileState`/`AreaState` when 0, so a fixture without a spend verb is
-  byte-identical. `{ cooldownTicksPerStack, slot }` cuts `cooldowns[SLOTS.indexOf(slot)]`
+  `ProjectileState`/`AreaState`/`DashState` when 0, so a fixture without a spend
+  verb is byte-identical. `{ cooldownTicksPerStack, slot }` cuts `cooldowns[SLOTS.indexOf(slot)]`
   by `n * stacks`, clamped at 0, at the same moment. No `SimEvent` is added: the
   spend shows in the counter and the cooldown value.
 

@@ -734,6 +734,31 @@ describe('the spend verbs at fire (v3 4.4b)', () => {
     expect(counterOf(state)).toEqual({ count: 1, lastHitTick: 0 });
   });
 
+  const DASH_THEN = (amount: number): AbilityEffect => ({
+    type: 'dash',
+    distance: 1,
+    ticks: 1,
+    then: [{ type: 'meleeArc', radius: 2.5, cosHalfAngle: -1, effects: [{ type: 'damage', amount }] }],
+  });
+
+  it('lands the bonus on the hits a dash then creates, rooted at fire or not', () => {
+    // The dash's `then` fires on a later tick than the cast (or inline when the caster is rooted at
+    // fire); the spend's bonus has to ride the dash record so both variants deal the same damage.
+    const run = (rooted: boolean): { health: number; counter: unknown } => {
+      const state = spending({ M2: quiet({ windupTicks: 3, effects: [BONUS(5), DASH_THEN(10)] }) });
+      load(state, 3);
+      const held = [input(0, 0, 1000, 0, M2)];
+      step(state, held);
+      if (rooted) applyStatus(state, 0, { type: 'root', ticks: 300 }, { sourceId: 2, slot: null });
+      for (let i = 0; i < 6; i++) step(state, held);
+      expect(checkAbilityInvariants(state)).toEqual([]);
+      return { health: champion(state, 2).health, counter: counterOf(state) };
+    };
+    // 3 stacks x 5 per stack = 15 on top of the arc's 10, in the unrooted fire too.
+    expect(run(false)).toEqual({ health: 95, counter: { count: 0, lastHitTick: 0 } });
+    expect(run(true)).toEqual({ health: 95, counter: { count: 0, lastHitTick: 0 } });
+  });
+
   it('holds the state invariants through a seeded brawl with the verbs', () => {
     const state = spending({
       M1: quiet({ effects: [BONUS(3), ARC(10)] }),
