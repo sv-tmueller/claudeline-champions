@@ -212,7 +212,10 @@ and 21.0 and 26.6 s (arena02) on the runner (jobs 125568510485 and 125574546646 
 41530318344 and 41532073021, the file 44.5 and 50.3 s beside the other long files), so
 twice the slowest is 53.2 s and the timeout stays 60 s. The unit job of the draft pull
 request read 7 min 11 s and 7 min 24 s (347.8 and 353.0 s of Vitest over 146 files) with
-them. They
+them. #187 re-read the scan and moved the cells to the Lumeth mirror (its rounds are long
+enough for the orb rounds; the Quillon v Lumeth pair of #225 then read exactly half on
+arena01): 8.0 and 6.2 s locally, the arena01 cell's rounds longer than the old pair's, so
+the 60 s timeout still covers twice the slowest. They
 are the only matches the package commits (the optional orb-on determinism row was left out
 for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
 unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.

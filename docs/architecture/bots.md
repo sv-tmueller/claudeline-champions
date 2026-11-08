@@ -371,9 +371,11 @@ six-cells.ts has it), both arenas, seeds 101 to 104, match seed 7, normal tier,
 played to matchEnd (a scratch, not committed, 42 matches; Durnhal of #211, the seventh kit, was
 not in it). A round is an orb
 round when it reaches tick 1200, and most do not: normal bots end a round at
-tick 1000 for most pairings, so the orb is up in 20 of 78 rounds on arena 1 and 16
-of 82 on arena 2. The bots took it in 14 of the 20 and 9 of the 16 (70 and 56
-percent); with the contest switched off, the same scan has 3 of 18 and 1 of 18,
+tick 1000 for most pairings, so the orb is up in 21 of 79 rounds on arena 1 and 17
+of 83 on arena 2 (the #225 scan read 20 of 78 and 16 of 82; the re-read here is
+after #187 capped the lead of the one-hit areas). The bots took it in 13 of the 21
+and 9 of the 17 (62 and 53 percent). The rest of this paragraph is #225's scan,
+not re-measured here: with the contest switched off, that scan has 3 of 18 and 1 of 18,
 which are the champions that stood on it by chance. The orb flag (the decision's, before
 the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
 each (one contest is a flip to true and one to false at its end or at the next round).
@@ -385,19 +387,24 @@ out of the reach of an enemy flips the threat test with it, so the contest start
 as the distance crosses `rangeMax`; this is reading A at work (an enemy in reach ends the
 contest) and not a bug, and no hysteresis is built (see Not built yet).
 
-The committed matches (`orb-match.test.ts`) are the pair that has orb
-rounds: a Quillon and a Hargrim against a Lumeth and a Hargrim, played to matchEnd
-with the orb of `data/orbs.json`.
+The committed matches (`orb-match.test.ts`) are the Lumeth mirror of the six
+kits (a Lumeth and a Hargrim against a Lumeth and a Hargrim), played to matchEnd
+with the orb of `data/orbs.json`: the pairing whose rounds are long enough for
+the orb rounds and whose bots take it in more than half. It was the Quillon v
+Lumeth pair of #225 until #187 capped the lead of the one-hit areas, when that
+cell read exactly half (2 of 4) on arena01; the scan above was then re-read with
+the Lumeth mirror in place.
 
 | Arena   | Ended | Longest ordinary round | Orb rounds | Taken | Taker team | Worst stall |
 | ------- | ----- | ---------------------- | ---------- | ----- | ---------- | ----------- |
-| arena01 | 8176  | 1823                   | 4          | 3     | A 2, B 1   | 17          |
-| arena02 | 7329  | 1666                   | 3          | 2     | A 0, B 2   | 21          |
+| arena01 | 11956 | 3395                   | 5          | 5     | A 2, B 3   | 26          |
+| arena02 | 8892  | 2465                   | 4          | 3     | A 1, B 2   | 15          |
 
 The mirror of the product's match (Hargrim and Quillon a side) is not that pair: its
 rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds on the two arenas. A cell
-takes 3.7 s locally (a Linux x86 host, Node 24.22), and the two cells are the
-only committed matches of #225, for the unit job's time (see Testing).
+takes 6 to 8 s locally (the longer Lumeth mirror rounds), and the two cells are the
+only committed matches of #225 (testing.md, Check suite: the unit job is near its
+time).
 
 ## Clear shot
 
@@ -2016,8 +2023,9 @@ The seeded runs that move (re-recorded each by its own formula, the cascade the
 sub-plan lists): the four Lumeth runs end at ticks 8254 (2v2 arena01, was 5081;
 round term 2300, the longest 2v2 round being 2265 (2229 on arena01, 2265 on arena02),
 budget 20 000), 5698 (2v2 arena02, was 7521; 2300, 18 000), 9357
-(3v3 arena01, was 6773; 2900, 23 000) and 6442 (3v3 arena02, was 10934; 2900,
-20 000), in `lumeth.test.ts` and the harness rows of `tools/balance/harness.test.ts`;
+(3v3 arena01, was 6773; 2900, 23 000) and 6295 (3v3 arena02, was 10934 then
+6442 after #213; 2900, 20 000, moved by #187), in `lumeth.test.ts` and the
+harness rows of `tools/balance/harness.test.ts`;
 the cells of `brimwick.test.ts` and `ondrel.test.ts` that passed their term (6 of
 the 18; the others pass and stand as records of when each budget was set) are
 re-recorded (Brimwick against Quillon on arena01 6303 and 1266, on arena02 4499 and
@@ -2068,7 +2076,8 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (8254, 5698, 9357 and 6442 since #213; 5081, 7521,
+tick when the budget was set (8254, 5698, 9357 and 6295, the last since #187;
+6442 since #213; 5081, 7521,
 6773 and 10934 before, the first moved from 6623 with #186), plus two rounds of the
 longest round that did not go to sudden death, rounded up to 100 (2300 in the 2v2
 runs, whose longest is 2265 since #213 and was 1619 before, and 2900 in the 3v3

@@ -80,7 +80,7 @@ const ROWS: Row[] = [
     arena: arena02,
     seeds: SEEDS_3V3,
     tiers: NORMAL_3V3,
-    endTick: 6442,
+    endTick: 6295,
     round: 2900,
     budget: 20_000,
   },
