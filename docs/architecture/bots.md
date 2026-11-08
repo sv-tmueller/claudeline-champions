@@ -1256,8 +1256,9 @@ error.
   area ability changed (#165, and re-measured for #187) played seeded 2v2
   matches (normal tier, seeds 1 to 10, both arenas, not committed: it patches
   `aim`) and counted the pulses of the areas the casting bots placed that had an
-  enemy inside. The #185 design has the four v1 kits, so Ondrel and Brimwick
-  cast and Lumeth never does (Firecracker, its EX, the Mire and Drowned Ground):
+  enemy inside. The #185 design has Ondrel and Brimwick as the casting bots
+  against the four v1 kits, so Firecracker, its EX, the Mire and Drowned Ground
+  are seen and Lumeth never casts:
 
   | Lead of an area ability        | Mire (r 2)         | Drowned Ground (r 4) | Firecracker (r 1.5) | Firecracker EX (r 2) |
   | ------------------------------ | ------------------ | -------------------- | ------------------- | -------------------- |
@@ -2140,8 +2141,10 @@ aim override dropped, `findLanding` true when none passes, the streak gate
 returned to `runs[i]`, the streak not zeroed on a change of target, the streak
 not zeroed on a dead think, the streak never reset; the lead dropped, doubled or
 taken from 10 m/s; the cap dropped (the capped Firecracker and Binding Sigil pins
-read 0 of 1), the cap widened to the radius, the cap applied to a `self` or
-`ahead` area, the cap read from the wrong effect; an object per escape gate
+of `area-lead.test.ts` read 0 of 1, and the `aim lead` pin reads the nominal
+pair), `AREA_LEAD_CAP_FRACTION` changed (the `leadCapOf` and `clampLead` unit
+rows and, through `aim`, the `aim lead` pin), the placement and duration tests of
+`leadCapOf` dropped (its lingering and `self`/`ahead` rows); an object per escape gate
 (168 B in the two escape scenes of the heap check).
 
 The seeded matches of #165 (`ondrel.test.ts` and `brimwick.test.ts`, over
