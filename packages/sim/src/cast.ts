@@ -154,7 +154,17 @@ function runEffects(
               list.push(ally);
             }
           }
-          applyEffects(state, champion.id, champion.id, list, { x: champion.x, y: champion.y }, cast.slot);
+          // The bonus of the spend verb (rules 2.6) lands here as it does on the spawned
+          // projectile's ally hit; the caster is the ally this aim applies the list to.
+          applyEffects(
+            state,
+            champion.id,
+            champion.id,
+            list,
+            { x: champion.x, y: champion.y },
+            cast.slot,
+            bonus,
+          );
           break;
         }
         const fire = fireFrom(champion, then);

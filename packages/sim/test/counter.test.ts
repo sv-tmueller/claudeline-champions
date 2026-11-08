@@ -705,6 +705,37 @@ describe('the spend verbs at fire (v3 4.4b)', () => {
     expect(champion(state, 2).health).toBe(120 - (8 + 8));
   });
 
+  const ALLY_BOLT = (amount: number): AbilityEffect => ({
+    type: 'projectile',
+    speed: 20,
+    radius: 0.3,
+    lifetimeTicks: 60,
+    pierce: true,
+    effects: [],
+    allyEffects: [{ type: 'damage', amount }],
+  });
+
+  it('lands the bonus on the damage of an allyEffects list aimed at the caster, as when it spawns', () => {
+    // The self-cast branch applies the ally list to the caster at once, spawning nothing; the spend
+    // verb's bonus has to reach a `damage` there exactly as it does on the spawned projectile's ally
+    // hit. Same cast, same ally list: the damage must not depend on the aim (cast.ts, rules 2.5).
+    const run = (verbs: AbilityEffect[], aimAtSelf: boolean): number => {
+      const state = spending({ M1: quiet({ effects: [...verbs, ALLY_BOLT(4)] }) });
+      place(state, 1, 2, 0);
+      load(state, 2);
+      step(state, [input(0, 0, aimAtSelf ? -200 : 1000, 0, M1)]);
+      if (aimAtSelf) return champion(state, 0).health;
+      for (let i = 0; i < 40 && champion(state, 1).health === 120; i++) step(state, []);
+      return champion(state, 1).health;
+    };
+    // 2 stacks x 5 per stack = 10 on top of the ally list's 4, in both aim variants.
+    expect(run([BONUS(5)], true)).toBe(120 - 4 - 10);
+    expect(run([BONUS(5)], false)).toBe(120 - 4 - 10);
+    // Controls: without a verb the two aims deal the same 4, so the difference is the bonus alone.
+    expect(run([], true)).toBe(120 - 4);
+    expect(run([], false)).toBe(120 - 4);
+  });
+
   it('spends before the hits of the same tick: a from-slot hit that lands then builds 1 back', () => {
     const state = spending({ M1: quiet({ effects: [BONUS(3), ARC(10)] }) }, 'Q');
     load(state, 2);
