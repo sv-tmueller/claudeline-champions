@@ -241,6 +241,19 @@ function catalogProblems(kit: KitDef): string[] {
   // on each of its base and EX (both windup 24), so the bound is not a flat count across the slot:
   // it compares the two abilities' live windows, cast `cooldownTicks` apart, and rejects only a real
   // overlap.
+  // Finding 1 of the round-4 report: the bound above places an area on the ability's fire step, but
+  // a `dash.then` area spawns when the dash ends, `dash.ticks - 1` ticks later (step 3f ends the dash
+  // and then `fireDashThen` runs its `then`), and a projectile `endArea` spawns at its flight's end.
+  // The walker must price every spawn path that can delay an area's appearance, or it admits a slot
+  // that holds two live areas of itself. Its `first` below is thus the windup plus the dash delay
+  // plus the flight, and E8 pins each of the three paths against the sim.
+  //
+  // Finding 2 of the round-4 report: the overlap test needs both conjuncts of a half-open-window
+  // intersection. Testing only `first.until > start + second.first` rejected a slot whose first area
+  // appears only after the second's window has closed, with a message that was not true. The missing
+  // lower conjunct is `first.first < start + second.until`. And `start` is not always the cooldown:
+  // the second cast waits for the cooldown *and* for the first windup to end, so it begins
+  // `max(cooldownTicks, first.windupTicks)` after the first cast.
   const flightTicks = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return 0;
     // The projectile ends `lifetimeTicks` after it spawns, so the area appears on the last of them.
@@ -282,32 +295,40 @@ function catalogProblems(kit: KitDef): string[] {
   }
   const liveAreas = (ability: AbilitySpec): LiveArea[] => {
     const out: LiveArea[] = [];
-    const walk = (effects: readonly AbilityEffect[]): void => {
+    // `delay` is the ticks a top-level effect's area spawns after the ability fires: 0 for an effect
+    // at the top level, the dash's ticks minus one inside a `then` (the dash ends on its last step).
+    const walk = (effects: readonly AbilityEffect[], delay: number): void => {
       for (const effect of effects) {
         if (areaLifetime(effect) > 0 && lingers(effect)) {
-          const first = ability.windupTicks + flightTicks(effect);
+          const first = ability.windupTicks + delay + flightTicks(effect);
           out.push({ lifetime: areaLifetime(effect), first, until: first + liveSpan(effect) });
         }
-        if (effect.type === 'dash') walk(effect.then);
+        if (effect.type === 'dash') walk(effect.then, delay + effect.ticks - 1);
       }
     };
-    walk(ability.effects);
+    walk(ability.effects, 0);
     return out;
   };
   /** The problem when the ability cast first has an area still live as the other ability fires. */
   const overlap = (
     first: LiveArea,
+    firstAbility: AbilitySpec,
     firstName: string,
     second: LiveArea,
     secondName: string,
     cooldownTicks: number,
   ): string | undefined => {
-    // The second area's first live step is `cooldownTicks + second.first` on the first cast's clock;
-    // the first area is still present on `first.until - 1`, so they overlap iff `until > cooldown + first`.
-    if (first.until <= cooldownTicks + second.first) return undefined;
+    // The second cast waits for the cooldown and for the first windup to end, so on the first cast's
+    // clock it begins `start` ticks after it; the second area's window is `[start + second.first,
+    // start + second.until)`. The first area's window is `[first.first, first.until)`. Two half-open
+    // windows overlap iff each start is before the other's end; dropping the lower conjunct rejected a
+    // slot whose first area appears only after the second's window has closed.
+    const start = Math.max(cooldownTicks, firstAbility.windupTicks);
+    if (first.until <= start + second.first) return undefined;
+    if (first.first >= start + second.until) return undefined;
     return (
       `a slot keeps one live area of its own, but the ${firstName} area is still live ` +
-      `${cooldownTicks + second.first} ticks after the ${firstName} cast, when the ${secondName} area appears`
+      `${start + second.first} ticks after the ${firstName} cast, when the ${secondName} area appears`
     );
   };
   for (const slot of SLOTS) {
@@ -316,7 +337,7 @@ function catalogProblems(kit: KitDef): string[] {
       { ability: spec, name: 'base', base: `${kit.id}.slots.${slot}` },
     ];
     if (spec.ex) abilities.push({ ability: spec.ex, name: 'EX', base: `${kit.id}.slots.${slot}.ex` });
-    const perAbility = abilities.map(({ ability, name, base }) => ({ name, base, areas: liveAreas(ability) }));
+    const perAbility = abilities.map(({ ability, name, base }) => ({ ability, name, base, areas: liveAreas(ability) }));
     for (const { base, areas } of perAbility) {
       if (areas.length < 2) continue;
       const lifetimes = areas.map((area) => area.lifetime);
@@ -334,8 +355,8 @@ function catalogProblems(kit: KitDef): string[] {
       const areaB = b.areas[0];
       if (areaA && areaB) {
         const problem =
-          overlap(areaA, a.name, areaB, b.name, spec.cooldownTicks) ??
-          overlap(areaB, b.name, areaA, a.name, spec.cooldownTicks);
+          overlap(areaA, a.ability, a.name, areaB, b.name, spec.cooldownTicks) ??
+          overlap(areaB, b.ability, b.name, areaA, a.name, spec.cooldownTicks);
         if (problem !== undefined) bad(`${kit.id}.slots.${slot}`, problem);
       }
     }
@@ -1262,6 +1283,197 @@ describe('the endArea rules', () => {
     expect(catalogProblems(tie)).toEqual([]);
     expect(maxLive(tie)).toBe(1);
     expect(catalogProblems(swapped(plain(10, 352), plain(0, 352)))).toEqual([message('base', 'EX')]);
+  });
+
+  it('E8 prices the dash ticks of a dash.then area on every spawn path', () => {
+    // Finding 1 of the round-4 report: the windup-aware bound was derived for an ability whose area
+    // spawns on the fire step, but a `dash.then` area spawns when the dash ends, `dash.ticks - 1`
+    // ticks later (step 3f ends the dash, then `fireDashThen` runs its `then`). The walker placed
+    // such an area on the fire step and accepted a slot that holds two live areas of itself. The
+    // sim-vs-walker pin below is the lesson of the round-4 report: a bound that adds one delay term
+    // must price every spawn path that can delay the area's appearance, so each of the three paths
+    // (plain `area`, `dash.then` area, projectile `endArea`) is pinned against the sim.
+    const swap = (
+      base: { windupTicks: number; effects: unknown[] },
+      ex: { windupTicks: number; effects: unknown[] },
+    ): KitDef => {
+      const copy = copyOf(quillon);
+      (copy.slots as unknown as Record<string, unknown>)['M2'] = {
+        cooldownTicks: 360,
+        movement: 'free',
+        ...base,
+        ex: { movement: 'free', ...ex },
+      };
+      return copy;
+    };
+    const areaPayload = (durationTicks: number) => ({
+      type: 'area',
+      radius: 2,
+      durationTicks,
+      intervalTicks: durationTicks,
+      targets: 'enemies',
+      placement: { type: 'self' },
+      effects: [{ type: 'damage', amount: 10 }],
+    });
+    const plain = (windup: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [areaPayload(durationTicks)],
+    });
+    const dashThen = (windup: number, dashTicks: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [{ type: 'dash', distance: 4, ticks: dashTicks, then: [areaPayload(durationTicks)] }],
+    });
+    const shot = (windup: number, lifetimeTicks: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [
+        { type: 'projectile', speed: 25, radius: 0.2, lifetimeTicks, pierce: false, effects: [{ type: 'damage', amount: 10 }], endArea: endArea(durationTicks) },
+      ],
+    });
+    const dashThenShot = (windup: number, dashTicks: number, lifetimeTicks: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [{ type: 'dash', distance: 4, ticks: dashTicks, then: [shot(0, lifetimeTicks, durationTicks).effects[0]] }],
+    });
+    const message = (first: string, second: string) =>
+      `quillon.slots.M2: a slot keeps one live area of its own, but the ${first} area is still live 360 ticks after the ${first} cast, when the ${second} area appears`;
+    /** The most areas of slot M2 ever live at once, the base cast first or the EX first. */
+    const maxLiveOf = (kit: KitDef, exFirst: boolean): number => {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(kit)]);
+      let live = 0;
+      for (let i = 0; i < 800; i++) {
+        champion(state, 0).energy = 100;
+        const buttons = exFirst
+          ? i < 360 ? Button.M2 | Button.SHIFT : Button.M2
+          : i < 360 ? Button.M2 : Button.M2 | Button.SHIFT;
+        step(state, [input(0, 0, 0, 0, buttons)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+      }
+      return live;
+    };
+    const simMax = (kit: KitDef) => Math.max(maxLiveOf(kit, false), maxLiveOf(kit, true));
+
+    // Plain `area` path: the base area (windup 100, duration 359) is still live when the EX area
+    // (windup 0) appears on the t=360 recharge. It is the E7 canonical shape, pinned again so the
+    // three paths sit side by side.
+    const plainPair = swap(plain(100, 359), plain(0, 359));
+    expect(catalogProblems(plainPair)).toEqual([message('base', 'EX')]);
+    expect(simMax(plainPair)).toBe(2);
+
+    // `dash.then` area path: the base's four-tick dash ends on the third step after the cast, so its
+    // 359-tick area is first live on t=3 and last live on t=361, one tick past the t=360 recharge.
+    // Three dash ticks are exactly the gap: with a one-tick dash the area is live on [0, 358) and the
+    // slot holds one.
+    const dashPair = swap(dashThen(0, 4, 359), plain(0, 359));
+    expect(catalogProblems(dashPair)).toEqual([message('base', 'EX')]);
+    expect(simMax(dashPair)).toBe(2);
+    expect(catalogProblems(swap(dashThen(0, 3, 359), plain(0, 359)))).toEqual([]);
+    expect(catalogProblems(swap(dashThen(0, 1, 359), plain(0, 359)))).toEqual([]);
+    // The reverse order: the EX carries the dash, so the walker must price the EX's dash too.
+    expect(catalogProblems(swap(plain(0, 359), dashThen(0, 4, 359)))).toEqual([
+      `quillon.slots.M2: a slot keeps one live area of its own, but the EX area is still live 360 ticks after the EX cast, when the base area appears`,
+    ]);
+    expect(simMax(swap(plain(0, 359), dashThen(0, 4, 359)))).toBe(2);
+
+    // Projectile `endArea` path, with the dash on the base: the dash ends on the fourth step after
+    // the cast, then the bolt flies its lifetime and leaves the area. Five dash ticks and a
+    // one-tick flight put the area's first live step at 4, past the t=360 expiry of the earlier one.
+    const shotPair = swap(shot(100, 1, 358), shot(0, 1, 358));
+    expect(catalogProblems(shotPair)).toEqual([message('base', 'EX')]);
+    expect(simMax(shotPair)).toBe(2);
+    const dashShotPair = swap(dashThenShot(0, 5, 1, 358), shot(0, 1, 358));
+    expect(catalogProblems(dashShotPair)).toEqual([message('base', 'EX')]);
+    expect(simMax(dashShotPair)).toBe(2);
+    expect(catalogProblems(swap(dashThenShot(0, 4, 1, 358), shot(0, 1, 358)))).toEqual([]);
+  });
+
+  it('E9 adds the lower conjunct of the overlap bound, so a late first area is accepted', () => {
+    // Finding 2 of the round-4 report: the bound tested only `first.until > start + second.first`,
+    // so a slot whose first area appears only *after* the second's window has closed was rejected
+    // with a message that was not true. The overlap of two half-open windows needs both conjuncts:
+    // `first.until > start + second.first` (the first ends after the second starts) *and*
+    // `first.first < start + second.until` (the first starts before the second ends). `start` is the
+    // tick the second cast begins on, counted from the first cast: the cooldown must be out and the
+    // first ability's windup over, so `start` is `max(cooldownTicks, first.windupTicks)`.
+    const swap = (
+      base: { windupTicks: number; effects: unknown[] },
+      ex: { windupTicks: number; effects: unknown[] },
+    ): KitDef => {
+      const copy = copyOf(quillon);
+      (copy.slots as unknown as Record<string, unknown>)['M2'] = {
+        cooldownTicks: 360,
+        movement: 'free',
+        ...base,
+        ex: { movement: 'free', ...ex },
+      };
+      return copy;
+    };
+    const plain = (windup: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [
+        { type: 'area', radius: 2, durationTicks, intervalTicks: durationTicks, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 10 }] },
+      ],
+    });
+    const shot = (windup: number, lifetimeTicks: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [
+        { type: 'projectile', speed: 25, radius: 0.2, lifetimeTicks, pierce: false, effects: [{ type: 'damage', amount: 10 }], endArea: endArea(durationTicks) },
+      ],
+    });
+    const dashThen = (windup: number, dashTicks: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [{ type: 'dash', distance: 4, ticks: dashTicks, then: [{ type: 'area', radius: 2, durationTicks, intervalTicks: durationTicks, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 10 }] }] }],
+    });
+    const message = (first: string, second: string) =>
+      `quillon.slots.M2: a slot keeps one live area of its own, but the ${first} area is still live 360 ticks after the ${first} cast, when the ${second} area appears`;
+    const maxLiveOf = (kit: KitDef, exFirst: boolean): number => {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(kit)]);
+      let live = 0;
+      for (let i = 0; i < 800; i++) {
+        champion(state, 0).energy = 100;
+        const buttons = exFirst
+          ? i < 360 ? Button.M2 | Button.SHIFT : Button.M2
+          : i < 360 ? Button.M2 : Button.M2 | Button.SHIFT;
+        step(state, [input(0, 0, 0, 0, buttons)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+      }
+      return live;
+    };
+    const simMax = (kit: KitDef) => Math.max(maxLiveOf(kit, false), maxLiveOf(kit, true));
+
+    // The tester's repro: the base is a 20-tick flight that leaves a one-hit area, so its area is
+    // first live on t = 359 + 19 = 378, long after the EX area (windup 0, one tick) has gone on
+    // t = 361. The windows never meet, yet the old bound rejected. On the plain path the first area
+    // appears on the fire step, at or before `start`, so the lower conjunct can only bite when a
+    // flight or a dash delays it.
+    const late = swap(shot(359, 20, 2), plain(0, 2));
+    expect(catalogProblems(late)).toEqual([]);
+    expect(simMax(late)).toBe(1);
+    // The boundary: a two-tick flight puts the first live step exactly on t = 360, the tick the EX
+    // area appears, so they overlap and the slot holds two; one more flight tick and it does not.
+    expect(catalogProblems(swap(shot(359, 2, 2), plain(0, 2)))).toEqual([message('base', 'EX')]);
+    expect(simMax(swap(shot(359, 2, 2), plain(0, 2)))).toBe(2);
+    expect(catalogProblems(swap(shot(359, 3, 2), plain(0, 2)))).toEqual([]);
+    expect(simMax(swap(shot(359, 3, 2), plain(0, 2)))).toBe(1);
+    // The same boundary on the dash.then path: a 362-tick dash leaves the area first live on t = 361,
+    // past the EX window; 361 dash ticks reach it and the slot holds two.
+    expect(catalogProblems(swap(dashThen(0, 362, 2), plain(0, 2)))).toEqual([]);
+    expect(simMax(swap(dashThen(0, 362, 2), plain(0, 2)))).toBe(1);
+    expect(catalogProblems(swap(dashThen(0, 361, 2), plain(0, 2)))).toEqual([message('base', 'EX')]);
+    expect(simMax(swap(dashThen(0, 361, 2), plain(0, 2)))).toBe(2);
+
+    // `start` is `max(cooldown, first.windup)`, not the cooldown alone. Here the EX is cast first
+    // with a windup (361) above the cooldown (360), so the base cannot start on the t=360 recharge:
+    // it waits until the EX windup ends and casts on t=361, the same tick the EX area (windup 361,
+    // one tick) is first live. The two windows meet and the slot holds two. Were `start` the cooldown
+    // alone, the base would be priced a tick early and the overlap missed. The reject names the true
+    // tick, 361.
+    expect(catalogProblems(swap(plain(0, 2), plain(361, 2)))).toEqual([
+      `quillon.slots.M2: a slot keeps one live area of its own, but the EX area is still live 361 ticks after the EX cast, when the base area appears`,
+    ]);
+    expect(simMax(swap(plain(0, 2), plain(361, 2)))).toBe(2);
+    expect(catalogProblems(swap(plain(0, 2), plain(360, 2)))).toEqual([message('EX', 'base')]);
+    expect(simMax(swap(plain(0, 2), plain(360, 2)))).toBe(2);
+    expect(catalogProblems(swap(plain(0, 2), plain(359, 2)))).toEqual([]);
+    expect(simMax(swap(plain(0, 2), plain(359, 2)))).toBe(1);
   });
 });
 
