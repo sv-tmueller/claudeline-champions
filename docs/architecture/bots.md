@@ -137,15 +137,29 @@ and stands there, nobody is in reach of anybody and the match never ends (the ki
 #58 froze this way with health 3, 27, 26 and 13). A retreating bot therefore advances on its target
 instead of walking to its spawn when both hold on the current state:
 
-- no alive enemy is within `rangeMax` of the profile with a clear shot of 0.5 m (it is not in
-  reach of anybody, the finisher test without the health filter);
+- no alive enemy is within its deadlock reach (see below) of the profile with a clear shot of 0.5 m
+  (it is not in reach of anybody, the finisher test without the health filter);
 - its team is not ahead: the sum of `health / maxHealth` over the alive champions of its team, the
   bot included, summed in id order, is at most the same sum over the alive enemies. Equal sums are
   not ahead, so on a tie both teams advance; the team that is ahead stays, so the leading team's
   low bot waits at its spawn by design.
 
+The deadlock reach (#222). The entry test above and the latched stand read `latchReach`, a new
+profile double written in `refreshKitCache` like `standReach` (the `standReach` precedent; one more
+double of the kit cache, starting at 0.5, no allocation). It is `rangeMax` for every champion that
+keeps its range and 1.25 of it (`LATCH_FRACTION`) for the champions with rangeMin 0, Hargrim,
+Skerrow and Durnhal, with their kit and without: 2.5 m, 1.875 m and 3.75 m with the shipped kits,
+3.75 m, 3.125 m and 4.375 m from the table. `enemyInReach` itself is untouched: the finisher and the
+orb threat test (see The energy orb) keep `rangeMax`. The value and the screen are recorded under
+The rule of #222 in Testing. Why the latched stand is a real stand and not a dead zone: `rangeMax`
+is by construction the top of the base M1 band less the 1 m range margin (`abilityReach(M1).max -
+RANGE_MARGIN`, see Profiles), so when `latchReach` is above it the bot stands past the top of its M1
+band; the probe shows it still casts its other slots there (a latched Hargrim presses M2 and R at
+2.4 m, a latched Skerrow presses Q, E and M2), which is what the stall oracle in `helpers.ts` now
+documents as a stand (it reads `latchReach`, not `rangeMax`, for the retreat stand).
+
 The advance uses the sight logic of a kite beyond `rangeMin`, toward the acted target: it stands
-while the target is within `rangeMax` with a clear shot (the cast logic is not tied to the intent,
+while the target is within `latchReach` with a clear shot (the cast logic is not tied to the intent,
 so a standing bot casts), else walks to the nearest sight cell (see Kite movement), else along the
 path to the target. The intent and the finisher rule do not change: the bot still retreats, and a
 finisher still takes over when an enemy that qualifies comes into reach.
@@ -154,7 +168,7 @@ The advance is latched. Once begun it goes on, and the bot stands in reach to ca
 intent is not retreat, the acted target is another champion, the team gets ahead or the bot dies (a
 bot revived at a new round starts afresh). Why: without a latch a bot behind on health, say a
 Quillon against a Hargrim ahead and standing at its spawn, advances until the target is within
-`rangeMax`, then the first rule no longer holds, so it steps back out of reach, and again, and its
+reach, then the first rule no longer holds, so it steps back out of reach, and again, and its
 cast run restarts on every other think and nothing ever lands. The latch is per bot state and is
 rewritten in place, so the think stays allocation free.
 
@@ -229,11 +243,19 @@ ends before the bodies touch (they
 touch at 1 m). The melee champion thus stops a step inside its reach and no
 longer on the edge of it, where a target that stepped back a little put it out
 of reach and made it walk in again (a re-close, see Testing, the approach and
-retreat of #213). Only the engage stand reads it: the finisher, the deadlock
-check (see Deadlock) and the sight logic of an advancing or kiting bot keep
-`rangeMax`, so what counts as reach is unchanged. The field is one more double
-of the profile record of the kit cache (it starts at 0.5, like the other two)
-and costs no allocation.
+retreat of #213). Only the engage stand reads it: the finisher and the sight
+logic of an advancing or kiting bot keep `rangeMax`, so what counts as reach for
+them is unchanged (the deadlock check reads `latchReach` since #222, see
+Deadlock). The field is one more double of the profile record of the kit cache
+(it starts at 0.5, like the other two) and costs no allocation.
+
+The deadlock reach (#222). A profile also has `latchReach`, the distance the deadlock rule measures
+an enemy against and at which a latched advance stands to cast (see Deadlock). It is `rangeMax` for
+every champion that keeps its range and 1.25 of `rangeMax` (`LATCH_FRACTION` in profile.ts) for the
+champions with rangeMin 0, Hargrim, Skerrow and Durnhal, with their kit and without: 2.5 m, 1.875 m
+and 3.75 m with the shipped kits, 3.75 m, 3.125 m and 4.375 m from the table. `enemyInReach`
+itself keeps `rangeMax` for the finisher and the orb threat test. The field is one more double of
+the profile record of the kit cache (it starts at 0.5, like the other two) and costs no allocation.
 
 The rule table of the profile (`RULES` in profile.ts, applied under the same
 condition as `KIT_RULES`: a kit of the champion's own id) adds what no kit field
@@ -336,8 +358,9 @@ for #225 (batch #223 decision 12), with a dated amendment line under the spec:
   walk: there is no pre-positioning.
 - **Threat range** is the bot's own reach: an enemy counts when it is alive,
   within the profile's `rangeMax` (inclusive) of the bot and in a clear shot of
-  0.5 m, which is `enemyInReach`, the test the finisher and the deadlock rule
-  already use. Why: it needs no new tuned constant and no new scan, it stays
+  0.5 m, which is `enemyInReach`, the test the finisher uses (the deadlock rule
+  used the same test before #222; since #222 its entry reads `latchReach`, see
+  Deadlock). Why: it needs no new tuned constant and no new scan, it stays
   generic through the profiles, and bots.md already words it as "in reach". A
   melee champion (rangeMin 0, so a short reach) therefore contests whenever no
   enemy is within its 2 to 3 m; a ranged one (Quillon 12.9 m, Lumeth 11 m) seldom
@@ -373,8 +396,10 @@ not in it). A round is an orb
 round when it reaches tick 1200, and most do not: normal bots end a round at
 tick 1000 for most pairings, so the orb is up in 21 of 79 rounds on arena 1 and 17
 of 83 on arena 2 (the #225 scan read 20 of 78 and 16 of 82; the re-read here is
-after #187 capped the lead of the one-hit areas). The bots took it in 13 of the 21
-and 9 of the 17 (62 and 53 percent). The rest of this paragraph is #225's scan,
+after #187 capped the lead of the one-hit areas and before the deadlock reach of
+#222, which was not re-scanned: the committed cells below are on the merged
+tree). The bots took it in 13 of the 21 and 9 of the 17 (62 and 53 percent). The
+rest of this paragraph is #225's scan,
 not re-measured here: with the contest switched off, that scan has 3 of 18 and 1 of 18,
 which are the champions that stood on it by chance. The orb flag (the decision's, before
 the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
@@ -397,8 +422,8 @@ the Lumeth mirror in place.
 
 | Arena   | Ended | Longest ordinary round | Orb rounds | Taken | Taker team | Worst stall |
 | ------- | ----- | ---------------------- | ---------- | ----- | ---------- | ----------- |
-| arena01 | 11956 | 3395                   | 5          | 5     | A 2, B 3   | 26          |
-| arena02 | 8892  | 2465                   | 4          | 3     | A 1, B 2   | 15          |
+| arena01 | 11085 | 3658                   | 4          | 3     | A 1, B 2   | 15          |
+| arena02 | 9611  | 2609                   | 4          | 4     | A 3, B 1   | 15          |
 
 The mirror of the product's match (Hargrim and Quillon a side) is not that pair: its
 rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds on the two arenas. A cell
@@ -1934,9 +1959,10 @@ it read `rangeMax`. It is `rangeMax` for a champion that keeps its range and
 Skerrow, with a kit and without. The rule covers both profiles of each, so the
 kitless Hargrim (table, rangeMax 3, stands within 2.4 m) and the kitless Skerrow
 (2.5, within 2.0 m) move too: the identity rows below that play kitless champions
-move with it. The finisher, the deadlock check and `seekShot` keep rangeMax. The
-value was screened on three values on seeds 1 to 8 (2v2) and 1 to 2 (3v3) of the
-36 cells (1 008 matches a side, the same phase script; the first row is main):
+move with it. The finisher and `seekShot` keep rangeMax; the deadlock check reads
+`latchReach` since #222 (see Deadlock). The value was screened on three values on
+seeds 1 to 8 (2v2) and 1 to 2 (3v3) of the 36 cells (1 008
+matches a side, the same phase script; the first row is main):
 
 | standReach / rangeMax | Hargrim mean rate, 20 cells | Skerrow mean rate, 20 cells | Hargrim closing damage taken per alive s | Skerrow closing damage taken per alive s | Closing runs, Hargrim | Closing runs, Skerrow |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1960,13 +1986,14 @@ walks at 1.25 and 1.45 m and stands at 1.15 and 1.1 m; a kitless Hargrim (within
 2.4 m) walks at 2.5 m and stands at 2.3 m; a Quillon (control) stands at 12.5 m,
 between 10.4 (0.8 of her 13) and 13; and the stand has no memory (the exit edge): a
 Hargrim standing at 1.55 m follows a target that steps to 1.65 m at once and
-stands again when it steps back. The three rows that keep rangeMax: the finisher
+stands again when it steps back. The two rows that keep rangeMax: the finisher
 (a Hargrim at 20 percent health engages a weaker enemy 1.8 m away, past its stand
-reach), the deadlock check (a retreating Hargrim with a healthier enemy 1.8 m
-away is in reach and walks to its spawn, west, where an advance would walk east)
-and the sight logic (an advancing Hargrim stands 1.8 m from its target inside
-rangeMax). `profile.test.ts` pins the literal stand reaches with the fraction
-`MELEE_STAND_FRACTION = 0.8` of `helpers.ts` as a separate literal (which the other
+reach) and the sight logic (an advancing Hargrim stands 1.8 m from its target
+inside rangeMax); the deadlock check reads `latchReach` since #222 (a retreating
+Hargrim with a healthier enemy 1.8 m away is in reach and walks to its spawn,
+west, where an advance would walk east). `profile.test.ts` pins the literal stand
+reaches with the fraction `MELEE_STAND_FRACTION = 0.8` of `helpers.ts` as a
+separate literal (which the other
 `profileFor` rows use through `profileOf`), the equality with rangeMax for the
 four ranged champions with a kit and without, and the bounds. Against main's
 `packages/bots/src` the new rows are red: 5 of the 17 rows of `stand.test.ts`
@@ -2067,6 +2094,208 @@ largest by 12.0 points (2v2 arena01 Brimwick v Hargrim, 90.0 to 78.0, a fill tha
 fights a Hargrim that is now closer), none across the band and none to a budget
 hit. The regenerated block is in balance.md, section 4 and 5.11.
 
+The rule of #222 (`deadlock.test.ts`, `latchReach` in `profile.ts`, see Deadlock
+and Profiles): the deadlock rule's entry test and the latched stand of `seekShot`
+read `latchReach` where they read `rangeMax`. It is `rangeMax` for a champion
+that keeps its range and `LATCH_FRACTION` (1.25) of it for the two rangeMin-0
+profiles, Hargrim and Skerrow, with a kit and without (2.5 m and 1.875 m with the
+shipped kits, 3.75 m and 3.125 m from the table). `enemyInReach` is untouched:
+the finisher, the orb contest and the sight cell search keep `rangeMax`. The
+field is one more double of the profile record of the kit cache, copied in
+`refreshKitCache` like `standReach`, and costs no allocation.
+
+The measurement before the rule (main at 388d36c, no bots or sim source
+touched): a scratch script, `latch.ts`, not in the repository (its text is in the
+body of the PR of #222), the #213 rider's 36 cells and schedule (seeds 1 to 50 per
+2v2 config and 1 to 16 per 3v3, normal tier, 7 056 matches). The before side
+reproduces the committed rates of all 36 cells (the gate). Each alive round think
+gets the #213 phase and, while latched, the sub-phase stand (in reach, still),
+reach (in reach, moving), walk (moving toward the target), other. The latch is a
+closure variable, so the script mirrors it from the state (the acted intent and
+target of `inspect()`, `teamAhead`, the reach test, the orb delay ring and the
+dead-think gate). Entries, the distance and the health gap at entry, the exits by
+reason, and the deaths and damage taken while latched are read from the same
+state, `think`'s return and `state.events`.
+
+| Kit | Latch thinks | Share of alive thinks % | Entries | Matches | Entries per match | Mean entry dist m | Mean entry gap | Deaths while latched | Share of the kit's deaths % | Latch damage taken | Share of its damage taken % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hargrim | 2 730 287 | 18.8 | 37 805 | 6 256 | 6.043 | 11.37 | -0.257 | 13 135 | 69.8 | 482 532 | 11.9 |
+| Skerrow | 2 154 641 | 17.2 | 41 494 | 6 256 | 6.633 | 11.46 | -0.237 | 13 647 | 70.3 | 387 015 | 11.8 |
+
+Deaths while latched by hold time (ticks from the entry) and by the distance to
+the acted target at the death:
+
+| Kit | Hold <=15 | <=30 | <=60 | <=120 | <=240 | <=480 | >480 | Mean hold | Mean dist at death | Deaths within 8 m % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hargrim | 679 | 850 | 1 340 | 3 080 | 4 920 | 2 217 | 49 | 144.7 | 3.56 | 98.7 |
+| Skerrow | 870 | 1 213 | 2 635 | 4 757 | 3 426 | 717 | 29 | 99.9 | 3.69 | 97.8 |
+
+The exits by reason (the total is the entry count):
+
+| Kit | Intent leaves retreat | Target changes | Team gets ahead | Bot dies |
+| --- | --- | --- | --- | --- |
+| Hargrim | 17 137 | 2 515 | 5 018 | 13 135 |
+| Skerrow | 16 567 | 6 560 | 4 720 | 13 647 |
+
+The entries by the distance to the acted target and by the team health gap at
+entry (own minus enemy, share of the entries %):
+
+| Kit | <=1 m | <=2 | <=3 | <=5 | <=8 | <=12 | <=20 | >20 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hargrim | 0.0 | 0.2 | 24.8 | 14.0 | 18.0 | 4.5 | 2.9 | 35.6 |
+| Skerrow | 0.0 | 9.8 | 6.2 | 13.4 | 28.4 | 5.6 | 2.5 | 34.0 |
+
+| Kit | Gap 0 | -0.1 | -0.25 | -0.5 | -1 | -2 | <-2 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Hargrim | 35.3 | 15.2 | 9.2 | 16.9 | 21.5 | 1.9 | 0.0 |
+| Skerrow | 33.8 | 16.6 | 11.5 | 18.2 | 18.7 | 1.3 | 0.0 |
+
+The choice (rule (a), the lead's decision on #222, the decision-2 precedent of
+#213). Of the three rules the issue names, the reach moves the one thing the
+reading says matters: where the latched bot stations itself. The deaths sit at
+the station (98.7 and 97.8 percent within 8 m, mean 3.56 and 3.69 m) and 78.4 and
+87.8 percent of the latch thinks are the walk that carries most of them, while a
+distance bound on the entry would remove only the 35 percent of entries past 20 m
+that carry 0.2 percent of the deaths (the transport that breaks the #58 freeze),
+and an exit reason only truncates the walk. The `>20 m` entries (35.6 and 34.0
+percent of entries) are the transport, not the cost.
+
+The value was screened on seeds 1 to 8 (2v2) and 1 to 2 (3v3) of the 36 cells
+(1 008 matches a side, the same phase script; the first row is main):
+
+| latchReach / rangeMax | Hargrim mean rate | Skerrow mean rate | Hargrim latch deaths | Skerrow latch deaths | Hargrim RA damage | Skerrow RA damage |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1.00 (main) | 13.28 | 18.07 | 1 877 | 1 898 | 48 659 | 42 718 |
+| 0.75 | 12.45 | 17.24 | 2 010 | 1 937 | 47 419 | 41 546 |
+| 0.90 | 12.55 | 15.99 | 1 907 | 1 926 | 47 463 | 41 695 |
+| 1.10 | 10.52 | 16.25 | 1 883 | 1 947 | 48 188 | 42 448 |
+| 1.25 | 11.30 | 16.51 | 1 854 | 1 926 | 48 286 | 41 663 |
+| 1.50 | 13.23 | 14.84 | 1 806 | 1 868 | 44 781 | 40 267 |
+| 2.00 | 11.09 | 17.24 | 1 730 | 1 882 | 40 539 | 38 016 |
+
+The full-cap confirmation (7 056 matches a side), deltas against main (Hargrim
+mean 12.64, Skerrow 16.55), with `retreatAdvance` damage dealt:
+
+| latchReach / rangeMax | dHmean | dSmean | H latch deaths | S latch deaths | H RA damage | S RA damage | H RA dealt | S RA dealt |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.60 | -1.76 | +1.58 | 14 860 | 14 163 | 326 796 | 299 929 | 108 497 | 111 269 |
+| 0.80 | -0.87 | +0.25 | 13 942 | 13 926 | 332 671 | 301 523 | 110 534 | 111 217 |
+| 0.90 | +0.03 | -0.34 | 13 420 | 13 774 | 334 207 | 303 538 | 115 342 | 113 257 |
+| 1.00 (main) | 0.00 | 0.00 | 13 135 | 13 647 | 344 994 | 307 441 | 121 485 | 116 302 |
+| 1.10 | -0.48 | -1.10 | 13 033 | 13 681 | 335 844 | 302 861 | 110 456 | 109 438 |
+| 1.25 | -0.82 | -1.08 | 12 931 | 13 590 | 336 466 | 299 443 | 104 470 | 109 372 |
+| 1.35 | -0.83 | -1.10 | 12 927 | 13 396 | 326 241 | 293 137 | 98 198 | 98 588 |
+| 1.50 | -1.08 | -0.73 | 12 839 | 13 401 | 318 563 | 290 174 | 95 346 | 94 283 |
+| 2.00 | -1.09 | -0.28 | 12 379 | 13 265 | 292 220 | 276 268 | 73 786 | 83 803 |
+
+1.25 is chosen: it is the smallest reach above 1.0 that lowers both kits' latch
+deaths and `retreatAdvance` damage taken, and its stand reach (2.5 m and 1.875 m)
+is inside the raw M1 arc (band top 3 m and 2.5 m; `latchReach` below `rangeMax +
+RANGE_MARGIN`, which `profile.test.ts` pins), so the latched bot keeps casting
+there — the probe shows a latched Hargrim at 2.4 m presses M2 and R and a latched
+Skerrow presses Q, E and M2, past `rangeMax` but inside the band. Above it the
+`retreatAdvance` damage dealt falls (121 485 and 116 302 on main, 104 470 and
+109 372 at 1.25, 95 346 and 94 283 at 1.5, 73 786 and 83 803 at 2.0), the M1
+in-band top being exactly `rangeMax` (`band.max - RANGE_MARGIN`), so 1.5 and up
+trade fewer latch deaths for a melee kit that deals less in the advance. 0.6 to
+0.9 (inside `rangeMax`) do not lower both metrics together (Skerrow's mean rises
+at 0.6 and 0.8, and 0.9 raises Hargrim's). The six-kit means at 1.25 (full-cap)
+confirm no kit other than the two the rule targets falls: brimwick 89.06 to
+91.03, lumeth 98.55 to 99.10, ondrel 95.16 to 95.95, quillon 94.24 to 95.68; the
+two melee kits fall (hargrim 12.64 to 11.82, skerrow 16.55 to 15.47). The screen
+is a screen: seeds 1 to 8 are noise of several points a cell (the #213 note).
+
+The frozen scenes (`deadlock.test.ts`, a `the deadlock reach (#222)` describe,
+arena01 open, the shipped kits, a hard bot on a `meleeLone` scene at 20 percent
+health with its team behind): the entry bound (Hargrim flees at 2.4 and 2.5 m,
+where main's `rangeMax` 2 would advance, and advances at 2.6; Skerrow flees at
+1.87 and advances at 1.88); the latched stand (a Hargrim latched with the enemy
+far stands at 2.4 m, past `rangeMax`, where a bot that begins there flees); the
+stand's edge (the latched bot stands at 2.4 m and walks in again at 2.6, where
+main walked at both); and the kitless table reach (a kitless Hargrim, table
+`rangeMax` 3, flees at 3.7 and advances at 3.8; the kit's 2.5 m reach would
+advance at both). `profile.test.ts` gains a `the deadlock reach (#222)` describe:
+1.25 of `rangeMax` for the two melee champions with a kit and without, `rangeMax`
+for the four ranged ones (and 8 for the dummy), the table reach for a kit of
+another id or with no M1 band, and the bounds (`rangeMax` to `rangeMax + 1`).
+Against main's `packages/bots/src` 24 tests of the two files are red: the four
+new deadlock rows, and the `profile.test.ts` rows that compare the whole profile
+object, which on the branch carries `latchReach` (the `standReach` rows of #213
+among them). Six mutations, each applied alone and then restored, every one red:
+(1) the reach dropped (`latchReach` = `rangeMax`, main's behaviour) reddens 16,
+the four deadlock rows and the rows of `profile.test.ts` that read a hard-coded
+`rangeMax`; (2) the entry reading `latchReach` but the stand reading `rangeMax`
+reddens the latched-stand row and its edge (2); (3) the stand reading `latchReach`
+but the entry reading `rangeMax` reddens the entry row and the kitless one (2);
+(4) the fraction 1.5 reddens 15, the four deadlock rows and the `profile.test.ts`
+rows, since a ranged profile's reach then leaves `rangeMax`; (5) the reach applied
+to every profile reddens 14, the ranged rows of `profile.test.ts` (the field is no
+longer `rangeMax`) and two latch rows of the old describe; (6) the field dropped
+at the kit cache (`refreshKitCache`) reddens 6, every reach row and two latch rows
+of `the latch of the advance`, the cache field staying 0.5.
+
+What moved. The identity harness (the 16 rows of PR #142's harness, orb off, run
+on main's `packages/bots/src` and the branch): five rows are unchanged — headless
+fb22c35a5f68, stall 418e9d6417a9, plain1200 3ad008d826fb, plainOther
+c0a93f85762f and skerrow 2a564f23901b — and eleven move, the first diff being the
+first think on which the latched stand's reach differs (the row's own scene sets
+it off before then):
+
+| Row | Old | New | First diff tick |
+| --- | --- | --- | --- |
+| kits | 4bb47dbeb659 | 48db068c2462 | 392 |
+| kits301 | 3e8f97a889c6 | cb7e2492b6d0 | 356 |
+| kitsHard | f8f77e6ad9ce | 6e89a9db9c12 | 410 |
+| kitsEasy | 8dde421a539f | d848b3ce269d | 435 |
+| kitsSwapped | 11cdfcf07e77 | 457f06d8de6f | 318 |
+| kitsSeed99 | d132e4b317b5 | ac865639c5bf | 392 |
+| kitsLowEarly | 2d49cd14d4d3 | 59820658043a | 140 |
+| kitsLow2 | ec66cc43b4b9 | d9b956b9db03 | 408 |
+| plainLow | 9c75e0b4cb08 | 1afc8766d005 | 1 965 |
+| lumeth2v2 | 8ce972930111 | 7828eeb0464c | 465 |
+| lumeth3v3 | bf55f9fe4df6 | ad40b347de60 | 456 |
+
+The rows that move are the ones whose scenes put a melee bot into a latched
+advance (the kits rows, the two low-health kit rows, plainLow and the two Lumeth
+rows); the five that stand (headless, stall, plain1200, plainOther, skerrow)
+never do within their length. The seeded runs that move, re-recorded each by its
+own formula: the four Lumeth runs end at ticks 8 438 (2v2 arena01, was 8 254;
+round term 2500, budget 21 000), 5 271 (2v2 arena02, was 5 698; 1700, 16 000),
+9 504 (3v3 arena01, was 9 357; 2 300, 22 000) and 4 809 (3v3 arena02, was
+6 295 since #187; 2 900, 18 000), on the tree merged with #187 and #160, in
+`lumeth.test.ts` and the harness rows of `tools/balance/harness.test.ts`; the
+cells of `brimwick.test.ts`, `ondrel.test.ts` and `durnhal.test.ts` that passed
+their term (Brimwick against Quillon on arena02 4499 and 1200; Ondrel against
+Quillon on arena02 4610 and 1103 and against Lumeth on arena02 5757 and 1645;
+Durnhal against Hargrim on arena01 5235 and 1199, against Quillon on arena01
+2843 and 758 and against Ondrel on arena01 5226 and 1530; on the merged tree
+also Ondrel against Brimwick on arena01 3944 and 1379, whose longest round
+passed its term of 1100, and the two orb cells of `orb-match.test.ts`, Lumeth
+against Lumeth on arena01 11085 and 3658 and on arena02 9611 and 2609, which
+read 3 and 4 of 4 orb rounds taken); Ondrel against Quillon on arena02 keeps its
+no-dash record and the byte `glides` 0 exception moves with it to Ondrel against
+Brimwick on arena02 (now glides 1, brimwick glides 0); the displaced-teleport
+run of `headless-kits.test.ts` moves from seeds 738 to 743 to 768 to 773 (tick
+366, champion 2's Skip, 0.12 m; no window of six seeds from 600 to 767 displaced
+it); and the stepped scene of #123 has a slower death (1 533 on easy in seed 6),
+so its budget is 3 100 (was 1 400; the #213 stand gave 447 on normal). `git
+diff` over the cascade touches
+`packages/bots/test/{lumeth,brimwick,ondrel,durnhal,headless-kits,touching,orb-match}.test.ts`
+and `tools/balance/harness.test.ts` only.
+
+The result, with the same phase script on the branch: the latch shrinks a little
+in time and price (Hargrim 15.5 to 14.9 percent of alive thinks and 1.42 to 1.37
+damage taken per alive second in the advance, Skerrow 16.8 to 16.3 and 1.48 to
+1.42) and the two kits' latch deaths fall (13 135 to 12 931 and 13 647 to 13 590,
+still about 70 percent of each kit's deaths, so the latch is not the whole of what
+holds the melee kits down). The block was regenerated on the committed head
+(`npm run balance` on Node 22.23.2: 17 640 matches, 1264.4 s, the six-kit block
+at 094b42e): 12 of 90 cells in band (was 11), the summed distance 2205.9 to
+2228.5 points, no budget hit; and again on the merge with main (0246028, the
+seven-kit block with the orb on and #187's cap: 25 200 matches, 15 of 126 in
+band as before, the summed distance 3204.5 to 3227.5). Both are read in
+balance.md, section 5.13.
+
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
 `configLumeth3v3`), to matchEnd with 3 rounds to win on arena01 and arena02:
@@ -2077,16 +2306,19 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (8254, 5698, 9357 and 6295, the last since #187;
+tick when the budget was set (8438, 5271, 9504 and 4809, since #222 on the tree
+merged with #187; 8254, 5698, 9357 and 6295 before, the last since #187;
 6442 since #213; 5081, 7521,
 6773 and 10934 before, the first moved from 6623 with #186), plus two rounds of the
-longest round that did not go to sudden death, rounded up to 100 (2300 in the 2v2
-runs, whose longest is 2265 since #213 and was 1619 before, and 2900 in the 3v3
-runs, the client's longest for the same roster, 2801), and one of 7000, rounded up
-to 1000 (20000, 18000, 23000 and 20000; 16000, 18000, 20000 and 24000 before #213,
-the first 18000 before #186); a run whose longest round passes its term fails. Every run has a Lumeth heal an ally; across the four,
-Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy, and
-Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
+longest round that did not go to sudden death, rounded up to 100 (2500, 1700,
+2300 and 2900 since #222: the longest 2v2 round is 2494, on arena01, and was
+2265 since #213 and 1619 before; 2900 in the 3v3 on arena02 is the client's
+longest for the same roster, 2801), and one of 7000, rounded up to 1000 (21000,
+16000, 22000 and 18000; 20000, 18000, 23000 and 20000 before #222; 16000, 18000,
+20000 and 24000 before #213, the first 18000 before #186); a run whose longest
+round passes its term fails. Every run has a Lumeth heal an ally; across the
+four, Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy,
+and Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
 start-edit runs of headless-kits.test.ts stay as their declared fallback (a miss
 is governed by decision 8.3 of batch #53). The seeds, tiers and budgets are
 pinned. The sim's ability watcher has the matching rows: a projectile hit on the
@@ -2598,12 +2830,12 @@ B, red on Node 26.7.0 in Maglev alone (3 of 3 runs).
 `orb-match.test.ts` plays a Lumeth and a Hargrim against a Lumeth and a Hargrim on
 both arenas with the orb on (seeds 101 to 104, match seed 7, normal, 3 rounds to
 win, to matchEnd, `SIX_SET`): the press oracle on every press, `think` leaves the
-checksum alone, no blocked escape, no stall over 120 ticks (26 and 15), inside the
+checksum alone, no blocked escape, no stall over 120 ticks (15 and 15), inside the
 budget, and the bots take the orb in more than half of the rounds in which it is
-collectible (the tally is `Played.orb` of `press-oracle.ts`: 5 of 5 and 3 of 4).
-With the contest switched off the two cells are red. The pair was the Quillon v
-Lumeth mirror of #225 until #187 capped the one-hit area lead (see "The energy
-orb").
+collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 4 of 4
+since #222, 5 of 5 and 3 of 4 before). With the contest switched off the two
+cells are red. The pair was the Quillon v Lumeth mirror of #225 until #187
+capped the one-hit area lead (see "The energy orb").
 
 The identity harness (the 16 rows of PR #142's harness, orb off: free play has no
 match flow, so `orbUpInto` is false on every think) is unchanged: all 16 hashes

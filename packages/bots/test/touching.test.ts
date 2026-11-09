@@ -184,11 +184,11 @@ describe.each(RECORDED)('the recorded state, $name', (row) => {
 // move on the first think after the reaction delay, a Hargrim must press (the press that was
 // missing on 9a9c653: the follower found no plan, so nobody walked into reach), the press must
 // land a damage event between them and one of them must die. The ring of the round clock played no
-// part (both stood from tick 480, before the ring closed), so the scene is free play. The budget
-// is twice the slowest death measured, rounded up to 100: 697 ticks (easy, seed 6, bot seeds 602
-// and 605; the seeds of the test, 601 and 603, give 447 at the slowest on normal since #213, 587 before).
+// part (both stood from tick 480, before the ring closed), so the scene is free play. The budget is
+// twice the slowest death measured, rounded up to 100: 3100 ticks (1533 at the slowest, easy, seed
+// 6, the seeds of the test; #213's stand gave 447 on normal, 587 before, and the budget was 1400).
 describe('the end-ring stand of #123, stepped', () => {
-  const BUDGET = 1400;
+  const BUDGET = 3100;
   const ZERO: PlayerInput = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, buttons: 0 };
 
   function ch(state: ReturnType<typeof sceneOf>, id: number): ChampionState {

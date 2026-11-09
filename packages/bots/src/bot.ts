@@ -150,7 +150,13 @@ function teamAhead(state: GameState, me: ChampionState): boolean {
   return own > enemy;
 }
 
-/** Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. */
+/**
+ * Whether an alive enemy is within `rangeMax` of the bot with a clear shot of 0.5 m. The reach test
+ * is written out here rather than shared with the deadlock entry as a helper that takes the reach:
+ * a call with a double argument that V8 does not inline boxes it, 16 B a think in Maglev (the same
+ * box the aim writes out; see `aim` and bots.md, Allocation). The deadlock entry writes the same
+ * loop out over `latchReach` in `move`, so neither call site passes a double.
+ */
 function enemyInReach(
   state: GameState,
   me: ChampionState,
@@ -319,9 +325,11 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
 
   /**
    * The sight logic of a bot that wants a shot at its target, the one a kite uses beyond rangeMin:
-   * stand while the target has a clear shot (and, with `requireRange`, is within rangeMax), else
-   * walk to the nearest cell that has one at a distance in [rangeMin, rangeMax], else along the
-   * path to the target, which ends in line of sight. Reads the distance to the target from `dist`.
+   * stand while the target has a clear shot (and, with `requireRange`, is within the deadlock reach,
+   * `latchReach`), else walk to the nearest cell that has one at a distance in [rangeMin, rangeMax],
+   * else along the path to the target, which ends in line of sight. Reads the distance to the target
+   * from `dist`. Only the latched deadlock advance passes `requireRange` (#222): its stand reads the
+   * deadlock reach, the sight cell search below keeps the kit's `rangeMax` (#213).
    */
   function seekShot(
     state: GameState,
@@ -331,10 +339,7 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
     profile: BotProfile,
     requireRange: boolean,
   ): void {
-    if (
-      (!requireRange || dist.metres <= profile.rangeMax) &&
-      standShot(state, me, target)
-    ) {
+    if ((!requireRange || dist.metres <= profile.latchReach) && standShot(state, me, target)) {
       return stand();
     }
     sight.rangeMin = profile.rangeMin;
@@ -383,7 +388,23 @@ export function createBot(playerId: number, difficulty: Difficulty, seed: number
         // so its cast run starts over on every other think and nothing lands.
         const ahead = teamAhead(state, me);
         if (advancing && (acted.targetId !== advanceTargetId || ahead)) advancing = false;
-        if (!advancing && !ahead && !enemyInReach(state, me, profile, sight, dist)) {
+        // The entry's reach test, enemyInReach's loop with the deadlock reach: written out here
+        // because a call passing `latchReach` as a double boxes it under Maglev (see enemyInReach).
+        // `inReach` is true when an alive enemy is within `latchReach` with a clear shot of 0.5 m.
+        let inReach = false;
+        if (!advancing && !ahead) {
+          for (let i = 0; i < state.champions.length; i++) {
+            const c = state.champions[i] as ChampionState;
+            if (!c.alive || c.team === me.team) continue;
+            distanceInto(dist, me, c);
+            if (dist.metres > profile.latchReach) continue;
+            if (clearShot(state, me, c, SIGHT_CLEARANCE, sight)) {
+              inReach = true;
+              break;
+            }
+          }
+        }
+        if (!advancing && !ahead && !inReach) {
           advancing = true;
           advanceTargetId = acted.targetId;
         }

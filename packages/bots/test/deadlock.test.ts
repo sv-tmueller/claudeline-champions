@@ -237,11 +237,125 @@ describe('the latch of the advance', () => {
   });
 });
 
+/**
+ * A retreating melee bot on open ground at 20 percent health with one enemy alive, its team behind
+ * (0.2 against 1). `enemyAt` is where the enemy stands; the bot is on the centre of a grid cell so
+ * a walk to its spawn is a stand. The bot has `championId`'s shipped kit, so its `latchReach` is
+ * LATCH_FRACTION of its rangeMax (2.5 m for Hargrim, 1.875 m for Skerrow); a kitless melee bot
+ * keeps the table profile. Everything is in the open (the pillar is not between them).
+ */
+function meleeLone(
+  championId: 'hargrim' | 'skerrow',
+  enemyAt: [number, number] = [10, 2],
+): { state: GameState; bot: Bot } {
+  const state = createMatch(
+    {
+      teamSize: 2,
+      players: [
+        { championId: 'hargrim', team: 'A' },
+        { championId, team: 'A' },
+        { championId: 'lumeth', team: 'B' },
+        { championId: 'skerrow', team: 'B' },
+      ],
+    },
+    open,
+    1,
+    jsonKits(),
+  );
+  for (const dead of [0, 3]) ch(state, dead).alive = false;
+  snap(state, 1);
+  put(state, 2, enemyAt[0], enemyAt[1]);
+  health(state, 1, 0.2);
+  return { state, bot: createBot(1, 'hard', 1) };
+}
+
+/**
+ * The deadlock reach (#222): a melee bot's entry test and its latched stand read `latchReach`
+ * (LATCH_FRACTION 1.25 of rangeMax) where the rest of the rule reads `rangeMax`. The distances are
+ * chosen on the 0.05 m grid of the walk: a bot at 2.5 and 2.6 m east of an enemy is in reach of
+ * rangeMax 2 (Hargrim) at neither, but the entry bound of the advance differs between them.
+ */
+describe('the deadlock reach (#222)', () => {
+  it('keeps advancing while the enemy is out of the reach, at distances past rangeMax but inside latchReach', () => {
+    // Hargrim: rangeMax 2, latchReach 2.5. At 2.4 and 2.5 m the entry reads an enemy in reach
+    // (main's rangeMax would not) and the bot flees to its spawn; at 2.6 m it is out of reach and
+    // walks in. Skerrow: rangeMax 1.5, latchReach 1.875, so 1.87 m flees and 1.88 m advances.
+    for (const [id, flee, advance] of [
+      ['hargrim', 2.5, 2.6],
+      ['skerrow', 1.87, 1.88],
+    ] as const) {
+      const near = meleeLone(id);
+      put(near.state, 1, -10, -2);
+      put(near.state, 2, -10 + flee, -2);
+      expect(think(near.bot, near.state, SETTLE).moveX, `${id} at ${flee} m flees`).toBe(-1);
+      const far = meleeLone(id);
+      put(far.state, 1, -10, -2);
+      put(far.state, 2, -10 + advance, -2);
+      expect(think(far.bot, far.state, SETTLE).moveX, `${id} at ${advance} m advances`).toBe(1);
+    }
+  });
+
+  it('a latched bot stands at rangeMax but within latchReach, where a bot that begins there flees', () => {
+    // Hargrim, enemy 2.4 m away with a clear shot and the team behind: an entry reads it in reach
+    // and flees; latched (begun with the enemy far) it stands and casts, because 2.4 <= 2.5.
+    const { state, bot } = meleeLone('hargrim');
+    put(state, 1, -10, -2);
+    put(state, 2, 10, 2);
+    expect(think(bot, state, SETTLE).moveX, 'it begins the advance').toBe(1);
+    put(state, 2, -10 + 2.4, -2);
+    const input = think(bot, state, SETTLE);
+    expect(bot.inspect()).toEqual({ intent: 'retreat', targetId: 2 });
+    expect([input.moveX, input.moveY], 'the latched bot stands').toEqual([0, 0]);
+  });
+
+  it('ends the latched stand at latchReach, not at rangeMax, so a latched bot stands past rangeMax', () => {
+    // Both 2.4 and 2.6 m are past Hargrim's rangeMax 2 but inside its latchReach 2.5. The latched
+    // bot stands at 2.4 and walks in again at 2.6, where main's rangeMax would have it walk at both.
+    const stand = (distance: number): number => {
+      const { state, bot } = meleeLone('hargrim');
+      put(state, 1, -10, -2);
+      put(state, 2, 10, 2);
+      expect(think(bot, state, SETTLE).moveX, 'it begins the advance').toBe(1);
+      put(state, 2, -10 + distance, -2);
+      return think(bot, state, SETTLE).moveX;
+    };
+    expect(stand(2.4), 'inside latchReach: the latched bot stands').toBe(0);
+    expect(stand(2.6), 'past latchReach: it walks in again').toBe(1);
+  });
+
+  it('keeps the kitless melee profile on the table reach, so a kitless Hargrim advances only past 3.75 m', () => {
+    // No kit: the table profile has rangeMax 3 and latchReach 3 * 1.25 = 3.75. An enemy 3.7 m away
+    // is inside it, so the bot flees; 3.8 m is out of it and the bot advances. The kit's 2.5 m
+    // latch reach would advance at both distances (a kitless run of the same scene is a control).
+    const kitless = (distance: number): number => {
+      const state = createMatch(
+        {
+          teamSize: 2,
+          players: [
+            { championId: 'hargrim', team: 'A' },
+            { championId: 'hargrim', team: 'A' },
+            { championId: 'hargrim', team: 'B' },
+            { championId: 'hargrim', team: 'B' },
+          ],
+        },
+        open,
+        1,
+      );
+      for (const dead of [0, 3]) ch(state, dead).alive = false;
+      put(state, 1, -10, -2);
+      put(state, 2, -10 + distance, -2);
+      health(state, 1, 0.2);
+      return think(createBot(1, 'hard', 1), state, SETTLE).moveX;
+    };
+    expect(kitless(3.7), 'inside the table latch reach').toBe(-1);
+    expect(kitless(3.8), 'past the table latch reach').toBe(1);
+  });
+});
+
 describe.each([
   { name: 'the test kits', kits: () => [hargrimKit(), quillonKit()] },
   { name: 'the shipped kits', kits: jsonKits },
-])('the match that froze at low health, with $name', ({ kits }) => {
-  // The final state of the kit headless run of #58 (a mirror 2v2 of Hargrim and Quillon, seeds 101
+])('the match that froze at low health, with $name', ({ kits }) => {  // The final state of the kit headless run of #58 (a mirror 2v2 of Hargrim and Quillon, seeds 101
   // to 104, easy, normal, hard, normal): health 3 of 160, 27 of 120, 26 of 160 and 13 of 120, every
   // champion under 36 percent, every champion retreating to its spawn and standing there, no kill.
   // Team A has 0.244 of health summed against 0.271 of team B, so team A is behind and advances,

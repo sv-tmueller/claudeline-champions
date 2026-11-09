@@ -10,10 +10,19 @@ export interface BotProfile {
    * An engaging champion stands once its target is within this and has a clear shot, and walks in
    * while it is not. Never above `rangeMax`: it is `rangeMax` for a champion that keeps its range,
    * and `STAND_FRACTION` of it for one that never kites (rangeMin 0), so a melee champion stops a
-   * step inside its reach, not on the edge of it. The finisher, the deadlock rule and the sight
-   * logic keep `rangeMax`.
+   * step inside its reach, not on the edge of it. The finisher and the sight logic keep `rangeMax`;
+   * the deadlock rule reads `latchReach` since #222.
    */
   standReach: number;
+  /**
+   * The deadlock reach (#222): the entry test of the deadlock rule measures enemies against this,
+   * and a latched bot stands to cast while its target is within it. It is `rangeMax` for a champion
+   * that keeps its range, and `LATCH_FRACTION` of it for one that never kites (rangeMin 0): above
+   * `rangeMax` the melee champion calls an enemy in reach from farther out, so it enters the advance
+   * less often and stands earlier on the walk that carries most of its latch deaths. The finisher,
+   * the orb contest and the sight logic keep `rangeMax`.
+   */
+  latchReach: number;
 }
 
 /**
@@ -26,9 +35,25 @@ export interface BotProfile {
  */
 export const STAND_FRACTION = 0.8;
 
-/** A profile: the stand reach follows from the range. */
+/**
+ * The share of `rangeMax` at which a champion with rangeMin 0 measures the deadlock reach (#222).
+ * Above 1 so that a melee champion calls an enemy in reach from farther out: it begins the advance
+ * less often, and the latched stand sits farther from the target than the engage stand, so the walk
+ * that carries most of the latch deaths is shorter. The screen fixed the value at 1.25 (bots.md,
+ * "The rule of #222"); it is not above 1.5, where the latched stand of both melee kits leaves the
+ * top of its M1 cast band (the band less `RANGE_MARGIN`, exactly `rangeMax`) and the bot stands
+ * without casting.
+ */
+export const LATCH_FRACTION = 1.25;
+
+/** A profile: the stand reach and the deadlock reach follow from the range. */
 function profileOf(rangeMin: number, rangeMax: number): BotProfile {
-  return { rangeMin, rangeMax, standReach: rangeMin === 0 ? rangeMax * STAND_FRACTION : rangeMax };
+  return {
+    rangeMin,
+    rangeMax,
+    standReach: rangeMin === 0 ? rangeMax * STAND_FRACTION : rangeMax,
+    latchReach: rangeMin === 0 ? rangeMax * LATCH_FRACTION : rangeMax,
+  };
 }
 
 const DEFAULT_PROFILE: BotProfile = profileOf(4, 8);
@@ -74,7 +99,12 @@ export function profileFor(championId: string, kit?: KitDef): BotProfile {
       if (rangeMax > 1 && rangeMax > rangeMin) return profileOf(rangeMin, rangeMax);
     }
   }
-  return { rangeMin: table.rangeMin, rangeMax: table.rangeMax, standReach: table.standReach };
+  return {
+    rangeMin: table.rangeMin,
+    rangeMax: table.rangeMax,
+    standReach: table.standReach,
+    latchReach: table.latchReach,
+  };
 }
 
 /** What a target must be doing for an opener: walking away from the bot, or toward it. */

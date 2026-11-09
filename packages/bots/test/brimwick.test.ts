@@ -14,7 +14,7 @@ const CELLS = [
   cellOf('brimwick', 'hargrim', 'arena01', 4046, 1412),
   cellOf('brimwick', 'hargrim', 'arena02', 4347, 1039),
   cellOf('brimwick', 'quillon', 'arena01', 6303, 1266),
-  cellOf('brimwick', 'quillon', 'arena02', 4499, 999),
+  cellOf('brimwick', 'quillon', 'arena02', 4499, 1200),
   cellOf('brimwick', 'lumeth', 'arena01', 6551, 1710),
   cellOf('brimwick', 'lumeth', 'arena02', 6159, 2325),
   cellOf('brimwick', 'skerrow', 'arena01', 4057, 1226),

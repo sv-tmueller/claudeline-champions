@@ -11,7 +11,8 @@ import type { Options } from './scenes';
 // target is within `standReach`, a fraction of rangeMax (STAND_FRACTION, 0.8 here as a literal in
 // helpers.ts), and no longer stands on the edge of rangeMax. The frozen states are on arena01 with
 // the shipped kits: champion 0 at (-6, 3), a dummy enemy (champion 2) east of it, nothing between
-// them. The finisher, the deadlock rule and the sight logic of a retreating bot keep rangeMax.
+// them. The finisher and the sight logic of a retreating bot keep rangeMax; the deadlock rule reads
+// latchReach since #222.
 
 const HARGRIM_STAND = profileOf(0, 2).standReach; // the shipped Hargrim: rangeMax 2, stands at 1.6
 const SKERROW_STAND = profileOf(0, 1.5).standReach; // the shipped Skerrow: rangeMax 1.5, stands at 1.2
@@ -163,7 +164,7 @@ describe('a champion that keeps its range is not changed (control)', () => {
   });
 });
 
-describe('the finisher, the deadlock rule and the sight logic keep rangeMax', () => {
+describe('the finisher and the sight logic keep rangeMax; the deadlock rule reads latchReach since #222', () => {
   it('the finisher: a Hargrim at 20 percent health engages a weaker enemy 1.8 m away, past its stand reach', () => {
     const state = duel('hargrim', 1.8, { health: 0.2, enemyHealth: 0.1 });
     const bot = createBot(0, 'hard', 1);

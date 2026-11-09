@@ -47,7 +47,9 @@ first.
   round, and its two spend verbs (#227, #245; no shipped kit has one); angles through `dmath.ts`; the sweep's
   heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
-  retreat by utility with the finisher and deadlock rules; the clear-shot test
+  retreat by utility with the finisher and deadlock rules, the deadlock's entry
+  test and latched stand reading a `latchReach` profile double (#222); the
+  clear-shot test
   (none for a melee arc, whose press lands as the sim's arc does, #186); casting
   from kit data with range profiles for all seven roster ids; the energy reserve;
   openers and escapes for Hargrim, Quillon and Skerrow (#81), Skerrow's wait at

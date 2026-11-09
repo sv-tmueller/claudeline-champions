@@ -12,15 +12,15 @@ import { NORMAL_2V2, SEEDS_2V2, cellOf, configOf, expectEnded, playCellOn } from
 // in an earlier run, job 125520587212): the timeout of 60 s is at least twice the slowest cell
 // (testing.md, Check suite, with the long-match precedent of ondrel.test.ts).
 const CELLS = [
-  cellOf('durnhal', 'hargrim', 'arena01', 3291, 1069),
+  cellOf('durnhal', 'hargrim', 'arena01', 5235, 1199),
   cellOf('durnhal', 'hargrim', 'arena02', 4764, 1193),
-  cellOf('durnhal', 'quillon', 'arena01', 2732, 696),
+  cellOf('durnhal', 'quillon', 'arena01', 2843, 758),
   cellOf('durnhal', 'quillon', 'arena02', 3301, 899),
   cellOf('durnhal', 'lumeth', 'arena01', 3937, 1140),
   cellOf('durnhal', 'lumeth', 'arena02', 4647, 1217),
   cellOf('durnhal', 'skerrow', 'arena01', 2390, 558),
   cellOf('durnhal', 'skerrow', 'arena02', 2523, 706),
-  cellOf('durnhal', 'ondrel', 'arena01', 5132, 1493),
+  cellOf('durnhal', 'ondrel', 'arena01', 5226, 1530),
   cellOf('durnhal', 'ondrel', 'arena02', 3971, 1706),
   cellOf('durnhal', 'brimwick', 'arena01', 5103, 1674),
   cellOf('durnhal', 'brimwick', 'arena02', 3889, 1202),

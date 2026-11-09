@@ -236,7 +236,7 @@ export function createKitCache(): KitCache {
     built: false,
     kit: undefined,
     championId: '',
-    profile: { rangeMin: 0.5, rangeMax: 0.5, standReach: 0.5 },
+    profile: { rangeMin: 0.5, rangeMax: 0.5, standReach: 0.5, latchReach: 0.5 },
     hasBase: new Uint8Array(SLOTS.length),
     baseMin: new Float64Array(SLOTS.length),
     baseMax: new Float64Array(SLOTS.length),
@@ -291,6 +291,7 @@ export function refreshKitCache(
   cache.profile.rangeMin = profile.rangeMin;
   cache.profile.rangeMax = profile.rangeMax;
   cache.profile.standReach = profile.standReach;
+  cache.profile.latchReach = profile.latchReach;
   const rules = rulesFor(championId, kit);
   for (let i = 0; i < SLOTS.length; i++) {
     cache.hasBase[i] = 0;
