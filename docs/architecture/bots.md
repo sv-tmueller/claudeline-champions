@@ -243,11 +243,11 @@ ends before the bodies touch (they
 touch at 1 m). The melee champion thus stops a step inside its reach and no
 longer on the edge of it, where a target that stepped back a little put it out
 of reach and made it walk in again (a re-close, see Testing, the approach and
-retreat of #213). Only the engage stand reads it: the finisher, the deadlock
-check (see Deadlock) and the sight logic of an advancing or kiting bot keep
-`rangeMax`, so what counts as reach is unchanged. The field is one more double
-of the profile record of the kit cache (it starts at 0.5, like the other two)
-and costs no allocation.
+retreat of #213). Only the engage stand reads it: the finisher and the sight
+logic of an advancing or kiting bot keep `rangeMax`, so what counts as reach for
+them is unchanged (the deadlock check reads `latchReach` since #222, see
+Deadlock). The field is one more double of the profile record of the kit cache
+(it starts at 0.5, like the other two) and costs no allocation.
 
 The deadlock reach (#222). A profile also has `latchReach`, the distance the deadlock rule measures
 an enemy against and at which a latched advance stands to cast (see Deadlock). It is `rangeMax` for
@@ -358,8 +358,9 @@ for #225 (batch #223 decision 12), with a dated amendment line under the spec:
   walk: there is no pre-positioning.
 - **Threat range** is the bot's own reach: an enemy counts when it is alive,
   within the profile's `rangeMax` (inclusive) of the bot and in a clear shot of
-  0.5 m, which is `enemyInReach`, the test the finisher and the deadlock rule
-  already use. Why: it needs no new tuned constant and no new scan, it stays
+  0.5 m, which is `enemyInReach`, the test the finisher uses (the deadlock rule
+  used the same test before #222; since #222 its entry reads `latchReach`, see
+  Deadlock). Why: it needs no new tuned constant and no new scan, it stays
   generic through the profiles, and bots.md already words it as "in reach". A
   melee champion (rangeMin 0, so a short reach) therefore contests whenever no
   enemy is within its 2 to 3 m; a ranged one (Quillon 12.9 m, Lumeth 11 m) seldom
@@ -1911,9 +1912,10 @@ it read `rangeMax`. It is `rangeMax` for a champion that keeps its range and
 Skerrow, with a kit and without. The rule covers both profiles of each, so the
 kitless Hargrim (table, rangeMax 3, stands within 2.4 m) and the kitless Skerrow
 (2.5, within 2.0 m) move too: the identity rows below that play kitless champions
-move with it. The finisher, the deadlock check and `seekShot` keep rangeMax. The
-value was screened on three values on seeds 1 to 8 (2v2) and 1 to 2 (3v3) of the
-36 cells (1 008 matches a side, the same phase script; the first row is main):
+move with it. The finisher and `seekShot` keep rangeMax; the deadlock check reads
+`latchReach` since #222 (see Deadlock). The value was screened on three values on
+seeds 1 to 8 (2v2) and 1 to 2 (3v3) of the 36 cells (1 008
+matches a side, the same phase script; the first row is main):
 
 | standReach / rangeMax | Hargrim mean rate, 20 cells | Skerrow mean rate, 20 cells | Hargrim closing damage taken per alive s | Skerrow closing damage taken per alive s | Closing runs, Hargrim | Closing runs, Skerrow |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1937,13 +1939,14 @@ walks at 1.25 and 1.45 m and stands at 1.15 and 1.1 m; a kitless Hargrim (within
 2.4 m) walks at 2.5 m and stands at 2.3 m; a Quillon (control) stands at 12.5 m,
 between 10.4 (0.8 of her 13) and 13; and the stand has no memory (the exit edge): a
 Hargrim standing at 1.55 m follows a target that steps to 1.65 m at once and
-stands again when it steps back. The three rows that keep rangeMax: the finisher
+stands again when it steps back. The two rows that keep rangeMax: the finisher
 (a Hargrim at 20 percent health engages a weaker enemy 1.8 m away, past its stand
-reach), the deadlock check (a retreating Hargrim with a healthier enemy 1.8 m
-away is in reach and walks to its spawn, west, where an advance would walk east)
-and the sight logic (an advancing Hargrim stands 1.8 m from its target inside
-rangeMax). `profile.test.ts` pins the literal stand reaches with the fraction
-`MELEE_STAND_FRACTION = 0.8` of `helpers.ts` as a separate literal (which the other
+reach) and the sight logic (an advancing Hargrim stands 1.8 m from its target
+inside rangeMax); the deadlock check reads `latchReach` since #222 (a retreating
+Hargrim with a healthier enemy 1.8 m away is in reach and walks to its spawn,
+west, where an advance would walk east). `profile.test.ts` pins the literal stand
+reaches with the fraction `MELEE_STAND_FRACTION = 0.8` of `helpers.ts` as a
+separate literal (which the other
 `profileFor` rows use through `profileOf`), the equality with rangeMax for the
 four ranged champions with a kit and without, and the bounds. Against main's
 `packages/bots/src` the new rows are red: 5 of the 17 rows of `stand.test.ts`

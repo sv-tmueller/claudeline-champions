@@ -867,9 +867,10 @@ what it did to the block. A new profile field, `standReach`, makes the two
 rangeMin-0 profiles (Hargrim and Skerrow, with a kit and without) stand to engage
 once the target is within 0.8 of `rangeMax` (1.6 m and 1.2 m with the shipped
 kits), where they stood on the edge of it: the walk-in no longer restarts each
-time a target steps back a little. The finisher, the deadlock check and the sight
-logic keep `rangeMax`, the latch of the deadlock rule is not changed (#222), and
-no kit or sim rule changes. 14 of the 16 identity rows of the bots tests move
+time a target steps back a little. The finisher and the sight logic keep
+`rangeMax`; the deadlock check reads `latchReach` since #222 (section 5.12). The
+latch of the deadlock rule was left to #222, and no kit or sim rule changes. 14
+of the 16 identity rows of the bots tests move
 (the first diff ticks are 58 to 320), the Lumeth runs and match-end budgets
 re-record, and the rule moves 33 of the 36 cells of Hargrim and Skerrow, so the
 block was regenerated on the committed head (decision 1 on #213: a bot change is

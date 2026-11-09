@@ -10,8 +10,8 @@ export interface BotProfile {
    * An engaging champion stands once its target is within this and has a clear shot, and walks in
    * while it is not. Never above `rangeMax`: it is `rangeMax` for a champion that keeps its range,
    * and `STAND_FRACTION` of it for one that never kites (rangeMin 0), so a melee champion stops a
-   * step inside its reach, not on the edge of it. The finisher, the deadlock rule and the sight
-   * logic keep `rangeMax`.
+   * step inside its reach, not on the edge of it. The finisher and the sight logic keep `rangeMax`;
+   * the deadlock rule reads `latchReach` since #222.
    */
   standReach: number;
   /**
