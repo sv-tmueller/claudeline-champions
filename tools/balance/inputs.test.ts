@@ -8,13 +8,21 @@ import { HARNESS_KITS, loadInputs } from './inputs.ts';
 const ROOT = new URL('../../', import.meta.url);
 
 describe('the harness roster', () => {
-  it('plays six of the seven kits of data/kits, in file order', () => {
-    expect(HARNESS_KITS).toEqual(['brimwick', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
+  it('plays the seven kits of data/kits, in file order', () => {
+    expect(HARNESS_KITS).toEqual(['brimwick', 'durnhal', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
     const files = readdirSync(fileURLToPath(new URL('data/kits/', ROOT))).filter((n) => n.endsWith('.json'));
     expect(files).toHaveLength(7);
     expect(files).toContain('durnhal.json');
     for (const id of HARNESS_KITS) expect(files).toContain(`${id}.json`);
     expect(loadInputs(ROOT).kits.map((kit) => kit.id)).toEqual([...HARNESS_KITS]);
+  });
+
+  it('loads the orb point of every arena from data/orbs.json', () => {
+    const { orbs } = loadInputs(ROOT);
+    expect([...orbs.keys()].sort()).toEqual(['arena01', 'arena02', 'arena03']);
+    expect(orbs.get('arena01')).toEqual({ x: 0, y: 2.5 });
+    expect(orbs.get('arena02')).toEqual({ x: 0, y: 0 });
+    expect(orbs.get('arena03')).toEqual({ x: 0, y: 2.5 });
   });
 
   it('throws on a listed kit with no file', () => {
@@ -26,7 +34,7 @@ describe('the harness roster', () => {
         cpSync(fileURLToPath(new URL(`data/kits/${id}.json`, ROOT)), join(dir, 'data', 'kits', `${id}.json`));
       }
       const root = pathToFileURL(`${dir}/`);
-      expect(() => loadInputs(root)).toThrow(new Error('the harness kit ondrel has no file in data/kits'));
+      expect(() => loadInputs(root)).toThrow(new Error('the harness kit lumeth has no file in data/kits'));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

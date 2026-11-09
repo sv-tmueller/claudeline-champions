@@ -30,6 +30,11 @@ export interface ProjectileSpec {
   effects: readonly Effect[];
   /** Lands on the owner's team instead of `effects`; when given, `effects` may be empty. */
   readonly allyEffects?: readonly Effect[];
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect it
+   * has a hit land. The key is left out of the entity when this is undefined.
+   */
+  bonusDamage?: number;
 }
 
 /** Smallest direction component, in magnitude, that `length` measures without underflow. */
@@ -74,6 +79,9 @@ export function spawnProjectile(
     return fail('lifetimeTicks must be a positive integer');
   }
   if (typeof spec.pierce !== 'boolean') return fail('pierce must be a boolean');
+  if (spec.bonusDamage !== undefined && !Number.isFinite(spec.bonusDamage)) {
+    return fail('bonusDamage is not a finite number');
+  }
   const effects = copyEffects(spec.effects, fail);
   let allyEffects: Effect[] | undefined;
   if (spec.allyEffects !== undefined) {
@@ -111,6 +119,7 @@ export function spawnProjectile(
   };
   // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
   if (allyEffects !== undefined) projectile.allyEffects = allyEffects;
+  if (spec.bonusDamage !== undefined) projectile.bonusDamage = spec.bonusDamage;
   state.projectiles.push(projectile);
   state.events.push({
     type: 'projectileSpawned',

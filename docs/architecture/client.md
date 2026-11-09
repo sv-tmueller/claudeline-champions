@@ -331,7 +331,13 @@ sim steps first and the views read its state afterwards.
   kits and reads the radius, the placement and the release;
   `e2e/lingering.spec.ts` reads `data-areas` in the browser.
 - `health-bars.ts`: a world-space bar above each champion, green for allies
-  and red for enemies.
+  and red for enemies. A champion whose kit declares an on-hit counter (rules.md
+  section 2.6) also gets one pooled pip row, built once in the constructor from the
+  per-champion caps `main.ts` reads, filled from the count the frame reads out of the
+  state. Filled pips reuse the champion's team material and empty slots the bar back,
+  so no colour is new; `counterCount(i)` and `counterChanged(i)` mirror `percent` and
+  `changed`. The pips sit between the bar and the head, so a model must clear
+  `BAR_Y`, `BAR_HEIGHT` and the pip row (cf. the `wrenna` roster entry).
 - `impact-rings.ts`: a fixed pool of rings that grow and fade where a
   projectile ended, aged in sim ticks. A hit on the owner's own team (a heal
   bolt) draws its ring in the owner team's projectile colour.
@@ -419,7 +425,7 @@ same commit.
 
 | File | Constants |
 |------|-----------|
-| `health-bars.ts` | `ALLY_BAR_COLOUR`, `ENEMY_BAR_COLOUR`, `BAR_BACK_COLOUR`, with `BAR_Y`, `BAR_HEIGHT` and the border that fix where a model must end |
+| `health-bars.ts` | `ALLY_BAR_COLOUR`, `ENEMY_BAR_COLOUR`, `BAR_BACK_COLOUR`, with `BAR_Y`, `BAR_HEIGHT`, the border and the pip row's `PIP_SIZE`, `PIP_GAP` and `PIP_Y` that fix where a model must end |
 | `impact-rings.ts` | `RING_COLOUR`; a heal bolt's ring reuses the projectile colours below |
 | `champion-look.ts` | `FLASH_COLOUR`, `DEAD_COLOUR` |
 | `entity-views.ts` | `PROJECTILE_ALLY_COLOUR`, `PROJECTILE_ENEMY_COLOUR` |
@@ -584,7 +590,12 @@ eighth, under the same root.
   At full health 40 absorb on 160 covers the last quarter. Its colour is
   `var(--hud-text)`, so no colour is new. It is hidden at 0 absorb and keeps
   its last transforms; `data-visible` and `data-absorb` say what it shows.
-- Energy bar: a fill with marks at 25 (EX ready) and 100 (ultimate ready).
+- Energy bar: a fill with marks at 25 (EX ready) and 100 (ultimate ready). A local
+  champion whose kit declares an on-hit counter (`counterCap(kits, championId)` in
+  `hud-views.ts`, read once from `state.kits` in `main.ts`) shows it as pips under
+  the bar: `data-part="pips"` carries `data-visible` and each pip `data-filled`,
+  written only on a change like every other HUD value. A kit with no counter builds
+  no pips at all and the container stays hidden.
 - Cooldown icons: seven, in `SLOTS` order and labelled M1, M2, SPACE, Q, E, R
   and F. `hud-views.ts` turns a champion into seven `SlotView`s: whole seconds
   of cooldown left, a windup flag, a blocked flag and a silenced flag. Its

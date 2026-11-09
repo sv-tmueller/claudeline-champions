@@ -33,6 +33,7 @@ function rig() {
     exMark: fake(),
     ultimateMark: fake(),
     shield: { root: fake(), fill: fake() },
+    pips: { root: fake(), slots: [] },
     slots: SLOTS.map(() => ({ icon: fake(), seconds: fake() })),
     score: fake(),
     timer: fake(),
