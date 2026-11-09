@@ -43,7 +43,7 @@ first.
   ring, opt-in through `roundsToWin`; the energy orb, opt-in through
   `energyOrb` (the point from `data/orbs.json`, #218); the on-hit counter a kit
   may declare, built by the hits of one slot, decayed by a window and reset each
-  round (#227; no shipped kit has one, and the spend verbs are #161); angles through `dmath.ts`; the sweep's
+  round, and its two spend verbs (#227, #245; no shipped kit has one); angles through `dmath.ts`; the sweep's
   heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules; the clear-shot test
@@ -111,10 +111,11 @@ first.
   `--mode 2v2|3v3` plays and checks one mode, which the manual workflow runs as
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
-  22.15 or later. It plays six of the seven kits of `data/kits`, the
-  `HARNESS_KITS` of `tools/balance/inputs.ts`: 90 cells and 17 640 matches over
-  three arenas, about 21 minutes on Apple silicon (the report of batch 15, #189,
-  with arena03 of #238).
+  22.15 or later. It plays every kit of `data/kits`, the `HARNESS_KITS` of
+  `tools/balance/inputs.ts`, with the standard match (the arena's orb point of
+  `data/orbs.json`): 126 cells and 25 200 matches over three arenas, about 31
+  minutes on Apple silicon (the report of #244, seven kits with the orb, after
+  the six-kit report of batch 15, #189, and arena03 of #238).
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test

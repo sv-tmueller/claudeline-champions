@@ -251,19 +251,19 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   and 11 903 on the bots of #213), and three of the four moved with the bots of #225, which contest
   it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
-  pairings, fills and the seed schedule, the cell plan (a six-name kit list
-  gives 15 pairings and 90 cells over three arenas, with 4 and 12 fills, played
-  by nothing),
-  `playMatch` against a reference loop, the aggregation and the report text, the
+  pairings, fills and the seed schedule, the cell plan (a seven-name kit list
+  gives 21 pairings and 126 cells over three arenas, with 5 and 20 fills, played
+  by nothing), the orb wiring (the seven-kit roster, each arena's loaded point,
+  and `matchConfig` set and left out),
+  `playMatch` against a reference loop with the arena orb, the aggregation and
+  the report text, the
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report; only the CLI row plays six-kit cells (180 matches, one seed of the 2v2
-  mode, 9.5 s locally and about 34 s projected on the runner, timeout 90 s, unit
-  job 122091170207 measured 23.6 s for 6.6 s locally on two arenas), the 3v3
+  report; only the CLI row plays seven-kit cells (315 matches, one seed of the 2v2
+  mode, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
   success path is a
-  36-match row on the four v1 kits (5.0 s locally and about 12.4 s projected on
-  the runner, timeout 30 s; the CLI's 3v3 row at six
-  kits is 360 matches, 34 s locally and projected at about 75 s on a runner, so
+  36-match row on the four v1 kits (with the orb, timeout 180 s; the CLI's 3v3 row at six
+  kits is 360 matches, so
   it was replaced, not given a longer timeout). The CLI's error rows pin the
   message of each rule, so a parser that rejects `--mode 3v3` fails them. Two
   smoke rows play Brimwick v Ondrel at seed 1, one match a mode, to a decision.
@@ -318,7 +318,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
 
 ## Balance reproduction
 
-`npm run balance` plays all 17 640 matches of the report in
+`npm run balance` plays all 25 200 matches of the report in
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
@@ -329,22 +329,23 @@ it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
 and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: a full run plays 17 640 matches and takes about 21 minutes on
-Apple silicon. It plays the six kits of `HARNESS_KITS` in
-`tools/balance/inputs.ts` (six of the seven files of `data/kits`, so a kit added
-to the directory joins the report by being listed there; Durnhal's file is not
-until step 1.3).
+`npm run check`: a full run plays 25 200 matches and takes about 31 minutes on
+Apple silicon. It plays every kit of `HARNESS_KITS` in
+`tools/balance/inputs.ts` (the seven files of `data/kits`, so a kit added to the
+directory joins the report by being listed there; Durnhal joined them at his
+step 1.3, #244). Every cell plays the standard match, so it sets the arena's orb
+point from `data/orbs.json` (spec section 6).
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
 pull request or a push). It can be dispatched with
 `gh workflow run balance.yml --ref <branch>` once the file is on the default
-branch. The whole run was 12 to 16 minutes at four kits; at six kits and three
-arenas it is about
-21 minutes locally (2v2 8.0, 3v3 13.4) and projects to about 23 to 25 (2v2) and
-39 to 42 (3v3) on a runner, so the jobs have `timeout-minutes` of 60 and 105,
-twice the projected check time (the failure step plays the mode again) and a
-margin. The
+branch. The whole run was 12 to 16 minutes at four kits; at seven kits with the
+orb and three arenas it is about
+31 minutes locally (2v2 11.2, 3v3 19.5, 12 600 matches each) and projects to
+about 34 (2v2) and 59 (3v3) on a runner, so the jobs have `timeout-minutes` of
+90 and 150, twice the projected check time (the failure step plays the mode
+again) and a margin. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 

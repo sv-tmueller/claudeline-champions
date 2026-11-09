@@ -167,6 +167,34 @@ describe('checksum of combat state', () => {
     const state = armed();
     expect(checksum(cloneState(state))).toBe(checksum(state));
   });
+
+  it('changes with the bonusDamage of a projectile and of an area, and with the key alone', () => {
+    const withBonus = (projectile: number | undefined, area: number | undefined): GameState => {
+      const state = fresh();
+      spawnProjectile(state, {
+        ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2,
+        lifetimeTicks: 60, pierce: true, effects: [{ type: 'damage', amount: 10 }], bonusDamage: projectile,
+      });
+      spawnArea(state, {
+        ownerId: 2, x: 3, y: 4, radius: 2, durationTicks: 60, intervalTicks: 30,
+        targets: 'all', effects: [{ type: 'heal', amount: 5 }], bonusDamage: area,
+      });
+      return state;
+    };
+    const base = checksum(withBonus(4, 6));
+    expect(checksum(withBonus(4, 6))).toBe(base);
+    expect(checksum(withBonus(5, 6))).not.toBe(base);
+    expect(checksum(withBonus(4, 7))).not.toBe(base);
+    // The key absent (not undefined) is what a cast with no spend verb leaves.
+    const keyless = cloneState(withBonus(4, 6));
+    expect(keyless.projectiles[0]).toHaveProperty('bonusDamage');
+    delete keyless.projectiles[0]!.bonusDamage;
+    delete keyless.areas[0]!.bonusDamage;
+    expect(keyless.projectiles[0]).not.toHaveProperty('bonusDamage');
+    expect(keyless.areas[0]).not.toHaveProperty('bonusDamage');
+    expect(checksum(keyless)).not.toBe(base);
+    expect(checksum(cloneState(withBonus(4, 6)))).toBe(base);
+  });
 });
 
 describe('cloneState', () => {
@@ -351,6 +379,52 @@ describe('checksum of the on-hit counter', () => {
     expect(cloneState(state)).toEqual(state);
     expect(checksum(cloneState(state))).toBe(checksum(state));
     expect('counter' in cloneState(fresh()).champions[0]!).toBe(false);
+  });
+});
+
+describe('checksum of the consumeCounter kit fields', () => {
+  function spending(): GameState {
+    // The verb lives in the kit, which the checksum covers; no shipped kit has one yet, so this is
+    // a test kit that declares the counter the validator requires.
+    const striker = testStriker();
+    striker.slots.M1.effects = [
+      { type: 'consumeCounter', bonusDamagePerStack: 4 },
+      { type: 'meleeArc', radius: 2.5, cosHalfAngle: 0.643, effects: [{ type: 'damage', amount: 10 }] },
+    ];
+    return createMatch(config2v2(), arena01, 1337, [
+      { ...striker, id: 'hargrim', counter: { from: 'M1', cap: 5, windowTicks: 60 } },
+    ]);
+  }
+
+  it('is stable for equal kits and changes with each verb field', () => {
+    const base = checksum(spending());
+    expect(checksum(spending())).toBe(base);
+    const mutations: [string, (s: GameState) => void][] = [
+      ['bonus removed', (s) => void (s.kits[0]!.slots.M1.effects[0] = { type: 'heal', amount: 1 })],
+      [
+        'bonus value',
+        (s) => void ((s.kits[0]!.slots.M1.effects[0] as { bonusDamagePerStack: number }).bonusDamagePerStack = 5),
+      ],
+      [
+        'verb switched to the cooldown cut',
+        (s) =>
+          void (s.kits[0]!.slots.M1.effects[0] = {
+            type: 'consumeCounter',
+            cooldownTicksPerStack: 120,
+            slot: 'SPACE',
+          }),
+      ],
+      [
+        'cut slot',
+        (s) =>
+          void ((s.kits[0]!.slots.M1.effects[0] as { slot: string }).slot = 'F'),
+      ],
+    ];
+    for (const [name, mutate] of mutations) {
+      const state = spending();
+      mutate(state);
+      expect(checksum(state), name).not.toBe(base);
+    }
   });
 });
 

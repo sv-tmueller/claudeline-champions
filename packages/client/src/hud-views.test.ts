@@ -8,6 +8,7 @@ import {
   createMatch,
   parseArenaDef,
   type CastState,
+  type KitDef,
   type MatchPhase,
   type StatusInstance,
   type MatchState,
@@ -16,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import {
   TIMER_TEXT,
+  counterCap,
   createRingView,
   createShieldView,
   createRoundView,
@@ -31,6 +33,7 @@ import {
   type RoundView,
   type SlotSource,
 } from './hud-views';
+import { HARGRIM_KIT, QUILLON_KIT } from './test-kits';
 
 function localChampion(): SlotSource {
   const state = createMatch(
@@ -66,6 +69,25 @@ describe('HUD constants', () => {
 function source(overrides: Partial<SlotSource> = {}): SlotSource {
   return { energy: 0, cooldowns: [0, 0, 0, 0, 0, 0, 0], cast: null, statuses: [], ...overrides };
 }
+
+describe('counter cap', () => {
+  const ARCH: KitDef = { ...QUILLON_KIT, id: 'arch', counter: { from: 'Q', cap: 3, windowTicks: 120 } };
+  const FIVE: KitDef = { ...HARGRIM_KIT, id: 'five', counter: { from: 'M1', cap: 5, windowTicks: 60 } };
+
+  it('reads the cap of the kit whose id is the champion id', () => {
+    expect(counterCap([HARGRIM_KIT, ARCH, FIVE], 'arch')).toBe(3);
+    expect(counterCap([HARGRIM_KIT, ARCH, FIVE], 'five')).toBe(5);
+  });
+
+  it('reads 0 for a kit that declares no counter', () => {
+    expect(counterCap([HARGRIM_KIT, ARCH], 'hargrim')).toBe(0);
+  });
+
+  it('reads 0 for a champion with no kit in the match', () => {
+    expect(counterCap([HARGRIM_KIT, ARCH], 'ysmeer')).toBe(0);
+    expect(counterCap([], 'arch')).toBe(0);
+  });
+});
 
 const WINDUP: CastState = { castId: 1, slot: 'Q', ex: false, windupTicks: 12, windupLeft: 12 };
 
