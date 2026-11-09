@@ -224,19 +224,42 @@ function catalogProblems(kit: KitDef): string[] {
   // the per-effect bound below only holds each one under the cooldown on its own, so two of them can
   // still hold two live areas of the slot at once.
   //
-  // The fix is per slot: at most one area-producing effect of a slot may leave a *lingering* area,
-  // one that outlives the step it spawns. Two non-lingering (one-hit, unfused) areas are gone by the
-  // step's end and never counted twice, which is why the shipped Lumeth F may carry two of them.
-  // A lone lingering effect stays under the cooldown (the per-effect bound below), so one lingering
-  // effect per slot is exactly the one-live-area rule (roster-v2 section 0, rules 2.8). A sum of the
-  // lifetimes under the cooldown is not enough: two bolts that each fly 100 ticks and leave a
-  // 79-tick area sum to 358 against the 360 cooldown yet their areas appear on the same tick and
-  // overlap, holding two live areas of the slot.
+  // The fix is per slot: at most one area-producing effect of an ability may leave a *lingering*
+  // area, and the base and its EX must not overlap either. Two non-lingering (one-hit, unfused)
+  // areas are gone by the step's end and never counted twice, which is why the shipped Lumeth F may
+  // carry two of them. A lone lingering effect stays under the cooldown (the per-effect bound
+  // below), so one lingering effect per ability is the one-live-area rule within that ability
+  // (roster-v2 section 0, rules 2.8). A sum of the lifetimes under the cooldown is not enough: two
+  // bolts that each fly 100 ticks and leave a 79-tick area sum to 358 against the 360 cooldown yet
+  // their areas appear on the same tick and overlap, holding two live areas of the slot.
+  //
+  // Finding 1 of the round-3 report: the count above is per *ability*, so a slot whose base and EX
+  // each carry exactly one lingering area passed the walker while the slot held two live areas of
+  // itself. The two abilities share the slot cooldown, so the second is cast `cooldownTicks` after
+  // the first, and the windup is the lever: with a later windup on the first ability its area is
+  // still live when the recharge fires the second. The shipped Ondrel M2 carries one lingering area
+  // on each of its base and EX (both windup 24), so the bound is not a flat count across the slot:
+  // it compares the two abilities' live windows, cast `cooldownTicks` apart, and rejects only a real
+  // overlap.
+  const flightTicks = (effect: AbilityEffect): number => {
+    if (effect.type === 'area') return 0;
+    // The projectile ends `lifetimeTicks` after it spawns, so the area appears on the last of them.
+    if (effect.type === 'projectile' && effect.endArea !== undefined) return effect.lifetimeTicks - 1;
+    return 0;
+  };
   const areaLifetime = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return (effect.fuseTicks ?? 0) + effect.durationTicks;
     if (effect.type === 'projectile' && effect.endArea !== undefined) {
       // The area spawns where the projectile ends: its flight, then the area's own fuse + duration.
       return effect.lifetimeTicks + (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks;
+    }
+    return 0;
+  };
+  /** The ticks from an area's first live step to its last: `expireAreas` takes one off on the spawn step. */
+  const liveSpan = (effect: AbilityEffect): number => {
+    if (effect.type === 'area') return (effect.fuseTicks ?? 0) + effect.durationTicks - 1;
+    if (effect.type === 'projectile' && effect.endArea !== undefined) {
+      return (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks - 1;
     }
     return 0;
   };
@@ -247,28 +270,74 @@ function catalogProblems(kit: KitDef): string[] {
     }
     return false;
   };
-  const lingeringLifetimes = (ability: AbilitySpec): number[] => {
-    const out: number[] = [];
+  /**
+   * One lingering area of an ability, as the tick of the slot's cooldown clock on which it is first
+   * live (`first`, counted from the cast) and the first tick it is gone (`until`, exclusive):
+   * `expireAreas` takes one off on the spawn step, so it is present on `[first, until)`.
+   */
+  interface LiveArea {
+    lifetime: number;
+    first: number;
+    until: number;
+  }
+  const liveAreas = (ability: AbilitySpec): LiveArea[] => {
+    const out: LiveArea[] = [];
     const walk = (effects: readonly AbilityEffect[]): void => {
       for (const effect of effects) {
-        if (areaLifetime(effect) > 0 && lingers(effect)) out.push(areaLifetime(effect));
+        if (areaLifetime(effect) > 0 && lingers(effect)) {
+          const first = ability.windupTicks + flightTicks(effect);
+          out.push({ lifetime: areaLifetime(effect), first, until: first + liveSpan(effect) });
+        }
         if (effect.type === 'dash') walk(effect.then);
       }
     };
     walk(ability.effects);
     return out;
   };
+  /** The problem when the ability cast first has an area still live as the other ability fires. */
+  const overlap = (
+    first: LiveArea,
+    firstName: string,
+    second: LiveArea,
+    secondName: string,
+    cooldownTicks: number,
+  ): string | undefined => {
+    // The second area's first live step is `cooldownTicks + second.first` on the first cast's clock;
+    // the first area is still present on `first.until - 1`, so they overlap iff `until > cooldown + first`.
+    if (first.until <= cooldownTicks + second.first) return undefined;
+    return (
+      `a slot keeps one live area of its own, but the ${firstName} area is still live ` +
+      `${cooldownTicks + second.first} ticks after the ${firstName} cast, when the ${secondName} area appears`
+    );
+  };
   for (const slot of SLOTS) {
     const spec = kit.slots[slot];
-    const abilities: { ability: AbilitySpec; base: string }[] = [{ ability: spec, base: `${kit.id}.slots.${slot}` }];
-    if (spec.ex) abilities.push({ ability: spec.ex, base: `${kit.id}.slots.${slot}.ex` });
-    for (const { ability, base } of abilities) {
-      const lifetimes = lingeringLifetimes(ability);
-      if (lifetimes.length < 2) continue;
+    const abilities: { ability: AbilitySpec; name: string; base: string }[] = [
+      { ability: spec, name: 'base', base: `${kit.id}.slots.${slot}` },
+    ];
+    if (spec.ex) abilities.push({ ability: spec.ex, name: 'EX', base: `${kit.id}.slots.${slot}.ex` });
+    const perAbility = abilities.map(({ ability, name, base }) => ({ name, base, areas: liveAreas(ability) }));
+    for (const { base, areas } of perAbility) {
+      if (areas.length < 2) continue;
+      const lifetimes = areas.map((area) => area.lifetime);
       bad(
         `${base}.effects`,
         `a slot keeps one live area of its own, but ${lifetimes.length} of its area-producing effects linger (${lifetimes.join(' + ')} ticks)`,
       );
+    }
+    // The base and its EX share the slot's cooldown, so the second is cast `cooldownTicks` after the
+    // first; either may be cast first. With exactly one lingering area each, the slot holds two live
+    // areas exactly when one ability's area is still present on the step the other's appears.
+    const [a, b] = perAbility;
+    if (perAbility.length === 2 && a?.areas.length === 1 && b?.areas.length === 1) {
+      const areaA = a.areas[0];
+      const areaB = b.areas[0];
+      if (areaA && areaB) {
+        const problem =
+          overlap(areaA, a.name, areaB, b.name, spec.cooldownTicks) ??
+          overlap(areaB, b.name, areaA, a.name, spec.cooldownTicks);
+        if (problem !== undefined) bad(`${kit.id}.slots.${slot}`, problem);
+      }
     }
   }
 
@@ -1091,6 +1160,108 @@ describe('the endArea rules', () => {
     expect(catalogProblems(plainStun)).toEqual([
       'quillon.slots.M2.effects[0].effects[0].status.ticks: stun of 500 ticks is outside 30 to 120',
     ]);
+  });
+
+  it('E7 keeps one live area across a slot’s base ability and its EX, whatever their windups', () => {
+    // Round-3 finding: the per-slot count bound was enforced per *ability*, so a slot whose base
+    // and EX each carried exactly one lingering area passed the walker while the slot held two live
+    // areas of itself. The windup is the lever: both variants share the slot's cooldown, so casts
+    // are `cooldownTicks` apart, and a later windup on one ability keeps its area alive when the
+    // recharge fires the other. The area of a cast is live from `windup + flight` after it for
+    // `fuse + duration` ticks, so the two overlap when the first's live end passes the second's
+    // live start. E5 never sets `spec.ex`, so this is the first pin of the base-versus-EX case.
+    const swapped = (
+      base: { windupTicks: number; effects: unknown[] },
+      ex: { windupTicks: number; effects: unknown[] },
+    ): KitDef => {
+      const copy = copyOf(quillon);
+      (copy.slots as unknown as Record<string, unknown>)['M2'] = {
+        cooldownTicks: 360,
+        movement: 'free',
+        ...base,
+        ex: { movement: 'free', ...ex },
+      };
+      return copy;
+    };
+    const plain = (windup: number, durationTicks: number) => ({
+      windupTicks: windup,
+      effects: [
+        { type: 'area', radius: 2, durationTicks, intervalTicks: durationTicks, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 10 }] },
+      ],
+    });
+    const shotAbility = (windup: number, area: ReturnType<typeof endArea>) => ({
+      windupTicks: windup,
+      effects: [
+        { type: 'projectile', speed: 25, radius: 0.2, lifetimeTicks: 1, pierce: false, effects: [{ type: 'damage', amount: 10 }], endArea: area },
+      ],
+    });
+    // Both abilities share the slot's cooldown, so the second is cast `cooldownTicks` after the
+    // first. An area is present from its first live step up to (not including) `until`, and
+    // `expireAreas` takes a tick off on the spawn step, so an area of `windup + flight` and
+    // `fuse + duration` is present on `[windup + flight, windup + flight + fuse + duration)`. The
+    // pair overlaps when the first area is still present on the step the second appears. The message
+    // names the first ability's area and the tick (from the first cast) the second area appears.
+    const message = (first: string, second: string) =>
+      `quillon.slots.M2: a slot keeps one live area of its own, but the ${first} area is still live 360 ticks after the ${first} cast, when the ${second} area appears`;
+    /** The most areas of slot M2 that are ever live at once, over three recharges. */
+    const maxLive = (kit: KitDef): number => {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(kit)]);
+      let live = 0;
+      for (let i = 0; i < 800; i++) {
+        champion(state, 0).energy = 100;
+        step(state, [input(0, 0, 0, 0, i < 360 ? Button.M2 : Button.M2 | Button.SHIFT)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+      }
+      return live;
+    };
+    /** The same, with the EX cast first and the base at its recharge. */
+    const maxLiveExFirst = (kit: KitDef): number => {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(kit)]);
+      let live = 0;
+      for (let i = 0; i < 800; i++) {
+        champion(state, 0).energy = 100;
+        step(state, [input(0, 0, 0, 0, i < 360 ? Button.M2 | Button.SHIFT : Button.M2)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+      }
+      return live;
+    };
+
+    // The tester's canonical repro: the base area (windup 100, duration 359) spawns at t=100 and is
+    // still alive when the EX area (windup 0) spawns on the t=360 recharge; the slot holds two.
+    const canonical = swapped(plain(100, 359), plain(0, 359));
+    expect(catalogProblems(canonical)).toEqual([message('base', 'EX')]);
+    expect(maxLive(canonical)).toBe(2);
+
+    // The same shape on the #160 subject: base and EX each one endArea shot (lifetime 1 + duration
+    // 358), windups 100 and 0. The flight of the projectile joins the live window.
+    const ending = swapped(shotAbility(100, endArea(358)), shotAbility(0, endArea(358)));
+    expect(catalogProblems(ending)).toEqual([message('base', 'EX')]);
+    expect(maxLive(ending)).toBe(2);
+
+    // The reverse order, the EX cast first with the longer windup: the walker must reject either
+    // ordering, so the aggregation is per slot, not per base-then-EX.
+    const reversed = swapped(plain(0, 359), plain(100, 359));
+    expect(catalogProblems(reversed)).toEqual([`quillon.slots.M2: a slot keeps one live area of its own, but the EX area is still live 360 ticks after the EX cast, when the base area appears`]);
+    expect(maxLiveExFirst(reversed)).toBe(2);
+
+    // The equal-windup control, the shipped-shape case: both areas appear on the recharge after the
+    // first has expired, so the slot never holds two.
+    const control = swapped(plain(0, 359), plain(0, 359));
+    expect(catalogProblems(control)).toEqual([]);
+    expect(maxLive(control)).toBe(1);
+
+    // The shipped Ondrel M2 shape: two lingering areas, windups equal (24), so the first is gone by
+    // the recharge. It stays accepted.
+    const ondrelCopy = copyOf(ondrel);
+    expect(catalogProblems(ondrelCopy)).toEqual([]);
+
+    // The tie is not an overlap: a base area (windup 10, duration 351) is last present 359 ticks
+    // after its cast, one before the t=360 recharge appears the EX area, so the slot holds one. One
+    // tick longer and the two overlap. (Both stay under the per-effect cooldown bound.)
+    const tie = swapped(plain(10, 351), plain(0, 351));
+    expect(catalogProblems(tie)).toEqual([]);
+    expect(maxLive(tie)).toBe(1);
+    expect(catalogProblems(swapped(plain(10, 352), plain(0, 352)))).toEqual([message('base', 'EX')]);
   });
 });
 
