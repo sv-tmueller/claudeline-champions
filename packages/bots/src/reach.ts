@@ -39,13 +39,13 @@ function effectReach(effect: AbilityEffect | ThenEffect, offset: number): Reach 
       // A dash stops at the first body it touches, so what it fires at its end can land next to
       // a target nearer than the dash distance.
       return hull(effect.then, offset + effect.distance);
-    // The counter spend marker (rules 2.6) adds damage or cuts a cooldown; it reaches nothing on
-    // its own and adds no metres to the effects around it.
-    case 'consumeCounter':
     case 'teleport':
     case 'applyStatus':
     case 'shield':
     case 'heal':
+    case 'consumeCounter':
+      // A spend verb has no reach of its own; the damage it boosts rides the projectile, area or
+      // arc that already has a band.
       return null;
   }
 }

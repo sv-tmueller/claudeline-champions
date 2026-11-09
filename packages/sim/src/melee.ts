@@ -18,7 +18,10 @@ export interface MeleeArcSpec {
   effects: readonly Effect[];
   /** The cast that swung it, whose hits earn energy; it must be in `state.casts`. */
   castId?: number | null;
-  /** The spend verb's damage bonus (rules 2.6), added to each `damage` effect; 0 adds nothing. */
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect it
+   * lands. The melee arc's hits are immediate, so the bonus has no entity to ride.
+   */
   bonusDamage?: number;
 }
 

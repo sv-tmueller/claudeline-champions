@@ -129,9 +129,8 @@ Iteration order is always id order. This gives:
   (`phaseTicks`, the ring radius) advance without events, as `tick` and the
   positions do; every discrete change has an event, with one exception: the
   on-hit counter (`counter` on the champion) changes without one, because every
-  build follows from a `damage` event of the `from` slot, every decay from
-  the window, and a spend from the cast's own `castFired` (the cooldown cut
-  shows in the cooldown value). Hit and expired positions
+  build follows from a `damage` event of the `from` slot and every decay from
+  the window. Hit and expired positions
   are the projectile centre at contact (the final position for `lifetime`, and
   where it was for `roundEnd`).
 
@@ -155,13 +154,14 @@ and the same input stream, `checksum` after N ticks is identical on every run.
   velocity, radius, remaining lifetime ticks, pierce flag, the champions it has
   already hit (`hitIds`, in hit order), an inline `effects` list, an optional
   `allyEffects` list (the key is missing, not `undefined`, when the projectile
-  has none), an optional `bonusDamage` (the spend verb's flat addition, the key
-  left out when 0) and `castId` (the cast that fired it, or `null` for a dev tool
-  spawn).
+  has none) and `castId` (the cast that fired it, or `null` for a dev tool
+  spawn). A projectile or area of a cast that spent its counter with the damage
+  verb (rules 2.6) also carries `bonusDamage`, the amount added to each `damage`
+  effect it lands; the key is left out when there is no bonus and is never
+  `undefined`.
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
-  the next application, an inline `effects` list, an optional `bonusDamage` as
-  for a projectile, and `castId` as for a
+  the next application, an inline `effects` list and `castId` as for a
   projectile. An area spawned with a fuse (rules 2.7) also has `fuseTicks`: the
   fuse length while armed, 0 from the first pulse on. The key is left out of an
   area without a fuse and is never `undefined`.
@@ -425,15 +425,13 @@ them from inside the sim, through `cast.ts`.
 | `status.ts` | `applyKnockback(state, targetId, { dirX, dirY, distance, ticks }, source)` | whether a push was added |
 | `motion.ts` | `startDash(state, championId, { dirX, dirY, distance, ticks }, cast = { castId: null, then: [] })` | whether the dash started |
 | `motion.ts` | `teleport(state, championId, toX, toY)` | false when blocked |
-| `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null, bonusDamage = 0)` | `applyEffects` returns the health its `heal` effects restored, and adds `bonusDamage` to each `damage` effect |
-| `energy.ts` | `landHit(state, { ownerId, castId }, targetId, effects, origin)` | |
-| `counter.ts` | `buildCounter(state, caster, slot)`, `spendCounter(caster)`, `stepCounters(state)` | what `landHit`, `fire` and `step` call, see [The on-hit counter](#the-on-hit-counter) |
+| `health.ts` | `applyDamage`, `applyHeal`, `applyEffects(state, sourceId, targetId, effects, origin, slot = null, bonusDamage = 0)` | `applyEffects` returns the health its `heal` effects restored; `bonusDamage` is added to each `damage` effect |
+| `energy.ts` | `landHit(state, { ownerId, castId, bonusDamage? }, targetId, effects, origin)` | |
+| `counter.ts` | `buildCounter(state, caster, slot)`, `stepCounters(state)`, `spendCounter(state, caster)` | what `landHit`, `step` and `fire` call, see [The on-hit counter](#the-on-hit-counter) |
 | `cast.ts` | `tickCooldowns`, `advanceWindup`, `startCast`, `fireDashThen`, `dropUnusedCasts`, `resetAbilityState` | what `step` calls, see [Abilities](#abilities-and-the-effects-toolkit) |
 | `flow.ts` | `stepLocked`, `stepSuddenDeathAndDecision` | what `step` calls for match flow, see [Match flow](#match-flow) |
 
-`source` is `{ sourceId, slot, bonusDamage? }`, with a null slot for a direct call
-and `bonusDamage` the spend verb's addition (rules 2.6), read off a projectile or
-an area and passed in by `meleeArc`. Projectiles,
+`source` is `{ sourceId, slot }`, with a null slot for a direct call. Projectiles,
 areas and melee arcs land their hits through `landHit`, which wraps
 `applyEffects` and gives energy. The `castId` of the two spawn functions and of
 `meleeArc` is for `cast.ts`: a cast id that is not in `state.casts` throws
@@ -459,7 +457,8 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
   with a bad field (an amount at or below 0, a status spec that `applyStatus`
   would reject, a shield with an absorb not above 0 and at most 1e6 or ticks
   outside 1 to 36000, a knockback with a distance not above 0 and at most 1e6,
-  ticks outside 1 to 36000 or a direction other than `away` or `toward`). A dead
+  ticks outside 1 to 36000 or a direction other than `away` or `toward`; a spec
+  `bonusDamage` that is given and is not a finite number). A dead
   owner may still spawn.
 - `meleeArc` hits every alive enemy of `ownerId` whose body overlaps the circle
   of `radius` around `(x, y)`, `dist <= radius + 0.5` inclusive, and whose
@@ -639,16 +638,17 @@ A dash and knockback impulses move a champion regardless of stun, root and a
 locked windup. They are step 3f of the tick.
 
 `champion.dash` is `null` or `{ dirX, dirY, stepLength, ticksLeft, castId, then
-[, bonusDamage] }`: the cast that started it (`null` for a direct call) and the
-effects that fire where it ends, plus the spend verb's `bonusDamage` (rules
-2.6) when the cast that started it had one, since a `then` fires on a later
-tick; the key is left out when there is none. `startDash(state, id, { dirX, dirY, distance, ticks })` sets
-it with `stepLength = distance / ticks`, emits `dashStarted` and ends a running
-dash as `replaced`, which drops that dash's `then`. A dash first moves in step
-3f of the holder's next turn, or of the same turn when a cast starts it, and
-moves `stepLength` meters a tick for `ticks` ticks. Its
-distance is at least 1e-6 m and its ticks at most 36000, so `stepLength` is
-always above 0 and the tick count always counts down to the end.
+}`: the cast that started it (`null` for a direct call) and the effects that
+fire where it ends. A dash a spending cast started (rules 2.6) also carries
+`bonusDamage`, the cast's per-cast damage bonus, so its deferred `then` hits land
+with it exactly as the rooted-at-fire path does; the key is left out, and is never
+`undefined`, when there is no bonus. `startDash(state, id, { dirX, dirY,
+distance, ticks })` sets the record with `stepLength = distance / ticks`, emits
+`dashStarted` and ends a running dash as `replaced`, which drops that dash's
+`then`. A dash first moves in step 3f of the holder's next turn, or of the same
+turn when a cast starts it, and moves `stepLength` meters a tick for `ticks`
+ticks. Its distance is at least 1e-6 m and its ticks at most 36000, so
+`stepLength` is always above 0 and the tick count always counts down to the end.
 
 Each tick, in step 3f:
 
@@ -792,7 +792,8 @@ Each kit defines exactly two EX variants.
   rule during windup (free, slowed, locked), and a list of effects.
 - Effects toolkit (the only primitives kits may use): `projectile`, `dash`,
   `meleeArc`, `area`, `applyStatus`, `heal`, `shield`, `teleport`,
-  `knockback`, `energyGain`. New primitives are added to the toolkit through
+  `knockback`, `energyGain`, and the top-level `consumeCounter` marker of the
+  on-hit counter (rules 2.6). New primitives are added to the toolkit through
   the design doc first, then the sim.
 - No global cooldown. Casting is blocked while another windup is in progress,
   while stunned, and while silenced (mobility slot included).
@@ -832,7 +833,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
 | `teleport` | `range`, `fixed` | goes exactly `range` m along the fire direction, or only as far as the aim when not `fixed` |
 | `applyStatus`, `shield`, `heal` | as the toolkit calls | land on the caster, never give energy |
-| `consumeCounter` | one of `bonusDamagePerStack` (1 to 30) or `cooldownTicksPerStack` (1 to 600) with `slot` | the spend verb of the counter (rules 2.6, v3 4.4b): a fire-time marker `fire` reads, not a list step; only on a kit that declares a `counter`, one per ability, never in a `then` |
+| `consumeCounter` | exactly one of `bonusDamagePerStack` (1 to 30) or `cooldownTicksPerStack` (1 to 600) with `slot` | top-level only, one per ability; spends the caster's whole counter when the cast fires (see [The on-hit counter](#the-on-hit-counter)) |
 
 `effects` inside a projectile, area or arc are hit effects (the `Effect` union,
 including `energyGain`) that land on each champion the entity touches.
@@ -868,13 +869,9 @@ kit has one counter, not a list`) whose `from` is a known slot, whose `cap` is a
 integer from 1 to 5 (`COUNTER_MAX_CAP`) and whose `windowTicks` is an integer from
 60 to 600 (`COUNTER_MIN_WINDOW_TICKS`, `COUNTER_MAX_WINDOW_TICKS`); unknown keys
 inside it are dropped, and a `counter` key inside a slot is a stray key like any
-other. A `consumeCounter` must have exactly one verb (`bonusDamagePerStack` an
-integer from 1 to 30, `COUNTER_MAX_BONUS_PER_STACK`; or `cooldownTicksPerStack`
-an integer from 1 to 600, `COUNTER_MAX_COOLDOWN_PER_STACK`, with a known `slot`),
-needs the kit to declare a `counter` (checked after the parse, since the counter
-is read last), appears at most once per ability, and is rejected inside a dash
-`then`. Unknown keys inside it are dropped, and a `slot` beside `bonusDamagePerStack`
-is a stray key like any other. Only the bounds above are checked here. Catalog ranges (a
+other. An ability may hold one top-level `consumeCounter` with exactly one verb
+(a second one, or a verb missing or doubled, fails) and only on a kit that
+declares a `counter`. Only the bounds above are checked here. Catalog ranges (a
 stun of 30 to 120 ticks, 8 to 30 damage), the fuse range of 15 to 120 ticks among
 them, the fuse-aware linger rule and the one-hit control exception are checked by
 the roster tests (`catalogProblems`). The bounds keep `step` from throwing, not
@@ -983,7 +980,7 @@ lastHitTick: 0 }` and emits nothing. It is not in the index.
 ### The on-hit counter
 
 A kit may declare one counter (`KitDef.counter`, rules.md section 2.6, v3 design
-section 4.4a; the spend verbs of 4.4b are built). A champion whose
+sections 4.4a and 4.4b). A champion whose
 kit declares it carries `counter: { count, lastHitTick }` from `createMatch` on,
 at `{ 0, 0 }`; any other champion has no `counter` key at all (never
 `undefined`, so `checksum` does not throw), and no shipped kit declares one, so
@@ -1010,22 +1007,20 @@ every committed fixture keeps its checksum. Both numbers are in the checksum.
   never runs step 6d, so the count stays frozen through it, and the last count
   stays at the match end.
 - **Reset.** `resetAbilityState` (above) at each round start.
-- **Spend.** An ability may carry one top-level `consumeCounter` effect with one
-  verb (rules 2.6). `fire` (`cast.ts`) scans the top-level effects for it, and
-  when found calls `spendCounter` (`counter.ts`) before `runEffects`, so the
-  whole counter is spent on the fire tick, ahead of any effect of the cast and
-  of the same tick's hits and decay. `spendCounter` returns the stacks and sets
-  `{ 0, 0 }`; at 0 stacks it returns 0 and touches nothing. `{ bonusDamagePerStack }`
-  hands `n * stacks` to the effects run, which passes it as `bonusDamage` on each
-  projectile, area or arc it creates, and on the `DashState` it starts when the
-  ability holds a `dash`, so the dash's `then` effects — which fire on a later
-  tick — land it exactly as the rooted branch, which fires them inline with the
-  bonus; `landHit` reads it off the `HitSource` and
-  `applyEffects` adds it to each `damage` effect's amount. The key is left out of
-  `ProjectileState`/`AreaState`/`DashState` when 0, so a fixture without a spend
-  verb is byte-identical. `{ cooldownTicksPerStack, slot }` cuts `cooldowns[SLOTS.indexOf(slot)]`
-  by `n * stacks`, clamped at 0, at the same moment. No `SimEvent` is added: the
-  spend shows in the counter and the cooldown value.
+- **Spend.** An ability may carry one top-level `consumeCounter` marker with
+  exactly one verb (`{ bonusDamagePerStack }` or `{ cooldownTicksPerStack,
+  slot }`, bounded in `constants.ts`; rules.md section 2.6, v3 design 4.4b).
+  When the ability fires, `fire` scans its effects for the marker, calls
+  `spendCounter` (`counter.ts`) to take the whole count, and applies the verb to
+  that same cast: the damage verb adds `perStack * spent` to each `damage` effect
+  the cast lands (`bonusDamage`, on the projectile, area, arc or dash record,
+  read back by `applyEffects`), and the cooldown verb subtracts `perStack *
+  spent` from the named slot's cooldown, clamped at 0. At 0 stacks it spends
+  nothing and the cast is unchanged. The marker is a no-op in `runEffects`, and
+  `validateKit` rejects a second marker and any `consumeCounter` on a kit without
+  a counter. A `dash` stores the bonus on its record so `fireDashThen` lands it
+  on the deferred `then` hits, the same way the rooted-at-fire path threads it
+  through `runEffects`.
 
 `counter.ts` follows the orb: no arrow function, indexed loops, no per-tick
 allocation, integer operations only, and no import of `cast.ts` (the cycle cast,

@@ -88,18 +88,20 @@ export type AbilityEffect =
   | { type: 'heal'; amount: number }
   | {
       /**
-       * The spend verb of the on-hit counter (rules.md section 2.6, v3 design section 4.4b). A
-       * fire-time marker, not a list step: `fire` scans for it, spends the caster's whole counter
-       * before any effect of the cast lands, and applies the one verb. Exactly one verb, and at
-       * most one per ability; a dash's `then` never carries it. The kit must declare a `counter`.
+       * Rules 2.6, v3 design section 4.4b: spend the caster's whole on-hit counter when this cast
+       * fires, one verb per effect. Marker, not a list effect: `fire` in `cast.ts` scans the
+       * ability's effects for it and spends before running them, so it must sit at the top level of
+       * an ability (never inside a dash's `then`) and only on a kit that declares a counter.
        */
       type: 'consumeCounter';
-      /** `n` damage per stack, added to each `damage` effect of this cast's hits; 1 to 30. */
-      bonusDamagePerStack?: number;
-      /** `n` ticks per stack off the named slot's cooldown at fire; 1 to 600. */
-      cooldownTicksPerStack?: number;
-      /** The slot whose cooldown is cut; required by `cooldownTicksPerStack`, banned by the other. */
-      slot?: Slot;
+      /** The damage effects of this cast deal this much more per stack spent. */
+      bonusDamagePerStack: number;
+    }
+  | {
+      type: 'consumeCounter';
+      /** The named slot's cooldown is cut by this many ticks per stack spent, never below 0. */
+      cooldownTicksPerStack: number;
+      slot: Slot;
     };
 
 /** What a dash may fire at its end: everything but another dash. */
@@ -305,28 +307,34 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
     case 'heal':
       return { type, amount: readMagnitude(effect['amount'], at('amount')) };
     case 'consumeCounter': {
-      if (inThen) return fail(path, 'consumeCounter cannot be inside then');
-      const bonus = effect['bonusDamagePerStack'];
-      const cut = effect['cooldownTicksPerStack'];
-      const hasBonus = bonus !== undefined;
-      const hasCut = cut !== undefined;
-      if (hasBonus === hasCut) {
-        return fail(
-          path,
-          'a consumeCounter has exactly one verb: bonusDamagePerStack or cooldownTicksPerStack',
-        );
+      // The spend verbs (rules 2.6, v3 design 4.4b). The spend itself happens in `fire`, before the
+      // ability's effects run, so the marker only lives at the top level of an ability.
+      if (inThen) return fail(path, 'a consumeCounter cannot be inside then');
+      const bonus: unknown = effect['bonusDamagePerStack'];
+      const cut: unknown = effect['cooldownTicksPerStack'];
+      // Exactly one verb: neither key, or both keys, is a mistake.
+      if ((bonus === undefined) === (cut === undefined)) {
+        return fail(path, 'consumeCounter takes exactly one verb');
       }
-      if (hasBonus) {
-        const verb: Extract<AbilityEffect, { type: 'consumeCounter' }> = {
+      if (bonus !== undefined) {
+        return {
           type,
-          bonusDamagePerStack: readCounterInt(bonus, at('bonusDamagePerStack'), 1, COUNTER_MAX_BONUS_PER_STACK),
+          bonusDamagePerStack: readCounterInt(
+            bonus,
+            at('bonusDamagePerStack'),
+            1,
+            COUNTER_MAX_BONUS_PER_STACK,
+          ),
         };
-        // `slot` belongs to the cooldown verb; it is dropped here like any stray key.
-        return verb;
       }
       return {
         type,
-        cooldownTicksPerStack: readCounterInt(cut, at('cooldownTicksPerStack'), 1, COUNTER_MAX_COOLDOWN_PER_STACK),
+        cooldownTicksPerStack: readCounterInt(
+          cut,
+          at('cooldownTicksPerStack'),
+          1,
+          COUNTER_MAX_COOLDOWN_PER_STACK,
+        ),
         slot: readSlot(effect['slot'], at('slot')),
       };
     }
@@ -338,16 +346,13 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
 function readEffects(value: unknown, path: string): AbilityEffect[] {
   if (!Array.isArray(value)) return fail(path, 'expected an array');
   if (value.length === 0) return fail(path, 'must not be empty');
-  const effects: AbilityEffect[] = [];
-  let spent = false;
-  for (let i = 0; i < value.length; i++) {
-    const effect = readEffect(value[i], `${path}[${i}]`, false);
-    // At most one spend verb per ability: the first spends the whole counter, so a second is dead.
-    if (effect.type === 'consumeCounter') {
-      if (spent) return fail(`${path}[${i}]`, 'a second consumeCounter (one per ability)');
-      spent = true;
-    }
-    effects.push(effect);
+  const effects = value.map((item, i) => readEffect(item, `${path}[${i}]`, false));
+  // At most one per ability: the first spends the whole counter, so a second is meaningless.
+  let spend = -1;
+  for (let i = 0; i < effects.length; i++) {
+    if ((effects[i] as AbilityEffect).type !== 'consumeCounter') continue;
+    if (spend >= 0) return fail(`${path}[${i}]`, 'an ability carries one consumeCounter');
+    spend = i;
   }
   return effects;
 }
@@ -384,6 +389,18 @@ function readAbility(value: unknown, path: string): AbilitySpec {
     return fail(`${path}.movement`, `unknown movement rule ${String(movement)}`);
   }
   return { windupTicks, movement, effects: readEffects(spec['effects'], `${path}.effects`) };
+}
+
+/**
+ * The path of the first `consumeCounter` in an ability, or null. A spend verb needs a counter on the
+ * kit (rules 2.6): `readEffect` cannot see the declaration, since it parses the slots first, so the
+ * check runs after both are read.
+ */
+function firstSpend(prefix: string, effects: readonly AbilityEffect[]): string | null {
+  for (let i = 0; i < effects.length; i++) {
+    if ((effects[i] as AbilityEffect).type === 'consumeCounter') return `${prefix}.effects[${i}].type`;
+  }
+  return null;
 }
 
 /**
@@ -439,20 +456,17 @@ export function validateKit(kit: unknown): KitDef {
   const kitDef: KitDef = { id, maxHealth, moveSpeed, support, slots, ex: [first, second] };
   // The key is left out, never undefined: `checksum` throws on an undefined value.
   if (root['counter'] !== undefined) kitDef.counter = readCounter(root['counter'], at('counter'));
-
-  // The spend verb needs the counter the kit declares, and `readEffect` runs before it: the check
-  // is here, after the parse, over the top-level effects only (a `then` never carries one).
+  // A `consumeCounter` needs the counter this kit declares: the slots parse before the declaration,
+  // so the check runs here, on the parsed slots.
   if (kitDef.counter === undefined) {
     for (const slot of SLOTS) {
+      const spec = slots[slot];
       const path = at(`slots.${slot}`);
-      const specs: [string, AbilitySpec][] = [[`${path}.effects`, slots[slot]]];
-      if (slots[slot].ex !== undefined) specs.push([`${path}.ex.effects`, slots[slot].ex as AbilitySpec]);
-      for (const [where, spec] of specs) {
-        for (let i = 0; i < spec.effects.length; i++) {
-          if ((spec.effects[i] as AbilityEffect).type === 'consumeCounter') {
-            return fail(`${where}[${i}]`, 'consumeCounter needs the kit to declare a counter');
-          }
-        }
+      const spend = firstSpend(path, spec.effects);
+      if (spend !== null) return fail(spend, 'consumeCounter needs a counter on the kit');
+      if (spec.ex !== undefined) {
+        const inEx = firstSpend(`${path}.ex`, spec.ex.effects);
+        if (inEx !== null) return fail(inEx, 'consumeCounter needs a counter on the kit');
       }
     }
   }

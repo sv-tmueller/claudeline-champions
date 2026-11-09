@@ -108,7 +108,7 @@ describe('on-hit counter constants', () => {
     expect(COUNTER_MAX_WINDOW_TICKS).toBe(600);
   });
 
-  it('holds the v3 design section 4.4b spend bounds: 30 damage, 600 ticks per stack', () => {
+  it('holds the spend-verb bounds: a bonus of at most 30 per stack, a cut of at most 600 per stack', () => {
     expect(COUNTER_MAX_BONUS_PER_STACK).toBe(30);
     expect(COUNTER_MAX_COOLDOWN_PER_STACK).toBe(600);
   });

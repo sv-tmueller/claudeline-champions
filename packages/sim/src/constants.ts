@@ -71,9 +71,10 @@ export const COUNTER_MIN_WINDOW_TICKS = 60;
 export const COUNTER_MAX_WINDOW_TICKS = 600;
 
 /**
- * The spend verbs of the counter, rules.md section 2.6 and v3 design section 4.4b. One stack can
- * give at most a whole non-F hit of bonus damage (30, the catalog ceiling), and one stack can cut
- * at most a whole ultimate cooldown (600 ticks, the window's top bound).
+ * The spend verbs, rules.md section 2.6 (v3 design section 4.4b): `bonusDamagePerStack` is an
+ * integer from 1 to the catalog ceiling of one non-F hit, so the landed total of a boosted cast
+ * stays inside the catalog; `cooldownTicksPerStack` is an integer from 1 to the window's top
+ * bound, one per stack cutting at most a whole ultimate.
  */
 export const COUNTER_MAX_BONUS_PER_STACK = 30;
 export const COUNTER_MAX_COOLDOWN_PER_STACK = 600;

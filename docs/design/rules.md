@@ -149,7 +149,7 @@ When a cast fires a projectile that has ally effects, and the aim position of th
 
 ### 2.6 The on-hit counter `[tuned]`
 
-A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `counter: { from: <slot>, cap: <1 to 5>, windowTicks: <60 to 600> }`. It is the one exception to roster-v1's "a kit has no passive", and it is declared in the kit data and not hidden in code. A kit with no `counter` has none of the state and none of the rules below. The spend verbs (`consumeCounter`, part 4.4b, #245) are in the sim.
+A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `counter: { from: <slot>, cap: <1 to 5>, windowTicks: <60 to 600> }`. It is the one exception to roster-v1's "a kit has no passive", and it is declared in the kit data and not hidden in code. A kit with no `counter` has none of the state and none of the rules below.
 
 - **Build:** a hit by the `from` slot that lands on an enemy adds one, up to `cap`. The EX variant of the `from` slot counts as that slot. A hit lands as it does for energy (section 3.1): the target is an enemy, alive and not invulnerable before the effects, and the hit's effects include `damage`. A hit that a shield fully absorbs still counts. A status, a shield or a push alone does not.
 - **Each hit counts:** unlike energy, the build ignores the once-per-target rule. Each pulse of an area that hits an enemy, and each enemy a piercing projectile or a melee arc hits, adds one.
@@ -159,10 +159,15 @@ A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `
 - **Decay:** the whole counter goes to 0 when `windowTicks` ticks pass with no qualifying hit. There is one timer per champion, not one per stack. A hit in tick T keeps the count through tick T + `windowTicks` - 1; it is 0 at the end of tick T + `windowTicks`, unless another hit lands in that tick. A dead champion's counter decays like any other.
 - **Pause:** the window runs during a round and in free play, and it is frozen during the warmup, the round end pause and after the match ends; the count stays as it was.
 - **Reset:** the counter is set to 0 at the start of each round, like energy (section 1.2).
-- **Spend:** an ability may carry one top-level effect `consumeCounter` with exactly one of two verbs. It spends the whole counter on the tick the cast fires and does nothing when the counter is 0. Only a kit that declares a `counter` may use it, at most one per ability, and never inside a dash's `then` (a `then` fires on a later tick than the cast). It is read at fire, before any effect of the cast lands, so the spend is exactly once and its order in the effect list does not matter; a windup cast spends when the windup ends (the fire tick), and a cast whose caster dies mid-windup never fires and never spends.
-  - `{ bonusDamagePerStack: <1 to 30> }`: each `damage` effect of this cast's hits deals `n` more per stack spent, on every hit the cast creates, whenever that hit lands. A projectile or an area carries the bonus and lands it with its hit; a melee arc lands it at once. The bonus is a flat addition to each `damage` effect; a `heal`, a `dot`'s `perPulse` and every other effect are untouched. Because the addition is flat, the damage range applies to the total (base + bonus), not to the base alone.
-  - `{ cooldownTicksPerStack: <1 to 600>, slot: <slot> }`: the named slot's current cooldown drops by `n` ticks per stack spent, never below 0. It may name the casting slot itself, whose cooldown the same cast has just set. Other slots are untouched. There is no event: the spend shows in the cooldown value.
-  - **Ordering:** the spend happens in the caster's turn, before the same tick's projectile and area hits and before the decay. A `from`-slot hit that lands later in that tick builds 1 back on the spent counter; a spend and a window expiry in the same tick is spent first, and the decay then sees 0 and leaves it. A cast's own immediate hits (a melee arc of the spending cast) land after the spend and build by the normal rule.
+
+**Spend** (v3 design section 4.4, part 4.4b, #161). An ability's top-level effects may carry one `consumeCounter`, which spends the caster's whole counter on the tick the cast fires and does nothing when the counter is 0 `[spec]`.
+
+- **One verb per effect.** `{ bonusDamagePerStack: <n> }` or `{ cooldownTicksPerStack: <n>, slot: <slot> }`, never both and never neither. A kit may carry at most one `consumeCounter` per ability, and only a kit that declares a `counter` may carry one at all: the verb has nothing to spend without it. It sits at the top level of an ability, never inside a dash's `then`, which fires on a later tick than the cast.
+- **The bounds.** `bonusDamagePerStack` is an integer from 1 to 30 (the catalog ceiling of one non-F hit), and `cooldownTicksPerStack` is an integer from 1 to 600 (the window's top bound). The `slot` is one of the seven, and it may name the casting slot's own cooldown, just set by this cast.
+- **When.** The spend runs in the caster's turn, before the cast's own effects land and before the tick's decay. A windup cast spends when the windup ends (the fire tick); a cast whose caster dies mid-windup never fires and never spends. The cast's own immediate hits (a melee arc) land after the spend and build the counter back by the normal build rule.
+- **The damage verb.** The damage effects of that cast deal `n` more per stack spent, and each damage effect in a hit list gets the bonus. The bonus rides on the projectile, area or melee arc the cast makes, so it lands with every hit of that cast whenever the hit lands, including a projectile that arrives later, each pulse of an area, and each enemy a piercing projectile or an arc touches; a projectile with `allyEffects` aimed at the caster (section 2.5) is a self-cast that spawns nothing, and the bonus lands with its ally list on the caster at once, exactly as it would on the ally hit. The damage range applies to the total, `base + bonus` `[spec]`: the sim checks no damage range itself (the catalog ranges of section 5 are held by the roster tests), so a kit that uses the verb must keep the landed total inside its catalog range. A damage over time applied by the cast gets no bonus; its pulses are a status, not a damage effect of the hit.
+- **The cooldown verb.** The named slot's current cooldown is cut by `n` ticks per stack spent, never below 0; every other slot is untouched. There is no event for it: the spend shows in the cooldown value.
+- **No new event.** The spend emits nothing of its own: the damage shows in the existing `damage` event, and the cooldown cut in the cooldown (decision 4 on #223).
 
 ### 2.7 The fuse on an area `[tuned]`
 
@@ -358,7 +363,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Element | Content |
 |---------|---------|
 | Health bar | Current and max health of the local champion, in detail. A shield shows as an extra segment. |
-| Energy bar | Energy from 0 to 100. Marks at 25 (EX ready) and 100 (ultimate ready). |
+| Energy bar | Energy from 0 to 100. Marks at 25 (EX ready) and 100 (ultimate ready). A champion with an on-hit counter (section 2.6) shows it as pips under the bar: one slot per point of the kit's cap, the first `count` filled. A kit with no counter shows none. |
 | Cooldown icons | One icon per slot: M1, M2, SPACE, Q, E, R, F. Each shows the remaining cooldown, and whether it is blocked by silence or low energy. |
 | Round score | Round wins of both teams, with the 3 needed to win the match. |
 | Round timer | Time left in the round. After it reaches 0 it shows sudden death. |
@@ -366,7 +371,7 @@ The HUD is an HTML and CSS overlay `[spec]`. It has these elements:
 | Kill feed | A line per death, showing the killer (or "ring") and the victim, and a line per orb pickup, showing the taker and "Energy orb" (amended 2026-11-02 by #224). Shows up to 5 lines. Each line stays for 5 s `[tuned]`. |
 | Debug overlay | Draws collision circles, obstacles, projectiles and line of sight `[spec]`. Off by default. |
 
-Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. The HUD health bar is the detailed view of the local champion only.
+Every champion also carries a world-space health bar above its model. It is green for allies and red for enemies `[tuned]`. A champion whose kit declares an on-hit counter (section 2.6) shows that counter as a row of pips under the same bar, one slot per point of the cap, the first `count` filled. The row follows the bar: it shows while the champion is alive and hides, with the bar, when the champion dies. The HUD health bar is the detailed view of the local champion only.
 
 ## 9. 2v2 and 3v3
 

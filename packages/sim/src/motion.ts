@@ -22,16 +22,16 @@ export interface DashSpec {
   ticks: number;
 }
 
-/** What a cast adds to a dash; a direct `startDash` has none of it. */
+/** What a cast adds to a dash; a direct `startDash` has neither. */
 export interface DashCast {
   castId: number | null;
   /** Copied. Effects that fire where the dash ends. */
   then: readonly ThenEffect[];
   /**
-   * The spend verb's damage bonus (rules 2.6) that the `then` effects must land, carried on the
-   * dash record because they fire on a later tick. The key is left out when there is none.
+   * The spend verb's per-cast damage bonus (rules 2.6, v3 design 4.4b), so the deferred `then`
+   * effects land with it like the rooted-at-fire path. Omitted (or 0) when there is none.
    */
-  bonusDamage?: number;
+  bonusDamage?: number | undefined;
 }
 
 function fail(what: 'dash' | 'teleport', problem: string): never {
@@ -85,7 +85,7 @@ export function startDash(
     then: [...cast.then],
   };
   // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
-  if (cast.bonusDamage !== undefined) dash.bonusDamage = cast.bonusDamage;
+  if (cast.bonusDamage !== undefined && cast.bonusDamage > 0) dash.bonusDamage = cast.bonusDamage;
   target.dash = dash;
   state.events.push({
     type: 'dashStarted',

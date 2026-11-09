@@ -17,9 +17,8 @@ export interface HitSource {
   /** The cast that made it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;
   /**
-   * The spend verb's damage bonus (rules 2.6), added to each `damage` effect of this hit's list;
-   * 0 or undefined adds nothing. A projectile and an area carry it on their state, an arc passes
-   * it in its source.
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b), read off the entity or spec that
+   * carries it: added to each `damage` effect of every hit it lands. Undefined when there is none.
    */
   bonusDamage?: number;
 }

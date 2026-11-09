@@ -47,6 +47,12 @@ export interface HudHandles {
    * visibility and the absorb, the fill carries the width (a scale).
    */
   shield: { root: HudElement; fill: HudElement };
+  /**
+   * The on-hit counter pips under the energy bar: the root carries `data-visible` and each
+   * pip `data-filled` (rules.md section 2.6). Empty for a local champion whose kit has no
+   * counter, which renders no pips at all.
+   */
+  pips: { root: HudElement; slots: readonly HudElement[] };
   /** One per slot in `SLOTS` order. */
   slots: readonly { icon: HudElement; seconds: HudElement }[];
   score: HudElement;
@@ -149,6 +155,11 @@ export class Hud {
   private ringCountdown = -1;
   private ringRadius = -1;
   private ringDistance = -1;
+  // The counter pips: 0 or less means the local champion has no counter. The container is
+  // built hidden, so its flag starts at 0 and the first update writes nothing for it; the
+  // per-slot flags start at -1 (odd), so each slot is written once.
+  private pipsVisible = 0;
+  private readonly pipFilled: number[] = [];
   private readonly slotSeconds: number[] = [];
   private readonly slotReady: number[] = [];
   private readonly slotWindup: number[] = [];
@@ -166,6 +177,7 @@ export class Hud {
     private readonly localId: number,
     private readonly killFeed: KillFeed,
     roundsToWin: number,
+    private readonly counterCap = 0,
   ) {
     const localTeam = champions[localId]?.team;
     this.tableMaxHealth = champions[localId]?.maxHealth ?? 0;
@@ -179,6 +191,7 @@ export class Hud {
     this.scoreTable = scoreTexts(roundsToWin);
     this.names = champions.map((champion) => championName(champion.championId));
     this.sides = champions.map((champion) => (champion.team === localTeam ? SIDE_ALLY : SIDE_ENEMY));
+    for (let i = 0; i < this.counterCap; i++) this.pipFilled.push(-1);
     for (let i = 0; i < this.slotViews.length; i++) {
       this.slotSeconds.push(-1);
       this.slotReady.push(-1);
@@ -201,6 +214,7 @@ export class Hud {
       this.updateHealth(champion);
       this.updateShield(champion);
       this.updateEnergy(champion.energy);
+      this.updateCounter(champion);
       this.updateSlots(champion);
     }
     this.updateRound(state);
@@ -273,6 +287,32 @@ export class Hud {
     if (ultimate !== this.ultimateReady) {
       this.ultimateReady = ultimate;
       this.handles.ultimateMark.setAttribute('data-ready', flag(ultimate === 1));
+    }
+  }
+
+  /**
+   * The on-hit counter pips under the energy bar (rules.md section 2.6). A local champion
+   * whose kit declares no counter (`counterCap` 0 or less) has no slots and is left alone.
+   * The container shows for a champion that has a counter and is alive; the count fills the
+   * slots from the left. The view holds only integers, compared with the last write, so a
+   * steady frame touches nothing. The count is read from the state; no event carries it.
+   */
+  private updateCounter(source: SlotSource): void {
+    if (this.counterCap <= 0) return;
+    const pips = this.handles.pips;
+    const counter = source.counter;
+    const shown = counter === undefined ? 0 : 1;
+    if (shown !== this.pipsVisible) {
+      this.pipsVisible = shown;
+      pips.root.setAttribute('data-visible', flag(shown === 1));
+    }
+    const count = Math.max(0, Math.min(counter?.count ?? 0, this.counterCap));
+    for (let i = 0; i < this.pipFilled.length; i++) {
+      const filled = i < count ? 1 : 0;
+      if (filled === this.pipFilled[i]) continue;
+      this.pipFilled[i] = filled;
+      const slot = pips.slots[i];
+      if (slot !== undefined) slot.setAttribute('data-filled', flag(filled === 1));
     }
   }
 

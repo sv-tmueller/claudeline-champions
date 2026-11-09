@@ -1,5 +1,5 @@
 import { DEFAULT_ROUNDS_TO_WIN, RING_SOURCE_ID, createMatch, step } from '@claudeline/sim';
-import type { ArenaDef, KitDef, MatchConfig, PlayerConfig, PlayerInput, TeamId } from '@claudeline/sim';
+import type { ArenaDef, KitDef, MatchConfig, OrbPoint, PlayerConfig, PlayerInput, TeamId } from '@claudeline/sim';
 import { createBot } from '@claudeline/bots';
 
 // The bot-versus-bot balance harness: pure. It plays the shipped bots through the entry points of
@@ -63,18 +63,25 @@ export function xOnTeamA(seed: number): boolean {
   return seed % 2 === 1;
 }
 
-/** The match config of a seed: X and the fill on one team, Y and the fill on the other, by `xOnTeamA`. */
-export function matchConfig(config: Config, seed: number): MatchConfig {
+/**
+ * The match config of a seed: X and the fill on one team, Y and the fill on the other, by
+ * `xOnTeamA`. The harness plays the standard match, so `orb` (the arena's row of `data/orbs.json`)
+ * sets `energyOrb` and turns the orb on; without it the key is left out and the match has none
+ * (rules.md 3.3, spec section 6).
+ */
+export function matchConfig(config: Config, seed: number, orb?: OrbPoint): MatchConfig {
   const xTeam: TeamId = xOnTeamA(seed) ? 'A' : 'B';
   const yTeam: TeamId = xTeam === 'A' ? 'B' : 'A';
   const team = (lead: string, team: TeamId): PlayerConfig[] =>
     [lead, ...config.fill].map((championId) => ({ championId, team }));
   const x = team(config.x, xTeam);
   const y = team(config.y, yTeam);
-  return {
+  const match: MatchConfig = {
     teamSize: config.mode === '2v2' ? 2 : 3,
     players: xTeam === 'A' ? [...x, ...y] : [...y, ...x],
   };
+  if (orb !== undefined) match.energyOrb = orb;
+  return match;
 }
 
 /** The seed of the bot of champion `id` in the match of seed `seed`: the client's rule (bot-driver.ts). */
@@ -183,8 +190,9 @@ export function playMatch(
   kits: readonly KitDef[],
   seed: number,
   maxTicks: number = MATCH_BUDGET_TICKS,
+  orb?: OrbPoint,
 ): MatchRecord {
-  const match = matchConfig(config, seed);
+  const match = matchConfig(config, seed, orb);
   return playSpec({
     match,
     arena,
@@ -195,10 +203,12 @@ export function playMatch(
   });
 }
 
-/** What a run plays: every kit (raw JSON) and every arena, in report order. */
+/** What a run plays: every kit (raw JSON), every arena and each arena's orb point, in report order. */
 export interface RunInputs {
   kits: readonly KitDef[];
   arenas: readonly ArenaDef[];
+  /** The orb point of each arena, by arena id; the harness plays every match with it. */
+  orbs: ReadonlyMap<string, OrbPoint>;
 }
 
 /** The modes in report order. */
@@ -284,7 +294,8 @@ export function planCells(
 
 /**
  * Plays every cell of the plan: within a cell each fill in turn with the seeds 1 to the mode's
- * count. `onMatch` hears of each finished match, for progress only.
+ * count, on the arena's orb point (the standard match, spec section 6). `onMatch` hears of each
+ * finished match, for progress only.
  */
 export function playCells(
   inputs: RunInputs,
@@ -300,10 +311,11 @@ export function playCells(
   return plan.map((planned) => {
     const arena = inputs.arenas.find((a) => a.id === planned.arena);
     if (arena === undefined) throw new Error(`no arena ${planned.arena}`);
+    const orb = inputs.orbs.get(planned.arena);
     const cell: Cell = { mode: planned.mode, arena: planned.arena, x: planned.x, y: planned.y, played: [] };
     for (const config of planned.configs) {
       for (let seed = 1; seed <= planned.seeds; seed++) {
-        const record = playMatch(config, arena, inputs.kits, seed);
+        const record = playMatch(config, arena, inputs.kits, seed, MATCH_BUDGET_TICKS, orb);
         cell.played.push({ fill: config.fill.join('+'), seed, record });
         onMatch?.(++done);
       }

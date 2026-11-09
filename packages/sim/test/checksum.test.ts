@@ -163,6 +163,11 @@ describe('checksum of combat state', () => {
     expect(() => checksum(state)).toThrow('non-finite');
   });
 
+  it('survives a clone with live projectiles and areas', () => {
+    const state = armed();
+    expect(checksum(cloneState(state))).toBe(checksum(state));
+  });
+
   // Each carry gets its own state with only that entity in it, so disabling one carry alone
   // (the `if` in projectile.ts or area.ts) turns exactly one row red instead of the other
   // entity still distinguishing the two states.
@@ -203,11 +208,6 @@ describe('checksum of combat state', () => {
     expect(keyless.areas[0]).not.toHaveProperty('bonusDamage');
     expect(checksum(keyless)).not.toBe(base);
     expect(checksum(cloneState(carried(8)))).toBe(base);
-  });
-
-  it('survives a clone with live projectiles and areas', () => {
-    const state = armed();
-    expect(checksum(cloneState(state))).toBe(checksum(state));
   });
 });
 
@@ -415,28 +415,45 @@ describe('checksum of the on-hit counter', () => {
     expect(checksum(cloneState(state))).toBe(checksum(state));
     expect('counter' in cloneState(fresh()).champions[0]!).toBe(false);
   });
+});
 
-  it('changes with a spend verb in the kit, and with each of its fields', () => {
-    const spending = (): GameState =>
-      createMatch(config2v2(), arena01, 1337, [
-        {
-          ...testStriker(),
-          id: 'hargrim',
-          counter: { from: 'M1', cap: 5, windowTicks: 60 },
-          slots: {
-            ...testStriker().slots,
-            M1: {
-              ...testStriker().slots.M1,
-              effects: [{ type: 'consumeCounter', bonusDamagePerStack: 4 }],
-            },
-          },
-        },
-      ]);
+describe('checksum of the consumeCounter kit fields', () => {
+  function spending(): GameState {
+    // The verb lives in the kit, which the checksum covers; no shipped kit has one yet, so this is
+    // a test kit that declares the counter the validator requires.
+    const striker = testStriker();
+    striker.slots.M1.effects = [
+      { type: 'consumeCounter', bonusDamagePerStack: 4 },
+      { type: 'meleeArc', radius: 2.5, cosHalfAngle: 0.643, effects: [{ type: 'damage', amount: 10 }] },
+    ];
+    return createMatch(config2v2(), arena01, 1337, [
+      { ...striker, id: 'hargrim', counter: { from: 'M1', cap: 5, windowTicks: 60 } },
+    ]);
+  }
+
+  it('is stable for equal kits and changes with each verb field', () => {
     const base = checksum(spending());
+    expect(checksum(spending())).toBe(base);
     const mutations: [string, (s: GameState) => void][] = [
-      ['verb removed', (s) => void (s.kits[0]!.slots.M1.effects = [{ type: 'heal', amount: 1 }])],
-      ['field value', (s) => void ((s.kits[0]!.slots.M1.effects[0] as { bonusDamagePerStack: number }).bonusDamagePerStack = 5)],
-      ['slot named', (s) => void (s.kits[0]!.slots.M1.effects[0] = { type: 'consumeCounter', cooldownTicksPerStack: 120, slot: 'SPACE' })],
+      ['bonus removed', (s) => void (s.kits[0]!.slots.M1.effects[0] = { type: 'heal', amount: 1 })],
+      [
+        'bonus value',
+        (s) => void ((s.kits[0]!.slots.M1.effects[0] as { bonusDamagePerStack: number }).bonusDamagePerStack = 5),
+      ],
+      [
+        'verb switched to the cooldown cut',
+        (s) =>
+          void (s.kits[0]!.slots.M1.effects[0] = {
+            type: 'consumeCounter',
+            cooldownTicksPerStack: 120,
+            slot: 'SPACE',
+          }),
+      ],
+      [
+        'cut slot',
+        (s) =>
+          void ((s.kits[0]!.slots.M1.effects[0] as { slot: string }).slot = 'F'),
+      ],
     ];
     for (const [name, mutate] of mutations) {
       const state = spending();

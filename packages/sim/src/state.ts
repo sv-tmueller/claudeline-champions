@@ -101,9 +101,8 @@ export interface ProjectileState {
    */
   allyEffects?: Effect[];
   /**
-   * The spend verb's damage bonus (rules 2.6): the flat amount added to each `damage` effect of
-   * this projectile's hits. The key is missing, not undefined, when there is none (0), so a
-   * fixture without a spend verb is byte-identical.
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect of
+   * this projectile's hit lists. The key is missing, not undefined, when there is none.
    */
   bonusDamage?: number;
   /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
@@ -131,7 +130,10 @@ export interface AreaState {
    */
   fuseTicks?: number;
   effects: Effect[];
-  /** The spend verb's damage bonus, as on `ProjectileState`; the key is left out when 0. */
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect of the
+   * pulses. The key is missing, not undefined, when there is none.
+   */
   bonusDamage?: number;
   /** The cast that spawned it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;
@@ -305,9 +307,9 @@ export interface DashState {
   /** Effects that fire where the dash ends, unless a stun, a death or a new dash ends it. */
   then: ThenEffect[];
   /**
-   * The spend verb's damage bonus (rules 2.6), handed to the `then` effects when they fire on a
-   * later tick, as a projectile or an area carries its own. The key is left out when the cast had
-   * no spend verb.
+   * The spend verb's damage bonus of the cast that started it (rules 2.6, v3 design 4.4b): the
+   * deferred `then` effects are hits of that cast too, so they land with the same per-cast bonus.
+   * The key is missing, not undefined, when there is none.
    */
   bonusDamage?: number;
 }

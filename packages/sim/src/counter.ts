@@ -39,22 +39,6 @@ export function buildCounter(state: GameState, caster: ChampionState, slot: Slot
 }
 
 /**
- * Spends the caster's whole counter and returns the stacks spent (0 for a kit with no counter, or
- * one already at 0). Called by `fire` in `cast.ts` on the tick the cast fires, before any effect of
- * the cast lands, for a `consumeCounter` in the ability. It sets `count` to 0 and the window stamp
- * `lastHitTick` to 0 (the #227 invariant holds: a count of 0 has a stamp of 0) and touches nothing
- * else, so a spend at 0 stacks is a no-op. A plain read and two writes: it allocates nothing.
- */
-export function spendCounter(caster: ChampionState): number {
-  const counter = caster.counter;
-  if (counter === undefined || counter.count === 0) return 0;
-  const stacks = counter.count;
-  counter.count = 0;
-  counter.lastHitTick = 0;
-  return stacks;
-}
-
-/**
  * Step 6d. Resets every counter whose window has run out: `windowTicks` or more ticks since the last
  * qualifying hit. Dead champions are included. A counter at 0 is left alone, so its `lastHitTick`
  * stays 0. A hit in step T keeps the count through step T + `windowTicks` - 1 and the count is 0 at
@@ -74,4 +58,20 @@ export function stepCounters(state: GameState): void {
       counter.lastHitTick = 0;
     }
   }
+}
+
+/**
+ * The spend verb (rules 2.6, v3 design 4.4b): takes the caster's whole counter and returns the
+ * stacks spent, or 0 when the caster has no counter or it is at 0 (the 0-stack no-op, which touches
+ * nothing). The window stamp is cleared with the count. `fire` in `cast.ts` calls it before the
+ * cast's effects run, so the bonus rides on every entity the cast makes and the cooldown cut applies
+ * to the value as it stands at that moment. This allocates nothing and does not import `cast.ts`.
+ */
+export function spendCounter(state: GameState, caster: ChampionState): number {
+  const counter = caster.counter;
+  if (counter === undefined || counter.count <= 0) return 0;
+  const spent = counter.count;
+  counter.count = 0;
+  counter.lastHitTick = 0;
+  return spent;
 }
