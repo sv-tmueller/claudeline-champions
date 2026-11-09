@@ -2595,13 +2595,15 @@ scene, and in `nearerThanEnemies` 152 B in both, red on Node 22 in every round
 (3 of 3 runs); a double argument to a call Maglev does not inline reads 64 and 80
 B, red on Node 26.7.0 in Maglev alone (3 of 3 runs).
 
-`orb-match.test.ts` plays a Quillon and a Hargrim against a Lumeth and a Hargrim on
+`orb-match.test.ts` plays a Lumeth and a Hargrim against a Lumeth and a Hargrim on
 both arenas with the orb on (seeds 101 to 104, match seed 7, normal, 3 rounds to
 win, to matchEnd, `SIX_SET`): the press oracle on every press, `think` leaves the
-checksum alone, no blocked escape, no stall over 120 ticks (17 and 21), inside the
+checksum alone, no blocked escape, no stall over 120 ticks (26 and 15), inside the
 budget, and the bots take the orb in more than half of the rounds in which it is
-collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 2 of 3).
-With the contest switched off the two cells are red.
+collectible (the tally is `Played.orb` of `press-oracle.ts`: 5 of 5 and 3 of 4).
+With the contest switched off the two cells are red. The pair was the Quillon v
+Lumeth mirror of #225 until #187 capped the one-hit area lead (see "The energy
+orb").
 
 The identity harness (the 16 rows of PR #142's harness, orb off: free play has no
 match flow, so `orbUpInto` is false on every think) is unchanged: all 16 hashes
