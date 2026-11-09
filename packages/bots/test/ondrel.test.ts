@@ -20,7 +20,7 @@ const CELLS = [
   cellOf('ondrel', 'lumeth', 'arena02', 5757, 1645),
   cellOf('ondrel', 'skerrow', 'arena01', 3281, 1105),
   cellOf('ondrel', 'skerrow', 'arena02', 5468, 1204),
-  cellOf('ondrel', 'brimwick', 'arena01', 3703, 1027),
+  cellOf('ondrel', 'brimwick', 'arena01', 3944, 1379),
   cellOf('ondrel', 'brimwick', 'arena02', 4124, 1329),
 ];
 

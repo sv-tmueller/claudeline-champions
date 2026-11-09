@@ -420,8 +420,8 @@ the Lumeth mirror in place.
 
 | Arena   | Ended | Longest ordinary round | Orb rounds | Taken | Taker team | Worst stall |
 | ------- | ----- | ---------------------- | ---------- | ----- | ---------- | ----------- |
-| arena01 | 11956 | 3395                   | 5          | 5     | A 2, B 3   | 26          |
-| arena02 | 8892  | 2465                   | 4          | 3     | A 1, B 2   | 15          |
+| arena01 | 11085 | 3658                   | 4          | 3     | A 1, B 2   | 15          |
+| arena02 | 9611  | 2609                   | 4          | 4     | A 3, B 1   | 15          |
 
 The mirror of the product's match (Hargrim and Quillon a side) is not that pair: its
 rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds on the two arenas. A cell
@@ -2257,16 +2257,19 @@ The rows that move are the ones whose scenes put a melee bot into a latched
 advance (the kits rows, the two low-health kit rows, plainLow and the two Lumeth
 rows); the five that stand (headless, stall, plain1200, plainOther, skerrow)
 never do within their length. The seeded runs that move, re-recorded each by its
-own formula: the four Lumeth runs end at ticks 7 836 (2v2 arena01, was 8 254;
-round term 1900, budget 19 000), 5 271 (2v2 arena02, was 5 698; 1700, 16 000),
-9 504 (3v3 arena01, was 9 357; 2 300, 22 000) and 11 567 (3v3 arena02, was
-6 442; 3 100, 25 000), in `lumeth.test.ts` and the harness rows of
+own formula: the four Lumeth runs end at ticks 8 438 (2v2 arena01, was 8 254;
+round term 2500, budget 21 000), 5 271 (2v2 arena02, was 5 698; 1700, 16 000),
+9 504 (3v3 arena01, was 9 357; 2 300, 22 000) and 4 809 (3v3 arena02, was
+6 295 since #187; 2 900, 18 000), on the tree merged with #187 and #160, in `lumeth.test.ts` and the harness rows of
 `tools/balance/harness.test.ts`; the cells of `brimwick.test.ts`, `ondrel.test.ts`
 and `durnhal.test.ts` that passed their term (Brimwick against Quillon on arena02
 4499 and 1200; Ondrel against Quillon on arena02 4610 and 1103 and against Lumeth
 on arena02 5757 and 1645; Durnhal against Hargrim on arena01 5235 and 1199,
 against Quillon on arena01 2843 and 758 and against Ondrel on arena01 5226 and
-1530); Ondrel against Quillon on arena02 keeps its no-dash record and the byte
+1530; on the merged tree also Ondrel against Brimwick on arena01 3944 and 1379, whose
+longest round passed its term of 1100, and the two orb cells of `orb-match.test.ts`,
+Lumeth against Lumeth on arena01 11085 and 3658 and on arena02 9611 and 2609, which
+read 3 and 4 of 4 orb rounds taken); Ondrel against Quillon on arena02 keeps its no-dash record and the byte
 `glides` 0 exception moves with it to Ondrel against Brimwick on arena02 (now
 glides 1, brimwick glides 0); the displaced-teleport run of `headless-kits.test.ts`
 moves from seeds 738 to 743 to 768 to 773 (tick 366, champion 2's Skip, 0.12 m;
@@ -2296,13 +2299,14 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (8254, 5698, 9357 and 6295, the last since #187;
+tick when the budget was set (8438, 5271, 9504 and 4809, since #222 on the tree
+merged with #187; 8254, 5698, 9357 and 6295 before, the last since #187;
 6442 since #213; 5081, 7521,
 6773 and 10934 before, the first moved from 6623 with #186), plus two rounds of the
-longest round that did not go to sudden death, rounded up to 100 (2300 in the 2v2
-runs, whose longest is 2265 since #213 and was 1619 before, and 2900 in the 3v3
+longest round that did not go to sudden death, rounded up to 100 (2500 in the 2v2
+runs, whose longest is 2494 since #222 and was 2265 since #213 and 1619 before, and 2900 in the 3v3
 runs, the client's longest for the same roster, 2801), and one of 7000, rounded up
-to 1000 (20000, 18000, 23000 and 20000; 16000, 18000, 20000 and 24000 before #213,
+to 1000 (21000, 16000, 22000 and 18000; 20000, 18000, 23000 and 20000 before #222; 16000, 18000, 20000 and 24000 before #213,
 the first 18000 before #186); a run whose longest round passes its term fails. Every run has a Lumeth heal an ally; across the four,
 Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy, and
 Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
@@ -2817,9 +2821,9 @@ B, red on Node 26.7.0 in Maglev alone (3 of 3 runs).
 `orb-match.test.ts` plays a Lumeth and a Hargrim against a Lumeth and a Hargrim on
 both arenas with the orb on (seeds 101 to 104, match seed 7, normal, 3 rounds to
 win, to matchEnd, `SIX_SET`): the press oracle on every press, `think` leaves the
-checksum alone, no blocked escape, no stall over 120 ticks (26 and 15), inside the
+checksum alone, no blocked escape, no stall over 120 ticks (15 and 15), inside the
 budget, and the bots take the orb in more than half of the rounds in which it is
-collectible (the tally is `Played.orb` of `press-oracle.ts`: 5 of 5 and 3 of 4).
+collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 4 of 4 since #222, 5 of 5 and 3 of 4 before).
 With the contest switched off the two cells are red. The pair was the Quillon v
 Lumeth mirror of #225 until #187 capped the one-hit area lead (see "The energy
 orb").
