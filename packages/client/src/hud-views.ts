@@ -4,6 +4,7 @@ import {
   TICK_RATE,
   ULTIMATE_ENERGY_COST,
   type ChampionState,
+  type KitDef,
   type MatchState,
   type StatusInstance,
 } from '@claudeline/sim';
@@ -12,12 +13,26 @@ import {
 const ULTIMATE_INDEX = SLOTS.length - 1;
 
 /**
+ * The number of pip slots a champion's counter has: the cap of the kit whose id is
+ * the champion id, or 0 for a champion whose kit declares no counter (and for a
+ * champion with no kit at all). Read once per match, never on the frame path.
+ */
+export function counterCap(kits: readonly KitDef[], championId: string): number {
+  for (let i = 0; i < kits.length; i++) {
+    const kit = kits[i] as KitDef;
+    if (kit.id === championId) return kit.counter === undefined ? 0 : kit.counter.cap;
+  }
+  return 0;
+}
+
+/**
  * What the HUD reads from a champion: the sim's own fields, so a rename there
  * breaks the build. `cooldowns` holds one remaining-tick entry per slot in
- * `SLOTS` order, `cast` is non-null during a windup and `statuses` holds the
- * silence and the shields.
+ * `SLOTS` order, `cast` is non-null during a windup, `statuses` holds the
+ * silence and the shields, and `counter` is the on-hit counter (rules.md
+ * section 2.6), missing for a kit that declares none.
  */
-export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast' | 'statuses'>;
+export type SlotSource = Pick<ChampionState, 'energy' | 'cooldowns' | 'cast' | 'statuses' | 'counter'>;
 
 export interface SlotView {
   /** Whole seconds of cooldown left, 0 when the slot is ready. */

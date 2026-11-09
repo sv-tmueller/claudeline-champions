@@ -20,6 +20,11 @@ export interface AreaSpec {
    * until then. The key is left out of the entity when this is undefined.
    */
   fuseTicks?: number | undefined;
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect of
+   * every pulse. The key is left out of the entity when this is undefined.
+   */
+  bonusDamage?: number | undefined;
 }
 
 function fail(problem: string): never {
@@ -50,6 +55,9 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
   }
   if (spec.fuseTicks !== undefined && !isPositiveInteger(spec.fuseTicks)) {
     return fail('fuseTicks must be a positive integer');
+  }
+  if (spec.bonusDamage !== undefined && !Number.isFinite(spec.bonusDamage)) {
+    return fail('bonusDamage is not a finite number');
   }
   if (spec.targets !== 'enemies' && spec.targets !== 'allies' && spec.targets !== 'all') {
     return fail(`unknown targets ${String(spec.targets)}`);
@@ -89,6 +97,8 @@ export function spawnArea(state: GameState, spec: AreaSpec, castId: number | nul
     area.ticksToNextApply = spec.fuseTicks;
     area.remainingTicks = spec.fuseTicks + spec.durationTicks;
   }
+  // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
+  if (spec.bonusDamage !== undefined) area.bonusDamage = spec.bonusDamage;
   state.areas.push(area);
   state.events.push({
     type: 'areaSpawned',

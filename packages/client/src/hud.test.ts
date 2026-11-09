@@ -13,7 +13,7 @@ import { Hud, type HudHandles } from './hud';
 import { KILL_FEED_LINES, KILL_FEED_TICKS, createKillFeed, type KillFeed } from './kill-feed';
 import type { SlotSource } from './hud-views';
 import { fake, type Fake } from './test-fake';
-import { TEST_KITS } from './test-kits';
+import { TEST_KITS, HARGRIM_KIT, QUILLON_KIT } from './test-kits';
 
 interface Rig {
   hud: Hud;
@@ -26,6 +26,7 @@ interface Rig {
     exMark: Fake;
     ultimateMark: Fake;
     shield: { root: Fake; fill: Fake };
+    pips: { root: Fake; slots: Fake[] };
     slots: { icon: Fake; seconds: Fake }[];
     score: Fake;
     timer: Fake;
@@ -34,7 +35,7 @@ interface Rig {
   };
 }
 
-function rig(threeVThree = false): Rig {
+function rig(threeVThree = false, counterCap = 0): Rig {
   const state = createMatch(
     threeVThree
       ? {
@@ -61,7 +62,9 @@ function rig(threeVThree = false): Rig {
         },
     parseArenaDef(arena01Json),
     1,
-    TEST_KITS,
+    counterCap > 0
+      ? [{ ...HARGRIM_KIT, counter: { from: 'Q', cap: counterCap, windowTicks: 120 } }, QUILLON_KIT]
+      : TEST_KITS,
   );
   const elements = {
     healthText: fake(),
@@ -70,6 +73,7 @@ function rig(threeVThree = false): Rig {
     exMark: fake(),
     ultimateMark: fake(),
     shield: { root: fake(), fill: fake() },
+    pips: { root: fake(), slots: Array.from({ length: counterCap }, () => fake()) },
     slots: SLOTS.map(() => ({ icon: fake(), seconds: fake() })),
     score: fake(),
     timer: fake(),
@@ -78,7 +82,7 @@ function rig(threeVThree = false): Rig {
   };
   const feed = createKillFeed();
   const handles: HudHandles = elements;
-  const hud = new Hud(handles, state.champions, 0, feed, 3);
+  const hud = new Hud(handles, state.champions, 0, feed, 3, counterCap);
   return { hud, state, feed, elements };
 }
 
@@ -91,6 +95,8 @@ function allElements(elements: Rig['elements']): Fake[] {
     elements.ultimateMark,
     elements.shield.root,
     elements.shield.fill,
+    elements.pips.root,
+    ...elements.pips.slots,
     ...elements.slots.flatMap((slot) => [slot.icon, slot.seconds]),
     elements.score,
     elements.timer,
@@ -137,6 +143,8 @@ describe('HUD first update', () => {
     // The shield is built hidden at 0, so the first update writes nothing for it.
     expect(elements.shield.root.log).toEqual([]);
     expect(elements.shield.fill.log).toEqual([]);
+    // The pip container is built hidden for a kit with no counter, so nothing is written.
+    expect(elements.pips.root.log).toEqual([]);
     expect(elements.score.log).toEqual(['text=0 : 0']);
     expect(elements.timer.log).toEqual(['text=1:30', 'data-sudden=false']);
     for (const { line, killer, victim } of elements.lines) {
@@ -813,5 +821,87 @@ describe('HUD kill feed of a 3v3', () => {
     expect(elements.lines[4]?.killer.log.slice(-2)).toEqual(['text=Quillon', 'data-team=ally']);
     expect(elements.lines[4]?.victim.log.slice(-2)).toEqual(['text=Quillon', 'data-team=enemy']);
     expect(elements.lines[0]?.killer.log.slice(-2)).toEqual(['text=Quillon', 'data-team=enemy']);
+  });
+});
+
+describe('HUD counter pips', () => {
+  it('hides the pip row for a champion without a counter', () => {
+    const { hud, state, elements } = rig();
+    hud.update(state);
+    clearLogs(elements);
+    hud.update(state);
+    expect(elements.pips.root.log).toEqual([]);
+    expect(elements.pips.slots).toEqual([]);
+  });
+
+  it('shows the row of a counter champion, all slots empty at a count of 0', () => {
+    const { hud, state, elements } = rig(false, 3);
+    hud.update(state);
+    expect(elements.pips.root.log).toEqual(['data-visible=true']);
+    for (const slot of elements.pips.slots) expect(slot.log).toEqual(['data-filled=false']);
+  });
+
+  it('fills the first count pips and empties the rest, for every count of the cap', () => {
+    for (const count of [0, 1, 2, 3]) {
+      // A fresh rig, so each count starts from the cache of a never-written slot.
+      const { hud, state, elements } = rig(false, 3);
+      local(state).counter = { count, lastHitTick: 0 };
+      hud.update(state);
+      expect(elements.pips.slots.map((slot) => slot.log), `count ${count}`).toEqual(
+        [0, 1, 2].map((i) => [`data-filled=${i < count}`]),
+      );
+      expect(elements.pips.root.log).toEqual(['data-visible=true']);
+    }
+  });
+
+  it('writes nothing on a steady frame with a counter shown', () => {
+    const { hud, state, elements } = rig(false, 3);
+    local(state).counter = { count: 2, lastHitTick: 0 };
+    hud.update(state);
+    clearLogs(elements);
+    hud.update(state);
+    hud.update(state);
+    expect(writeCount(elements)).toBe(0);
+  });
+
+  it('writes only the pip that changed in the very update that first sees the count', () => {
+    const { hud, state, elements } = rig(false, 3);
+    local(state).counter = { count: 2, lastHitTick: 0 };
+    hud.update(state);
+    clearLogs(elements);
+    local(state).counter = { count: 3, lastHitTick: 10 };
+    hud.update(state);
+    expect(elements.pips.slots[2]?.log).toEqual(['data-filled=true']);
+    expect(elements.pips.slots[0]?.log).toEqual([]);
+    expect(elements.pips.slots[1]?.log).toEqual([]);
+    expect(writeCount(elements)).toBe(1);
+  });
+
+  it('clears every pip when the count decays back to 0 in one update', () => {
+    const { hud, state, elements } = rig(false, 3);
+    local(state).counter = { count: 3, lastHitTick: 0 };
+    hud.update(state);
+    clearLogs(elements);
+    local(state).counter = { count: 0, lastHitTick: 0 };
+    hud.update(state);
+    for (const slot of elements.pips.slots) expect(slot.log).toEqual(['data-filled=false']);
+    expect(writeCount(elements)).toBe(3);
+  });
+
+  it('reads a cap of 5 as five slots, the most a kit may declare', () => {
+    const { hud, state, elements } = rig(false, 5);
+    local(state).counter = { count: 5, lastHitTick: 0 };
+    hud.update(state);
+    expect(elements.pips.slots).toHaveLength(5);
+    for (const slot of elements.pips.slots) expect(slot.log).toEqual(['data-filled=true']);
+    expect(elements.pips.root.log).toEqual(['data-visible=true']);
+  });
+
+  it('clamps a count past the cap to the slots it has', () => {
+    const { hud, state, elements } = rig(false, 2);
+    local(state).counter = { count: 3, lastHitTick: 0 };
+    hud.update(state);
+    expect(elements.pips.slots).toHaveLength(2);
+    for (const slot of elements.pips.slots) expect(slot.log).toEqual(['data-filled=true']);
   });
 });
