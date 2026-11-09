@@ -180,6 +180,7 @@ function runEffects(
             effects: effect.effects,
             // `spawnProjectile` leaves the key out of the entity when this is undefined.
             allyEffects: effect.allyEffects,
+            endArea: effect.endArea,
             bonusDamage: bonusDamage > 0 ? bonusDamage : undefined,
           },
           cast.castId,

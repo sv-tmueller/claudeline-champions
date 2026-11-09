@@ -26,6 +26,20 @@ export type AreaPlacement =
   | { type: 'aim'; range: number };
 
 /**
+ * Spec 4.3: the payload of a projectile's `endArea`, the fields of an `area` but its `placement`.
+ * The spawned area obeys every area rule, the fuse (rules 2.7) included.
+ */
+export interface EndAreaSpec {
+  radius: number;
+  durationTicks: number;
+  intervalTicks: number;
+  targets: AreaTargets;
+  effects: Effect[];
+  /** Rules 2.7: read as on any area. The key is left out when there is none. */
+  fuseTicks?: number;
+}
+
+/**
  * One step of an ability. A closed union run by a `switch` in `cast.ts`: the toolkit, not a
  * scripting language. Hit effects (`effects` on a projectile, area or arc) land on the champions
  * the entity touches; `applyStatus`, `shield` and `heal` at this level land on the caster.
@@ -46,6 +60,12 @@ export type AbilityEffect =
        * projectile pass enemies. The key is left out when there is none.
        */
       allyEffects?: Effect[];
+      /**
+       * Spec 4.3: an area (the `area` payload without `placement`) spawned where the projectile
+       * ends: at the end of its lifetime, on a blocking obstacle or on the arena edge, never on a
+       * champion hit. Rejected together with `pierce`. The key is left out when there is none.
+       */
+      endArea?: EndAreaSpec;
     }
   | {
       type: 'area';
@@ -196,6 +216,14 @@ function readHitEffects(value: unknown, path: string): Effect[] {
   return copyEffects(value as Effect[], (problem) => fail(path, problem));
 }
 
+/** The `targets` of an area or an `endArea`; one of the three team words. */
+function readTargets(value: unknown, path: string): AreaTargets {
+  if (value !== 'enemies' && value !== 'allies' && value !== 'all') {
+    return fail(path, `unknown targets ${String(value)}`);
+  }
+  return value;
+}
+
 function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffect {
   const effect = readObject(value, path);
   const at = (key: string) => `${path}.${key}`;
@@ -224,6 +252,24 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
         effects,
       };
       if (ally !== undefined) projectile.allyEffects = readHitEffects(ally, at('allyEffects'));
+      if (effect['endArea'] !== undefined) {
+        // Spec 4.3: the two are disjoint; keep it disjoint here rather than in the sweep.
+        if (pierce) return fail(at('endArea'), 'a piercing projectile cannot carry an endArea');
+        // The area payload without `placement`; unknown keys, `placement` included, are dropped.
+        const area = readObject(effect['endArea'], at('endArea'));
+        const areaAt = (key: string) => `${at('endArea')}.${key}`;
+        const endArea: EndAreaSpec = {
+          radius: readMagnitude(area['radius'], areaAt('radius')),
+          durationTicks: readTicks(area['durationTicks'], areaAt('durationTicks')),
+          intervalTicks: readTicks(area['intervalTicks'], areaAt('intervalTicks')),
+          targets: readTargets(area['targets'], areaAt('targets')),
+          effects: readHitEffects(area['effects'], areaAt('effects')),
+        };
+        if (area['fuseTicks'] !== undefined) {
+          endArea.fuseTicks = readTicks(area['fuseTicks'], areaAt('fuseTicks'));
+        }
+        projectile.endArea = endArea;
+      }
       return projectile;
     }
     case 'area': {
@@ -239,10 +285,7 @@ function readEffect(value: unknown, path: string, inThen: boolean): AbilityEffec
       const radius = readMagnitude(effect['radius'], at('radius'));
       const durationTicks = readTicks(effect['durationTicks'], at('durationTicks'));
       const intervalTicks = readTicks(effect['intervalTicks'], at('intervalTicks'));
-      const targets: unknown = effect['targets'];
-      if (targets !== 'enemies' && targets !== 'allies' && targets !== 'all') {
-        return fail(at('targets'), `unknown targets ${String(targets)}`);
-      }
+      const targets = readTargets(effect['targets'], at('targets'));
       const area: Extract<AbilityEffect, { type: 'area' }> = {
         type,
         placement,

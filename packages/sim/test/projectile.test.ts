@@ -802,3 +802,153 @@ describe('spawnProjectile allyEffects checks', () => {
     );
   });
 });
+
+describe('a projectile that spawns an endArea where it ends (spec 4.3)', () => {
+  const endArea = {
+    radius: 2,
+    durationTicks: 30,
+    intervalTicks: 30,
+    targets: 'enemies' as const,
+    effects: [{ type: 'damage', amount: 10 } as const],
+  };
+
+  it('spawns it at the exact position and tick on the lifetime end, not a tick before', () => {
+    const state = open();
+    spawnProjectile(state, spec({ x: -5, y: 8, speed: 10, lifetimeTicks: 5, endArea }));
+    for (let i = 0; i < 4; i++) {
+      step(state, []);
+      expect(state.areas).toHaveLength(0);
+    }
+    step(state, []);
+    expect(state.projectiles).toHaveLength(0);
+    expect(state.areas).toHaveLength(1);
+    const area = state.areas[0];
+    expect(area).toMatchObject({ ownerId: 0, radius: 2, y: 8 });
+    expect(area?.x).toBeCloseTo(-5 + (5 * 10) / 60, 9);
+    expect(ofType(state.events, 'projectileExpired')).toMatchObject([{ reason: 'lifetime' }]);
+    // The expired event comes first, the area spawn second.
+    expect(state.events.map((e) => e.type)).toEqual(['projectileExpired', 'areaSpawned']);
+  });
+
+  it('spawns it at the contact point on a blocking obstacle', () => {
+    const wall: Obstacle = { type: 'rect', x: 0, y: 0, w: 0.5, h: 4, height: 1, blocksProjectiles: true };
+    const state = open([wall]);
+    spawnProjectile(state, spec({ speed: 120, endArea }));
+    const events = runOut(state);
+    const [expired] = ofType(events, 'projectileExpired');
+    expect(expired?.reason).toBe('obstacle');
+    expect(expired?.x).toBeCloseTo(-0.45, 9);
+    expect(state.areas).toHaveLength(1);
+    expect(state.areas[0]?.x).toBeCloseTo(-0.45, 9);
+  });
+
+  it('spawns it on the arena edge, at the boundary stop', () => {
+    const state = open();
+    spawnProjectile(state, spec({ x: -5, y: 8, endArea }));
+    runOut(state);
+    expect(state.areas).toHaveLength(1);
+    expect(state.areas[0]?.x).toBeCloseTo(14.8, 9);
+  });
+
+  it('does not spawn it when it ends on a champion hit', () => {
+    const state = open();
+    place(state, 2, 5, 0);
+    spawnProjectile(state, spec({ endArea }));
+    const events = runOut(state);
+    expect(ofType(events, 'projectileHit')).toHaveLength(1);
+    expect(ofType(events, 'projectileExpired')).toMatchObject([{ reason: 'hit' }]);
+    expect(state.areas).toHaveLength(0);
+  });
+
+  it('spawns nothing at round end, where the projectile is cleared without a sweep', () => {
+    const state = createMatch({ ...config2v2(), roundsToWin: 3 }, openArena(), 1);
+    for (let i = 0; i < 180; i++) step(state, []);
+    spawnProjectile(state, spec({ x: -10, y: 8, dirX: 0, dirY: 1, speed: 6, lifetimeTicks: 600, endArea }));
+    // Team B is wiped, so the round is decided in the very step, before the lifetime end.
+    kill(state, 2);
+    kill(state, 3);
+    step(state, []);
+    expect(state.projectiles).toHaveLength(0);
+    expect(state.areas).toHaveLength(0);
+  });
+
+  it('copies the endArea into the entity, key left out when absent', () => {
+    const withEnd = open();
+    spawnProjectile(withEnd, spec({ endArea }));
+    expect(withEnd.projectiles[0]?.endArea).toEqual(endArea);
+    expect(withEnd.projectiles[0]?.endArea).not.toBe(endArea);
+    const without = open();
+    spawnProjectile(without, spec());
+    expect(without.projectiles[0]).not.toHaveProperty('endArea');
+  });
+
+  it('carries the cast id into the spawned area, so its hits keep earning energy', () => {
+    const state = open();
+    const cast = 7;
+    state.casts.push({ id: cast, casterId: 0, slot: 'Q', ex: false, credited: [] });
+    spawnProjectile(state, spec({ x: -5, y: 8, speed: 10, lifetimeTicks: 5, endArea }), cast);
+    runOut(state);
+    expect(state.areas[0]?.castId).toBe(cast);
+    // The cast record is kept alive by the area after the projectile is gone.
+    expect(state.casts.map((c) => c.id)).toContain(cast);
+  });
+
+  it('spawns it even when the caster has died since firing (lead decision 2)', () => {
+    const state = open();
+    spawnProjectile(state, spec({ x: -5, y: 8, speed: 10, lifetimeTicks: 5, endArea }));
+    kill(state, 0);
+    step(state, []);
+    for (let i = 0; i < 4; i++) step(state, []);
+    expect(state.areas).toHaveLength(1);
+    expect(state.areas[0]?.ownerId).toBe(0);
+  });
+
+  it('pulses the contact-spawn on the same tick, but the lifetime-spawn a tick later (lead decision 1)', () => {
+    // A blocking wall right in front: the obstacle spawn happens in phase 4, whose areas pulse in
+    // phase 5 of the same step.
+    const wall: Obstacle = { type: 'rect', x: 0, y: 0, w: 0.5, h: 4, height: 1, blocksProjectiles: true };
+    const contact = open([wall]);
+    place(contact, 2, 0, 8);
+    spawnProjectile(contact, spec({ speed: 120, endArea: { ...endArea, radius: 5 } }));
+    const contactEvents = runOut(contact);
+    expect(ofType(contactEvents, 'areaSpawned')).toHaveLength(1);
+    expect(ofType(contactEvents, 'areaTick')).toHaveLength(1);
+    // The lifetime end is phase 6, after the areas have already pulsed, so the first pulse is the
+    // next tick.
+    const lifetime = open();
+    place(lifetime, 2, -5, 0);
+    spawnProjectile(lifetime, spec({ x: -5, y: 8, speed: 10, lifetimeTicks: 5, endArea: { ...endArea, radius: 5 } }));
+    const lifeEvents = runOut(lifetime);
+    const spawned = lifeEvents.findIndex((e) => e.type === 'areaSpawned');
+    expect(spawned).toBeGreaterThanOrEqual(0);
+    expect(lifeEvents[spawned - 1]?.type, 'the expired event precedes the spawn').toBe('projectileExpired');
+    expect(ofType(lifeEvents, 'areaTick')).toHaveLength(0);
+    step(lifetime, []);
+    expect(ofType(lifetime.events, 'areaTick')).toHaveLength(1);
+  });
+
+  it('rejects a malformed endArea with its path', () => {
+    expect(() => spawnProjectile(open(), spec({ endArea: { ...endArea, radius: 0 } as never }))).toThrow(
+      'Invalid projectile: endArea radius must be above 0',
+    );
+    expect(() => spawnProjectile(open(), spec({ endArea: { ...endArea, durationTicks: 0 } as never }))).toThrow(
+      'Invalid projectile: endArea durationTicks must be a positive integer',
+    );
+    expect(() => spawnProjectile(open(), spec({ endArea: { ...endArea, fuseTicks: 0 } as never }))).toThrow(
+      'Invalid projectile: endArea fuseTicks must be a positive integer',
+    );
+  });
+
+  it('rejects pierce together with an endArea at the spawnProjectile boundary too', () => {
+    // `validateKit` rejects the combination, but a dev tool spawns straight through here, so the
+    // rule is enforced at this boundary as well (finding 3 of the round-1 report).
+    const state = open();
+    expect(() => spawnProjectile(state, spec({ pierce: true, endArea }))).toThrow(
+      'Invalid projectile: endArea a piercing projectile cannot carry an endArea',
+    );
+    expect(state.projectiles).toHaveLength(0);
+    // Pierce alone and an endArea alone stay valid.
+    expect(() => spawnProjectile(open(), spec({ pierce: true }))).not.toThrow();
+    expect(() => spawnProjectile(open(), spec({ endArea }))).not.toThrow();
+  });
+});

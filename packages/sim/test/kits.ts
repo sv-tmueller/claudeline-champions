@@ -12,6 +12,109 @@ import type { AbilitySpec, KitDef, Slot, SlotSpec } from '../src/index';
 
 export const STRIKER_ID = 'test-striker';
 export const MENDER_ID = 'test-mender';
+export const ENDER_ID = 'test-ender';
+
+/**
+ * The ender (spec 4.3, #160): no shipped kit carries an `endArea` yet, so this one does, on every
+ * projectile it fires. It mirrors the striker's stats and is used only by the scripted `endArea`
+ * fixture; the ability and roster fixtures stay on the striker and the mender, so they do not move.
+ */
+export function testEnder(): KitDef {
+  const area = {
+    radius: 2,
+    durationTicks: 30,
+    intervalTicks: 30,
+    targets: 'enemies' as const,
+    effects: [{ type: 'damage' as const, amount: 10 }],
+  };
+  return {
+    id: ENDER_ID,
+    maxHealth: 160,
+    moveSpeed: 5.5,
+    support: false,
+    ex: ['M2', 'SPACE'],
+    slots: {
+      // An instant arc, so a close enemy still trades blows and the round can end.
+      M1: {
+        cooldownTicks: 20,
+        windupTicks: 0,
+        movement: 'free',
+        effects: [
+          { type: 'meleeArc', radius: 2.5, cosHalfAngle: 0.643, effects: [{ type: 'damage', amount: 10 }] },
+        ],
+      },
+      // A non-piercing bolt whose endArea has no fuse: it spawns on a lifetime, obstacle or edge end.
+      M2: {
+        cooldownTicks: 120,
+        windupTicks: 6,
+        movement: 'free',
+        effects: [
+          {
+            type: 'projectile',
+            speed: 20,
+            radius: 0.3,
+            lifetimeTicks: 24,
+            pierce: false,
+            effects: [{ type: 'damage', amount: 12 }],
+            endArea: area,
+          },
+        ],
+        ex: {
+          windupTicks: 0,
+          movement: 'free',
+          effects: [
+            {
+              type: 'projectile',
+              speed: 25,
+              radius: 0.25,
+              lifetimeTicks: 30,
+              pierce: false,
+              effects: [{ type: 'damage', amount: 16 }],
+              endArea: area,
+            },
+          ],
+        },
+      },
+      // The same, with a fuse (rules 2.7) on the endArea, so the armed spawn is exercised too.
+      SPACE: {
+        cooldownTicks: 240,
+        windupTicks: 0,
+        movement: 'free',
+        effects: [
+          {
+            type: 'projectile',
+            speed: 16,
+            radius: 0.4,
+            lifetimeTicks: 18,
+            pierce: false,
+            effects: [{ type: 'damage', amount: 10 }],
+            endArea: { ...area, fuseTicks: 30 },
+          },
+        ],
+        ex: {
+          windupTicks: 0,
+          movement: 'free',
+          effects: [
+            {
+              type: 'projectile',
+              speed: 14,
+              radius: 0.45,
+              lifetimeTicks: 24,
+              pierce: false,
+              effects: [{ type: 'damage', amount: 12 }],
+              endArea: { ...area, durationTicks: 60, intervalTicks: 30, fuseTicks: 45 },
+            },
+          ],
+        },
+      },
+      Q: quiet(),
+      E: quiet(),
+      R: quiet(),
+      F: quiet(),
+    },
+  };
+}
+
 
 /** The striker: damage dealer, `support: false`, 160 health. */
 export function testStriker(): KitDef {
@@ -187,8 +290,7 @@ export function testStriker(): KitDef {
 }
 
 /** The mender: heals allies, `support: true`, 120 health. */
-export function testMender(): KitDef {
-  return {
+export function testMender(): KitDef {  return {
     id: MENDER_ID,
     maxHealth: 120,
     moveSpeed: 5.5,

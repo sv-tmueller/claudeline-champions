@@ -157,8 +157,48 @@ describe('checksum of combat state', () => {
     expect(checksum(cloneState(fusedArea(45)))).toBe(base);
   });
 
-  it('throws on a NaN projectile coordinate', () => {
-    const state = armed();
+  it('changes with the endArea of a projectile, and with the key alone', () => {
+    const ending = (radius: number): GameState => {
+      const state = fresh();
+      spawnProjectile(state, {
+        ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2,
+        lifetimeTicks: 60, pierce: false, effects: [{ type: 'damage', amount: 10 }],
+        endArea: { radius, durationTicks: 30, intervalTicks: 30, targets: 'enemies', effects: [{ type: 'damage', amount: 5 }] },
+      });
+      return state;
+    };
+    const base = checksum(ending(2));
+    expect(checksum(ending(2))).toBe(base);
+    expect(checksum(ending(3))).not.toBe(base);
+    // The same state with only the key gone: nothing else differs, so the key is what the checksum sees.
+    const keyless = cloneState(ending(2));
+    delete keyless.projectiles[0]!.endArea;
+    expect(keyless.projectiles[0]).not.toHaveProperty('endArea');
+    expect(checksum(keyless)).not.toBe(base);
+    expect(checksum(cloneState(ending(2)))).toBe(base);
+  });
+
+  it('changes with the endArea effects and its fuseTicks', () => {
+    const ending = (mutate: (area: NonNullable<GameState['projectiles'][0]['endArea']>) => void): GameState => {
+      const state = fresh();
+      spawnProjectile(state, {
+        ownerId: 0, x: -5, y: 0, dirX: 1, dirY: 0, speed: 25, radius: 0.2,
+        lifetimeTicks: 60, pierce: false, effects: [{ type: 'damage', amount: 10 }],
+        endArea: { radius: 2, durationTicks: 30, intervalTicks: 30, targets: 'enemies', effects: [{ type: 'damage', amount: 5 }] },
+      });
+      const area = state.projectiles[0]?.endArea;
+      if (!area) throw new Error('missing endArea');
+      mutate(area);
+      return state;
+    };
+    const base = checksum(ending(() => {}));
+    expect(
+      checksum(ending((area) => void ((area.effects[0] as { amount: number }).amount += 1))),
+    ).not.toBe(base);
+    expect(checksum(ending((area) => void (area.fuseTicks = 45)))).not.toBe(base);
+  });
+
+  it('throws on a NaN projectile coordinate', () => {    const state = armed();
     state.projectiles[0]!.y = NaN;
     expect(() => checksum(state)).toThrow('non-finite');
   });
