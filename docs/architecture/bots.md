@@ -787,6 +787,9 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 - The deadlock rule's latched advance is a retreat, so a latched Quillon that a target closes on
   within 6 m blinks away. The #58 scene of the Deadlock section passes with both kit sets; the
   fallback if that ever fails is to leave the latched advance out of the trigger.
+  `escapes.test.ts` pins it (`the escape of a latched advance`): a Quillon latched on a target 16 m
+  off presses Skip, aimed 4 m straight away, from the latched stand once the target closes to 4 m,
+  and the row goes red with the latched advance left out of the trigger.
 
 The held ultimate: Skerrow's Reaper's Dance and Brimwick's Grand Finale are held for a target she
 can finish or one that cannot get away (`holdF` of the row). The run of F counts only while the
