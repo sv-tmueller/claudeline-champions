@@ -16,6 +16,11 @@ export interface HitSource {
   ownerId: number;
   /** The cast that made it, or null for a dev tool spawn, which earns no energy. */
   castId: number | null;
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b), read off the entity or spec that
+   * carries it: added to each `damage` effect of every hit it lands. Undefined when there is none.
+   */
+  bonusDamage?: number;
 }
 
 /** What a qualifying hit or heal gives before `energyGain`: F 15, an EX variant 10, M1 5, else 10. */
@@ -71,7 +76,15 @@ export function landHit(
     !hasStatus(target, 'invulnerable') &&
     effects.some((e) => e.type === 'damage');
 
-  const restored = applyEffects(state, ownerId, targetId, effects, origin, record ? record.slot : null);
+  const restored = applyEffects(
+    state,
+    ownerId,
+    targetId,
+    effects,
+    origin,
+    record ? record.slot : null,
+    source.bonusDamage,
+  );
 
   // A qualifying hit builds the counter of the slot's kit, every time: the once-per-target rule
   // below is for energy only.

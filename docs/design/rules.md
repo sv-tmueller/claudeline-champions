@@ -149,7 +149,7 @@ When a cast fires a projectile that has ally effects, and the aim position of th
 
 ### 2.6 The on-hit counter `[tuned]`
 
-A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `counter: { from: <slot>, cap: <1 to 5>, windowTicks: <60 to 600> }`. It is the one exception to roster-v1's "a kit has no passive", and it is declared in the kit data and not hidden in code. A kit with no `counter` has none of the state and none of the rules below. The spend verbs of the counter (`consumeCounter`) are part 4.4b (#161) and are not in the sim yet.
+A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `counter: { from: <slot>, cap: <1 to 5>, windowTicks: <60 to 600> }`. It is the one exception to roster-v1's "a kit has no passive", and it is declared in the kit data and not hidden in code. A kit with no `counter` has none of the state and none of the rules below.
 
 - **Build:** a hit by the `from` slot that lands on an enemy adds one, up to `cap`. The EX variant of the `from` slot counts as that slot. A hit lands as it does for energy (section 3.1): the target is an enemy, alive and not invulnerable before the effects, and the hit's effects include `damage`. A hit that a shield fully absorbs still counts. A status, a shield or a push alone does not.
 - **Each hit counts:** unlike energy, the build ignores the once-per-target rule. Each pulse of an area that hits an enemy, and each enemy a piercing projectile or a melee arc hits, adds one.
@@ -159,6 +159,15 @@ A kit may declare one on-hit counter (v3 design section 4.4, part 4.4a, #227): `
 - **Decay:** the whole counter goes to 0 when `windowTicks` ticks pass with no qualifying hit. There is one timer per champion, not one per stack. A hit in tick T keeps the count through tick T + `windowTicks` - 1; it is 0 at the end of tick T + `windowTicks`, unless another hit lands in that tick. A dead champion's counter decays like any other.
 - **Pause:** the window runs during a round and in free play, and it is frozen during the warmup, the round end pause and after the match ends; the count stays as it was.
 - **Reset:** the counter is set to 0 at the start of each round, like energy (section 1.2).
+
+**Spend** (v3 design section 4.4, part 4.4b, #161). An ability's top-level effects may carry one `consumeCounter`, which spends the caster's whole counter on the tick the cast fires and does nothing when the counter is 0 `[spec]`.
+
+- **One verb per effect.** `{ bonusDamagePerStack: <n> }` or `{ cooldownTicksPerStack: <n>, slot: <slot> }`, never both and never neither. A kit may carry at most one `consumeCounter` per ability, and only a kit that declares a `counter` may carry one at all: the verb has nothing to spend without it. It sits at the top level of an ability, never inside a dash's `then`, which fires on a later tick than the cast.
+- **The bounds.** `bonusDamagePerStack` is an integer from 1 to 30 (the catalog ceiling of one non-F hit), and `cooldownTicksPerStack` is an integer from 1 to 600 (the window's top bound). The `slot` is one of the seven, and it may name the casting slot's own cooldown, just set by this cast.
+- **When.** The spend runs in the caster's turn, before the cast's own effects land and before the tick's decay. A windup cast spends when the windup ends (the fire tick); a cast whose caster dies mid-windup never fires and never spends. The cast's own immediate hits (a melee arc) land after the spend and build the counter back by the normal build rule.
+- **The damage verb.** The damage effects of that cast deal `n` more per stack spent, and each damage effect in a hit list gets the bonus. The bonus rides on the projectile, area or melee arc the cast makes, so it lands with every hit of that cast whenever the hit lands, including a projectile that arrives later, each pulse of an area, and each enemy a piercing projectile or an arc touches. The damage range applies to the total, `base + bonus` `[spec]`: the sim checks no damage range itself (the catalog ranges of section 5 are held by the roster tests), so a kit that uses the verb must keep the landed total inside its catalog range. A damage over time applied by the cast gets no bonus; its pulses are a status, not a damage effect of the hit.
+- **The cooldown verb.** The named slot's current cooldown is cut by `n` ticks per stack spent, never below 0; every other slot is untouched. There is no event for it: the spend shows in the cooldown value.
+- **No new event.** The spend emits nothing of its own: the damage shows in the existing `damage` event, and the cooldown cut in the cooldown (decision 4 on #223).
 
 ### 2.7 The fuse on an area `[tuned]`
 

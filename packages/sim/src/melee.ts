@@ -18,6 +18,11 @@ export interface MeleeArcSpec {
   effects: readonly Effect[];
   /** The cast that swung it, whose hits earn energy; it must be in `state.casts`. */
   castId?: number | null;
+  /**
+   * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect it
+   * lands. The melee arc's hits are immediate, so the bonus has no entity to ride.
+   */
+  bonusDamage?: number;
 }
 
 function fail(problem: string): never {
@@ -85,7 +90,7 @@ export function meleeArc(state: GameState, spec: MeleeArcSpec): number[] {
     targetIds: [...targetIds],
   });
   const origin = { x: spec.x + 0, y: spec.y + 0 };
-  const source = { ownerId: spec.ownerId, castId };
+  const source = { ownerId: spec.ownerId, castId, bonusDamage: spec.bonusDamage };
   for (const targetId of targetIds) landHit(state, source, targetId, effects, origin);
   return targetIds;
 }

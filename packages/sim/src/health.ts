@@ -166,7 +166,8 @@ export function upkeepStatuses(state: GameState, champion: ChampionState): void 
  * `heal` effects restored. `origin` is where the hit came from (projectile contact point, area
  * centre, arc origin), which `away` knockback points away from. The statuses it applies carry
  * `slot`, the slot of the cast that landed the hit, or none. `energyGain` is skipped: `landHit`
- * reads it.
+ * reads it. `bonusDamage`, when given and above 0, is added to every `damage` effect's amount
+ * (rules 2.6, v3 design 4.4b): the damage range applies to the total `amount + bonusDamage`.
  */
 export function applyEffects(
   state: GameState,
@@ -175,13 +176,14 @@ export function applyEffects(
   effects: readonly Effect[],
   origin: Point,
   slot: Slot | null = null,
+  bonusDamage = 0,
 ): number {
   const source = { sourceId, slot };
   let restored = 0;
   for (const effect of effects) {
     switch (effect.type) {
       case 'damage':
-        applyDamage(state, targetId, effect.amount, sourceId);
+        applyDamage(state, targetId, bonusDamage > 0 ? effect.amount + bonusDamage : effect.amount, sourceId);
         break;
       case 'heal':
         restored += applyHeal(state, targetId, effect.amount, sourceId);
