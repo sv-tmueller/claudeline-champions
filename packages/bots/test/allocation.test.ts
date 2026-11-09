@@ -616,6 +616,27 @@ function buildScenes(): Scene[] {
       },
       configBrimwick(),
     ),
+    // A Brimwick windup: the same as the escape scene, but Brimwick has pressed Firecracker and
+    // its 24-tick cast is frozen part-way (its other slots on cooldown): `aim` resolves the cap
+    // from the winding-up Firecracker (#187), a one-hit aim-placed area, and takes the capped
+    // branch on every think, so the double local and the one `sqrt` are measured. No press (the
+    // cast is in progress), no move (the target is out of the kite band).
+    scene(
+      'brimwick windup',
+      1,
+      'engage',
+      false,
+      false,
+      (state) => {
+        put(state, 1, -7, -3);
+        put(state, 2, 2, -3);
+        ch(state, 2).vy = 5.5;
+        const me = ch(state, 1);
+        me.cooldowns.fill(100);
+        me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 24, windupLeft: 12 };
+      },
+      configBrimwick(),
+    ),
     // A dodge: Quillon 8 m from Hargrim on a clear lane, every slot on cooldown, so she stands and
     // presses nothing, and two bolts of the Hargrim's team aimed at her, one flying along an axis
     // (vy 0) and one on a diagonal: the threat scan of both on every think, their memo entries,

@@ -1,3 +1,4 @@
+import type { AbilitySpec } from '@claudeline/sim';
 import type { Vec2 } from './grid';
 
 /**
@@ -5,6 +6,58 @@ import type { Vec2 } from './grid';
  * from the kit; this value stands for a champion without a kit and for an ability with none.
  */
 export const NOMINAL_PROJECTILE_SPEED = 20;
+
+/**
+ * The half of the area radius a one-hit aim-placed area caps the lead offset at (#187). The lead
+ * of an ability with no projectile is the nominal 20 m/s intercept, which passes the area centre
+ * over the target when the target keeps its velocity. A one-hit area fires a single pulse at the
+ * centre, so the lead only pays when the pulse lands the target inside the circle; on the #187
+ * re-measure a full-radius cap gained on every one-hit area (Firecracker 94.5 to 98.3 percent,
+ * Firecracker EX 95.2 to 97.4, Binding Sigil 95.6 to 96.4, clean set) but half the radius gained
+ * more (99.3, 98.1 and 97.3), because the circle covers the whole walk of the target over the
+ * cast in one direction and half its width in the other. The cap is measured from the target's
+ * position (the issue's "offset"), plain radius and not radius plus `CHAMPION_RADIUS`. The
+ * lingering areas stay nominal: their pulses walk the circle over the whole duration, so the
+ * nominal lead measured within a point of the best (#165, bots.md Aim).
+ */
+export const AREA_LEAD_CAP_FRACTION = 0.5;
+
+/**
+ * The cap a one-hit aim-placed area puts on the lead offset, or `Infinity` when the ability has
+ * none. The placement restriction is load-bearing: a `self` or `ahead` area does not follow the
+ * aim point, so capping the offset would move the recorded aim for no gain. The one-hit test is
+ * `durationTicks <= intervalTicks` (rules.md 2.7: `ceil(duration/interval)` pulses).
+ */
+export function leadCapOf(spec: AbilitySpec | undefined): number {
+  if (spec === undefined) return Number.POSITIVE_INFINITY;
+  for (const effect of spec.effects) {
+    if (
+      effect.type === 'area' &&
+      effect.placement.type === 'aim' &&
+      effect.durationTicks <= effect.intervalTicks
+    ) {
+      return effect.radius * AREA_LEAD_CAP_FRACTION;
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * `at` pulled toward `of` when their offset is farther than `cap`, the offset measured from `of`.
+ * The clamp `aim` writes out over locals mirrors this, operation for operation: `sqrt` only on the
+ * capped path, and no `Math.hypot` (it allocates in V8 by design).
+ */
+export function clampLead(at: Vec2, of: Vec2, cap: number): Vec2 {
+  const dx = at.x - of.x;
+  const dy = at.y - of.y;
+  const dd = dx * dx + dy * dy;
+  if (dd > cap * cap) {
+    const k = cap / Math.sqrt(dd);
+    return { x: of.x + dx * k, y: of.y + dy * k };
+  }
+  return { x: at.x, y: at.y };
+}
+
 
 /**
  * The time a projectile of the given speed needs to meet a target at offset d moving with

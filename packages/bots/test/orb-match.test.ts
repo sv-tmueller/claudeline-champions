@@ -8,27 +8,34 @@ import type { Played } from './press-oracle';
 import { NORMAL_2V2, SEEDS_2V2, cellOf, configOf, expectEnded } from './six-cells';
 import type { Cell } from './six-cells';
 
-// The seeded 2v2 with the energy orb on (#225, bots.md The energy orb): a Quillon with a Hargrim
-// against a Lumeth with a Hargrim, 3 rounds to win, the orb of `data/orbs.json` on each arena,
-// normal bots with the seeds of the other cells, played to matchEnd. The rule is that of
-// orb.test.ts: a bot contests the orb when it is up, no enemy is in its reach and it is nearer than
-// every enemy. Here it is measured as a match: the bots take the orb in most of the rounds in which
-// it becomes collectible, nothing stalls past 120 ticks, the budget holds, every press passes the
-// press oracle and `think` leaves the state alone (play checks the last two on every tick).
+// The seeded 2v2 with the energy orb on (#225, bots.md The energy orb): a Lumeth with a Hargrim
+// against a Lumeth with a Hargrim (the Lumeth mirror of the six kits), 3 rounds to win, the orb of
+// `data/orbs.json` on each arena, normal bots with the seeds of the other cells, played to matchEnd.
+// The rule is that of orb.test.ts: a bot contests the orb when it is up, no enemy is in its reach
+// and it is nearer than every enemy. Here it is measured as a match: the bots take the orb in most
+// of the rounds in which it becomes collectible, nothing stalls past 120 ticks, the budget holds,
+// every press passes the press oracle and `think` leaves the state alone (play checks the last two
+// on every tick).
 //
-// Why this pair and not the Hargrim and Quillon mirror of the product's match: the mirror's rounds
-// end before tick 1200 but for one of its 6 rounds (both arenas), so it has 0 and 1 orb rounds on
-// the two arenas and nothing to assert; the pair with Lumeth, whose
-// rounds last 1000 to 1800 ticks, has 4 and 3 (bots.md, The energy orb, has the scan of all 21
-// pairings, 42 matches). The two cells
-// are the only committed matches of the batch (testing.md, Check suite: the unit job is near its
-// time). A cell takes 3.7 s locally (a Linux x86 host, Node 24.22): the timeout of 60 s is that of
-// the other long cells (brimwick.test.ts).
+// Why this pair: the rule needs a pairing whose rounds are long enough for the orb to become
+// collectible (tick 1200) in several of them, and whose bots then take it in more than half. On
+// the bots before #187, the pair of #225 (a Quillon with a Hargrim against a Lumeth with a Hargrim)
+// was the one; after #187 capped the lead of the one-hit areas it read exactly half on arena01
+// (`taken 2` of `orbRounds 4`), so the scan of all 21 pairings was re-read (bots.md, The energy
+// orb) and the Lumeth mirror stands: 5 of 5 on arena01 and 3 of 4 on arena02. The Hargrim and
+// Quillon mirror of the product's match is not it: its rounds end before tick 1200 but for one of
+// its 6, so it has 0 and 1 orb rounds and nothing to assert. The two cells are the only committed
+// matches of this kind (testing.md, Check suite: the unit job is near its time). A cell takes 6 to
+// 8 s locally (the longer Lumeth mirror rounds): the timeout of 60 s is that of the other long
+// cells (brimwick.test.ts).
 
-// What the first run measured: the end tick and the longest ordinary round, see six-cells.ts.
+// What the first run measured: the end tick and the longest ordinary round, see six-cells.ts. The
+// pair re-read below is the Lumeth mirror: after #187 changed the aim of the one-hit areas the
+// Quillon v Lumeth pair read exactly half its orb rounds taken on arena01, so the scan was re-read
+// and this pair, which reads 5 of 5 and 3 of 4 on the two arenas, stands as the cell.
 const CELLS: Cell[] = [
-  cellOf('quillon', 'lumeth', 'arena01', 8176, 1823),
-  cellOf('quillon', 'lumeth', 'arena02', 7329, 1666),
+  cellOf('lumeth', 'lumeth', 'arena01', 11956, 3395),
+  cellOf('lumeth', 'lumeth', 'arena02', 8892, 2465),
 ];
 
 function playOrb(cell: Cell): Played {

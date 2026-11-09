@@ -73,7 +73,8 @@ others.
   timeout stays 15 s (twice 6.9 s is 13.8 s). With the two orb scenes of #225 (21
   scenes) the unit job reads 8.2 s (job 125568510485, 8152 ms), twice which is 16.3 s,
   so the timeout is 20 s; on a loaded machine (load average 25 on 6 CPUs) it read 16.4 s
-  and failed the old 15 s.
+  and failed the old 15 s. The "brimwick windup" scene of #187 (the 22nd) adds 1.2 s
+  locally for the one window, well inside the budget.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (eight models): 2.5 to 4.0 s locally, 3.3 to
   7.2 s green, 3.3 to 8.0 s red, timeout 20 s.
@@ -211,7 +212,10 @@ and 21.0 and 26.6 s (arena02) on the runner (jobs 125568510485 and 125574546646 
 41530318344 and 41532073021, the file 44.5 and 50.3 s beside the other long files), so
 twice the slowest is 53.2 s and the timeout stays 60 s. The unit job of the draft pull
 request read 7 min 11 s and 7 min 24 s (347.8 and 353.0 s of Vitest over 146 files) with
-them. They
+them. #187 re-read the scan and moved the cells to the Lumeth mirror (its rounds are long
+enough for the orb rounds; the Quillon v Lumeth pair of #225 then read exactly half on
+arena01): 8.0 and 6.2 s locally, the arena01 cell's rounds longer than the old pair's, so
+the 60 s timeout still covers twice the slowest. They
 are the only matches the package commits (the optional orb-on determinism row was left out
 for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
 unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.

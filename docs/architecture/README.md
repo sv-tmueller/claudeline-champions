@@ -64,7 +64,9 @@ first.
   Brimwick Flash Powder on a target walking toward her, Flare Step and Smoke Pot
   as escapes, rangeMin 7 and Grand Finale held for a target at 55 health or less
   or a cornered one (#165). One escape streak gates the whole escape order, and
-  the areas lead at the nominal 20 m/s (measured, see [bots](bots.md), Aim).
+  the areas lead at the nominal 20 m/s, except the one-hit aimed ones (Firecracker
+  and Binding Sigil), whose lead offset is capped at half the area's radius, the
+  lingering ones staying nominal (measured, see [bots](bots.md), Aim; #187).
   Durnhal (#211) stands at 2.4 m, throws Breaker Throw at a target walking away,
   and has Bulwark Charge then Aegis Line as escapes, the dash an escape only (the
   `escapeOnly` field of his rule).
