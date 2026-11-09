@@ -657,6 +657,38 @@ describe('spending the counter', () => {
     expect(champion(state, 2).health).toBe(120 - 22);
   });
 
+  it('lands the bonus on the damage of an allyEffects list aimed at the caster, as when it spawns', () => {
+    // The self-cast branch applies the ally list to the caster at once, spawning nothing; the spend
+    // verb's bonus has to reach a `damage` there exactly as it does on the spawned projectile's ally
+    // hit. Same cast, same ally list: the damage must not depend on the aim (cast.ts, rules 2.5).
+    const allyBolt: AbilityEffect = {
+      type: 'projectile',
+      speed: 20,
+      radius: 0.3,
+      lifetimeTicks: 60,
+      pierce: true,
+      effects: [],
+      allyEffects: [{ type: 'damage', amount: 4 }],
+    };
+    const run = (verbs: AbilityEffect[], aimAtSelf: boolean): number => {
+      const state = spent([...verbs, allyBolt]);
+      // The ally (champion 1) stands in the cast's path when it is not aimed at the caster.
+      place(state, 1, 2, 0);
+      setCount(state, 2);
+      // Aiming at (-3, 0), the caster's own position, is the self-cast; at (10, 0) it spawns.
+      step(state, [input(0, 0, aimAtSelf ? -300 : 1000, 0, Button.Q)]);
+      if (aimAtSelf) return champion(state, 0).health;
+      for (let i = 0; i < 40 && champion(state, 1).health === 120; i++) step(state, []);
+      return champion(state, 1).health;
+    };
+    // 2 stacks x 5 per stack = 10 on top of the ally list's 4, in both aim variants.
+    expect(run([bonus(5)], true)).toBe(120 - 4 - 10);
+    expect(run([bonus(5)], false)).toBe(120 - 4 - 10);
+    // Controls: without a verb the two aims deal the same 4, so the difference is the bonus alone.
+    expect(run([], true)).toBe(120 - 4);
+    expect(run([], false)).toBe(120 - 4);
+  });
+
   it('carries the bonus on the then arc of a dash, rooted at fire and deferred alike', () => {
     // The then-arc is a hit of the spending cast (its slot is the cast's, its hit is credited to
     // the cast), so it must see the 3-stack bonus on both paths: the rooted-at-fire one, where

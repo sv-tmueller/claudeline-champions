@@ -695,3 +695,85 @@ describe('validateKit and the fuse of an area (rules 2.7)', () => {
     ).toThrow('Invalid kit: test-striker.slots.SPACE.effects[0].then[0].fuseTicks: 0 is not an integer from 1 to 36000');
   });
 });
+
+describe('validateKit and the endArea of a projectile (spec 4.3)', () => {
+  // The striker's Q bolt pierces, so the payload goes on a non-piercing copy.
+  const withEnd = (endArea: unknown): Mutate =>
+    (k) => {
+      const shot = bolt(k) as { endArea?: unknown; pierce: boolean };
+      shot.pierce = false;
+      shot.endArea = endArea;
+    };
+
+  const payload = {
+    radius: 2,
+    durationTicks: 30,
+    intervalTicks: 30,
+    targets: 'enemies' as const,
+    effects: [{ type: 'heal' as const, amount: 5 }],
+  };
+
+  it('accepts an endArea with a full payload and copies it deep, leaving it off otherwise', () => {
+    const kit = broken(withEnd(payload)) as KitDef;
+    const copy = validateKit(kit);
+    expect(copy).toStrictEqual(kit);
+    const shot = bolt(copy);
+    expect(shot.endArea).toEqual(payload);
+    const before = (bolt(kit) as { endArea?: { effects: unknown[] } }).endArea;
+    expect(shot.endArea).not.toBe(before);
+    expect(shot.endArea?.effects[0]).not.toBe(before?.effects[0]);
+    const plain = validateKit(testStriker());
+    expect('endArea' in bolt(plain)).toBe(false);
+    expect(validateKit(plain)).toStrictEqual(testStriker());
+  });
+
+  it('accepts a fuseTicks on the endArea, as on any area (rules 2.7)', () => {
+    const kit = broken(withEnd({ ...payload, fuseTicks: 45 })) as KitDef;
+    const copy = validateKit(kit);
+    expect(bolt(copy).endArea).toMatchObject({ fuseTicks: 45, durationTicks: 30 });
+    expect(copy).toStrictEqual(kit);
+    expect(() => validateKit(broken(withEnd({ ...payload, fuseTicks: 0 })))).toThrow(
+      'Invalid kit: test-striker.slots.Q.effects[0].endArea.fuseTicks: 0 is not an integer from 1 to 36000',
+    );
+  });
+
+  it.each([
+    ['a bad radius', { ...payload, radius: 0 }, 'radius: 0 is not a number above 0'],
+    ['a fractional durationTicks', { ...payload, durationTicks: 1.5 }, 'durationTicks: 1.5 is not an integer from 1 to 36000'],
+    ['a zero intervalTicks', { ...payload, intervalTicks: 0 }, 'intervalTicks: 0 is not an integer from 1 to 36000'],
+    ['an unknown targets', { ...payload, targets: 'none' }, 'targets: unknown targets none'],
+    ['empty effects', { ...payload, effects: [] }, 'effects: must not be empty'],
+  ])('applies the area rejects to the endArea: %s', (_name, value, problem) => {
+    expect(() => validateKit(broken(withEnd(value)))).toThrow(
+      `Invalid kit: test-striker.slots.Q.effects[0].endArea.${problem}`,
+    );
+  });
+
+  it('drops an unknown key like placement, ignoring it', () => {
+    const kit = broken(withEnd({ ...payload, placement: { type: 'ahead', distance: 3 } })) as KitDef;
+    const copy = validateKit(kit);
+    expect(bolt(copy).endArea).toEqual(payload);
+    expect('placement' in (bolt(copy).endArea as object)).toBe(false);
+  });
+
+  it('rejects pierce together with an endArea, at the endArea path', () => {
+    expect(() =>
+      validateKit(broken((k) => void ((bolt(k) as { endArea?: unknown }).endArea = payload))),
+    ).toThrow(
+      'Invalid kit: test-striker.slots.Q.effects[0].endArea: a piercing projectile cannot carry an endArea',
+    );
+  });
+
+  it('reads an endArea inside a dash then, and rejects pierce there too', () => {
+    const kit = broken((k) => {
+      dash(k).then = [{ ...bolt(k), pierce: false, endArea: payload }];
+    }) as KitDef;
+    const copy = validateKit(kit);
+    expect(dash(copy).then[0]).toMatchObject({ type: 'projectile', endArea: payload });
+    expect(() =>
+      validateKit(broken((k) => void (dash(k).then = [{ ...bolt(k), endArea: payload }]))),
+    ).toThrow(
+      'Invalid kit: test-striker.slots.SPACE.effects[0].then[0].endArea: a piercing projectile cannot carry an endArea',
+    );
+  });
+});

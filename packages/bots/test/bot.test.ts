@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, hasLineOfSight, step } from '@claudeline/sim';
-import type { ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
+import type { AbilitySpec, ArenaDef, ChampionState, GameState, PlayerInput } from '@claudeline/sim';
 import { KITE_STEP, TARGET_SWITCH_MARGIN, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
 import { TIERS } from '../src/difficulty';
@@ -11,9 +11,17 @@ import { buildNavGrid, cellIndexAt } from '../src/grid';
 import type { Vec2 } from '../src/grid';
 import { profileFor } from '../src/profile';
 import { nearestSightCell } from '../src/sight';
-import { NOMINAL_PROJECTILE_SPEED, leadPoint, rotateByHalfTangent, roundAim } from '../src/aim';
+import {
+  AREA_LEAD_CAP_FRACTION,
+  NOMINAL_PROJECTILE_SPEED,
+  clampLead,
+  leadCapOf,
+  leadPoint,
+  rotateByHalfTangent,
+  roundAim,
+} from '../src/aim';
 import { createRng } from '../src/rng';
-import { arena01, clearShotOracle, config2v2, configMirror, configSix, jsonKits, sixKits } from './helpers';
+import { arena01, clearShotOracle, config2v2, configBrimwick, configMirror, configSix, jsonKits, sixKits } from './helpers';
 import { hargrimKit, quillonFastExKit } from './kits';
 
 const open: ArenaDef = { ...arena01, id: 'open', obstacles: [] };
@@ -721,7 +729,7 @@ describe('aim lead', () => {
       { kits: sixKits, config: (i: number) => configSix(Math.floor(i / 12) % 2 === 1) },
     ];
     const slots = ['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const;
-    const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, speeds: new Set<number>() };
+    const seen = { approach: 0, retreat: 0, fast: 0, zero: 0, capped: 0, speeds: new Set<number>() };
     let checked = 0;
     for (let i = 0; i < 4000; i++) {
       const set = kitSets[Math.floor(i / 4) % kitSets.length] as (typeof kitSets)[number];
@@ -740,18 +748,26 @@ describe('aim lead', () => {
       target.vx = Math.cos(heading) * speedOfTarget;
       target.vy = Math.sin(heading) * speedOfTarget;
 
-      // Half the states have a cast winding up, which sets the speed the aim leads with.
+      // Half the states have a cast winding up, which sets the speed the aim leads with. The same
+      // spec resolves the cap of a one-hit aim-placed area (#187): `leadCapOf` reads its first
+      // `aim`-placed one-hit area, as `aim` does once no projectile is found.
       let speed = NOMINAL_PROJECTILE_SPEED;
+      let spec: AbilitySpec | undefined;
       if (i % 2 === 1) {
         const slot = slots[Math.floor(rng.next() * slots.length)] as (typeof slots)[number];
         const kit = kits.find((k) => k.id === me.championId);
         const base = kit?.slots[slot];
         const variant = base?.ex !== undefined && rng.next() < 0.5;
-        const spec = variant ? base?.ex : base;
+        spec = variant ? base?.ex : base;
         const first = spec?.effects[0];
         if (first !== undefined && first.type === 'projectile') speed = first.speed;
         me.cast = { castId: 1, slot, ex: variant, windupTicks: 30, windupLeft: 10 };
       }
+      // `aim` resolves the cap from the same spec, and only when the spec has no projectile.
+      const cap =
+        spec !== undefined && spec.effects.every((e) => e.type !== 'projectile')
+          ? leadCapOf(spec)
+          : Number.POSITIVE_INFINITY;
 
       // The edges of the lead, on a line with the shooter, in three variants: a target that stands
       // still (b is 0), one closing at exactly the speed of the projectile (a is 0), and one
@@ -772,10 +788,16 @@ describe('aim lead', () => {
 
       const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
       const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, speed);
-      const turned = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+      // The cap clamps the lead offset (measured from the subject) before the error turn, exactly
+      // as `aim` writes it out: the same `clampLead` of aim.ts.
+      const capped = clampLead(lead, target, cap);
+      const turned = rotateByHalfTangent(capped.x - me.x, capped.y - me.y, u);
       const expected = [roundAim(me.x + turned.x), roundAim(me.y + turned.y)];
       expect([input.aimX, input.aimY], `state ${i}, speed ${speed}, seed ${seed}`).toEqual(expected);
       checked++;
+      if (cap !== Number.POSITIVE_INFINITY && Math.hypot(lead.x - target.x, lead.y - target.y) > cap) {
+        seen.capped++;
+      }
 
       const dx = target.x - me.x;
       const dy = target.y - me.y;
@@ -792,12 +814,60 @@ describe('aim lead', () => {
     expect(seen.retreat).toBeGreaterThan(300);
     expect(seen.fast).toBeGreaterThan(300);
     expect(seen.zero).toBeGreaterThan(100);
+    // The capped branch of #187 is reached, so it is not vacuous: 23 of the 4000 states wind up a
+    // one-hit aim area (Brimwick's Firecracker or Lumeth's Binding Sigil) and put the nominal lead
+    // past its cap. The bar is 15.
+    expect(seen.capped).toBeGreaterThan(15);
     // Nominal 20 and the Quillon and Hargrim projectile speeds of the shipped kits: 22, 14, 12, 25,
     // the fixture's: 15 for its base M2 and 18 for its EX, and the 16 of Undertow and the 24 of
     // Flash Powder.
     for (const speed of [12, 14, 15, 16, 18, 20, 22, 24, 25]) {
       expect([...seen.speeds], `speed ${speed}`).toContain(speed);
     }
+  });
+
+  // The cap of #187 pins the capped lead to the centimetre on one frozen windup state, and shows
+  // the capped aim differ from the nominal one: the cheapest deterministic red-when-dropped proof.
+  // Brimwick champion 1 has pressed Firecracker (M2, r 1.5, cap 0.75) and is 10 m west of a target
+  // strafing north at 5.5 m/s. The nominal lead is 5, 2.86 (the target plus its own walk over the
+  // 20 m/s flight), 2.86 m above the target, so the cap pulls the aim point back to the circle edge;
+  // the capped turn reads 499, 90 and the nominal 495, 301. Red when the cap is dropped: the pin
+  // then reads the nominal pair.
+  it('caps the lead of a one-hit aim-placed area, to the centimetre', () => {
+    const state = createMatch(configBrimwick(), open, 1, sixKits());
+    kill(state, 0, 2, 3);
+    const me = put(state, 1, -5, 0);
+    const target = ch(state, 2);
+    target.alive = true;
+    target.x = 5;
+    target.y = 0;
+    target.vx = 0;
+    target.vy = 5.5;
+    me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 24, windupLeft: 10 };
+    const seed = 3;
+    const bot = createBot(1, 'hard', seed);
+    const input = thinkTimes(bot, state, TIERS.hard.delay + 1);
+    expect(bot.inspect()).toEqual({ intent: 'engage', targetId: 2 });
+
+    // The bot's first aim draw, replayed from the same seed, is the one error in force.
+    const u = (2 * createRng(seed).next() - 1) * TIERS.hard.maxU;
+    const spec = sixKits().find((k) => k.id === 'brimwick')?.slots['M2'];
+    const cap = leadCapOf(spec);
+    expect(cap).toBe(1.5 * AREA_LEAD_CAP_FRACTION);
+    expect(cap).toBe(0.75);
+    const lead = leadPoint(me, target, { x: target.vx, y: target.vy }, NOMINAL_PROJECTILE_SPEED);
+    const capped = clampLead(lead, target, cap);
+    const turned = rotateByHalfTangent(capped.x - me.x, capped.y - me.y, u);
+    expect(input.aimX).toBe(roundAim(me.x + turned.x));
+    expect(input.aimY).toBe(roundAim(me.y + turned.y));
+    // The cap bit: the aim sits on the cap circle above the target, not on the nominal lead.
+    expect([input.aimX, input.aimY]).toEqual([499, 90]);
+    const nominal = rotateByHalfTangent(lead.x - me.x, lead.y - me.y, u);
+    expect([input.aimX, input.aimY]).not.toEqual([
+      roundAim(me.x + nominal.x),
+      roundAim(me.y + nominal.y),
+    ]);
+    expect(input.aimY).toBeLessThan(roundAim(me.y + nominal.y));
   });
 
   // The rounding of the inline form turns -0 into 0 without an integer test: `Math.round` of a

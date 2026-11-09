@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_MOVE_SPEED, createMatch, debug, step } from '@claudeline/sim';
-import type { GameState, MoveAxis } from '@claudeline/sim';
+import type { AbilitySpec, GameState, MoveAxis } from '@claudeline/sim';
 import {
   NOMINAL_PROJECTILE_SPEED,
+  clampLead,
   interceptTime,
+  leadCapOf,
   leadPoint,
   roundAim,
   rotateByHalfTangent,
@@ -154,5 +156,100 @@ describe('roundAim', () => {
     expect(roundAim(-1.236)).toBe(-124);
     expect(Object.is(roundAim(-0.001), 0)).toBe(true);
     expect(Object.is(roundAim(-0), 0)).toBe(true);
+  });
+});
+
+describe('leadCapOf', () => {
+  const areaEffect = (
+    radius: number,
+    durationTicks: number,
+    intervalTicks: number,
+    placement: unknown,
+  ) => ({
+    type: 'area' as const,
+    placement,
+    radius,
+    durationTicks,
+    intervalTicks,
+    targets: 'enemies' as const,
+    effects: [{ type: 'damage' as const, amount: 1 }],
+  });
+  const spec = (effects: unknown[]) =>
+    ({ windupTicks: 0, movement: 'free' as const, effects }) as unknown as AbilitySpec;
+
+  it('caps a one-hit aim-placed area at half its radius', () => {
+    const s = spec([areaEffect(2, 1, 1, { type: 'aim', range: 9 })]);
+    expect(leadCapOf(s)).toBe(1);
+  });
+
+  it('caps at zero for a zero-radius area', () => {
+    const s = spec([areaEffect(0, 1, 1, { type: 'aim', range: 9 })]);
+    expect(leadCapOf(s)).toBe(0);
+  });
+
+  it('does not cap a lingering area', () => {
+    const s = spec([areaEffect(4, 300, 60, { type: 'aim', range: 8 })]);
+    expect(leadCapOf(s)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('does not cap a self-placed or ahead-placed one-hit area', () => {
+    expect(leadCapOf(spec([areaEffect(3.5, 1, 1, { type: 'self' })]))).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+    expect(leadCapOf(spec([areaEffect(3.5, 1, 1, { type: 'ahead', distance: 4 })]))).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it('reads Infinity for a spec with no area, and for none', () => {
+    expect(leadCapOf(spec([{ type: 'dash', distance: 4, ticks: 6, then: [] }]))).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+    expect(leadCapOf(undefined)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('reads the first one-hit aim area, not a later one', () => {
+    const s = spec([
+      { type: 'dash', distance: 4, ticks: 6, then: [] },
+      areaEffect(2, 1, 1, { type: 'aim', range: 9 }),
+      areaEffect(8, 1, 1, { type: 'aim', range: 9 }),
+    ]);
+    expect(leadCapOf(s)).toBe(1);
+  });
+});
+
+describe('clampLead', () => {
+  it('leaves an offset inside the cap alone', () => {
+    expect(clampLead({ x: 4, y: 3 }, { x: 0, y: 0 }, 10)).toEqual({ x: 4, y: 3 });
+  });
+
+  it('leaves an offset exactly at the cap alone', () => {
+    expect(clampLead({ x: 10, y: 0 }, { x: 0, y: 0 }, 10)).toEqual({ x: 10, y: 0 });
+    expect(clampLead({ x: 30, y: 40 }, { x: 0, y: 0 }, 50)).toEqual({ x: 30, y: 40 });
+  });
+
+  it('scales an offset past the cap to the cap', () => {
+    const at = clampLead({ x: 20, y: 0 }, { x: 0, y: 0 }, 10);
+    expect(at.x).toBeCloseTo(10, 12);
+    expect(at.y).toBe(0);
+    expect(Math.hypot(at.x, at.y)).toBeCloseTo(10, 12);
+  });
+
+  it('measures the offset from the subject, not the origin', () => {
+    const at = clampLead({ x: 13, y: 4 }, { x: 3, y: 4 }, 5);
+    expect(Math.hypot(at.x - 3, at.y - 4)).toBeCloseTo(5, 12);
+    expect(at.x - 3).toBeCloseTo(5, 12);
+    expect(at.y).toBeCloseTo(4, 12);
+  });
+
+  it('leaves an infinite cap alone', () => {
+    expect(clampLead({ x: 1000, y: -2000 }, { x: 5, y: 5 }, Number.POSITIVE_INFINITY)).toEqual({
+      x: 1000,
+      y: -2000,
+    });
+  });
+
+  it('leaves a zero offset alone at any cap, including zero', () => {
+    expect(clampLead({ x: 3, y: 4 }, { x: 3, y: 4 }, 0)).toEqual({ x: 3, y: 4 });
   });
 });

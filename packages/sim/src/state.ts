@@ -1,6 +1,6 @@
 import type { ArenaDef } from './arena';
 import type { Slot } from './input';
-import type { KitDef, ThenEffect } from './kit';
+import type { EndAreaSpec, KitDef, ThenEffect } from './kit';
 
 export type TeamId = 'A' | 'B';
 
@@ -100,6 +100,12 @@ export interface ProjectileState {
    * With it, a projectile with empty `effects` passes enemies.
    */
   allyEffects?: Effect[];
+  /**
+   * Spec 4.3: the area spawned where the projectile ends (a lifetime end, a blocking obstacle or
+   * the arena edge; never a champion hit). It carries the projectile's `castId`. The key is
+   * missing, not undefined, when the projectile has none.
+   */
+  endArea?: EndAreaSpec;
   /**
    * The spend verb's damage bonus (rules 2.6, v3 design 4.4b): added to each `damage` effect of
    * this projectile's hit lists. The key is missing, not undefined, when there is none.

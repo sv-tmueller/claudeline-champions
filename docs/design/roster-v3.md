@@ -41,6 +41,11 @@ unchanged.
 - Statuses and mechanics a kit needs that the catalog does not have yet are
   named in the champion's section. Each is built in its own package with a
   rules entry before the kit that uses it.
+- The `endArea` of a projectile (v3 spec section 4.3, [rules](rules.md)
+  section 2.8) is in the toolkit since #160, so the roster-v2 section 0 list of
+  what is not in the toolkit no longer holds for it. No kit of this document
+  uses it yet; Wrenna's section 2 names where hers would and why her
+  Heartseeker EX carries none.
 
 ## 1. Durnhal, the guardian tank
 
@@ -356,9 +361,10 @@ against Rod Bolt's 13.93 m, the longest basic shot of the roster. Its start at
 10 m clears Hargrim's 9 m hook, Durnhal's 9 m throw, every melee swing from
 where it stands and the end of Ondrel's Clod Toss (10 m). It does not clear
 everything. Still reaching into the band, among others, are Ondrel's Mire (10.5
-m), Mire EX (11 m) and Drowned Ground (12.5 m), and Brimwick's Spark (11 m),
-Firecracker (11 m, 11.5 m as the EX) and Grand Finale (12 m); the web lines
-above weigh each against her.
+m), Mire EX (11 m) and Drowned Ground (12.5 m), Brimwick's Spark (11 m),
+Firecracker (11 m, 11.5 m as the EX) and Grand Finale (12 m), and Skerrow's
+Lunge EX (10.5 m) and Reaper's Dance (11 m), which close before they swing; the
+web lines above weigh each against her.
 
 Every number of this section that a catalog range binds has one row. The
 sources are the approved spec section 10 and section 4.6, rules sections 4.1

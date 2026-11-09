@@ -394,9 +394,11 @@ six-cells.ts has it), both arenas, seeds 101 to 104, match seed 7, normal tier,
 played to matchEnd (a scratch, not committed, 42 matches; Durnhal of #211, the seventh kit, was
 not in it). A round is an orb
 round when it reaches tick 1200, and most do not: normal bots end a round at
-tick 1000 for most pairings, so the orb is up in 20 of 78 rounds on arena 1 and 16
-of 82 on arena 2. The bots took it in 14 of the 20 and 9 of the 16 (70 and 56
-percent); with the contest switched off, the same scan has 3 of 18 and 1 of 18,
+tick 1000 for most pairings, so the orb is up in 21 of 79 rounds on arena 1 and 17
+of 83 on arena 2 (the #225 scan read 20 of 78 and 16 of 82; the re-read here is
+after #187 capped the lead of the one-hit areas). The bots took it in 13 of the 21
+and 9 of the 17 (62 and 53 percent). The rest of this paragraph is #225's scan,
+not re-measured here: with the contest switched off, that scan has 3 of 18 and 1 of 18,
 which are the champions that stood on it by chance. The orb flag (the decision's, before
 the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
 each (one contest is a flip to true and one to false at its end or at the next round).
@@ -408,19 +410,24 @@ out of the reach of an enemy flips the threat test with it, so the contest start
 as the distance crosses `rangeMax`; this is reading A at work (an enemy in reach ends the
 contest) and not a bug, and no hysteresis is built (see Not built yet).
 
-The committed matches (`orb-match.test.ts`) are the pair that has orb
-rounds: a Quillon and a Hargrim against a Lumeth and a Hargrim, played to matchEnd
-with the orb of `data/orbs.json`.
+The committed matches (`orb-match.test.ts`) are the Lumeth mirror of the six
+kits (a Lumeth and a Hargrim against a Lumeth and a Hargrim), played to matchEnd
+with the orb of `data/orbs.json`: the pairing whose rounds are long enough for
+the orb rounds and whose bots take it in more than half. It was the Quillon v
+Lumeth pair of #225 until #187 capped the lead of the one-hit areas, when that
+cell read exactly half (2 of 4) on arena01; the scan above was then re-read with
+the Lumeth mirror in place.
 
 | Arena   | Ended | Longest ordinary round | Orb rounds | Taken | Taker team | Worst stall |
 | ------- | ----- | ---------------------- | ---------- | ----- | ---------- | ----------- |
-| arena01 | 8176  | 1823                   | 4          | 3     | A 2, B 1   | 17          |
-| arena02 | 7329  | 1666                   | 3          | 2     | A 0, B 2   | 21          |
+| arena01 | 11956 | 3395                   | 5          | 5     | A 2, B 3   | 26          |
+| arena02 | 8892  | 2465                   | 4          | 3     | A 1, B 2   | 15          |
 
 The mirror of the product's match (Hargrim and Quillon a side) is not that pair: its
 rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds on the two arenas. A cell
-takes 3.7 s locally (a Linux x86 host, Node 24.22), and the two cells are the
-only committed matches of #225, for the unit job's time (see Testing).
+takes 6 to 8 s locally (the longer Lumeth mirror rounds), and the two cells are the
+only committed matches of #225 (testing.md, Check suite: the unit job is near its
+time).
 
 ## Clear shot
 
@@ -814,8 +821,16 @@ makes that true, and what stays outside it:
   the shot test), and the aim is written out over locals. `scoreIntents`, `clearShot`,
   `nearestSightCell`, `steerToward` and `followPath` are wrappers over those forms, so
   there is one implementation of each and nothing to keep in step. The aim is the one
-  place with two: `leadPoint`, `rotateByHalfTangent` and `roundAim` of aim.ts stay as the
-  independent reference, and a seeded test compares `think`'s inlined aim with them.
+  place with two: `leadPoint`, `rotateByHalfTangent`, `roundAim`, `leadCapOf` and
+  `clampLead` of aim.ts stay as the independent reference, and a seeded test compares
+  `think`'s inlined aim with them. The cap (#187) is one more double local of `aim`,
+  read the way `effect.speed` already is: `leadCapOf`'s scan (the first `aim`-placed
+  one-hit area of the spec) is written out as a loop over the effects, the offset
+  `lead − subject` is three double locals (`odx`, `ody`, `dd = odx*odx + ody*ody`), and
+  the clamp scales by `leadCap / Math.sqrt(dd)` only when `dd > leadCap * leadCap`, with
+  plain `sqrt` and never `Math.hypot` (which allocates in V8 by design).
+  `packages/bots/test/allocation.test.ts` measures the capped branch in the "brimwick
+  windup" scene (a frozen Firecracker windup), 0 B per think.
 - The cache of the rules is typed arrays and double fields too: per slot
   `hasOpen`, `openMin`, `openMax`, `motion` (Int8), `needsNearAlly`, `isEscape`,
   `escapeRange`, `escapeFixed`, `escapeDash`, `escapeWithin` (one double) and
@@ -1254,43 +1269,74 @@ error.
 - Speed: the first top-level projectile of the ability winding up, or else of the
   ability pressed on this think, or else the nominal 20 m/s (no kit, or no
   projectile in it).
-- Areas lead at the nominal speed too, and a kit-derived lead was measured and
-  not built (#165). An ability with no projectile (the Mire and Drowned Ground
-  of Ondrel, Firecracker of Brimwick, Binding Sigil of Lumeth) is placed at the
-  aim point, so the lead moves the point to where a target walking at 5.5 m/s
-  would be after the flight of a 20 m/s projectile. The question was whether a
-  lead bounded by the area does better than the nominal one. A scratch copy of
-  the head with the lead of an area ability changed played 160 seeded 2v2
-  matches of Ondrel and Brimwick against each shipped kit on both arenas (normal
-  tier, seeds 1 to 10, not committed: it patches `aim`), and counted the pulses
-  of the areas they placed that had an enemy inside:
+- Areas lead at the nominal speed, except a one-hit aim-placed area, whose lead
+  offset is capped at half the area's radius (#187). An ability with no
+  projectile (the Mire and Drowned Ground of Ondrel, Firecracker of Brimwick,
+  Binding Sigil of Lumeth) is placed at the aim point, so the lead moves the
+  point to where a target walking at 5.5 m/s would be after the flight of a
+  20 m/s projectile. The question was whether a lead bounded by the area does
+  better than the nominal one. A scratch copy of the head with the lead of an
+  area ability changed (#165, and re-measured for #187) played seeded 2v2
+  matches (normal tier, seeds 1 to 10, both arenas, not committed: it patches
+  `aim`) and counted the pulses of the areas the casting bots placed that had an
+  enemy inside. The #185 design has Ondrel and Brimwick as the casting bots
+  against the four v1 kits, so Firecracker, its EX, the Mire and Drowned Ground
+  are seen and Lumeth never casts:
 
   | Lead of an area ability        | Mire (r 2)         | Drowned Ground (r 4) | Firecracker (r 1.5) | Firecracker EX (r 2) |
   | ------------------------------ | ------------------ | -------------------- | ------------------- | -------------------- |
-  | nominal 20 m/s (built)         | 932 of 1185 (78.6) | 71 of 76 (93.4)      | 374 of 400 (93.5)   | 488 of 510 (95.7)    |
-  | offset at most the radius      | 943 of 1192 (79.1) | 72 of 77 (93.5)      | 387 of 395 (98.0)   | 482 of 499 (96.6)    |
-  | offset at most half the radius | 938 of 1207 (77.7) | 82 of 88 (93.2)      | 400 of 403 (99.3)   | 489 of 504 (97.0)    |
-  | none (the target's own point)  | 863 of 1137 (75.9) | 81 of 88 (92.0)      | 394 of 397 (99.2)   | 488 of 503 (97.0)    |
-  | doubled                        | 793 of 1317 (60.2) | 71 of 89 (79.8)      | 239 of 449 (53.2)   | 402 of 484 (83.1)    |
+  | nominal 20 m/s (was built)     | 967 of 1246 (77.6) | 69 of 84 (82.1)      | 381 of 408 (93.4)   | 490 of 517 (94.8)    |
+  | offset at most the radius      | 961 of 1241 (77.4) | 72 of 86 (83.7)      | 410 of 417 (98.3)   | 495 of 511 (96.9)    |
+  | offset at most half the radius | 961 of 1241 (77.4) | 72 of 86 (83.7)      | 419 of 423 (99.1)   | 491 of 504 (97.4)    |
+  | none (the target's own point)  | 961 of 1241 (77.4) | 72 of 86 (83.7)      | 416 of 421 (98.8)   | 491 of 504 (97.4)    |
+  | doubled                        | 967 of 1246 (77.6) | 69 of 84 (82.1)      | 383 of 408 (93.9)   | 490 of 517 (94.8)    |
+
+  Binding Sigil needs a set of its own, since Lumeth never casts in the #185
+  one, so a second set "clean" leaves out every opponent with a one-hit aimed
+  area and adds Lumeth as a casting bot (same seeds, tier and arenas):
+
+  | Lead of an area ability        | Mire (r 2)       | Drowned Ground (r 4) | Firecracker (r 1.5) | Firecracker EX (r 2) | Binding Sigil (r 2) |
+  | ------------------------------ | ---------------- | -------------------- | ------------------- | -------------------- | ------------------- |
+  | nominal 20 m/s (was built)     | 567 of 804 (70.5) | 9 of 13 (69.2)      | 399 of 422 (94.5)   | 420 of 441 (95.2)    | 323 of 338 (95.6)   |
+  | offset at most the radius      | 567 of 804 (70.5) | 9 of 13 (69.2)      | 411 of 418 (98.3)   | 419 of 430 (97.4)    | 325 of 337 (96.4)   |
+  | offset at most half the radius | 567 of 804 (70.5) | 9 of 13 (69.2)      | 423 of 426 (99.3)   | 420 of 428 (98.1)    | 327 of 336 (97.3)   |
+  | none (the target's own point)  | 567 of 804 (70.5) | 9 of 13 (69.2)      | 423 of 427 (99.1)   | 421 of 429 (98.1)    | 327 of 336 (97.3)   |
+  | doubled                        | 567 of 804 (70.5) | 9 of 13 (69.2)      | 401 of 422 (95.0)   | 420 of 441 (95.2)    | 323 of 338 (95.6)   |
 
   The nominal lead is within a point of the best for the lingering areas (the
-  Mire and Drowned Ground, which pulse three and five times): a cap at the
-  radius reads 0.5 and 0.1 points above it, a cap at half the radius 0.9 and 0.2
-  below, and no lead 2.7 and 1.4 below, so a kit-derived lead would add
-  arithmetic on doubles to `aim` (the boxing hazard of the Allocation section)
-  for nothing, and `aim` is unchanged. The one-hit areas read the other way:
-  Firecracker gains 4 to 6 points from a cap (93.5 to 98.0 and 99.3), a
-  kit-derived lead for the areas with one pulse stays unbuilt (see Not built
-  yet). The shares are over different matches, the bots' own lead changing what
-  they face, and the first figure of each cell moves by a few pulses with the
-  seeds (an earlier scratch on the same design read 938 of 1189 for the nominal
-  Mire). `packages/bots/test/area-lead.test.ts` pins the built behaviour with
-  the sim as the oracle: the bot and an enemy strafing at full speed, five of
-  five pulses of Drowned Ground at 6 m and two of three of the Mire at 7 m on the
-  first area; the lead dropped reads 2 of 5 and 1 of 3, doubled 0 of 3 on the
-  Mire. The six-kit set of the reference-chain test of `bot.test.ts` adds the
-  16 and 24 m/s of Undertow and Flash Powder to the speeds the aim is compared
-  at, and the areas of the six kits to the casts that lead at the nominal 20.
+  Mire and Drowned Ground, which pulse three and five times): on the #185 set a
+  cap at the radius reads 0.2 below it on the Mire and 1.6 above on Drowned
+  Ground (77.6 against 77.4; 82.1 against 83.7), a cap at half the radius the
+  same pair, and no lead identical, so a kit-derived lead would add arithmetic
+  on doubles to `aim` (the boxing hazard of the Allocation section) for nothing,
+  and the lingering areas stay nominal. The one-hit areas read the
+  other way, and a cap gains on every one of the three: Firecracker 94.5 to 99.3
+  on the clean set (93.4 to 99.1 on the #185 one), Firecracker EX 95.2 to 98.1
+  and Binding Sigil 95.6 to 97.3. Half the radius is at least as good as the
+  full radius on every one of the three (99.3 against 98.3, 98.1 against 97.4,
+  97.3 against 96.4), so `AREA_LEAD_CAP_FRACTION` is 0.5. The cap applies only
+  to an area with `placement.type === 'aim'` and `durationTicks <=
+  intervalTicks` (the one-hit test of rules.md 2.7): a `self` or `ahead` area
+  does not follow the aim point, so capping it would move the recorded aim, and
+  the checksum, for no gain (see the identity harness of Testing). The cap is
+  measured from the target's position, plain radius and not radius plus
+  `CHAMPION_RADIUS`; the lead offset is `min(nominal offset, cap)`, applied
+  after the lead and before the error turn. The shares are over different
+  matches, the bots' own lead changing what they face, and the first figure of
+  each cell moves by a few pulses with the seeds (an earlier scratch on the same
+  design read 938 of 1189 for the nominal Mire, and 932 of 1185 in the #185
+  table). The measurement passed the #187 abort gate: all three one-hit areas
+  gained on the re-measure, so the cap was built.
+  `packages/bots/test/area-lead.test.ts` pins the built behaviour with the sim
+  as the oracle: the bot and an enemy strafing at full speed, five of five
+  pulses of Drowned Ground at 6 m and two of three of the Mire at 7 m on the
+  first area (the lingering areas unchanged), one of one Firecracker pulse at
+  9 m and one of one Binding Sigil pulse at 10 m (the capped areas); the lead
+  dropped reads 0 of 1 on both capped pins and 2 of 5 and 1 of 3 on the
+  lingering ones, doubled 0 of 3 on the Mire. The six-kit set of the
+  reference-chain test of `bot.test.ts` adds the 16 and 24 m/s of Undertow and
+  Flash Powder to the speeds the aim is compared at, and the areas of the six
+  kits to the casts the cap is resolved from.
 - Fallback: aim at the target when `c = 0`, `a >= 0` (the target is at least as
   fast as the projectile) or `t` is not finite.
 - Error: the vector to the aim point turns by `2 atan(u)` with the rational
@@ -1378,12 +1424,11 @@ match replays exactly from its input stream.
   cells of Ondrel and Brimwick and the 12 of Durnhal play to the end (see Testing). A 3v3 with the six
   kits is not played in a bots test either; the balance report plays 3v3s over
   the six (`balance.md` section 5.9, #189).
-- A lead for an area that is derived from the kit: the nominal lead stays, which
-  for the Mire and Drowned Ground measured within a point of the best (see Aim).
-  The one-hit areas (Firecracker, and Binding Sigil, which was not measured)
-  read the other way: Firecracker lands 93.5 percent of its pulses on an enemy
-  with the nominal lead and 98 and more with the offset capped at the radius
-  (see Aim); a follow-up, low priority.
+- A kit-derived speed for the areas: the lead uses the nominal 20 m/s for every
+  area (the one-hit aimed ones cap the offset, #187; see Aim). The lingering
+  areas stay nominal because their pulses walk the circle over the whole
+  duration, so the nominal lead measured within a point of the best (see Aim).
+  Beyond the cap, no per-area speed is derived from the kit.
 - Local steering around champions (the dodge ignores them), and ally logic
   beyond Lumeth's ally slots (peeling for an ally).
   Dodging an area is not built either; the dodge is built for projectiles (see
@@ -2004,8 +2049,9 @@ The seeded runs that move (re-recorded each by its own formula, the cascade the
 sub-plan lists): the four Lumeth runs end at ticks 8254 (2v2 arena01, was 5081;
 round term 2300, the longest 2v2 round being 2265 (2229 on arena01, 2265 on arena02),
 budget 20 000), 5698 (2v2 arena02, was 7521; 2300, 18 000), 9357
-(3v3 arena01, was 6773; 2900, 23 000) and 6442 (3v3 arena02, was 10934; 2900,
-20 000), in `lumeth.test.ts` and the harness rows of `tools/balance/harness.test.ts`;
+(3v3 arena01, was 6773; 2900, 23 000) and 6295 (3v3 arena02, was 10934 then
+6442 after #213; 2900, 20 000, moved by #187), in `lumeth.test.ts` and the
+harness rows of `tools/balance/harness.test.ts`;
 the cells of `brimwick.test.ts` and `ondrel.test.ts` that passed their term (6 of
 the 18; the others pass and stand as records of when each budget was set) are
 re-recorded (Brimwick against Quillon on arena01 6303 and 1266, on arena02 4499 and
@@ -2250,7 +2296,8 @@ headless-kits.test.ts so that both files use it): every press passes the oracle
 ignores buttons there), the invariants hold, `think` leaves the checksum alone,
 no bot stalls for more than 120 ticks and no escape teleport is blocked. Each
 match ends within a tick budget by the formula of the client's rows: the end
-tick when the budget was set (8254, 5698, 9357 and 6442 since #213; 5081, 7521,
+tick when the budget was set (8254, 5698, 9357 and 6295, the last since #187;
+6442 since #213; 5081, 7521,
 6773 and 10934 before, the first moved from 6623 with #186), plus two rounds of the
 longest round that did not go to sudden death, rounded up to 100 (2300 in the 2v2
 runs, whose longest is 2265 since #213 and was 1619 before, and 2900 in the 3v3
@@ -2296,9 +2343,14 @@ a healthy target at 8 m, pressed at a healthy target in the north-east corner,
 not against a wall with a way along it; Ondrel presses Drowned Ground at a
 healthy target; the reserve spends `M2+SHIFT` at 80 energy at 10.2 m against a
 healthy target and holds it against 55 health). `area-lead.test.ts` pins the
-lead of the areas on the sim (see Aim). Mutations that turn each red (each
-alone, restored after): the `PROFILES` row, the `KIT_RULES` row or the `RULES`
-row dropped, `rangeMin` moved to 4 or 6 (Ondrel) and 6 or 8 (Brimwick), either
+lead of the areas on the sim (see Aim): the two lingering pins unchanged, plus
+one of one Firecracker pulse at 9 m and one of one Binding Sigil pulse at 10 m
+with an ally inside the `nearAlly` gate. `bot.test.ts`'s `aim lead` adds a
+to-the-centimetre pin of the capped lead on a frozen Brimwick Firecracker windup
+(aim 499, 90 capped against the nominal 495, 301; cap 0.75). Mutations that turn
+each red (each alone, restored after): the `PROFILES` row, the `KIT_RULES` row or
+the `RULES` row dropped, `rangeMin` moved to 4 or 6 (Ondrel) and 6 or 8
+(Brimwick), either
 `holdF` flipped; the motion of Undertow or Flash Powder dropped or inverted,
 either band moved to a literal one metre off, either opener dropped; `<=` for
 `<` in the held test, the damage read as 54 or 56, the cornered test dropped;
@@ -2307,8 +2359,12 @@ Reed Step made the line of sight, that of Flare Step made `segmentClear`, the
 aim override dropped, `findLanding` true when none passes, the streak gate
 returned to `runs[i]`, the streak not zeroed on a change of target, the streak
 not zeroed on a dead think, the streak never reset; the lead dropped, doubled or
-taken from 10 m/s; an object per escape gate (168 B in the two escape scenes of
-the heap check).
+taken from 10 m/s; the cap dropped (the capped Firecracker and Binding Sigil pins
+of `area-lead.test.ts` read 0 of 1, and the `aim lead` pin reads the nominal
+pair), `AREA_LEAD_CAP_FRACTION` changed (the `leadCapOf` and `clampLead` unit
+rows and, through `aim`, the `aim lead` pin), the placement and duration tests of
+`leadCapOf` dropped (its lingering and `self`/`ahead` rows); an object per escape gate
+(168 B in the two escape scenes of the heap check).
 
 The seeded matches of #165 (`ondrel.test.ts` and `brimwick.test.ts`, over
 `six-cells.ts`, so Vitest runs the two in parallel) play each new kit, with a
@@ -2758,13 +2814,15 @@ scene, and in `nearerThanEnemies` 152 B in both, red on Node 22 in every round
 (3 of 3 runs); a double argument to a call Maglev does not inline reads 64 and 80
 B, red on Node 26.7.0 in Maglev alone (3 of 3 runs).
 
-`orb-match.test.ts` plays a Quillon and a Hargrim against a Lumeth and a Hargrim on
+`orb-match.test.ts` plays a Lumeth and a Hargrim against a Lumeth and a Hargrim on
 both arenas with the orb on (seeds 101 to 104, match seed 7, normal, 3 rounds to
 win, to matchEnd, `SIX_SET`): the press oracle on every press, `think` leaves the
-checksum alone, no blocked escape, no stall over 120 ticks (17 and 21), inside the
+checksum alone, no blocked escape, no stall over 120 ticks (26 and 15), inside the
 budget, and the bots take the orb in more than half of the rounds in which it is
-collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 2 of 3).
-With the contest switched off the two cells are red.
+collectible (the tally is `Played.orb` of `press-oracle.ts`: 5 of 5 and 3 of 4).
+With the contest switched off the two cells are red. The pair was the Quillon v
+Lumeth mirror of #225 until #187 capped the one-hit area lead (see "The energy
+orb").
 
 The identity harness (the 16 rows of PR #142's harness, orb off: free play has no
 match flow, so `orbUpInto` is false on every think) is unchanged: all 16 hashes

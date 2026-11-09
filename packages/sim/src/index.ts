@@ -57,6 +57,7 @@ export type {
   AbilitySpec,
   AreaPlacement,
   CounterSpec,
+  EndAreaSpec,
   KitDef,
   MovementRule,
   SlotSpec,

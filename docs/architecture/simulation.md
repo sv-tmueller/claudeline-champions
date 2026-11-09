@@ -154,11 +154,11 @@ and the same input stream, `checksum` after N ticks is identical on every run.
   velocity, radius, remaining lifetime ticks, pierce flag, the champions it has
   already hit (`hitIds`, in hit order), an inline `effects` list, an optional
   `allyEffects` list (the key is missing, not `undefined`, when the projectile
-  has none) and `castId` (the cast that fired it, or `null` for a dev tool
-  spawn). A projectile or area of a cast that spent its counter with the damage
-  verb (rules 2.6) also carries `bonusDamage`, the amount added to each `damage`
-  effect it lands; the key is left out when there is no bonus and is never
-  `undefined`.
+  has none), an optional `endArea` (the area spawned where it ends, rules 2.8;
+  the key is missing, not `undefined`, when it has none), an optional
+  `bonusDamage` (the counter's damage verb, rules 2.6; the key is missing, not
+  `undefined`, when there is none) and `castId` (the cast that fired it, or
+  `null` for a dev tool spawn).
 - Area: id, owner, team, shape (circle today, cone and rectangle later),
   position, radius, targets filter, remaining ticks, tick interval, ticks to
   the next application, an inline `effects` list and `castId` as for a
@@ -342,6 +342,16 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   the obstacle, so a champion pressed against a wall can still fire away from
   it. Into the wall it ends at once.
 - Each projectile gets exactly one `projectileExpired`.
+- A projectile with an `endArea` (`rules 2.8`) spawns that area at the position
+  the `projectileExpired` event carries, on every end reason but `hit`: an
+  obstacle or boundary end (`'obstacle'` or `'boundary'`, in the same sweep
+  step, phase 4) and a lifetime end (in `expireProjectiles`, phase 6), never a
+  champion hit. Round end (phase 6c) replaces the projectile lists without
+  reaching either path, so it spawns nothing. The area takes the projectile's
+  `castId` and its owner, so its hits earn energy for the cast and the cast
+  record outlives the projectile until the area ends. A contact-spawn pulses in
+  phase 5 of the same step; a lifetime-spawn is pushed after phase 5 and first
+  pulses the next step.
 
 ## Areas
 
@@ -453,7 +463,11 @@ and only `index.ts` imports `debug.ts`. Every function throws `Error('Invalid
   that is not a positive integer, an area `fuseTicks` that is given and is not a
   positive integer, a projectile `pierce` that is not a boolean,
   `effects` that is not an array, a projectile `allyEffects` that is given but
-  is not a non-empty array, an effect (in either list) of an unknown type or
+  is not a non-empty array, a projectile `endArea` that is given but is not an
+  object with a radius above 0, positive-integer `durationTicks` and
+  `intervalTicks`, a known `targets` and an `effects` array (its own optional
+  `fuseTicks` a positive integer, and no `endArea` beside `pierce: true`), an
+  effect (in either list) of an unknown type or
   with a bad field (an amount at or below 0, a status spec that `applyStatus`
   would reject, a shield with an absorb not above 0 and at most 1e6 or ticks
   outside 1 to 36000, a knockback with a distance not above 0 and at most 1e6,
@@ -827,7 +841,7 @@ All times are integer ticks. `AbilityEffect` is one of:
 
 | Effect | Fields | What it does |
 | --- | --- | --- |
-| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner in flight; aimed within the caster's own circle, nothing spawns and they land on her at 60 percent heal, see Firing), `effects` on the other team |
+| `projectile` | `speed`, `radius`, `lifetimeTicks`, `pierce`, `effects`, optional `allyEffects`, optional `endArea` | spawns a projectile from the caster along the fire direction; `allyEffects` land on the owner's team (never the owner in flight; aimed within the caster's own circle, nothing spawns and they land on her at 60 percent heal, see Firing), `effects` on the other team; `endArea` (rules 2.8) is an area effect whose `placement` is ignored, spawned where the projectile ends unless it hit a champion, and rejected beside `pierce` |
 | `area` | `placement` (`self`, `ahead { distance }`, `aim { range }`), `radius`, `durationTicks`, `intervalTicks`, `targets`, `effects`, optional `fuseTicks` | spawns an area, armed for `fuseTicks` ticks first when it has one (rules 2.7); `ahead` goes `distance` m along the fire direction, `aim` goes to the aim point, at most `range` m |
 | `meleeArc` | `radius`, `cosHalfAngle`, `effects` | swings an arc at the caster position along the fire direction |
 | `dash` | `distance`, `ticks`, `then` | starts a dash along the fire direction; `then` effects fire where it ends and may not hold a dash |
@@ -843,6 +857,9 @@ dash `then`. A hit effect inside an `effects` or `allyEffects` list is copied
 field by field, so a stray key there is dropped. When present, `allyEffects`
 must not be empty; a projectile that has it may have an empty `effects`, which
 makes it ally-only, and one without it must keep `effects` non-empty.
+`endArea` is a projectile-only key too (rules 2.8); it reads like an area's
+payload minus `placement`, is dropped from any other effect, and fails
+validation beside `pierce: true`.
 
 `createMatch(config, arena, seed, kits = [])` validates every kit it is given
 (an invalid one throws `Invalid kit: <path>: <problem>`), rejects a duplicate id
@@ -873,7 +890,8 @@ other. An ability may hold one top-level `consumeCounter` with exactly one verb
 (a second one, or a verb missing or doubled, fails) and only on a kit that
 declares a `counter`. Only the bounds above are checked here. Catalog ranges (a
 stun of 30 to 120 ticks, 8 to 30 damage), the fuse range of 15 to 120 ticks among
-them, the fuse-aware linger rule and the one-hit control exception are checked by
+them, the fuse-aware linger rule, the one-hit control exception and the
+`endArea` duration-plus-fuse-under-cooldown rule are checked by
 the roster tests (`catalogProblems`). The bounds keep `step` from throwing, not
 cheap: the live entities of a kit grow with lifetime over cooldown, step 7
 (`dropUnusedCasts`) is quadratic in them, and the catalog ranges keep them small.
@@ -1090,7 +1108,9 @@ unchanged. Statuses, a dash and the ring stay frozen through the pause.
 `roundEnded`, `castInterrupted` (`roundEnd`) per windup in champion id order,
 `projectileExpired` (`roundEnd`) per projectile in id order at its position,
 `areaExpired` per area in id order. Each projectile therefore still gets
-exactly one `projectileExpired`. The client package may rely on this order.
+exactly one `projectileExpired`. A projectile with an `endArea` spawns nothing
+here: the lists are replaced without the phase 4 sweep or the phase 6 expiry
+(rules 2.8, round end). The client package may rely on this order.
 
 **The round reset** (`startRound`, the same for round 1 and every later round)
 runs in the last locked step of the warmup or the pause: leftover projectiles and
