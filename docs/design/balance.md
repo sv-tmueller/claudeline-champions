@@ -19,15 +19,18 @@ harness, and section 5.9 reads the block it generated at 3704221 (60 cells, 8
 of them in band). The block was regenerated after the bots stopped refusing a
 melee press the sim lands (issue #186): 7 of 60 in band, read in section 5.10.
 Arena03 (#238) then extended that block into the three-arena one of section 4:
-90 cells and 11 in band. The deadlock reach of #222 (batch 18) then regenerated
-that six-kit block on the three arenas: 90 cells and 12 in band, read in section
-5.13. The seven-kit report (issue #244) then added Durnhal and turned the energy
-orb on in every cell, regenerating the block on the committed head: 126 cells and
-15 in band, read in section 5.12, which reads Durnhal's 36 cells against
-roster-v3.md section 1 and lists what the orb moved. The block was regenerated
-once more after #187 capped the lead of a one-hit aim-placed area: still 126
-cells and 15 in band, read in the same section. Sections 5.1 to 5.8 and 6 stay
-the record of the four-kit report at 9a9c653 and of the passes made on it.
+90 cells and 11 in band. The deadlock reach of #222 (batch 18) regenerated that
+six-kit block on its branch (at 094b42e): 90 cells and 12 in band, read in
+section 5.13. The seven-kit report (issue #244), on main and without the reach,
+added Durnhal and turned the energy orb on in every cell, regenerating the block
+on the committed head: 126 cells and 15 in band, read in section 5.12, which
+reads Durnhal's 36 cells against roster-v3.md section 1 and lists what the orb
+moved. The block was regenerated after #187 capped the lead of a one-hit
+aim-placed area (at 4407c96): still 126 cells and 15 in band, read in the same
+section. It was regenerated once more on the merge of #222 with main (at
+0246028): still 126 cells and 15 in band, read against the 4407c96 block in
+section 5.13. Sections 5.1 to 5.8 and 6 stay the record of the four-kit report
+at 9a9c653 and of the passes made on it.
 
 Sources:
 
@@ -426,11 +429,12 @@ Win rate in percent over the cells the champion is in, as X or as Y.
 
 Sections 5.1 to 5.8 read the four-kit report at 9a9c653; 5.9 reads the six-kit
 block of #189 (generated at 3704221), 5.10 the block of #186, and 5.11 the
-block of #213, which #238 then extended with arena03 into the 90-cell three-arena
-block; 5.12 reads the seven-kit block of section 4 (Durnhal in the harness roster,
-the energy orb on, #244; regenerated again for #187's capped one-hit area lead);
-5.13 reads what the deadlock reach of #222 (batch 18) did to the 90-cell
-three-arena block of 5.11.
+block of #213, which #238 then extended with arena03 into the 90-cell
+three-arena block; 5.12 reads the seven-kit block (Durnhal in the harness
+roster, the energy orb on, #244; regenerated again for #187's capped one-hit
+area lead, at 4407c96); 5.13 reads what the deadlock reach of #222 (batch 18)
+did to the 90-cell three-arena block of 5.11 (at 094b42e) and to the seven-kit
+block (the block of section 4, at 0246028).
 
 After the tuning passes of #121 and #124 three cells are in the band and 21 are
 outside. Each is in band or accepted with its reason, with its reading. The
@@ -969,20 +973,22 @@ Durnhal joins the harness roster and the harness plays the standard match: the
 energy orb on, at the arena's point of `data/orbs.json`, in every cell (spec
 section 6; rules.md 3.3). His kit is data (#204) and his bot profile is #211, so
 nothing about him is new here but his 36 cells: the six pairings against the six
-shipped kits, on the three arenas and in both modes. The block of section 4 was
-regenerated on the merged head, on the committed sources, after #187 capped the
-lead of a one-hit aim-placed area: 126 cells, 25 200 matches, 15 in band and no
-budget hit. Three things move at once and the reading keeps them apart — the orb,
-which rides on every cell of the seven kits, Durnhal himself, a new X, Y and fill
-of the six, and the cap, whose reach is wide because the capped areas are the
-Firecracker of Brimwick and the Binding Sigil of Lumeth and a Brimwick or Lumeth
-bot is in all 90 shared cells, as X, Y or one of the fills (against the #244
-block, which holds the orb and the fill already, the cap alone moves 68 of the
-90 and 24 of Durnhal's 36).
-Per champion over all of its cells the block reads Brimwick 60.3, Durnhal 21.4,
-Hargrim 14.7, Lumeth 89.0, Ondrel 66.1, Quillon 77.3 and Skerrow 21.1. The
-seven-kit block of #244, before the cap, is the reference the section compares
-against (its own head line and figures are in section 4).
+shipped kits, on the three arenas and in both modes. The block was regenerated
+on the merged head, on the committed sources, after #187 capped the lead of a
+one-hit aim-placed area (at 4407c96): 126 cells, 25 200 matches, 15 in band and
+no budget hit; every figure of this section is of that block (section 4 now
+holds its regeneration with the deadlock reach of #222, at 0246028, read against
+it in section 5.13). Three things move at once and the reading keeps them apart
+— the orb, which rides on every cell of the seven kits, Durnhal himself, a new
+X, Y and fill of the six, and the cap, whose reach is wide because the capped
+areas are the Firecracker of Brimwick and the Binding Sigil of Lumeth and a
+Brimwick or Lumeth bot is in all 90 shared cells, as X, Y or one of the fills
+(against the #244 block, which holds the orb and the fill already, the cap alone
+moves 68 of the 90 and 24 of Durnhal's 36). Per champion over all of its cells
+that block reads Brimwick 60.3, Durnhal 21.4, Hargrim 14.7, Lumeth 89.0, Ondrel
+66.1, Quillon 77.3 and Skerrow 21.1. The seven-kit block of #244, before the
+cap, is the reference the section compares against (its own head line and
+figures are in section 4).
 
 **Durnhal's 36 cells.** 4 are in band and 32 are out, the summed distance 950.0
 points, 26.4 a cell, second only to Lumeth's 29.3. Against the web of roster-v3.md
@@ -1140,9 +1146,11 @@ confirmed on the full cap (the tables are in bots.md); the value is the smallest
 reach above 1.0 that lowers both melee kits' latch deaths and `retreatAdvance`
 damage taken, and it stays inside the raw M1 arc so the latched bot keeps casting.
 11 of the 16 identity rows of the bots tests move (the first diff ticks are 140 to
-1 965; five rows never latch within their length), the seeded runs re-record, and
-the block was regenerated on the committed head (decision 1 on #213: a bot change
-is measured whole; `npm run balance` on Node 22.23.2: 17 640 matches, 1264.4 s).
+1 965; five rows never latch within their length), the seeded runs re-record,
+and the six-kit block was regenerated on the branch's committed head (at
+094b42e; decision 1 on #213: a bot change is measured whole; `npm run balance`
+on Node 22.23.2: 17 640 matches, 1264.4 s), and the seven-kit block again on the
+merge with main (at 0246028; 25 200 matches, 1797.6 s).
 
 **The block against the block of 5.11 and #238.** Cells in band: 12 of 90 (11),
 a net of one. The summed distance rises from 2205.9 to 2228.5 points, the first
@@ -1173,6 +1181,22 @@ deaths (bots.md, #222). The latch is not the whole of what holds the melee kits
 down, and the reach does not close the band: the step after stays a kit change,
 if the standing stays. No share of any cell is stated as the cause, and the
 decision stays with the lead.
+
+**The seven-kit block on the merge with main.** Section 4 is the block
+regenerated on the merge of #222 with main (0246028: seven kits, the orb on,
+#187's cap; #160's endArea and #254's spend verbs are in no shipped kit), so
+against the block 5.12 reads (4407c96) the move is the reach alone. Cells in
+band: 15 of 126 (15), still 4 of Durnhal's 36 and 11 of the shared 90. 110 of
+the 126 rates move (81 of the shared 90, 29 of Durnhal's 36), 5 by more than the
+7 points of one cell's noise, the largest 3v3 arena02 Durnhal v Hargrim (50.0 to
+62.0) and 2v2 arena02 Durnhal v Hargrim (64.0 to 75.5). Four verdicts change:
+2v2 arena01 Brimwick v Ondrel in (61.0 to 57.0), 3v3 arena01 Durnhal v Hargrim
+in (64.0 to 59.0), 2v2 arena02 Lumeth v Quillon out (56.5 to 66.0) and 3v3
+arena02 Durnhal v Hargrim out (50.0 to 62.0). The summed distance rises from
+3204.5 to 3227.5 points (2254.5 to 2266.5 in the shared 90, 950.0 to 961.0 in
+Durnhal's 36). No match hit the budget. Per champion over all of its cells:
+Brimwick 60.3 to 60.6, Durnhal 21.4 to 21.5, Hargrim 14.7 to 13.8, Lumeth 89.0
+to 88.5, Ondrel 66.1 to 66.6, Quillon 77.3 to 78.1 and Skerrow 21.1 to 20.9.
 
 ## 6. Changes made
 

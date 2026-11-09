@@ -396,8 +396,10 @@ not in it). A round is an orb
 round when it reaches tick 1200, and most do not: normal bots end a round at
 tick 1000 for most pairings, so the orb is up in 21 of 79 rounds on arena 1 and 17
 of 83 on arena 2 (the #225 scan read 20 of 78 and 16 of 82; the re-read here is
-after #187 capped the lead of the one-hit areas). The bots took it in 13 of the 21
-and 9 of the 17 (62 and 53 percent). The rest of this paragraph is #225's scan,
+after #187 capped the lead of the one-hit areas and before the deadlock reach of
+#222, which was not re-scanned: the committed cells below are on the merged
+tree). The bots took it in 13 of the 21 and 9 of the 17 (62 and 53 percent). The
+rest of this paragraph is #225's scan,
 not re-measured here: with the contest switched off, that scan has 3 of 18 and 1 of 18,
 which are the champions that stood on it by chance. The orb flag (the decision's, before
 the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
@@ -2260,23 +2262,25 @@ never do within their length. The seeded runs that move, re-recorded each by its
 own formula: the four Lumeth runs end at ticks 8 438 (2v2 arena01, was 8 254;
 round term 2500, budget 21 000), 5 271 (2v2 arena02, was 5 698; 1700, 16 000),
 9 504 (3v3 arena01, was 9 357; 2 300, 22 000) and 4 809 (3v3 arena02, was
-6 295 since #187; 2 900, 18 000), on the tree merged with #187 and #160, in `lumeth.test.ts` and the harness rows of
-`tools/balance/harness.test.ts`; the cells of `brimwick.test.ts`, `ondrel.test.ts`
-and `durnhal.test.ts` that passed their term (Brimwick against Quillon on arena02
-4499 and 1200; Ondrel against Quillon on arena02 4610 and 1103 and against Lumeth
-on arena02 5757 and 1645; Durnhal against Hargrim on arena01 5235 and 1199,
-against Quillon on arena01 2843 and 758 and against Ondrel on arena01 5226 and
-1530; on the merged tree also Ondrel against Brimwick on arena01 3944 and 1379, whose
-longest round passed its term of 1100, and the two orb cells of `orb-match.test.ts`,
-Lumeth against Lumeth on arena01 11085 and 3658 and on arena02 9611 and 2609, which
-read 3 and 4 of 4 orb rounds taken); Ondrel against Quillon on arena02 keeps its no-dash record and the byte
-`glides` 0 exception moves with it to Ondrel against Brimwick on arena02 (now
-glides 1, brimwick glides 0); the displaced-teleport run of `headless-kits.test.ts`
-moves from seeds 738 to 743 to 768 to 773 (tick 366, champion 2's Skip, 0.12 m;
-no window of six seeds from 600 to 767 displaced it); and the stepped scene of
-#123 has a slower death (1 533 on easy in seed 6), so its budget is 3 100 (was
-1 400; the #213 stand gave 447 on normal). `git diff` over the cascade touches
-`packages/bots/test/{lumeth,brimwick,ondrel,durnhal,headless-kits,touching}.test.ts`
+6 295 since #187; 2 900, 18 000), on the tree merged with #187 and #160, in
+`lumeth.test.ts` and the harness rows of `tools/balance/harness.test.ts`; the
+cells of `brimwick.test.ts`, `ondrel.test.ts` and `durnhal.test.ts` that passed
+their term (Brimwick against Quillon on arena02 4499 and 1200; Ondrel against
+Quillon on arena02 4610 and 1103 and against Lumeth on arena02 5757 and 1645;
+Durnhal against Hargrim on arena01 5235 and 1199, against Quillon on arena01
+2843 and 758 and against Ondrel on arena01 5226 and 1530; on the merged tree
+also Ondrel against Brimwick on arena01 3944 and 1379, whose longest round
+passed its term of 1100, and the two orb cells of `orb-match.test.ts`, Lumeth
+against Lumeth on arena01 11085 and 3658 and on arena02 9611 and 2609, which
+read 3 and 4 of 4 orb rounds taken); Ondrel against Quillon on arena02 keeps its
+no-dash record and the byte `glides` 0 exception moves with it to Ondrel against
+Brimwick on arena02 (now glides 1, brimwick glides 0); the displaced-teleport
+run of `headless-kits.test.ts` moves from seeds 738 to 743 to 768 to 773 (tick
+366, champion 2's Skip, 0.12 m; no window of six seeds from 600 to 767 displaced
+it); and the stepped scene of #123 has a slower death (1 533 on easy in seed 6),
+so its budget is 3 100 (was 1 400; the #213 stand gave 447 on normal). `git
+diff` over the cascade touches
+`packages/bots/test/{lumeth,brimwick,ondrel,durnhal,headless-kits,touching,orb-match}.test.ts`
 and `tools/balance/harness.test.ts` only.
 
 The result, with the same phase script on the branch: the latch shrinks a little
@@ -2285,9 +2289,12 @@ damage taken per alive second in the advance, Skerrow 16.8 to 16.3 and 1.48 to
 1.42) and the two kits' latch deaths fall (13 135 to 12 931 and 13 647 to 13 590,
 still about 70 percent of each kit's deaths, so the latch is not the whole of what
 holds the melee kits down). The block was regenerated on the committed head
-(`npm run balance` on Node 22.23.2: 17 640 matches, 1264.4 s): 12 of 90 cells in
-band (was 11), the summed distance 2205.9 to 2228.5 points, no budget hit. It is
-read in balance.md, section 5.13.
+(`npm run balance` on Node 22.23.2: 17 640 matches, 1264.4 s, the six-kit block
+at 094b42e): 12 of 90 cells in band (was 11), the summed distance 2205.9 to
+2228.5 points, no budget hit; and again on the merge with main (0246028, the
+seven-kit block with the orb on and #187's cap: 25 200 matches, 15 of 126 in
+band as before, the summed distance 3204.5 to 3227.5). Both are read in
+balance.md, section 5.13.
 
 The seeded matches of #112 (`lumeth.test.ts`) play Hargrim and Lumeth against
 Hargrim and Quillon, and the client's 3v3 (Hargrim, Quillon and Lumeth a side,
@@ -2303,13 +2310,15 @@ tick when the budget was set (8438, 5271, 9504 and 4809, since #222 on the tree
 merged with #187; 8254, 5698, 9357 and 6295 before, the last since #187;
 6442 since #213; 5081, 7521,
 6773 and 10934 before, the first moved from 6623 with #186), plus two rounds of the
-longest round that did not go to sudden death, rounded up to 100 (2500 in the 2v2
-runs, whose longest is 2494 since #222 and was 2265 since #213 and 1619 before, and 2900 in the 3v3
-runs, the client's longest for the same roster, 2801), and one of 7000, rounded up
-to 1000 (21000, 16000, 22000 and 18000; 20000, 18000, 23000 and 20000 before #222; 16000, 18000, 20000 and 24000 before #213,
-the first 18000 before #186); a run whose longest round passes its term fails. Every run has a Lumeth heal an ally; across the four,
-Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy, and
-Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
+longest round that did not go to sudden death, rounded up to 100 (2500, 1700,
+2300 and 2900 since #222: the longest 2v2 round is 2494, on arena01, and was
+2265 since #213 and 1619 before; 2900 in the 3v3 on arena02 is the client's
+longest for the same roster, 2801), and one of 7000, rounded up to 1000 (21000,
+16000, 22000 and 18000; 20000, 18000, 23000 and 20000 before #222; 16000, 18000,
+20000 and 24000 before #213, the first 18000 before #186); a run whose longest
+round passes its term fails. Every run has a Lumeth heal an ally; across the
+four, Soothing Surge heals an ally, Aegis Veil is cast, Mend Bolt hits an enemy,
+and Lantern Burst and Glide are pressed (both in the 3v3 on arena02). The two
 start-edit runs of headless-kits.test.ts stay as their declared fallback (a miss
 is governed by decision 8.3 of batch #53). The seeds, tiers and budgets are
 pinned. The sim's ability watcher has the matching rows: a projectile hit on the
@@ -2823,10 +2832,10 @@ both arenas with the orb on (seeds 101 to 104, match seed 7, normal, 3 rounds to
 win, to matchEnd, `SIX_SET`): the press oracle on every press, `think` leaves the
 checksum alone, no blocked escape, no stall over 120 ticks (15 and 15), inside the
 budget, and the bots take the orb in more than half of the rounds in which it is
-collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 4 of 4 since #222, 5 of 5 and 3 of 4 before).
-With the contest switched off the two cells are red. The pair was the Quillon v
-Lumeth mirror of #225 until #187 capped the one-hit area lead (see "The energy
-orb").
+collectible (the tally is `Played.orb` of `press-oracle.ts`: 3 of 4 and 4 of 4
+since #222, 5 of 5 and 3 of 4 before). With the contest switched off the two
+cells are red. The pair was the Quillon v Lumeth mirror of #225 until #187
+capped the one-hit area lead (see "The energy orb").
 
 The identity harness (the 16 rows of PR #142's harness, orb off: free play has no
 match flow, so `orbUpInto` is false on every think) is unchanged: all 16 hashes

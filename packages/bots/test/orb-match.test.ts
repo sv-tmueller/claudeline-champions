@@ -22,12 +22,12 @@ import type { Cell } from './six-cells';
 // the bots before #187, the pair of #225 (a Quillon with a Hargrim against a Lumeth with a Hargrim)
 // was the one; after #187 capped the lead of the one-hit areas it read exactly half on arena01
 // (`taken 2` of `orbRounds 4`), so the scan of all 21 pairings was re-read (bots.md, The energy
-// orb) and the Lumeth mirror stands: 5 of 5 on arena01 and 3 of 4 on arena02 (3 of 4 and 4 of 4 since the deadlock reach of #222). The Hargrim and
-// Quillon mirror of the product's match is not it: its rounds end before tick 1200 but for one of
-// its 6, so it has 0 and 1 orb rounds and nothing to assert. The two cells are the only committed
-// matches of this kind (testing.md, Check suite: the unit job is near its time). A cell takes 6 to
-// 8 s locally (the longer Lumeth mirror rounds): the timeout of 60 s is that of the other long
-// cells (brimwick.test.ts).
+// orb) and the Lumeth mirror stands: 5 of 5 on arena01 and 3 of 4 on arena02 (3 of 4 and 4 of 4
+// since the deadlock reach of #222). The Hargrim and Quillon mirror of the product's match is not
+// it: its rounds end before tick 1200 but for one of its 6, so it has 0 and 1 orb rounds and
+// nothing to assert. The two cells are the only committed matches of this kind (testing.md, Check
+// suite: the unit job is near its time). A cell takes 6 to 8 s locally (the longer Lumeth mirror
+// rounds): the timeout of 60 s is that of the other long cells (brimwick.test.ts).
 
 // What the first run measured: the end tick and the longest ordinary round, see six-cells.ts. The
 // pair re-read below is the Lumeth mirror: after #187 changed the aim of the one-hit areas the
