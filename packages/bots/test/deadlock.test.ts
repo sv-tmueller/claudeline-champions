@@ -355,7 +355,8 @@ describe('the deadlock reach (#222)', () => {
 describe.each([
   { name: 'the test kits', kits: () => [hargrimKit(), quillonKit()] },
   { name: 'the shipped kits', kits: jsonKits },
-])('the match that froze at low health, with $name', ({ kits }) => {  // The final state of the kit headless run of #58 (a mirror 2v2 of Hargrim and Quillon, seeds 101
+])('the match that froze at low health, with $name', ({ kits }) => {
+  // The final state of the kit headless run of #58 (a mirror 2v2 of Hargrim and Quillon, seeds 101
   // to 104, easy, normal, hard, normal): health 3 of 160, 27 of 120, 26 of 160 and 13 of 120, every
   // champion under 36 percent, every champion retreating to its spawn and standing there, no kill.
   // Team A has 0.244 of health summed against 0.271 of team B, so team A is behind and advances,

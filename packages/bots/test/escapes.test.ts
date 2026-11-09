@@ -92,6 +92,35 @@ describe('the escape trigger', () => {
   });
 });
 
+// The deadlock rule's latched advance (the retreat case of `move` in bot.ts) is a retreat, so the
+// common trigger holds for it (bots.md, Escapes). The scene runs its own bot: `firstPress` and
+// `pressOf` make a fresh one, and a fresh bot is never latched.
+describe('the escape of a latched advance', () => {
+  it('presses Skip from the latched stand when the target closes to 4 m, aimed 4 m straight away', () => {
+    // Quillon is behind at 0.2 health against 1, with the target 16 m off, past latchReach.
+    const state = sceneOf('quillon', 16, { ready: ['SPACE'], health: 0.2 });
+    const me = state.champions[0] as ChampionState;
+    const bot = createBot(0, 'hard', 1);
+    let input: PlayerInput | undefined;
+    for (let i = 0; i < TIERS.hard.delay + 10; i++) input = copyInput(bot.think(state));
+    expect(bot.inspect()).toEqual({ intent: 'retreat', targetId: 2 });
+    expect(input?.moveX, 'it advances: the latch is set').toBe(1);
+
+    // The target closes to 4 m, in reach: the latch holds her standing, and a fresh bot at 4 m
+    // would kite instead, so the intent is asserted too.
+    (state.champions[2] as ChampionState).x = me.x + 4;
+    input = undefined;
+    for (let i = 0; i < THINKS && input === undefined; i++) {
+      const next = bot.think(state);
+      if (next.buttons !== 0) input = copyInput(next);
+    }
+    expect(input && labelOf(input.buttons)).toBe('SPACE');
+    expect([input?.aimX, input?.aimY]).toEqual([-1000, 0]);
+    expect([input?.moveX, input?.moveY], 'the latched stand').toEqual([0, 0]);
+    expect(bot.inspect()).toEqual({ intent: 'retreat', targetId: 2 });
+  });
+});
+
 // Lumeth's trigger is her own: any acted intent but idle, with the acted target within 3 m,
 // inclusive (the roster's "an enemy inside 3 m"). It replaces the common trigger for her: a kite
 // inside rangeMin 6 and a retreat within 6 m are no escape think unless the target is that close.
