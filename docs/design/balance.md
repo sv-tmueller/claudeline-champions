@@ -3,34 +3,33 @@
 ## 1. Status and sources
 
 Status: the harness and the baseline of batch #105 (issue #109), its first
-tuning pass (issue #121), the Hargrim and Quillon pass (issue #124), the
-six-kit report of batch 15 (issue #189, section 5.9), the melee presses of
-batch 16 (issue #186, section 5.10) and the melee stand of batch 17 (issue
-#213, section 5.11). The
-first pass moved two numbers, one of Skerrow's and one of Lumeth's (section 6),
-and the second moved none: each of its 20 candidates was dropped, by a
-pre-check or by its full run (section 6.2). Sections 5 and 6 record the report
-after the two numbers of #121, with 3 of 24 cells in band, where the baseline
-had 1, which is also the report of #124's head, since no kit changed. Every
-cell is in band or accepted with its reason there. The report in section 4 was
-regenerated after the bots began to dodge (issue #137): 5 of 24 cells in band
-(the note of section 4). The six-kit report added Ondrel and Brimwick to the
-harness, and section 5.9 reads the block it generated at 3704221 (60 cells, 8
-of them in band). The block was regenerated after the bots stopped refusing a
+tuning pass (issue #121), the Hargrim and Quillon pass (issue #124), the six-kit
+report of batch 15 (issue #189, section 5.9), the melee presses of batch 16
+(issue #186, section 5.10) and the melee stand of batch 17 (issue #213, section
+5.11). The first pass moved two numbers, one of Skerrow's and one of Lumeth's
+(section 6), and the second moved none: each of its 20 candidates was dropped,
+by a pre-check or by its full run (section 6.2). Sections 5 and 6 record the
+report after the two numbers of #121, with 3 of 24 cells in band, where the
+baseline had 1, which is also the report of #124's head, since no kit changed.
+Every cell is in band or accepted with its reason there. The report in section 4
+was regenerated after the bots began to dodge (issue #137): 5 of 24 cells in
+band (the note of section 4). The six-kit report added Ondrel and Brimwick to
+the harness, and section 5.9 reads the block it generated at 3704221 (60 cells,
+8 of them in band). The block was regenerated after the bots stopped refusing a
 melee press the sim lands (issue #186): 7 of 60 in band, read in section 5.10.
-Arena03 (#238) then extended that block into the three-arena one of section 4:
-90 cells and 11 in band. The deadlock reach of #222 (batch 18) regenerated that
-six-kit block on its branch (at 094b42e): 90 cells and 12 in band, read in
-section 5.13. The seven-kit report (issue #244), on main and without the reach,
-added Durnhal and turned the energy orb on in every cell, regenerating the block
-on the committed head: 126 cells and 15 in band, read in section 5.12, which
-reads Durnhal's 36 cells against roster-v3.md section 1 and lists what the orb
-moved. The block was regenerated after #187 capped the lead of a one-hit
-aim-placed area (at 4407c96): still 126 cells and 15 in band, read in the same
-section. It was regenerated once more on the merge of #222 with main (at
-0246028): still 126 cells and 15 in band, read against the 4407c96 block in
-section 5.13. Sections 5.1 to 5.8 and 6 stay the record of the four-kit report
-at 9a9c653 and of the passes made on it.
+Arena03 (#238) then extended that block into the three-arena six-kit block of
+#189 (section 5.11 reads it): 90 cells and 11 in band. The deadlock reach of
+#222 (batch 18) regenerated that six-kit block on its branch (at 094b42e): 90
+cells and 12 in band, read in section 5.13. The seven-kit report (issue #244),
+on main and without the reach, added Durnhal and turned the energy orb on in
+every cell, regenerating the block on the committed head: 126 cells and 15 in
+band, read in section 5.12, which reads Durnhal's 36 cells against roster-v3.md
+section 1 and lists what the orb moved. The block was regenerated after #187
+capped the lead of a one-hit aim-placed area (at 4407c96): still 126 cells and
+15 in band, read in the same section. It was regenerated once more on the merge
+of #222 with main (at 0246028): still 126 cells and 15 in band, read against the
+4407c96 block in section 5.13. Sections 5.1 to 5.8 and 6 stay the record of the
+four-kit report at 9a9c653 and of the passes made on it.
 
 Sources:
 
@@ -199,41 +198,40 @@ band (11 of the 90 cells the six kits share and 4 of Durnhal's 36), the summed
 distance of the 126 cells to the band 3227.5 points (2266.5 in the 90 six-kit
 cells, 961.0 in Durnhal's 36), and no budget hit. Per champion over all of its
 cells: Brimwick 60.6, Durnhal 21.5, Hargrim 13.8, Lumeth 88.5, Ondrel 66.6,
-Quillon 78.1 and Skerrow 20.9. It was regenerated on the merge of #222 with main
-(`0246028`), with Durnhal in the harness roster, the energy orb on in every cell
-(spec section 6), #187's cap on the one-hit area lead and #222's reach, so
-section 5.13 reads it against the block of #187 (generated at `4407c96`), which
-section 5.12 reads: section 5.12 reads Durnhal's cells and what the orb, his
-fill and the cap moved in the other 90. The block that one replaced, the block
-of #187's cap at `4407c96` (before the reach of #222), read 15 in band (11 of
-the 90 and 4 of Durnhal's 36), 3204.5 points (2254.5 and 950.0) and Brimwick
-60.3, Durnhal 21.4, Hargrim 14.7, Lumeth 89.0, Ondrel 66.1, Quillon 77.3 and
-Skerrow 21.1. The block that one replaced, the seven-kit block of #244 (generated
-at `ac23e84`, before the cap), read 15 in band (10 of the 90 and 5 of his 36),
-3249.5 points (2296.5 and 953.0) and Brimwick 58.9, Durnhal 21.1, Hargrim 14.7,
-Lumeth 89.2, Ondrel 66.6, Quillon 78.3 and Skerrow 21.3. The block that one
-replaced (the six-kit report, #189 with batch 15) had 90 cells and 17 640
-matches on three arenas (arena03 of #238), 11 of them in band (4 of the 36 cells
-with Ondrel or Brimwick on the first two arenas, 3 of the 24 four-kit cells
-there, and 4 of the 30 new arena03 cells), 2205.9 points (847.2, 644.8 and
-713.9) and Brimwick 50.3, Hargrim 13.6, Lumeth 87.2, Ondrel 62.2, Quillon 71.9
-and Skerrow 14.8; the orb, Durnhal as a fill and the cap moved 78 of its 90
-cells, 12 of them by more than the 7 points of one cell's noise (section 3). The
-block of #213 (the 60 cells of the first two arenas) had 7 in band and 1492.0
-points (847.2 and 644.8) with Brimwick 50.6, Hargrim 12.6, Lumeth 89.0, Ondrel
-59.2, Quillon 72.0 and Skerrow 16.6; every one of its 60 cells is unchanged in
-the #238 block, because arena03 adds cells and moves none. The block of #186
-(generated at e5c29a4, see 5.10) had 7 in band, 1552.9 points (882.7 and 670.2)
-and Brimwick 51.9, Hargrim 11.7, Lumeth 89.3, Ondrel 60.2, Quillon 73.0 and
-Skerrow 13.9; the block of #189 (generated at 3704221) had 8 in band, 1561.3
-points (883.9 and 677.4) and Brimwick 52.3, Hargrim 11.4, Lumeth 89.1, Ondrel
-60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in sections 5.10, 5.11
-and 5.12. The four-kit report that the six-kit report replaced is the block
-regenerated after the dodge of #137, and nothing between it and #189 moved a
-four-kit cell: #155, #165, #191 and #158 landed after it, and PR #185 and PR
-#196 each reproduced that block with `--check` on main (PR #196 after #191, #158
-and #162). Its 24 cells moved because Ondrel and Brimwick are new fills (section
-5.9).
+Quillon 78.1 and Skerrow 20.9. It was regenerated on the merge of #222 with
+main, with Durnhal in the harness roster, the energy orb on in every cell (spec
+section 6), #187's cap on the one-hit area lead and #222's reach; section 5.13
+reads it against the block of #187 (generated at `4407c96`), and section 5.12
+reads that block: Durnhal's cells and what the orb, his fill and the cap moved
+in the other 90. The block this one replaced, the block of #187's cap at
+`4407c96` (before the reach of #222), read 15 in band (11 of the 90 and 4 of
+Durnhal's 36), 3204.5 points (2254.5 and 950.0) and Brimwick 60.3, Durnhal 21.4,
+Hargrim 14.7, Lumeth 89.0, Ondrel 66.1, Quillon 77.3 and Skerrow 21.1. The block
+that one replaced, the seven-kit block of #244 (generated at `ac23e84`, before
+the cap), read 15 in band (10 of the 90 and 5 of his 36), 3249.5 points (2296.5
+and 953.0) and Brimwick 58.9, Durnhal 21.1, Hargrim 14.7, Lumeth 89.2, Ondrel
+66.6, Quillon 78.3 and Skerrow 21.3. The block that one replaced (the six-kit
+report, #189 with batch 15) had 90 cells and 17 640 matches on three arenas
+(arena03 of #238), 11 of them in band (4 of the 36 cells with Ondrel or Brimwick
+on the first two arenas, 3 of the 24 four-kit cells there, and 4 of the 30 new
+arena03 cells), 2205.9 points (847.2, 644.8 and 713.9) and Brimwick 50.3,
+Hargrim 13.6, Lumeth 87.2, Ondrel 62.2, Quillon 71.9 and Skerrow 14.8; the orb,
+Durnhal as a fill and the cap moved 78 of its 90 cells, 12 of them by more than
+the 7 points of one cell's noise (section 3). The block of #213 (the 60 cells of
+the first two arenas) had 7 in band and 1492.0 points (847.2 and 644.8) with
+Brimwick 50.6, Hargrim 12.6, Lumeth 89.0, Ondrel 59.2, Quillon 72.0 and Skerrow
+16.6; every one of its 60 cells is unchanged in the #238 block, because arena03
+adds cells and moves none. The block of #186 (generated at e5c29a4, see 5.10)
+had 7 in band, 1552.9 points (882.7 and 670.2) and Brimwick 51.9, Hargrim 11.7,
+Lumeth 89.3, Ondrel 60.2, Quillon 73.0 and Skerrow 13.9; the block of #189
+(generated at 3704221) had 8 in band, 1561.3 points (883.9 and 677.4) and
+Brimwick 52.3, Hargrim 11.4, Lumeth 89.1, Ondrel 60.1, Quillon 73.3 and Skerrow
+13.7; what moved is read in sections 5.10, 5.11 and 5.12. The four-kit report
+that the six-kit report replaced is the block regenerated after the dodge of
+#137, and nothing between it and #189 moved a four-kit cell: #155, #165, #191
+and #158 landed after it, and PR #185 and PR #196 each reproduced that block
+with `--check` on main (PR #196 after #191, #158 and #162). Its 24 cells moved
+because Ondrel and Brimwick are new fills (section 5.9).
 
 What follows, up to the block, is the history of the four-kit report that the
 six-kit report replaced. That report was the one after the tuning pass of #121, and of
@@ -872,8 +870,8 @@ package changes no kit and no bots rule.
 Note (2026-10-27, #186): the open question above, whether the profiles or the
 kits move first, is read in section 5.10 on a measurement. The figures of this
 section stay those of the block of #189, which the #186 block replaced; section
-5.10 lists what moved, and #238 extended that block with arena03 into the block
-of section 4.
+5.10 lists what moved, and #238 extended that block with arena03 into the
+three-arena six-kit block of #189, which section 5.11 reads.
 
 ### 5.10 The melee presses of #186 (batch 16)
 
@@ -1159,16 +1157,16 @@ and the six-kit block was regenerated on the branch's committed head (at
 on Node 22.23.2: 17 640 matches, 1264.4 s), and the seven-kit block again on the
 merge with main (at 0246028; 25 200 matches, 1797.6 s).
 
-**The block against the block of 5.11 and #238.** Cells in band: 12 of 90 (11),
-a net of one. The summed distance rises from 2205.9 to 2228.5 points, the first
-regeneration under which it rises: 847.2 to 856.3 in the 36 new-kit cells of the
-first two arenas, 644.8 to 654.2 in their 24 four-kit cells, 389.0 to 389.7 in
-the 18 new-kit arena03 cells and 324.9 to 328.3 in the 12 four-kit arena03 cells.
-77 of the 90 rates move, none by more than the 6.0 points of 2v2 arena01 Brimwick
-v Ondrel (50.5 to 44.5, after the #213 stand had already taken it from 52.5 to
-43.0 and back; the next largest are 3v3 arena03 Hargrim v Skerrow, 68.8 to 66.1,
-and 2v2 arena03 Brimwick v Ondrel, 37.5 to 41.5). Three
-verdicts change, all in arena03: 2v2
+**The six-kit block (094b42e) against the block of 5.11 and #238.** Cells in
+band: 12 of 90 (11), a net of one. The summed distance rises from 2205.9 to
+2228.5 points, the first regeneration of the six-kit block under which it rises:
+847.2 to 856.3 in the 36 new-kit cells of the first two arenas, 644.8 to 654.2
+in their 24 four-kit cells, 389.0 to 389.7 in the 18 new-kit arena03 cells and
+324.9 to 328.3 in the 12 four-kit arena03 cells. 77 of the 90 rates move, none
+by more than the 6.0 points of 2v2 arena01 Brimwick v Ondrel (50.5 to 44.5,
+after the #213 stand had already taken it from 52.5 to 43.0 and back; the next
+largest are 3v3 arena03 Hargrim v Skerrow, 68.8 to 66.1, and 2v2 arena03
+Brimwick v Ondrel, 37.5 to 41.5). Three verdicts change, all in arena03: 2v2
 Brimwick v Ondrel in (37.5 to 41.5), 2v2 Lumeth v Ondrel out (60.0 to 61.5, 1.5
 points over) and 3v3 Brimwick v Quillon in (37.5 to 41.1), so two cells come in
 and one goes out. No match hit the budget. Per champion over all of its cells:

@@ -391,26 +391,27 @@ the field. The rule draws no random number.
 Measured, on the six shipped kits with the orb on: every one of the 21 pairings
 (15 two-kit pairs and the 6 mirrors, with a filler of Hargrim or Quillon as
 six-cells.ts has it), both arenas, seeds 101 to 104, match seed 7, normal tier,
-played to matchEnd (a scratch, not committed, 42 matches; Durnhal of #211, the seventh kit, was
-not in it). A round is an orb
-round when it reaches tick 1200, and most do not: normal bots end a round at
-tick 1000 for most pairings, so the orb is up in 21 of 79 rounds on arena 1 and 17
-of 83 on arena 2 (the #225 scan read 20 of 78 and 16 of 82; the re-read here is
-after #187 capped the lead of the one-hit areas and before the deadlock reach of
-#222, which was not re-scanned: the committed cells below are on the merged
-tree). The bots took it in 13 of the 21 and 9 of the 17 (62 and 53 percent). The
-rest of this paragraph is #225's scan,
-not re-measured here: with the contest switched off, that scan has 3 of 18 and 1 of 18,
-which are the champions that stood on it by chance. The orb flag (the decision's, before
-the delay) flips 117 times in those 20 orb rounds and 70 times in the 16, four bots in
-each (one contest is a flip to true and one to false at its end or at the next round).
-The flips are not spread evenly: a cell with orb rounds reads 2 to 12 flips, but for the
-cells with Lumeth, which read 0 to 46 (Lumeth against Brimwick on arena 1: 46 flips in 2 orb
-rounds of the 4 bots, about one flip every 74 bot-ticks; the Lumeth mirror 26 and 22; Quillon
-against Lumeth 28 and 8). A ranged kit's reach is 9 to 13 m, and a champion that kites in and
-out of the reach of an enemy flips the threat test with it, so the contest starts and stops
-as the distance crosses `rangeMax`; this is reading A at work (an enemy in reach ends the
-contest) and not a bug, and no hysteresis is built (see Not built yet).
+played to matchEnd (a scratch, not committed, 42 matches; Durnhal of #211, the
+seventh kit, was not in it). A round is an orb round when it reaches tick 1200,
+and most do not: normal bots end a round at tick 1000 for most pairings, so the
+orb is up in 21 of 79 rounds on arena 1 and 17 of 83 on arena 2 (the #225 scan
+read 20 of 78 and 16 of 82; the re-read here is after #187 capped the lead of
+the one-hit areas and before the deadlock reach of #222, which was not
+re-scanned: the committed cells below are on the merged tree). The bots took it
+in 13 of the 21 and 9 of the 17 (62 and 53 percent). The rest of this paragraph
+is #225's scan, not re-measured here: with the contest switched off, that scan
+has 3 of 18 and 1 of 18, which are the champions that stood on it by chance. The
+orb flag (the decision's, before the delay) flips 117 times in those 20 orb
+rounds and 70 times in the 16, four bots in each (one contest is a flip to true
+and one to false at its end or at the next round). The flips are not spread
+evenly: a cell with orb rounds reads 2 to 12 flips, but for the cells with
+Lumeth, which read 0 to 46 (Lumeth against Brimwick on arena 1: 46 flips in 2
+orb rounds of the 4 bots, about one flip every 74 bot-ticks; the Lumeth mirror
+26 and 22; Quillon against Lumeth 28 and 8). A ranged kit's reach is 9 to 13 m,
+and a champion that kites in and out of the reach of an enemy flips the threat
+test with it, so the contest starts and stops as the distance crosses
+`rangeMax`; this is reading A at work (an enemy in reach ends the contest) and
+not a bug, and no hysteresis is built (see Not built yet).
 
 The committed matches (`orb-match.test.ts`) are the Lumeth mirror of the six
 kits (a Lumeth and a Hargrim against a Lumeth and a Hargrim), played to matchEnd
@@ -2095,14 +2096,15 @@ fights a Hargrim that is now closer), none across the band and none to a budget
 hit. The regenerated block is in balance.md, section 4 and 5.11.
 
 The rule of #222 (`deadlock.test.ts`, `latchReach` in `profile.ts`, see Deadlock
-and Profiles): the deadlock rule's entry test and the latched stand of `seekShot`
-read `latchReach` where they read `rangeMax`. It is `rangeMax` for a champion
-that keeps its range and `LATCH_FRACTION` (1.25) of it for the two rangeMin-0
-profiles, Hargrim and Skerrow, with a kit and without (2.5 m and 1.875 m with the
-shipped kits, 3.75 m and 3.125 m from the table). `enemyInReach` is untouched:
-the finisher, the orb contest and the sight cell search keep `rangeMax`. The
-field is one more double of the profile record of the kit cache, copied in
-`refreshKitCache` like `standReach`, and costs no allocation.
+and Profiles): the deadlock rule's entry test and the latched stand of
+`seekShot` read `latchReach` where they read `rangeMax`. It is `rangeMax` for a
+champion that keeps its range and `LATCH_FRACTION` (1.25) of it for the three
+rangeMin-0 profiles, Hargrim, Skerrow and Durnhal, with a kit and without
+(2.5 m, 1.875 m and 3.75 m with the shipped kits, 3.75 m, 3.125 m and 4.375 m
+from the table). `enemyInReach` is untouched: the finisher, the orb contest and
+the sight cell search keep `rangeMax`. The field is one more double of the
+profile record of the kit cache, copied in `refreshKitCache` like `standReach`,
+and costs no allocation.
 
 The measurement before the rule (main at 388d36c, no bots or sim source
 touched): a scratch script, `latch.ts`, not in the repository (its text is in the
@@ -2261,8 +2263,8 @@ rows); the five that stand (headless, stall, plain1200, plainOther, skerrow)
 never do within their length. The seeded runs that move, re-recorded each by its
 own formula: the four Lumeth runs end at ticks 8 438 (2v2 arena01, was 8 254;
 round term 2500, budget 21 000), 5 271 (2v2 arena02, was 5 698; 1700, 16 000),
-9 504 (3v3 arena01, was 9 357; 2 300, 22 000) and 4 809 (3v3 arena02, was
-6 295 since #187; 2 900, 18 000), on the tree merged with #187 and #160, in
+9 504 (3v3 arena01, was 9 357; 2 300, 22 000) and 4 809 (3v3 arena02, was 6 295
+since #187; 2 900, 18 000), on the tree merged with #187 and #160, in
 `lumeth.test.ts` and the harness rows of `tools/balance/harness.test.ts`; the
 cells of `brimwick.test.ts`, `ondrel.test.ts` and `durnhal.test.ts` that passed
 their term (Brimwick against Quillon on arena02 4499 and 1200; Ondrel against
@@ -2278,8 +2280,8 @@ Brimwick on arena02 (now glides 1, brimwick glides 0); the displaced-teleport
 run of `headless-kits.test.ts` moves from seeds 738 to 743 to 768 to 773 (tick
 366, champion 2's Skip, 0.12 m; no window of six seeds from 600 to 767 displaced
 it); and the stepped scene of #123 has a slower death (1 533 on easy in seed 6),
-so its budget is 3 100 (was 1 400; the #213 stand gave 447 on normal). `git
-diff` over the cascade touches
+so its budget is 3 100 (was 1 400; the #213 stand gave 447 on normal).
+`git diff` over the cascade touches
 `packages/bots/test/{lumeth,brimwick,ondrel,durnhal,headless-kits,touching,orb-match}.test.ts`
 and `tools/balance/harness.test.ts` only.
 
