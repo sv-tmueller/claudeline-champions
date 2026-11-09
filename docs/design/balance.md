@@ -211,20 +211,20 @@ the 90 and 4 of Durnhal's 36), 3204.5 points (2254.5 and 950.0) and Brimwick
 Skerrow 21.1. The block that one replaced, the seven-kit block of #244 (generated
 at `ac23e84`, before the cap), read 15 in band (10 of the 90 and 5 of his 36),
 3249.5 points (2296.5 and 953.0) and Brimwick 58.9, Durnhal 21.1, Hargrim 14.7,
-Lumeth 89.2, Ondrel 66.6, Quillon 78.3 and Skerrow 21.3. The block that one replaced (the
-six-kit report, #189 with batch 15) had 90 cells and 17 640 matches on three
-arenas (arena03 of #238), 11 of them in band (4 of the 36 cells with Ondrel or
-Brimwick on the first two arenas, 3 of the 24 four-kit cells there, and 4 of the
-30 new arena03 cells), 2205.9 points (847.2, 644.8 and 713.9) and Brimwick 50.3,
-Hargrim 13.6, Lumeth 87.2, Ondrel 62.2, Quillon 71.9 and Skerrow 14.8; the orb,
-Durnhal as a fill and the cap moved 78 of its 90 cells, 12 of them by more than
-the 7 points of one cell's noise (section 3). The block of #213 (the 60 cells of the first two
-arenas) had 7 in band and 1492.0 points (847.2 and 644.8) with Brimwick 50.6,
-Hargrim 12.6, Lumeth 89.0, Ondrel 59.2, Quillon 72.0 and Skerrow 16.6; every one
-of its 60 cells is unchanged in the #238 block, because arena03 adds cells and
-moves none. The block of #186 (generated
-at e5c29a4, see 5.10) had 7 in band, 1552.9 points (882.7 and
-670.2) and Brimwick 51.9, Hargrim 11.7, Lumeth 89.3, Ondrel 60.2, Quillon 73.0 and
+Lumeth 89.2, Ondrel 66.6, Quillon 78.3 and Skerrow 21.3. The block that one
+replaced (the six-kit report, #189 with batch 15) had 90 cells and 17 640
+matches on three arenas (arena03 of #238), 11 of them in band (4 of the 36 cells
+with Ondrel or Brimwick on the first two arenas, 3 of the 24 four-kit cells
+there, and 4 of the 30 new arena03 cells), 2205.9 points (847.2, 644.8 and
+713.9) and Brimwick 50.3, Hargrim 13.6, Lumeth 87.2, Ondrel 62.2, Quillon 71.9
+and Skerrow 14.8; the orb, Durnhal as a fill and the cap moved 78 of its 90
+cells, 12 of them by more than the 7 points of one cell's noise (section 3). The
+block of #213 (the 60 cells of the first two arenas) had 7 in band and 1492.0
+points (847.2 and 644.8) with Brimwick 50.6, Hargrim 12.6, Lumeth 89.0, Ondrel
+59.2, Quillon 72.0 and Skerrow 16.6; every one of its 60 cells is unchanged in
+the #238 block, because arena03 adds cells and moves none. The block of #186
+(generated at e5c29a4, see 5.10) had 7 in band, 1552.9 points (882.7 and 670.2)
+and Brimwick 51.9, Hargrim 11.7, Lumeth 89.3, Ondrel 60.2, Quillon 73.0 and
 Skerrow 13.9; the block of #189 (generated at 3704221) had 8 in band, 1561.3
 points (883.9 and 677.4) and Brimwick 52.3, Hargrim 11.4, Lumeth 89.1, Ondrel
 60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in sections 5.10, 5.11
@@ -1073,17 +1073,18 @@ candidate would have to hold.
 **What the orb, the Durnhal fill and the cap moved.** Of the 90 cells the six
 shipped kits shared with the six-kit block, 78 move at all and 12 move by more
 than the 7 points of one cell's noise (section 3); 62 move by less than 4. Three
-changes are confounded here: the orb and Durnhal, which the #244 block (`ac23e84`, now in the
-section 4 intro's history) already held (the orb on every cell of every kit, Durnhal a new fill of every
-six-kit cell, so its fills go from 4 to 5 in 2v2 and from 12 to 20 in 3v3), and
-#187's cap, which this block adds on every cell with a Brimwick or Lumeth bot.
-The seeds are per fill, so the old fills of a 2v2 cell now play seeds 1 to 40
-instead of 1 to 50 (160 of the cell's 200 matches) and the new fill takes the
-other 40; in 3v3 the old fills play 1 to 10 instead of 1 to 16 (120 of 200). The
-move against the six-kit block is all three together, as the fill change of #189
-was read (5.9); the move against the #244 block is the cap alone (68 of the 90
-cells move, none by more than 6.5 points, and 24 of Durnhal's 36). No reading
-separates the orb from the fill; the cap is separated by the #244 block (`ac23e84`).
+changes are confounded here: the orb and Durnhal, which the #244 block
+(`ac23e84`, now in the section 4 intro's history) already held (the orb on every
+cell of every kit, Durnhal a new fill of every six-kit cell, so its fills go
+from 4 to 5 in 2v2 and from 12 to 20 in 3v3), and #187's cap, which this block
+adds on every cell with a Brimwick or Lumeth bot. The seeds are per fill, so the
+old fills of a 2v2 cell now play seeds 1 to 40 instead of 1 to 50 (160 of the
+cell's 200 matches) and the new fill takes the other 40; in 3v3 the old fills
+play 1 to 10 instead of 1 to 16 (120 of 200). The move against the six-kit block
+is all three together, as the fill change of #189 was read (5.9); the move
+against the #244 block is the cap alone (68 of the 90 cells move, none by more
+than 6.5 points, and 24 of Durnhal's 36). No reading separates the orb from the
+fill; the cap is separated by the #244 block (`ac23e84`).
 
 Cells in band held in the shared 90, at 11, five left it while five entered. Left
 against the six-kit block: Hargrim v Skerrow in 2v2 on arena01 (43.0 to 32.5),
