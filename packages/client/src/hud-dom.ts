@@ -22,10 +22,13 @@ export function make(parent: HTMLElement, tag: string, attributes: Record<string
  * `data-visible` and `data-absorb`, and its `shield-fill` child the width.
  * The timer also carries `data-sudden`, true while it shows the sudden death
  * text. The ring warning carries `data-visible`, `data-counting` (the countdown
- * before the ring) and `data-outside` (the red edge). `roundsToWin` is the
- * "first to N" of the score.
+ * before the ring) and `data-outside` (the red edge). The counter pips sit under
+ * the energy bar: `data-part="pips"` carries `data-visible` and each pip
+ * `data-filled` (rules.md section 2.6). `roundsToWin` is the "first to N" of the
+ * score, and `counterCap` is the number of pip slots the local champion's kit
+ * declares, 0 for a kit with none, which builds no pips at all.
  */
-export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
+export function buildHud(root: HTMLElement, roundsToWin: number, counterCap = 0): HudHandles {
   const health = make(root, 'div', { 'data-hud': 'health-bar' });
   const healthTrack = make(health, 'div', { 'data-part': 'track' });
   const healthFill = make(healthTrack, 'div', { 'data-part': 'fill' });
@@ -39,6 +42,15 @@ export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
   const energyFill = make(energyTrack, 'div', { 'data-part': 'fill' });
   const exMark = make(energyTrack, 'div', { 'data-mark': 'ex' });
   const ultimateMark = make(energyTrack, 'div', { 'data-mark': 'ultimate' });
+
+  // The counter pips, one per slot of the cap, under the energy bar. The container is
+  // built hidden and the pips empty, which `Hud` starts from, so the first update of a
+  // champion with no counter writes nothing for it. A kit with no counter builds none.
+  const pips = make(energy, 'div', { 'data-part': 'pips', 'data-visible': 'false' });
+  const pipSlots: HudElement[] = [];
+  for (let i = 0; i < counterCap; i++) {
+    pipSlots.push(make(pips, 'div', { 'data-pip': String(i), 'data-filled': 'false' }) as HudElement);
+  }
 
   const icons = make(root, 'div', { 'data-hud': 'cooldown-icons' });
   const slots = SLOTS.map((slot) => {
@@ -89,6 +101,7 @@ export function buildHud(root: HTMLElement, roundsToWin: number): HudHandles {
     exMark,
     ultimateMark,
     shield: { root: shield as HudElement, fill: shieldFill as HudElement },
+    pips: { root: pips as HudElement, slots: pipSlots },
     slots,
     score: scoreText,
     timer,
