@@ -1,4 +1,4 @@
-# Balance: the bands, the baseline, the tuning passes and the six-kit report
+# Balance: the bands, the baseline, the tuning passes and the seven-kit report
 
 ## 1. Status and sources
 
@@ -19,7 +19,12 @@ harness, and section 5.9 reads the block it generated at 3704221 (60 cells, 8
 of them in band). The block was regenerated after the bots stopped refusing a
 melee press the sim lands (issue #186): 7 of 60 in band, read in section 5.10.
 Arena03 (#238) then extended that block into the three-arena one of section 4:
-90 cells and 11 in band.
+90 cells and 11 in band. The seven-kit report (issue #244) then added Durnhal
+and turned the energy orb on in every cell, regenerating the block on the
+committed head: 126 cells and 15 in band, read in section 5.12, which reads
+Durnhal's 36 cells against roster-v3.md section 1 and lists what the orb moved.
+The block was regenerated once more after #187 capped the lead of a one-hit
+aim-placed area: still 126 cells and 15 in band, read in the same section.
 Sections 5.1 to 5.8 and 6 stay the record of the four-kit report at 9a9c653 and
 of the passes made on it.
 
@@ -43,9 +48,16 @@ Sources:
   (the tools half is #195), and the question of Brimwick's counter web, which
   #188 filed against [roster-v2.md](roster-v2.md) section 3, is read in section
   5.9.
+- Batch #251 takes up Durnhal: #244 adds him to the harness at step 1.3 of
+  roadmap #176 and turns the energy orb on in every cell (spec section 6), so
+  section 4 is the seven-kit block and section 5.12 reads his 36 cells and the
+  orb's effect on the 90 six-kit ones.
 - [roster-v2.md](roster-v2.md) holds the two kits of #148 and their counter web
   (section 1), the intended counters of the six-kit report; its section 6
   forecasts how the bots will bias it.
+- [roster-v3.md](roster-v3.md) holds Durnhal (section 1) and his counter web,
+  the intent section 5.12 reads against the measured seven-kit cells; his bot
+  profile is in [bots.md](../architecture/bots.md).
 - [roster-v1.md](roster-v1.md) holds the kits and the intended counters (the
   "Intended counters" lists); its section 6, "Balance notes", reads the
   baseline against them.
@@ -54,15 +66,15 @@ Sources:
 ## 2. The bands
 
 - A cell is one mode (2v2 or 3v3), one arena and one pairing, so there are
-  90 cells with the six kits of the harness roster and three arenas, 15 pairings
-  a mode and arena (the 24 of the four v1 kits on the first two arenas are among
-  them).
+  126 cells with the seven kits of the harness roster and three arenas, 21
+  pairings a mode and arena (the 24 of the four v1 kits on the first two arenas
+  and the 90 of the six-kit report are among them).
 - The band is 40 to 60 percent inclusive on X's win rate in the cell. The test
   is on the exact rate (wins times 100 against 40 and 60 times the decided
   matches), not on the rounded figure in the table.
 - X is the first kit of the pairing in the order of the kit files of the
-  harness roster (`brimwick`, `hargrim`, `lumeth`, `ondrel`, `quillon`,
-  `skerrow`). A rate under 50 means Y is ahead.
+  harness roster (`brimwick`, `durnhal`, `hargrim`, `lumeth`, `ondrel`,
+  `quillon`, `skerrow`). A rate under 50 means Y is ahead.
 - A roster counter (an intended counter in roster-v1.md, or in the web of
   roster-v2.md section 1) is read as the favoured side inside the band: the
   favourite at 50 to 60 percent and the other side at 40 to 50. A favourite
@@ -72,24 +84,27 @@ Sources:
 ## 3. The method
 
 - **Pairing.** An unordered pair X v Y of different kits of the harness
-  roster, so 15 pairings with six kits. The roster is the fixed list
-  `HARNESS_KITS` in `tools/balance/inputs.ts`, six of the seven kits of
-  `data/kits` in file order, and a listed kit with no file is an error. Ondrel
-  and Brimwick (#148) joined the four v1 kits in the six-kit report (#189;
-  [decision 3 of batch #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667)),
-  so the 90 cells, the 17 640 matches and the block of section 4 are those of
-  six kits on three arenas (arena03 of #238). Durnhal's kit is in `data/kits`
-  since #204 and is not in the harness roster until step 1.3 of roadmap #176, so
-  the block does not move.
+  roster, so 21 pairings with seven kits. The roster is the fixed list
+  `HARNESS_KITS` in `tools/balance/inputs.ts`, every kit of `data/kits` in file
+  order, and a listed kit with no file is an error. Ondrel and Brimwick (#148)
+  joined the four v1 kits in the six-kit report (#189; [decision 3 of batch
+  #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667))
+  and Durnhal (#204, his kit as data) joined them at step 1.3 of roadmap #176
+  (#244), so the 126 cells, the 25 200 matches and the block of section 4 are
+  those of seven kits on three arenas (arena03 of #238). The harness plays the
+  standard match, so every cell sets the arena's orb point (`data/orbs.json`,
+  spec section 6): the block of section 4 is the seven-kit one with the orb on
+  and section 5.12 reads what the orb moved.
   "Pairing" is read as the matchup of two champions, as decision 6
   words it, and not as the duo of roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
-  In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: four fills
-  with six kits (two with four), pooled in the cell and each shown in the Fills
-  column. In 3v3 they are [X, Z, W] v [Y, Z, W] for each ordered pair of two
-  kits outside the pair: twelve fills with six kits (two with four), both
-  orders of each two, pooled and each shown, because the order sets the spawn
-  slots (see Noise). X takes the first spawn slot of its team.
+  In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: five fills
+  with seven kits (four with six, two with four), pooled in the cell and each
+  shown in the Fills column. In 3v3 they are [X, Z, W] v [Y, Z, W] for each
+  ordered pair of two kits outside the pair: twenty fills with seven kits
+  (twelve with six, two with four), both orders of each two, pooled and each
+  shown, because the order sets the spawn slots (see Noise). X takes the first
+  spawn slot of its team.
 - **Sides.** Odd seeds put X on team A and even seeds on team B, so each side
   gets half of the matches. The table shows X's wins as A and as B.
 - **Seeds.** Each cell plays about 200 matches, whatever its fills: the seeds of
@@ -97,17 +112,19 @@ Sources:
   cell's fills, worked out per mode (`seedSchedule` in
   `tools/balance/harness.ts`). With four kits a cell has 2 fills in either mode,
   so it is seeds 1 to 100 for each config: 24 configs, 200 matches in every cell
-  and 4800 in all. With six kits it is 50 seeds for each of the 4 fills of a
+  and 4800 in all. With six kits it was 50 seeds for each of the 4 fills of a
   2v2 cell (200 matches) and 16 for each of the 12 fills of a 3v3 cell (192
-  matches): with three arenas, 90 cells and 17 640 matches in all (9000 in 2v2
-  and 8640 in 3v3).
+  matches). With seven kits it is 40 seeds for each of the 5 fills of a 2v2
+  cell and 10 for each of the 20 fills of a 3v3 cell, 200 matches in every cell:
+  with three arenas, 126 cells and 25 200 matches in all (12 600 in each mode).
   The count is even so that X plays each side equally often. When the
   two modes get the same count the head of the block says "Seeds 1 to N for each
   config"; when they differ it names each mode's count, and the Seeds / matches
   column states them in any case. Decision 3 of batch #193 set this: it amends
   decision 21 of batch #105 ("seeds 1 to 100") and reads decision 6 of batch #12
   as "about 200 matches a cell", because 100 seeds on every fill is 48 000
-  matches at six kits. The noise below and the keep threshold of decision 32
+  matches at six kits on two arenas (72 000 on three) and 157 500 at seven kits
+  on three arenas. The noise below and the keep threshold of decision 32
   stand. The match seed is the seed and the bot of champion id `i` gets
   `seed * 100 + i`, the rule of the client's `bot-driver.ts`. The sim never
   draws from its own random state, so the bot seeds are the only source of
@@ -149,10 +166,10 @@ Sources:
   heals count the instant part only; no Lunge away for Skerrow. A kit that is
   balanced for players may not be for these bots, and the reverse.
 - **Noise.** A rate over `n` decided matches has a 95 percent interval of
-  about 7 points at n = 200 (every cell, 192 in a six-kit 3v3 cell) around 50
+  about 7 points at n = 200 (every cell, 200 in every seven-kit cell) around 50
   percent, and about 10 at n = 100 (one fill alone, as the four-kit report
-  had it). A six-kit fill has fewer matches, 50 in 2v2 (about 14 points) and
-  16 in 3v3 (about 24), so one fill of a six-kit cell is read with that
+  had it). A seven-kit fill has fewer matches, 40 in 2v2 (about 16 points) and
+  10 in 3v3 (about 31), so one fill of a seven-kit cell is read with that
   distance. A cell within the 7 points of 40 or 60 cannot be told from the
   band by one run. Two things were measured once with scratch
   code that is not part of the tool (X's rate over 100 matches, in the
@@ -171,34 +188,45 @@ Sources:
 ## 4. The report
 
 The block below is generated by `npm run balance`; do not edit it. The head line
-names the commit the sources were read at. It is the six-kit report (#189, batch
-15), regenerated after #186 (batch 16) and after #213 (batch 17), and
-regenerated again with arena03 (#238): 90 cells and 17 640 matches, 11 cells in
-band (4 of the 36 cells with Ondrel or Brimwick on the first two arenas, 3 of the
-24 four-kit cells there, and 4 of the 30 new arena03 cells), the summed distance
-of the 90 cells to the band 2205.9 points (847.2 in the 36 new-kit cells of the
-first two arenas, 644.8 in their 24 four-kit cells and 713.9 in the 30 arena03
-cells, 324.9 four-kit and 389.0 new-kit), and no budget hit. Per champion over
-all of its cells: Brimwick 50.3, Hargrim 13.6, Lumeth 87.2, Ondrel 62.2, Quillon
-71.9 and Skerrow 14.8. The block that this one replaced (the block of #213, the
-60 cells of the first two arenas) had 7 in band and 1492.0 points (847.2 and
-644.8) with Brimwick 50.6, Hargrim 12.6, Lumeth 89.0, Ondrel 59.2, Quillon 72.0
-and Skerrow 16.6; every one of its 60 cells is unchanged in the new block,
-because arena03 adds cells and moves none. The block of #186 (generated
+names the commit the sources were read at. It is the seven-kit report (#244, the
+tools half of batch #251) with the capped lead of #187: 126 cells and 25 200
+matches, 15 cells in band (11 of the 90 cells the six kits share and 4 of
+Durnhal's 36), the summed distance of the 126 cells to the band 3204.5 points
+(2254.5 in the 90 six-kit cells, 950.0 in Durnhal's 36), and no budget hit. Per
+champion over all of its cells: Brimwick 60.3, Durnhal 21.4, Hargrim 14.7, Lumeth
+89.0, Ondrel 66.1, Quillon 77.3 and Skerrow 21.1. It was regenerated on the
+merged head with Durnhal in the harness roster, the energy orb on in every cell
+(spec section 6) and #187's cap on the one-hit area lead, so three changes land
+together: section 5.12 reads Durnhal's cells and what the orb, his fill and the
+cap moved in the other 90. The seven-kit block of #244 (generated at `ac23e84`,
+before the cap) read 15 in band (10 of the 90 and 5 of his 36), 3249.5 points
+(2296.5 and 953.0) and Brimwick 58.9, Durnhal 21.1, Hargrim 14.7, Lumeth 89.2,
+Ondrel 66.6, Quillon 78.3 and Skerrow 21.3. The block that one replaced (the
+six-kit report, #189 with batch 15) had 90 cells and 17 640 matches on three
+arenas (arena03 of #238), 11 of them in band (4 of the 36 cells with Ondrel or
+Brimwick on the first two arenas, 3 of the 24 four-kit cells there, and 4 of the
+30 new arena03 cells), 2205.9 points (847.2, 644.8 and 713.9) and Brimwick 50.3,
+Hargrim 13.6, Lumeth 87.2, Ondrel 62.2, Quillon 71.9 and Skerrow 14.8; the orb,
+Durnhal as a fill and the cap moved 78 of its 90 cells, 12 of them by more than
+the 7 points of one cell's noise (section 3). The block of #213 (the 60 cells of the first two
+arenas) had 7 in band and 1492.0 points (847.2 and 644.8) with Brimwick 50.6,
+Hargrim 12.6, Lumeth 89.0, Ondrel 59.2, Quillon 72.0 and Skerrow 16.6; every one
+of its 60 cells is unchanged in the #238 block, because arena03 adds cells and
+moves none. The block of #186 (generated
 at e5c29a4, see 5.10) had 7 in band, 1552.9 points (882.7 and
 670.2) and Brimwick 51.9, Hargrim 11.7, Lumeth 89.3, Ondrel 60.2, Quillon 73.0 and
 Skerrow 13.9; the block of #189 (generated at 3704221) had 8 in band, 1561.3
 points (883.9 and 677.4) and Brimwick 52.3, Hargrim 11.4, Lumeth 89.1, Ondrel
-60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in sections 5.10 and
-5.11. The four-kit report that the six-kit report replaced is the block
+60.1, Quillon 73.3 and Skerrow 13.7; what moved is read in sections 5.10, 5.11
+and 5.12. The four-kit report that the six-kit report replaced is the block
 regenerated after the dodge of #137, and nothing between it and #189 moved a
 four-kit cell: #155, #165, #191 and #158 landed after it, and PR #185 and PR
 #196 each reproduced that block with `--check` on main (PR #196 after #191, #158
 and #162). Its 24 cells moved because Ondrel and Brimwick are new fills (section
 5.9).
 
-What follows, up to the block, is the history of the four-kit report that this
-one replaces. That report was the one after the tuning pass of #121, and of
+What follows, up to the block, is the history of the four-kit report that the
+six-kit report replaced. That report was the one after the tuning pass of #121, and of
 #124, which changed no kit, regenerated after the dodge of #137 (the note
 below), and "the block" in that history is the four-kit block. The baseline,
 before any number moved, had 1
@@ -236,107 +264,143 @@ of #137 as well and pinned (#123, bots.md, Testing). No bots rule was missing
 and the four-kit block was as generated: no source it reads changed.
 
 <!-- balance:report -->
-Generated by `npm run balance` from the sources at `700cffe`.
+Generated by `npm run balance` from the sources at `4407c96`.
 
-Seeds 1 to 50 for each 2v2 config and 1 to 16 for each 3v3 config, every bot at the normal tier. X's rate
+Seeds 1 to 40 for each 2v2 config and 1 to 10 for each 3v3 config, every bot at the normal tier. X's rate
 is the share of the decided matches X won, in percent; the band is 40 to 60
 inclusive, on the exact rate.
-Cells in band: 11 of 90.
+Cells in band: 15 of 126.
 
 ### Cells
 
 | Mode | Arena | X v Y | Fills (X's rate) | Seeds / matches | X rate % | X wins as A | X wins as B | Verdict | Round mean | Round longest | Sudden-death rounds | First hit mean | Drawn rounds | Budget hits |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2v2 | arena01 | brimwick v hargrim | lumeth 42.0, ondrel 100.0, quillon 98.0, skerrow 72.0 | 50 / 200 | 78.0 | 78/100 | 78/100 | outside | 986 | 3455 | 1 of 750 | 129 | 0 | 0 |
-| 2v2 | arena01 | brimwick v lumeth | hargrim 4.0, ondrel 14.0, quillon 2.0, skerrow 2.0 | 50 / 200 | 5.5 | 9/100 | 2/100 | outside | 1163 | 3606 | 1 of 732 | 131 | 0 | 0 |
-| 2v2 | arena01 | brimwick v ondrel | hargrim 82.0, lumeth 12.0, quillon 52.0, skerrow 56.0 | 50 / 200 | 50.5 | 51/100 | 50/100 | in band | 1046 | 5087 | 1 of 776 | 123 | 1 | 0 |
-| 2v2 | arena01 | brimwick v quillon | hargrim 26.0, lumeth 10.0, ondrel 16.0, skerrow 8.0 | 50 / 200 | 15.0 | 13/100 | 17/100 | outside | 1015 | 3439 | 0 of 760 | 131 | 2 | 0 |
-| 2v2 | arena01 | brimwick v skerrow | hargrim 84.0, lumeth 56.0, ondrel 100.0, quillon 100.0 | 50 / 200 | 85.0 | 83/100 | 87/100 | outside | 918 | 2439 | 1 of 727 | 122 | 2 | 0 |
-| 2v2 | arena01 | hargrim v lumeth | brimwick 0.0, ondrel 0.0, quillon 0.0, skerrow 6.0 | 50 / 200 | 1.5 | 3/100 | 0/100 | outside | 955 | 1583 | 1 of 644 | 121 | 0 | 0 |
-| 2v2 | arena01 | hargrim v ondrel | brimwick 0.0, lumeth 0.0, quillon 0.0, skerrow 4.0 | 50 / 200 | 1.0 | 1/100 | 1/100 | outside | 953 | 3573 | 0 of 667 | 119 | 0 | 0 |
-| 2v2 | arena01 | hargrim v quillon | brimwick 0.0, lumeth 10.0, ondrel 0.0, skerrow 0.0 | 50 / 200 | 2.5 | 0/100 | 5/100 | outside | 883 | 2083 | 0 of 661 | 125 | 0 | 0 |
-| 2v2 | arena01 | hargrim v skerrow | brimwick 64.0, lumeth 16.0, ondrel 28.0, quillon 64.0 | 50 / 200 | 43.0 | 39/100 | 47/100 | in band | 1112 | 3079 | 0 of 814 | 118 | 11 | 0 |
-| 2v2 | arena01 | lumeth v ondrel | brimwick 66.0, hargrim 96.0, quillon 82.0, skerrow 92.0 | 50 / 200 | 84.0 | 85/100 | 83/100 | outside | 1085 | 2109 | 2 of 771 | 127 | 1 | 0 |
-| 2v2 | arena01 | lumeth v quillon | brimwick 46.0, hargrim 88.0, ondrel 52.0, skerrow 92.0 | 50 / 200 | 69.5 | 66/100 | 73/100 | outside | 1100 | 4504 | 0 of 808 | 129 | 1 | 0 |
-| 2v2 | arena01 | lumeth v skerrow | brimwick 100.0, hargrim 98.0, ondrel 100.0, quillon 98.0 | 50 / 200 | 99.0 | 98/100 | 100/100 | outside | 874 | 2032 | 0 of 656 | 123 | 1 | 0 |
-| 2v2 | arena01 | ondrel v quillon | brimwick 18.0, hargrim 22.0, lumeth 42.0, skerrow 22.0 | 50 / 200 | 26.0 | 28/100 | 24/100 | outside | 1037 | 4213 | 1 of 802 | 132 | 1 | 0 |
-| 2v2 | arena01 | ondrel v skerrow | brimwick 98.0, hargrim 100.0, lumeth 100.0, quillon 100.0 | 50 / 200 | 99.5 | 99/100 | 100/100 | outside | 854 | 2329 | 0 of 649 | 121 | 0 | 0 |
-| 2v2 | arena01 | quillon v skerrow | brimwick 100.0, hargrim 100.0, lumeth 94.0, ondrel 100.0 | 50 / 200 | 98.5 | 99/100 | 98/100 | outside | 841 | 2524 | 0 of 657 | 131 | 0 | 0 |
-| 2v2 | arena02 | brimwick v hargrim | lumeth 88.0, ondrel 100.0, quillon 100.0, skerrow 86.0 | 50 / 200 | 93.5 | 93/100 | 94/100 | outside | 1012 | 2885 | 0 of 718 | 107 | 1 | 0 |
-| 2v2 | arena02 | brimwick v lumeth | hargrim 2.0, ondrel 22.0, quillon 16.0, skerrow 4.0 | 50 / 200 | 11.0 | 8/100 | 14/100 | outside | 1048 | 3083 | 0 of 733 | 111 | 0 | 0 |
-| 2v2 | arena02 | brimwick v ondrel | hargrim 66.0, lumeth 52.0, quillon 68.0, skerrow 44.0 | 50 / 200 | 57.5 | 50/100 | 65/100 | in band | 1058 | 5185 | 0 of 845 | 107 | 0 | 0 |
-| 2v2 | arena02 | brimwick v quillon | hargrim 10.0, lumeth 24.0, ondrel 12.0, skerrow 10.0 | 50 / 200 | 14.0 | 16/100 | 12/100 | outside | 935 | 3864 | 1 of 794 | 113 | 0 | 0 |
-| 2v2 | arena02 | brimwick v skerrow | hargrim 96.0, lumeth 96.0, ondrel 98.0, quillon 84.0 | 50 / 200 | 93.5 | 93/100 | 94/100 | outside | 927 | 2497 | 0 of 731 | 107 | 2 | 0 |
-| 2v2 | arena02 | hargrim v lumeth | brimwick 0.0, ondrel 2.0, quillon 2.0, skerrow 4.0 | 50 / 200 | 2.0 | 3/100 | 1/100 | outside | 1021 | 2112 | 0 of 664 | 107 | 0 | 0 |
-| 2v2 | arena02 | hargrim v ondrel | brimwick 0.0, lumeth 0.0, quillon 4.0, skerrow 2.0 | 50 / 200 | 1.5 | 1/100 | 2/100 | outside | 990 | 3673 | 0 of 668 | 109 | 1 | 0 |
-| 2v2 | arena02 | hargrim v quillon | brimwick 2.0, lumeth 6.0, ondrel 0.0, skerrow 0.0 | 50 / 200 | 2.0 | 2/100 | 2/100 | outside | 924 | 2386 | 0 of 651 | 113 | 4 | 0 |
-| 2v2 | arena02 | hargrim v skerrow | brimwick 28.0, lumeth 4.0, ondrel 24.0, quillon 40.0 | 50 / 200 | 24.0 | 24/100 | 24/100 | outside | 1054 | 3158 | 0 of 794 | 107 | 7 | 0 |
-| 2v2 | arena02 | lumeth v ondrel | brimwick 78.0, hargrim 88.0, quillon 76.0, skerrow 96.0 | 50 / 200 | 84.5 | 79/100 | 90/100 | outside | 1035 | 2192 | 0 of 783 | 110 | 1 | 0 |
-| 2v2 | arena02 | lumeth v quillon | brimwick 78.0, hargrim 56.0, ondrel 76.0, skerrow 52.0 | 50 / 200 | 65.5 | 71/100 | 60/100 | outside | 1048 | 2114 | 0 of 806 | 111 | 2 | 0 |
-| 2v2 | arena02 | lumeth v skerrow | brimwick 100.0, hargrim 92.0, ondrel 100.0, quillon 92.0 | 50 / 200 | 96.0 | 97/100 | 95/100 | outside | 887 | 1618 | 2 of 667 | 107 | 1 | 0 |
-| 2v2 | arena02 | ondrel v quillon | brimwick 40.0, hargrim 6.0, lumeth 62.0, skerrow 4.0 | 50 / 200 | 28.0 | 31/100 | 25/100 | outside | 944 | 3517 | 2 of 811 | 111 | 3 | 0 |
-| 2v2 | arena02 | ondrel v skerrow | brimwick 96.0, hargrim 100.0, lumeth 92.0, quillon 90.0 | 50 / 200 | 94.5 | 95/100 | 94/100 | outside | 945 | 3052 | 0 of 711 | 109 | 1 | 0 |
-| 2v2 | arena02 | quillon v skerrow | brimwick 100.0, hargrim 98.0, lumeth 96.0, ondrel 100.0 | 50 / 200 | 98.5 | 98/100 | 99/100 | outside | 869 | 2102 | 0 of 677 | 113 | 1 | 0 |
-| 2v2 | arena03 | brimwick v hargrim | lumeth 64.0, ondrel 100.0, quillon 100.0, skerrow 64.0 | 50 / 200 | 82.0 | 76/100 | 88/100 | outside | 1009 | 2521 | 1 of 726 | 148 | 0 | 0 |
-| 2v2 | arena03 | brimwick v lumeth | hargrim 0.0, ondrel 26.0, quillon 20.0, skerrow 0.0 | 50 / 200 | 11.5 | 14/100 | 9/100 | outside | 1109 | 2496 | 2 of 742 | 153 | 0 | 0 |
-| 2v2 | arena03 | brimwick v ondrel | hargrim 58.0, lumeth 10.0, quillon 46.0, skerrow 36.0 | 50 / 200 | 37.5 | 39/100 | 36/100 | outside | 1073 | 4752 | 6 of 786 | 146 | 1 | 0 |
-| 2v2 | arena03 | brimwick v quillon | hargrim 16.0, lumeth 18.0, ondrel 44.0, skerrow 10.0 | 50 / 200 | 22.0 | 23/100 | 21/100 | outside | 1026 | 5342 | 3 of 777 | 136 | 0 | 0 |
-| 2v2 | arena03 | brimwick v skerrow | hargrim 58.0, lumeth 78.0, ondrel 100.0, quillon 100.0 | 50 / 200 | 84.0 | 78/100 | 90/100 | outside | 931 | 2200 | 1 of 742 | 134 | 0 | 0 |
-| 2v2 | arena03 | hargrim v lumeth | brimwick 2.0, ondrel 0.0, quillon 0.0, skerrow 6.0 | 50 / 200 | 2.0 | 2/100 | 2/100 | outside | 940 | 1700 | 0 of 654 | 128 | 0 | 0 |
-| 2v2 | arena03 | hargrim v ondrel | brimwick 0.0, lumeth 10.0, quillon 0.0, skerrow 2.0 | 50 / 200 | 3.0 | 6/100 | 0/100 | outside | 1020 | 4002 | 0 of 684 | 130 | 2 | 0 |
-| 2v2 | arena03 | hargrim v quillon | brimwick 0.0, lumeth 18.0, ondrel 0.0, skerrow 0.0 | 50 / 200 | 4.5 | 1/100 | 8/100 | outside | 916 | 2692 | 1 of 662 | 127 | 0 | 0 |
-| 2v2 | arena03 | hargrim v skerrow | brimwick 50.0, lumeth 20.0, ondrel 40.0, quillon 70.0 | 50 / 200 | 45.0 | 46/100 | 44/100 | in band | 1116 | 3662 | 0 of 792 | 112 | 6 | 0 |
-| 2v2 | arena03 | lumeth v ondrel | brimwick 34.0, hargrim 46.0, quillon 60.0, skerrow 100.0 | 50 / 200 | 60.0 | 57/100 | 63/100 | in band | 994 | 2451 | 1 of 798 | 138 | 2 | 0 |
-| 2v2 | arena03 | lumeth v quillon | brimwick 42.0, hargrim 48.0, ondrel 64.0, skerrow 66.0 | 50 / 200 | 55.0 | 48/100 | 62/100 | in band | 1068 | 2552 | 1 of 849 | 135 | 1 | 0 |
-| 2v2 | arena03 | lumeth v skerrow | brimwick 100.0, hargrim 94.0, ondrel 100.0, quillon 100.0 | 50 / 200 | 98.5 | 98/100 | 99/100 | outside | 879 | 1945 | 0 of 632 | 116 | 1 | 0 |
-| 2v2 | arena03 | ondrel v quillon | brimwick 28.0, hargrim 14.0, lumeth 70.0, skerrow 4.0 | 50 / 200 | 29.0 | 23/100 | 35/100 | outside | 972 | 4991 | 1 of 769 | 131 | 0 | 0 |
-| 2v2 | arena03 | ondrel v skerrow | brimwick 100.0, hargrim 98.0, lumeth 98.0, quillon 100.0 | 50 / 200 | 99.0 | 98/100 | 100/100 | outside | 926 | 3328 | 0 of 667 | 118 | 1 | 0 |
-| 2v2 | arena03 | quillon v skerrow | brimwick 100.0, hargrim 100.0, lumeth 94.0, ondrel 100.0 | 50 / 200 | 98.5 | 99/100 | 98/100 | outside | 829 | 2292 | 0 of 646 | 130 | 1 | 0 |
-| 3v3 | arena01 | brimwick v hargrim | lumeth+ondrel 93.8, lumeth+quillon 75.0, lumeth+skerrow 100.0, ondrel+lumeth 87.5, ondrel+quillon 93.8, ondrel+skerrow 100.0, quillon+lumeth 93.8, quillon+ondrel 87.5, quillon+skerrow 100.0, skerrow+lumeth 87.5, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 16 / 192 | 93.2 | 87/96 | 92/96 | outside | 1218 | 4376 | 0 of 657 | 118 | 1 | 0 |
-| 3v3 | arena01 | brimwick v lumeth | hargrim+ondrel 0.0, hargrim+quillon 6.3, hargrim+skerrow 0.0, ondrel+hargrim 6.3, ondrel+quillon 12.5, ondrel+skerrow 6.3, quillon+hargrim 0.0, quillon+ondrel 18.8, quillon+skerrow 0.0, skerrow+hargrim 0.0, skerrow+ondrel 0.0, skerrow+quillon 6.3 | 16 / 192 | 4.7 | 3/96 | 6/96 | outside | 1256 | 2556 | 2 of 707 | 122 | 2 | 0 |
-| 3v3 | arena01 | brimwick v ondrel | hargrim+lumeth 25.0, hargrim+quillon 31.3, hargrim+skerrow 56.3, lumeth+hargrim 43.8, lumeth+quillon 0.0, lumeth+skerrow 25.0, quillon+hargrim 25.0, quillon+lumeth 18.8, quillon+skerrow 37.5, skerrow+hargrim 50.0, skerrow+lumeth 31.3, skerrow+quillon 75.0 | 16 / 192 | 34.9 | 33/96 | 34/96 | outside | 1361 | 4427 | 3 of 788 | 119 | 1 | 0 |
-| 3v3 | arena01 | brimwick v quillon | hargrim+lumeth 6.3, hargrim+ondrel 43.8, hargrim+skerrow 31.3, lumeth+hargrim 12.5, lumeth+ondrel 50.0, lumeth+skerrow 18.8, ondrel+hargrim 18.8, ondrel+lumeth 37.5, ondrel+skerrow 31.3, skerrow+hargrim 25.0, skerrow+lumeth 37.5, skerrow+ondrel 31.3 | 16 / 192 | 28.6 | 28/96 | 27/96 | outside | 1369 | 3968 | 3 of 759 | 124 | 1 | 0 |
-| 3v3 | arena01 | brimwick v skerrow | hargrim+lumeth 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, lumeth+hargrim 100.0, lumeth+ondrel 100.0, lumeth+quillon 81.3, ondrel+hargrim 100.0, ondrel+lumeth 87.5, ondrel+quillon 93.8, quillon+hargrim 100.0, quillon+lumeth 93.8, quillon+ondrel 100.0 | 16 / 192 | 96.4 | 92/96 | 93/96 | outside | 1227 | 4608 | 4 of 684 | 120 | 0 | 0 |
-| 3v3 | arena01 | hargrim v lumeth | brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, ondrel+brimwick 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 16 / 192 | 0.0 | 0/96 | 0/96 | outside | 1053 | 2040 | 0 of 604 | 117 | 0 | 0 |
-| 3v3 | arena01 | hargrim v ondrel | brimwick+lumeth 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, lumeth+brimwick 12.5, lumeth+quillon 0.0, lumeth+skerrow 0.0, quillon+brimwick 0.0, quillon+lumeth 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+lumeth 37.5, skerrow+quillon 0.0 | 16 / 192 | 4.2 | 6/96 | 2/96 | outside | 1205 | 3861 | 1 of 650 | 118 | 1 | 0 |
-| 3v3 | arena01 | hargrim v quillon | brimwick+lumeth 6.3, brimwick+ondrel 0.0, brimwick+skerrow 0.0, lumeth+brimwick 6.3, lumeth+ondrel 25.0, lumeth+skerrow 12.5, ondrel+brimwick 0.0, ondrel+lumeth 12.5, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+lumeth 12.5, skerrow+ondrel 0.0 | 16 / 192 | 6.3 | 5/96 | 7/96 | outside | 1208 | 4914 | 0 of 663 | 121 | 0 | 0 |
-| 3v3 | arena01 | hargrim v skerrow | brimwick+lumeth 37.5, brimwick+ondrel 62.5, brimwick+quillon 43.8, lumeth+brimwick 56.3, lumeth+ondrel 37.5, lumeth+quillon 50.0, ondrel+brimwick 75.0, ondrel+lumeth 43.8, ondrel+quillon 62.5, quillon+brimwick 56.3, quillon+lumeth 56.3, quillon+ondrel 68.8 | 16 / 192 | 54.2 | 50/96 | 54/96 | in band | 1518 | 4929 | 6 of 777 | 116 | 1 | 0 |
-| 3v3 | arena01 | lumeth v ondrel | brimwick+hargrim 100.0, brimwick+quillon 68.8, brimwick+skerrow 93.8, hargrim+brimwick 87.5, hargrim+quillon 87.5, hargrim+skerrow 100.0, quillon+brimwick 56.3, quillon+hargrim 93.8, quillon+skerrow 100.0, skerrow+brimwick 87.5, skerrow+hargrim 87.5, skerrow+quillon 87.5 | 16 / 192 | 87.5 | 84/96 | 84/96 | outside | 1223 | 2107 | 1 of 740 | 121 | 1 | 0 |
-| 3v3 | arena01 | lumeth v quillon | brimwick+hargrim 75.0, brimwick+ondrel 50.0, brimwick+skerrow 87.5, hargrim+brimwick 62.5, hargrim+ondrel 75.0, hargrim+skerrow 81.3, ondrel+brimwick 81.3, ondrel+hargrim 87.5, ondrel+skerrow 75.0, skerrow+brimwick 87.5, skerrow+hargrim 87.5, skerrow+ondrel 81.3 | 16 / 192 | 77.6 | 74/96 | 75/96 | outside | 1221 | 2968 | 0 of 776 | 124 | 1 | 0 |
-| 3v3 | arena01 | lumeth v skerrow | brimwick+hargrim 100.0, brimwick+ondrel 100.0, brimwick+quillon 100.0, hargrim+brimwick 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, ondrel+brimwick 100.0, ondrel+hargrim 100.0, ondrel+quillon 100.0, quillon+brimwick 100.0, quillon+hargrim 100.0, quillon+ondrel 100.0 | 16 / 192 | 100.0 | 96/96 | 96/96 | outside | 1042 | 1969 | 1 of 602 | 120 | 2 | 0 |
-| 3v3 | arena01 | ondrel v quillon | brimwick+hargrim 25.0, brimwick+lumeth 43.8, brimwick+skerrow 18.8, hargrim+brimwick 37.5, hargrim+lumeth 68.8, hargrim+skerrow 37.5, lumeth+brimwick 62.5, lumeth+hargrim 31.3, lumeth+skerrow 68.8, skerrow+brimwick 62.5, skerrow+hargrim 37.5, skerrow+lumeth 56.3 | 16 / 192 | 45.8 | 55/96 | 33/96 | in band | 1357 | 4983 | 2 of 781 | 125 | 2 | 0 |
-| 3v3 | arena01 | ondrel v skerrow | brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+quillon 100.0, hargrim+brimwick 100.0, hargrim+lumeth 87.5, hargrim+quillon 87.5, lumeth+brimwick 100.0, lumeth+hargrim 100.0, lumeth+quillon 100.0, quillon+brimwick 93.8, quillon+hargrim 100.0, quillon+lumeth 93.8 | 16 / 192 | 96.9 | 92/96 | 94/96 | outside | 1202 | 3790 | 2 of 648 | 120 | 1 | 0 |
-| 3v3 | arena01 | quillon v skerrow | brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+ondrel 100.0, hargrim+brimwick 100.0, hargrim+lumeth 93.8, hargrim+ondrel 100.0, lumeth+brimwick 93.8, lumeth+hargrim 93.8, lumeth+ondrel 81.3, ondrel+brimwick 93.8, ondrel+hargrim 100.0, ondrel+lumeth 93.8 | 16 / 192 | 95.8 | 90/96 | 94/96 | outside | 1186 | 4482 | 0 of 650 | 125 | 1 | 0 |
-| 3v3 | arena02 | brimwick v hargrim | lumeth+ondrel 56.3, lumeth+quillon 81.3, lumeth+skerrow 100.0, ondrel+lumeth 75.0, ondrel+quillon 93.8, ondrel+skerrow 93.8, quillon+lumeth 81.3, quillon+ondrel 87.5, quillon+skerrow 93.8, skerrow+lumeth 62.5, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 16 / 192 | 85.4 | 82/96 | 82/96 | outside | 1316 | 4888 | 1 of 705 | 106 | 1 | 0 |
-| 3v3 | arena02 | brimwick v lumeth | hargrim+ondrel 31.3, hargrim+quillon 18.8, hargrim+skerrow 12.5, ondrel+hargrim 0.0, ondrel+quillon 6.3, ondrel+skerrow 0.0, quillon+hargrim 18.8, quillon+ondrel 18.8, quillon+skerrow 0.0, skerrow+hargrim 0.0, skerrow+ondrel 12.5, skerrow+quillon 25.0 | 16 / 192 | 12.0 | 11/96 | 12/96 | outside | 1250 | 2383 | 0 of 726 | 110 | 0 | 0 |
-| 3v3 | arena02 | brimwick v ondrel | hargrim+lumeth 25.0, hargrim+quillon 50.0, hargrim+skerrow 56.3, lumeth+hargrim 18.8, lumeth+quillon 31.3, lumeth+skerrow 43.8, quillon+hargrim 62.5, quillon+lumeth 25.0, quillon+skerrow 37.5, skerrow+hargrim 56.3, skerrow+lumeth 31.3, skerrow+quillon 6.3 | 16 / 192 | 37.0 | 39/96 | 32/96 | outside | 1371 | 5357 | 4 of 799 | 106 | 1 | 0 |
-| 3v3 | arena02 | brimwick v quillon | hargrim+lumeth 43.8, hargrim+ondrel 18.8, hargrim+skerrow 0.0, lumeth+hargrim 12.5, lumeth+ondrel 31.3, lumeth+skerrow 56.3, ondrel+hargrim 25.0, ondrel+lumeth 93.8, ondrel+skerrow 6.3, skerrow+hargrim 6.3, skerrow+lumeth 31.3, skerrow+ondrel 18.8 | 16 / 192 | 28.6 | 33/96 | 22/96 | outside | 1314 | 5210 | 5 of 764 | 110 | 0 | 0 |
-| 3v3 | arena02 | brimwick v skerrow | hargrim+lumeth 100.0, hargrim+ondrel 93.8, hargrim+quillon 100.0, lumeth+hargrim 100.0, lumeth+ondrel 62.5, lumeth+quillon 81.3, ondrel+hargrim 100.0, ondrel+lumeth 56.3, ondrel+quillon 87.5, quillon+hargrim 93.8, quillon+lumeth 93.8, quillon+ondrel 81.3 | 16 / 192 | 87.5 | 81/96 | 87/96 | outside | 1280 | 4070 | 1 of 696 | 106 | 1 | 0 |
-| 3v3 | arena02 | hargrim v lumeth | brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 6.3, ondrel+brimwick 6.3, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 12.5, quillon+ondrel 6.3, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 16 / 192 | 2.6 | 1/96 | 4/96 | outside | 1117 | 1939 | 1 of 642 | 105 | 0 | 0 |
-| 3v3 | arena02 | hargrim v ondrel | brimwick+lumeth 12.5, brimwick+quillon 0.0, brimwick+skerrow 0.0, lumeth+brimwick 31.3, lumeth+quillon 12.5, lumeth+skerrow 0.0, quillon+brimwick 6.3, quillon+lumeth 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+lumeth 12.5, skerrow+quillon 0.0 | 16 / 192 | 6.3 | 8/96 | 4/96 | outside | 1278 | 5378 | 0 of 672 | 108 | 1 | 0 |
-| 3v3 | arena02 | hargrim v quillon | brimwick+lumeth 6.3, brimwick+ondrel 0.0, brimwick+skerrow 0.0, lumeth+brimwick 18.8, lumeth+ondrel 18.8, lumeth+skerrow 0.0, ondrel+brimwick 0.0, ondrel+lumeth 62.5, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+lumeth 31.3, skerrow+ondrel 0.0 | 16 / 192 | 11.5 | 8/96 | 14/96 | outside | 1298 | 3546 | 0 of 676 | 109 | 1 | 0 |
-| 3v3 | arena02 | hargrim v skerrow | brimwick+lumeth 50.0, brimwick+ondrel 12.5, brimwick+quillon 37.5, lumeth+brimwick 31.3, lumeth+ondrel 25.0, lumeth+quillon 43.8, ondrel+brimwick 50.0, ondrel+lumeth 43.8, ondrel+quillon 43.8, quillon+brimwick 56.3, quillon+lumeth 43.8, quillon+ondrel 50.0 | 16 / 192 | 40.6 | 40/96 | 38/96 | in band | 1385 | 5170 | 4 of 786 | 105 | 1 | 0 |
-| 3v3 | arena02 | lumeth v ondrel | brimwick+hargrim 93.8, brimwick+quillon 68.8, brimwick+skerrow 100.0, hargrim+brimwick 62.5, hargrim+quillon 81.3, hargrim+skerrow 68.8, quillon+brimwick 93.8, quillon+hargrim 75.0, quillon+skerrow 93.8, skerrow+brimwick 87.5, skerrow+hargrim 93.8, skerrow+quillon 75.0 | 16 / 192 | 82.8 | 80/96 | 79/96 | outside | 1241 | 3948 | 0 of 765 | 108 | 0 | 0 |
-| 3v3 | arena02 | lumeth v quillon | brimwick+hargrim 75.0, brimwick+ondrel 75.0, brimwick+skerrow 87.5, hargrim+brimwick 93.8, hargrim+ondrel 75.0, hargrim+skerrow 50.0, ondrel+brimwick 81.3, ondrel+hargrim 68.8, ondrel+skerrow 93.8, skerrow+brimwick 75.0, skerrow+hargrim 43.8, skerrow+ondrel 68.8 | 16 / 192 | 74.0 | 74/96 | 68/96 | outside | 1218 | 2517 | 1 of 759 | 110 | 1 | 0 |
-| 3v3 | arena02 | lumeth v skerrow | brimwick+hargrim 100.0, brimwick+ondrel 100.0, brimwick+quillon 100.0, hargrim+brimwick 100.0, hargrim+ondrel 100.0, hargrim+quillon 93.8, ondrel+brimwick 100.0, ondrel+hargrim 100.0, ondrel+quillon 100.0, quillon+brimwick 100.0, quillon+hargrim 100.0, quillon+ondrel 100.0 | 16 / 192 | 99.5 | 95/96 | 96/96 | outside | 1098 | 1968 | 1 of 612 | 106 | 0 | 0 |
-| 3v3 | arena02 | ondrel v quillon | brimwick+hargrim 18.8, brimwick+lumeth 100.0, brimwick+skerrow 6.3, hargrim+brimwick 31.3, hargrim+lumeth 87.5, hargrim+skerrow 12.5, lumeth+brimwick 50.0, lumeth+hargrim 56.3, lumeth+skerrow 62.5, skerrow+brimwick 6.3, skerrow+hargrim 0.0, skerrow+lumeth 87.5 | 16 / 192 | 43.2 | 44/96 | 39/96 | in band | 1381 | 5392 | 3 of 766 | 110 | 2 | 0 |
-| 3v3 | arena02 | ondrel v skerrow | brimwick+hargrim 87.5, brimwick+lumeth 87.5, brimwick+quillon 87.5, hargrim+brimwick 100.0, hargrim+lumeth 87.5, hargrim+quillon 93.8, lumeth+brimwick 62.5, lumeth+hargrim 100.0, lumeth+quillon 75.0, quillon+brimwick 56.3, quillon+hargrim 75.0, quillon+lumeth 87.5 | 16 / 192 | 83.3 | 79/96 | 81/96 | outside | 1275 | 4620 | 2 of 704 | 108 | 2 | 0 |
-| 3v3 | arena02 | quillon v skerrow | brimwick+hargrim 100.0, brimwick+lumeth 87.5, brimwick+ondrel 100.0, hargrim+brimwick 100.0, hargrim+lumeth 75.0, hargrim+ondrel 100.0, lumeth+brimwick 75.0, lumeth+hargrim 93.8, lumeth+ondrel 43.8, ondrel+brimwick 87.5, ondrel+hargrim 100.0, ondrel+lumeth 37.5 | 16 / 192 | 83.3 | 81/96 | 79/96 | outside | 1251 | 4674 | 3 of 692 | 109 | 1 | 0 |
-| 3v3 | arena03 | brimwick v hargrim | lumeth+ondrel 81.3, lumeth+quillon 87.5, lumeth+skerrow 100.0, ondrel+lumeth 93.8, ondrel+quillon 100.0, ondrel+skerrow 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0, quillon+skerrow 100.0, skerrow+lumeth 81.3, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 16 / 192 | 95.3 | 90/96 | 93/96 | outside | 1285 | 5340 | 5 of 655 | 137 | 0 | 0 |
-| 3v3 | arena03 | brimwick v lumeth | hargrim+ondrel 6.3, hargrim+quillon 18.8, hargrim+skerrow 6.3, ondrel+hargrim 0.0, ondrel+quillon 12.5, ondrel+skerrow 6.3, quillon+hargrim 0.0, quillon+ondrel 18.8, quillon+skerrow 0.0, skerrow+hargrim 6.3, skerrow+ondrel 0.0, skerrow+quillon 6.3 | 16 / 192 | 6.8 | 5/96 | 8/96 | outside | 1275 | 2198 | 0 of 700 | 143 | 0 | 0 |
-| 3v3 | arena03 | brimwick v ondrel | hargrim+lumeth 12.5, hargrim+quillon 56.3, hargrim+skerrow 68.8, lumeth+hargrim 12.5, lumeth+quillon 18.8, lumeth+skerrow 6.3, quillon+hargrim 6.3, quillon+lumeth 12.5, quillon+skerrow 18.8, skerrow+hargrim 68.8, skerrow+lumeth 0.0, skerrow+quillon 25.0 | 16 / 192 | 25.5 | 25/96 | 24/96 | outside | 1354 | 5371 | 6 of 737 | 138 | 0 | 0 |
-| 3v3 | arena03 | brimwick v quillon | hargrim+lumeth 37.5, hargrim+ondrel 25.0, hargrim+skerrow 25.0, lumeth+hargrim 25.0, lumeth+ondrel 87.5, lumeth+skerrow 56.3, ondrel+hargrim 31.3, ondrel+lumeth 56.3, ondrel+skerrow 37.5, skerrow+hargrim 0.0, skerrow+lumeth 31.3, skerrow+ondrel 37.5 | 16 / 192 | 37.5 | 39/96 | 33/96 | outside | 1427 | 5114 | 9 of 751 | 130 | 0 | 0 |
-| 3v3 | arena03 | brimwick v skerrow | hargrim+lumeth 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, lumeth+hargrim 100.0, lumeth+ondrel 87.5, lumeth+quillon 75.0, ondrel+hargrim 100.0, ondrel+lumeth 93.8, ondrel+quillon 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0 | 16 / 192 | 96.4 | 92/96 | 93/96 | outside | 1244 | 4986 | 2 of 655 | 122 | 0 | 0 |
-| 3v3 | arena03 | hargrim v lumeth | brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, ondrel+brimwick 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 16 / 192 | 0.0 | 0/96 | 0/96 | outside | 1036 | 1773 | 1 of 593 | 127 | 0 | 0 |
-| 3v3 | arena03 | hargrim v ondrel | brimwick+lumeth 0.0, brimwick+quillon 6.3, brimwick+skerrow 0.0, lumeth+brimwick 6.3, lumeth+quillon 6.3, lumeth+skerrow 0.0, quillon+brimwick 0.0, quillon+lumeth 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+lumeth 25.0, skerrow+quillon 6.3 | 16 / 192 | 4.2 | 5/96 | 3/96 | outside | 1216 | 5194 | 0 of 642 | 128 | 0 | 0 |
-| 3v3 | arena03 | hargrim v quillon | brimwick+lumeth 0.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, lumeth+brimwick 12.5, lumeth+ondrel 25.0, lumeth+skerrow 31.3, ondrel+brimwick 0.0, ondrel+lumeth 6.3, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+lumeth 6.3, skerrow+ondrel 0.0 | 16 / 192 | 6.8 | 7/96 | 6/96 | outside | 1253 | 5291 | 3 of 671 | 125 | 0 | 0 |
-| 3v3 | arena03 | hargrim v skerrow | brimwick+lumeth 68.8, brimwick+ondrel 31.3, brimwick+quillon 87.5, lumeth+brimwick 56.3, lumeth+ondrel 87.5, lumeth+quillon 68.8, ondrel+brimwick 75.0, ondrel+lumeth 68.8, ondrel+quillon 81.3, quillon+brimwick 81.3, quillon+lumeth 43.8, quillon+ondrel 75.0 | 16 / 192 | 68.8 | 67/96 | 65/96 | outside | 1523 | 5315 | 20 of 778 | 110 | 1 | 0 |
-| 3v3 | arena03 | lumeth v ondrel | brimwick+hargrim 100.0, brimwick+quillon 18.8, brimwick+skerrow 100.0, hargrim+brimwick 37.5, hargrim+quillon 50.0, hargrim+skerrow 75.0, quillon+brimwick 56.3, quillon+hargrim 100.0, quillon+skerrow 93.8, skerrow+brimwick 56.3, skerrow+hargrim 100.0, skerrow+quillon 50.0 | 16 / 192 | 69.8 | 66/96 | 68/96 | outside | 1176 | 2188 | 0 of 739 | 135 | 3 | 0 |
-| 3v3 | arena03 | lumeth v quillon | brimwick+hargrim 87.5, brimwick+ondrel 81.3, brimwick+skerrow 93.8, hargrim+brimwick 87.5, hargrim+ondrel 43.8, hargrim+skerrow 31.3, ondrel+brimwick 37.5, ondrel+hargrim 75.0, ondrel+skerrow 100.0, skerrow+brimwick 87.5, skerrow+hargrim 75.0, skerrow+ondrel 75.0 | 16 / 192 | 72.9 | 70/96 | 70/96 | outside | 1227 | 2295 | 1 of 738 | 132 | 2 | 0 |
-| 3v3 | arena03 | lumeth v skerrow | brimwick+hargrim 100.0, brimwick+ondrel 100.0, brimwick+quillon 100.0, hargrim+brimwick 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, ondrel+brimwick 100.0, ondrel+hargrim 100.0, ondrel+quillon 100.0, quillon+brimwick 100.0, quillon+hargrim 100.0, quillon+ondrel 100.0 | 16 / 192 | 100.0 | 96/96 | 96/96 | outside | 1027 | 1730 | 0 of 580 | 114 | 0 | 0 |
-| 3v3 | arena03 | ondrel v quillon | brimwick+hargrim 62.5, brimwick+lumeth 87.5, brimwick+skerrow 43.8, hargrim+brimwick 43.8, hargrim+lumeth 68.8, hargrim+skerrow 12.5, lumeth+brimwick 68.8, lumeth+hargrim 75.0, lumeth+skerrow 75.0, skerrow+brimwick 25.0, skerrow+hargrim 6.3, skerrow+lumeth 75.0 | 16 / 192 | 53.6 | 47/96 | 56/96 | in band | 1289 | 4674 | 12 of 750 | 127 | 1 | 0 |
-| 3v3 | arena03 | ondrel v skerrow | brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+quillon 100.0, hargrim+brimwick 100.0, hargrim+lumeth 100.0, hargrim+quillon 100.0, lumeth+brimwick 93.8, lumeth+hargrim 100.0, lumeth+quillon 100.0, quillon+brimwick 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0 | 16 / 192 | 99.5 | 96/96 | 95/96 | outside | 1217 | 4125 | 1 of 612 | 115 | 0 | 0 |
-| 3v3 | arena03 | quillon v skerrow | brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+ondrel 100.0, hargrim+brimwick 100.0, hargrim+lumeth 100.0, hargrim+ondrel 100.0, lumeth+brimwick 100.0, lumeth+hargrim 100.0, lumeth+ondrel 93.8, ondrel+brimwick 100.0, ondrel+hargrim 100.0, ondrel+lumeth 100.0 | 16 / 192 | 99.5 | 96/96 | 95/96 | outside | 1242 | 5305 | 7 of 623 | 129 | 0 | 0 |
+| 2v2 | arena01 | brimwick v durnhal | hargrim 85.0, lumeth 87.5, ondrel 100.0, quillon 100.0, skerrow 77.5 | 40 / 200 | 90.0 | 85/100 | 95/100 | outside | 1036 | 2942 | 0 of 740 | 126 | 2 | 0 |
+| 2v2 | arena01 | brimwick v hargrim | durnhal 100.0, lumeth 22.5, ondrel 100.0, quillon 97.5, skerrow 77.5 | 40 / 200 | 79.5 | 79/100 | 80/100 | outside | 962 | 1960 | 1 of 733 | 128 | 2 | 0 |
+| 2v2 | arena01 | brimwick v lumeth | durnhal 12.5, hargrim 2.5, ondrel 15.0, quillon 7.5, skerrow 0.0 | 40 / 200 | 7.5 | 9/100 | 6/100 | outside | 1225 | 3126 | 3 of 752 | 131 | 1 | 0 |
+| 2v2 | arena01 | brimwick v ondrel | durnhal 62.5, hargrim 92.5, lumeth 22.5, quillon 60.0, skerrow 67.5 | 40 / 200 | 61.0 | 63/100 | 59/100 | outside | 1046 | 3114 | 0 of 765 | 122 | 1 | 0 |
+| 2v2 | arena01 | brimwick v quillon | durnhal 20.0, hargrim 25.0, lumeth 15.0, ondrel 22.5, skerrow 15.0 | 40 / 200 | 19.5 | 20/100 | 19/100 | outside | 998 | 3731 | 0 of 763 | 133 | 1 | 0 |
+| 2v2 | arena01 | brimwick v skerrow | durnhal 100.0, hargrim 85.0, lumeth 60.0, ondrel 100.0, quillon 100.0 | 40 / 200 | 89.0 | 83/100 | 95/100 | outside | 875 | 2626 | 0 of 710 | 122 | 1 | 0 |
+| 2v2 | arena01 | durnhal v hargrim | brimwick 62.5, lumeth 100.0, ondrel 60.0, quillon 55.0, skerrow 37.5 | 40 / 200 | 63.0 | 62/100 | 64/100 | outside | 1283 | 5183 | 5 of 742 | 130 | 2 | 0 |
+| 2v2 | arena01 | durnhal v lumeth | brimwick 0.0, hargrim 0.0, ondrel 0.0, quillon 0.0, skerrow 0.0 | 40 / 200 | 0.0 | 0/100 | 0/100 | outside | 1008 | 2218 | 2 of 629 | 124 | 2 | 0 |
+| 2v2 | arena01 | durnhal v ondrel | brimwick 0.0, hargrim 2.5, lumeth 0.0, quillon 0.0, skerrow 0.0 | 40 / 200 | 0.5 | 0/100 | 1/100 | outside | 1055 | 5275 | 0 of 682 | 122 | 1 | 0 |
+| 2v2 | arena01 | durnhal v quillon | brimwick 0.0, hargrim 0.0, lumeth 0.0, ondrel 0.0, skerrow 0.0 | 40 / 200 | 0.0 | 0/100 | 0/100 | outside | 860 | 2411 | 0 of 620 | 129 | 1 | 0 |
+| 2v2 | arena01 | durnhal v skerrow | brimwick 60.0, hargrim 22.5, lumeth 57.5, ondrel 67.5, quillon 50.0 | 40 / 200 | 51.5 | 44/100 | 59/100 | in band | 1151 | 4931 | 2 of 801 | 119 | 4 | 0 |
+| 2v2 | arena01 | hargrim v lumeth | brimwick 0.0, durnhal 0.0, ondrel 0.0, quillon 0.0, skerrow 5.0 | 40 / 200 | 1.0 | 2/100 | 0/100 | outside | 953 | 1967 | 0 of 631 | 123 | 0 | 0 |
+| 2v2 | arena01 | hargrim v ondrel | brimwick 0.0, durnhal 0.0, lumeth 0.0, quillon 0.0, skerrow 2.5 | 40 / 200 | 0.5 | 0/100 | 1/100 | outside | 943 | 3136 | 0 of 656 | 120 | 0 | 0 |
+| 2v2 | arena01 | hargrim v quillon | brimwick 0.0, durnhal 0.0, lumeth 15.0, ondrel 0.0, skerrow 0.0 | 40 / 200 | 3.0 | 2/100 | 4/100 | outside | 841 | 2065 | 0 of 648 | 129 | 0 | 0 |
+| 2v2 | arena01 | hargrim v skerrow | brimwick 57.5, durnhal 2.5, lumeth 15.0, ondrel 25.0, quillon 62.5 | 40 / 200 | 32.5 | 27/100 | 38/100 | outside | 1026 | 3877 | 0 of 780 | 118 | 12 | 0 |
+| 2v2 | arena01 | lumeth v ondrel | brimwick 65.0, durnhal 92.5, hargrim 100.0, quillon 82.5, skerrow 97.5 | 40 / 200 | 87.5 | 89/100 | 86/100 | outside | 1189 | 3100 | 1 of 769 | 128 | 1 | 0 |
+| 2v2 | arena01 | lumeth v quillon | brimwick 42.5, durnhal 65.0, hargrim 82.5, ondrel 47.5, skerrow 92.5 | 40 / 200 | 66.0 | 62/100 | 70/100 | outside | 1197 | 3440 | 0 of 827 | 132 | 3 | 0 |
+| 2v2 | arena01 | lumeth v skerrow | brimwick 100.0, durnhal 97.5, hargrim 97.5, ondrel 100.0, quillon 100.0 | 40 / 200 | 99.0 | 99/100 | 99/100 | outside | 872 | 1770 | 0 of 648 | 124 | 1 | 0 |
+| 2v2 | arena01 | ondrel v quillon | brimwick 22.5, durnhal 12.5, hargrim 15.0, lumeth 50.0, skerrow 25.0 | 40 / 200 | 25.0 | 25/100 | 25/100 | outside | 1045 | 4120 | 0 of 784 | 133 | 1 | 0 |
+| 2v2 | arena01 | ondrel v skerrow | brimwick 100.0, durnhal 100.0, hargrim 100.0, lumeth 97.5, quillon 100.0 | 40 / 200 | 99.5 | 99/100 | 100/100 | outside | 851 | 2481 | 0 of 649 | 121 | 0 | 0 |
+| 2v2 | arena01 | quillon v skerrow | brimwick 100.0, durnhal 100.0, hargrim 100.0, lumeth 80.0, ondrel 100.0 | 40 / 200 | 96.0 | 95/100 | 97/100 | outside | 814 | 2327 | 0 of 647 | 133 | 0 | 0 |
+| 2v2 | arena02 | brimwick v durnhal | hargrim 97.5, lumeth 87.5, ondrel 100.0, quillon 92.5, skerrow 77.5 | 40 / 200 | 91.0 | 95/100 | 87/100 | outside | 1103 | 4130 | 1 of 712 | 107 | 1 | 0 |
+| 2v2 | arena02 | brimwick v hargrim | durnhal 100.0, lumeth 87.5, ondrel 100.0, quillon 97.5, skerrow 92.5 | 40 / 200 | 95.5 | 95/100 | 96/100 | outside | 979 | 3119 | 0 of 698 | 107 | 1 | 0 |
+| 2v2 | arena02 | brimwick v lumeth | durnhal 15.0, hargrim 5.0, ondrel 27.5, quillon 10.0, skerrow 2.5 | 40 / 200 | 12.0 | 11/100 | 13/100 | outside | 1139 | 4425 | 0 of 766 | 111 | 0 | 0 |
+| 2v2 | arena02 | brimwick v ondrel | durnhal 72.5, hargrim 67.5, lumeth 45.0, quillon 70.0, skerrow 42.5 | 40 / 200 | 59.5 | 57/100 | 62/100 | in band | 1022 | 2917 | 0 of 821 | 107 | 0 | 0 |
+| 2v2 | arena02 | brimwick v quillon | durnhal 2.5, hargrim 10.0, lumeth 27.5, ondrel 10.0, skerrow 10.0 | 40 / 200 | 12.0 | 13/100 | 11/100 | outside | 921 | 2806 | 0 of 794 | 112 | 2 | 0 |
+| 2v2 | arena02 | brimwick v skerrow | durnhal 100.0, hargrim 97.5, lumeth 95.0, ondrel 97.5, quillon 92.5 | 40 / 200 | 96.5 | 96/100 | 97/100 | outside | 876 | 2656 | 0 of 712 | 107 | 2 | 0 |
+| 2v2 | arena02 | durnhal v hargrim | brimwick 52.5, lumeth 95.0, ondrel 55.0, quillon 65.0, skerrow 52.5 | 40 / 200 | 64.0 | 62/100 | 66/100 | outside | 1161 | 5292 | 2 of 823 | 118 | 2 | 0 |
+| 2v2 | arena02 | durnhal v lumeth | brimwick 0.0, hargrim 0.0, ondrel 0.0, quillon 0.0, skerrow 0.0 | 40 / 200 | 0.0 | 0/100 | 0/100 | outside | 1048 | 2245 | 0 of 645 | 108 | 1 | 0 |
+| 2v2 | arena02 | durnhal v ondrel | brimwick 0.0, hargrim 0.0, lumeth 2.5, quillon 5.0, skerrow 0.0 | 40 / 200 | 1.5 | 2/100 | 1/100 | outside | 1095 | 5038 | 0 of 651 | 109 | 1 | 0 |
+| 2v2 | arena02 | durnhal v quillon | brimwick 0.0, hargrim 0.0, lumeth 0.0, ondrel 0.0, skerrow 2.5 | 40 / 200 | 0.5 | 1/100 | 0/100 | outside | 912 | 2481 | 0 of 630 | 116 | 1 | 0 |
+| 2v2 | arena02 | durnhal v skerrow | brimwick 32.5, hargrim 0.0, lumeth 2.5, ondrel 30.0, quillon 62.5 | 40 / 200 | 25.5 | 26/100 | 25/100 | outside | 1063 | 4838 | 1 of 764 | 107 | 4 | 0 |
+| 2v2 | arena02 | hargrim v lumeth | brimwick 0.0, durnhal 0.0, ondrel 0.0, quillon 2.5, skerrow 5.0 | 40 / 200 | 1.5 | 2/100 | 1/100 | outside | 995 | 1979 | 0 of 661 | 107 | 0 | 0 |
+| 2v2 | arena02 | hargrim v ondrel | brimwick 0.0, durnhal 0.0, lumeth 0.0, quillon 2.5, skerrow 2.5 | 40 / 200 | 1.0 | 1/100 | 1/100 | outside | 954 | 3418 | 0 of 655 | 109 | 1 | 0 |
+| 2v2 | arena02 | hargrim v quillon | brimwick 0.0, durnhal 0.0, lumeth 10.0, ondrel 0.0, skerrow 0.0 | 40 / 200 | 2.0 | 1/100 | 3/100 | outside | 879 | 2402 | 0 of 647 | 116 | 4 | 0 |
+| 2v2 | arena02 | hargrim v skerrow | brimwick 37.5, durnhal 0.0, lumeth 5.0, ondrel 25.0, quillon 47.5 | 40 / 200 | 23.0 | 19/100 | 27/100 | outside | 984 | 3081 | 0 of 766 | 107 | 6 | 0 |
+| 2v2 | arena02 | lumeth v ondrel | brimwick 82.5, durnhal 95.0, hargrim 87.5, quillon 70.0, skerrow 90.0 | 40 / 200 | 85.0 | 80/100 | 90/100 | outside | 1111 | 2433 | 0 of 769 | 110 | 2 | 0 |
+| 2v2 | arena02 | lumeth v quillon | brimwick 80.0, durnhal 37.5, hargrim 42.5, ondrel 70.0, skerrow 52.5 | 40 / 200 | 56.5 | 62/100 | 51/100 | in band | 1128 | 2844 | 0 of 802 | 112 | 1 | 0 |
+| 2v2 | arena02 | lumeth v skerrow | brimwick 95.0, durnhal 97.5, hargrim 92.5, ondrel 100.0, quillon 97.5 | 40 / 200 | 96.5 | 98/100 | 95/100 | outside | 890 | 1723 | 0 of 666 | 108 | 2 | 0 |
+| 2v2 | arena02 | ondrel v quillon | brimwick 52.5, durnhal 2.5, hargrim 10.0, lumeth 72.5, skerrow 2.5 | 40 / 200 | 28.0 | 24/100 | 32/100 | outside | 957 | 5013 | 0 of 796 | 111 | 4 | 0 |
+| 2v2 | arena02 | ondrel v skerrow | brimwick 97.5, durnhal 95.0, hargrim 100.0, lumeth 82.5, quillon 90.0 | 40 / 200 | 93.0 | 92/100 | 94/100 | outside | 914 | 3132 | 0 of 712 | 109 | 3 | 0 |
+| 2v2 | arena02 | quillon v skerrow | brimwick 100.0, durnhal 100.0, hargrim 100.0, lumeth 97.5, ondrel 100.0 | 40 / 200 | 99.5 | 99/100 | 100/100 | outside | 858 | 1976 | 0 of 675 | 113 | 1 | 0 |
+| 2v2 | arena03 | brimwick v durnhal | hargrim 82.5, lumeth 90.0, ondrel 100.0, quillon 100.0, skerrow 82.5 | 40 / 200 | 91.0 | 90/100 | 92/100 | outside | 1005 | 2893 | 0 of 721 | 147 | 2 | 0 |
+| 2v2 | arena03 | brimwick v hargrim | durnhal 100.0, lumeth 70.0, ondrel 100.0, quillon 100.0, skerrow 70.0 | 40 / 200 | 88.0 | 85/100 | 91/100 | outside | 958 | 2561 | 0 of 701 | 144 | 0 | 0 |
+| 2v2 | arena03 | brimwick v lumeth | durnhal 0.0, hargrim 0.0, ondrel 30.0, quillon 22.5, skerrow 0.0 | 40 / 200 | 10.5 | 14/100 | 7/100 | outside | 1168 | 3135 | 0 of 757 | 148 | 1 | 0 |
+| 2v2 | arena03 | brimwick v ondrel | durnhal 72.5, hargrim 65.0, lumeth 10.0, quillon 52.5, skerrow 35.0 | 40 / 200 | 47.0 | 47/100 | 47/100 | in band | 1055 | 4410 | 4 of 786 | 143 | 1 | 0 |
+| 2v2 | arena03 | brimwick v quillon | durnhal 22.5, hargrim 30.0, lumeth 20.0, ondrel 52.5, skerrow 12.5 | 40 / 200 | 27.5 | 33/100 | 22/100 | outside | 1015 | 4172 | 0 of 789 | 135 | 0 | 0 |
+| 2v2 | arena03 | brimwick v skerrow | durnhal 95.0, hargrim 70.0, lumeth 82.5, ondrel 100.0, quillon 100.0 | 40 / 200 | 89.5 | 84/100 | 95/100 | outside | 916 | 2283 | 1 of 733 | 130 | 1 | 0 |
+| 2v2 | arena03 | durnhal v hargrim | brimwick 72.5, lumeth 100.0, ondrel 87.5, quillon 92.5, skerrow 60.0 | 40 / 200 | 82.5 | 89/100 | 76/100 | outside | 1241 | 4957 | 2 of 743 | 127 | 1 | 0 |
+| 2v2 | arena03 | durnhal v lumeth | brimwick 0.0, hargrim 0.0, ondrel 0.0, quillon 0.0, skerrow 0.0 | 40 / 200 | 0.0 | 0/100 | 0/100 | outside | 917 | 2052 | 0 of 607 | 128 | 1 | 0 |
+| 2v2 | arena03 | durnhal v ondrel | brimwick 0.0, hargrim 0.0, lumeth 0.0, quillon 0.0, skerrow 2.5 | 40 / 200 | 0.5 | 1/100 | 0/100 | outside | 1063 | 3800 | 0 of 655 | 130 | 0 | 0 |
+| 2v2 | arena03 | durnhal v quillon | brimwick 0.0, hargrim 0.0, lumeth 0.0, ondrel 0.0, skerrow 0.0 | 40 / 200 | 0.0 | 0/100 | 0/100 | outside | 877 | 2907 | 0 of 620 | 130 | 0 | 0 |
+| 2v2 | arena03 | durnhal v skerrow | brimwick 70.0, hargrim 15.0, lumeth 60.0, ondrel 55.0, quillon 77.5 | 40 / 200 | 55.5 | 54/100 | 57/100 | in band | 1143 | 5294 | 0 of 807 | 113 | 5 | 0 |
+| 2v2 | arena03 | hargrim v lumeth | brimwick 0.0, durnhal 2.5, ondrel 0.0, quillon 0.0, skerrow 5.0 | 40 / 200 | 1.5 | 1/100 | 2/100 | outside | 952 | 1863 | 0 of 646 | 128 | 0 | 0 |
+| 2v2 | arena03 | hargrim v ondrel | brimwick 0.0, durnhal 0.0, lumeth 7.5, quillon 0.0, skerrow 2.5 | 40 / 200 | 2.0 | 4/100 | 0/100 | outside | 975 | 2831 | 0 of 689 | 129 | 1 | 0 |
+| 2v2 | arena03 | hargrim v quillon | brimwick 0.0, durnhal 0.0, lumeth 32.5, ondrel 0.0, skerrow 0.0 | 40 / 200 | 6.5 | 1/100 | 12/100 | outside | 887 | 2577 | 0 of 651 | 125 | 0 | 0 |
+| 2v2 | arena03 | hargrim v skerrow | brimwick 42.5, durnhal 7.5, lumeth 2.5, ondrel 42.5, quillon 67.5 | 40 / 200 | 32.5 | 36/100 | 29/100 | outside | 1022 | 2973 | 0 of 785 | 111 | 6 | 0 |
+| 2v2 | arena03 | lumeth v ondrel | brimwick 47.5, durnhal 47.5, hargrim 50.0, quillon 65.0, skerrow 100.0 | 40 / 200 | 62.0 | 60/100 | 64/100 | outside | 1038 | 2634 | 0 of 823 | 136 | 2 | 0 |
+| 2v2 | arena03 | lumeth v quillon | brimwick 37.5, durnhal 37.5, hargrim 52.5, ondrel 67.5, skerrow 65.0 | 40 / 200 | 52.0 | 50/100 | 54/100 | in band | 1099 | 2792 | 0 of 845 | 133 | 1 | 0 |
+| 2v2 | arena03 | lumeth v skerrow | brimwick 100.0, durnhal 97.5, hargrim 92.5, ondrel 100.0, quillon 100.0 | 40 / 200 | 98.0 | 98/100 | 98/100 | outside | 864 | 1975 | 0 of 644 | 116 | 1 | 0 |
+| 2v2 | arena03 | ondrel v quillon | brimwick 20.0, durnhal 5.0, hargrim 17.5, lumeth 67.5, skerrow 5.0 | 40 / 200 | 23.0 | 20/100 | 26/100 | outside | 965 | 3374 | 2 of 740 | 129 | 0 | 0 |
+| 2v2 | arena03 | ondrel v skerrow | brimwick 100.0, durnhal 97.5, hargrim 97.5, lumeth 100.0, quillon 100.0 | 40 / 200 | 99.0 | 99/100 | 99/100 | outside | 890 | 2971 | 0 of 678 | 116 | 2 | 0 |
+| 2v2 | arena03 | quillon v skerrow | brimwick 100.0, durnhal 100.0, hargrim 100.0, lumeth 92.5, ondrel 100.0 | 40 / 200 | 98.5 | 98/100 | 99/100 | outside | 796 | 1970 | 0 of 643 | 128 | 1 | 0 |
+| 3v3 | arena01 | brimwick v durnhal | hargrim+lumeth 70.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, hargrim+skerrow 100.0, lumeth+hargrim 90.0, lumeth+ondrel 70.0, lumeth+quillon 90.0, lumeth+skerrow 100.0, ondrel+hargrim 100.0, ondrel+lumeth 80.0, ondrel+quillon 100.0, ondrel+skerrow 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0, quillon+skerrow 100.0, skerrow+hargrim 90.0, skerrow+lumeth 80.0, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 10 / 200 | 93.5 | 93/100 | 94/100 | outside | 1241 | 4362 | 0 of 695 | 120 | 0 | 0 |
+| 3v3 | arena01 | brimwick v hargrim | durnhal+lumeth 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, durnhal+skerrow 100.0, lumeth+durnhal 100.0, lumeth+ondrel 80.0, lumeth+quillon 70.0, lumeth+skerrow 100.0, ondrel+durnhal 100.0, ondrel+lumeth 80.0, ondrel+quillon 100.0, ondrel+skerrow 100.0, quillon+durnhal 100.0, quillon+lumeth 90.0, quillon+ondrel 90.0, quillon+skerrow 100.0, skerrow+durnhal 100.0, skerrow+lumeth 90.0, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 10 / 200 | 95.0 | 95/100 | 95/100 | outside | 1161 | 3451 | 1 of 669 | 120 | 1 | 0 |
+| 3v3 | arena01 | brimwick v lumeth | durnhal+hargrim 10.0, durnhal+ondrel 0.0, durnhal+quillon 10.0, durnhal+skerrow 10.0, hargrim+durnhal 20.0, hargrim+ondrel 20.0, hargrim+quillon 20.0, hargrim+skerrow 10.0, ondrel+durnhal 10.0, ondrel+hargrim 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+durnhal 10.0, quillon+hargrim 10.0, quillon+ondrel 10.0, quillon+skerrow 30.0, skerrow+durnhal 0.0, skerrow+hargrim 0.0, skerrow+ondrel 10.0, skerrow+quillon 0.0 | 10 / 200 | 9.0 | 14/100 | 4/100 | outside | 1329 | 3491 | 3 of 765 | 123 | 0 | 0 |
+| 3v3 | arena01 | brimwick v ondrel | durnhal+hargrim 80.0, durnhal+lumeth 30.0, durnhal+quillon 50.0, durnhal+skerrow 60.0, hargrim+durnhal 70.0, hargrim+lumeth 50.0, hargrim+quillon 40.0, hargrim+skerrow 50.0, lumeth+durnhal 10.0, lumeth+hargrim 20.0, lumeth+quillon 40.0, lumeth+skerrow 40.0, quillon+durnhal 40.0, quillon+hargrim 30.0, quillon+lumeth 10.0, quillon+skerrow 40.0, skerrow+durnhal 80.0, skerrow+hargrim 70.0, skerrow+lumeth 30.0, skerrow+quillon 60.0 | 10 / 200 | 45.0 | 47/100 | 43/100 | in band | 1369 | 4238 | 3 of 808 | 119 | 2 | 0 |
+| 3v3 | arena01 | brimwick v quillon | durnhal+hargrim 30.0, durnhal+lumeth 20.0, durnhal+ondrel 30.0, durnhal+skerrow 10.0, hargrim+durnhal 50.0, hargrim+lumeth 40.0, hargrim+ondrel 40.0, hargrim+skerrow 20.0, lumeth+durnhal 30.0, lumeth+hargrim 30.0, lumeth+ondrel 60.0, lumeth+skerrow 30.0, ondrel+durnhal 30.0, ondrel+hargrim 40.0, ondrel+lumeth 30.0, ondrel+skerrow 30.0, skerrow+durnhal 50.0, skerrow+hargrim 30.0, skerrow+lumeth 40.0, skerrow+ondrel 20.0 | 10 / 200 | 33.0 | 35/100 | 31/100 | outside | 1372 | 4073 | 2 of 815 | 128 | 0 | 0 |
+| 3v3 | arena01 | brimwick v skerrow | durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, hargrim+durnhal 100.0, hargrim+lumeth 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, lumeth+durnhal 100.0, lumeth+hargrim 100.0, lumeth+ondrel 100.0, lumeth+quillon 90.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+lumeth 100.0, ondrel+quillon 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0 | 10 / 200 | 99.5 | 99/100 | 100/100 | outside | 1181 | 4751 | 1 of 665 | 120 | 1 | 0 |
+| 3v3 | arena01 | durnhal v hargrim | brimwick+lumeth 80.0, brimwick+ondrel 40.0, brimwick+quillon 70.0, brimwick+skerrow 20.0, lumeth+brimwick 70.0, lumeth+ondrel 80.0, lumeth+quillon 80.0, lumeth+skerrow 100.0, ondrel+brimwick 70.0, ondrel+lumeth 100.0, ondrel+quillon 60.0, ondrel+skerrow 40.0, quillon+brimwick 60.0, quillon+lumeth 90.0, quillon+ondrel 60.0, quillon+skerrow 40.0, skerrow+brimwick 30.0, skerrow+lumeth 90.0, skerrow+ondrel 50.0, skerrow+quillon 50.0 | 10 / 200 | 64.0 | 68/100 | 60/100 | outside | 1485 | 5346 | 5 of 792 | 122 | 7 | 0 |
+| 3v3 | arena01 | durnhal v lumeth | brimwick+hargrim 0.0, brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+ondrel 0.0, hargrim+quillon 0.0, hargrim+skerrow 0.0, ondrel+brimwick 0.0, ondrel+hargrim 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+hargrim 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 10 / 200 | 0.0 | 0/100 | 0/100 | outside | 1078 | 2158 | 1 of 629 | 119 | 0 | 0 |
+| 3v3 | arena01 | durnhal v ondrel | brimwick+hargrim 0.0, brimwick+lumeth 0.0, brimwick+quillon 10.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+lumeth 10.0, hargrim+quillon 10.0, hargrim+skerrow 0.0, lumeth+brimwick 0.0, lumeth+hargrim 0.0, lumeth+quillon 10.0, lumeth+skerrow 0.0, quillon+brimwick 0.0, quillon+hargrim 0.0, quillon+lumeth 10.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+lumeth 30.0, skerrow+quillon 0.0 | 10 / 200 | 4.0 | 3/100 | 5/100 | outside | 1193 | 4638 | 3 of 690 | 119 | 0 | 0 |
+| 3v3 | arena01 | durnhal v quillon | brimwick+hargrim 0.0, brimwick+lumeth 0.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+lumeth 0.0, hargrim+ondrel 0.0, hargrim+skerrow 0.0, lumeth+brimwick 10.0, lumeth+hargrim 10.0, lumeth+ondrel 10.0, lumeth+skerrow 10.0, ondrel+brimwick 0.0, ondrel+hargrim 0.0, ondrel+lumeth 0.0, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+lumeth 0.0, skerrow+ondrel 0.0 | 10 / 200 | 2.0 | 1/100 | 3/100 | outside | 1189 | 3869 | 0 of 666 | 124 | 1 | 0 |
+| 3v3 | arena01 | durnhal v skerrow | brimwick+hargrim 70.0, brimwick+lumeth 70.0, brimwick+ondrel 100.0, brimwick+quillon 80.0, hargrim+brimwick 40.0, hargrim+lumeth 20.0, hargrim+ondrel 60.0, hargrim+quillon 70.0, lumeth+brimwick 100.0, lumeth+hargrim 30.0, lumeth+ondrel 50.0, lumeth+quillon 50.0, ondrel+brimwick 50.0, ondrel+hargrim 60.0, ondrel+lumeth 60.0, ondrel+quillon 70.0, quillon+brimwick 60.0, quillon+hargrim 70.0, quillon+lumeth 80.0, quillon+ondrel 70.0 | 10 / 200 | 63.0 | 59/100 | 67/100 | outside | 1453 | 5248 | 2 of 819 | 117 | 3 | 0 |
+| 3v3 | arena01 | hargrim v lumeth | brimwick+durnhal 0.0, brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+ondrel 0.0, durnhal+quillon 0.0, durnhal+skerrow 0.0, ondrel+brimwick 0.0, ondrel+durnhal 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+durnhal 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 10 / 200 | 0.0 | 0/100 | 0/100 | outside | 1060 | 1960 | 0 of 623 | 119 | 0 | 0 |
+| 3v3 | arena01 | hargrim v ondrel | brimwick+durnhal 0.0, brimwick+lumeth 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+lumeth 0.0, durnhal+quillon 0.0, durnhal+skerrow 0.0, lumeth+brimwick 0.0, lumeth+durnhal 0.0, lumeth+quillon 0.0, lumeth+skerrow 0.0, quillon+brimwick 0.0, quillon+durnhal 0.0, quillon+lumeth 10.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+lumeth 20.0, skerrow+quillon 0.0 | 10 / 200 | 1.5 | 2/100 | 1/100 | outside | 1154 | 3820 | 1 of 665 | 119 | 1 | 0 |
+| 3v3 | arena01 | hargrim v quillon | brimwick+durnhal 0.0, brimwick+lumeth 0.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+lumeth 0.0, durnhal+ondrel 0.0, durnhal+skerrow 0.0, lumeth+brimwick 10.0, lumeth+durnhal 10.0, lumeth+ondrel 30.0, lumeth+skerrow 10.0, ondrel+brimwick 10.0, ondrel+durnhal 0.0, ondrel+lumeth 10.0, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+lumeth 0.0, skerrow+ondrel 0.0 | 10 / 200 | 4.0 | 2/100 | 6/100 | outside | 1169 | 5299 | 0 of 675 | 124 | 0 | 0 |
+| 3v3 | arena01 | hargrim v skerrow | brimwick+durnhal 30.0, brimwick+lumeth 50.0, brimwick+ondrel 60.0, brimwick+quillon 40.0, durnhal+brimwick 40.0, durnhal+lumeth 50.0, durnhal+ondrel 40.0, durnhal+quillon 50.0, lumeth+brimwick 60.0, lumeth+durnhal 0.0, lumeth+ondrel 30.0, lumeth+quillon 70.0, ondrel+brimwick 80.0, ondrel+durnhal 50.0, ondrel+lumeth 40.0, ondrel+quillon 40.0, quillon+brimwick 60.0, quillon+durnhal 10.0, quillon+lumeth 70.0, quillon+ondrel 50.0 | 10 / 200 | 46.0 | 47/100 | 45/100 | in band | 1427 | 5230 | 8 of 800 | 117 | 4 | 0 |
+| 3v3 | arena01 | lumeth v ondrel | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+quillon 90.0, brimwick+skerrow 100.0, durnhal+brimwick 60.0, durnhal+hargrim 70.0, durnhal+quillon 80.0, durnhal+skerrow 90.0, hargrim+brimwick 80.0, hargrim+durnhal 100.0, hargrim+quillon 80.0, hargrim+skerrow 90.0, quillon+brimwick 70.0, quillon+durnhal 80.0, quillon+hargrim 90.0, quillon+skerrow 90.0, skerrow+brimwick 80.0, skerrow+durnhal 100.0, skerrow+hargrim 100.0, skerrow+quillon 100.0 | 10 / 200 | 87.5 | 89/100 | 86/100 | outside | 1306 | 3076 | 0 of 756 | 122 | 1 | 0 |
+| 3v3 | arena01 | lumeth v quillon | brimwick+durnhal 70.0, brimwick+hargrim 40.0, brimwick+ondrel 40.0, brimwick+skerrow 90.0, durnhal+brimwick 40.0, durnhal+hargrim 50.0, durnhal+ondrel 90.0, durnhal+skerrow 100.0, hargrim+brimwick 80.0, hargrim+durnhal 70.0, hargrim+ondrel 80.0, hargrim+skerrow 90.0, ondrel+brimwick 70.0, ondrel+durnhal 80.0, ondrel+hargrim 90.0, ondrel+skerrow 80.0, skerrow+brimwick 70.0, skerrow+durnhal 90.0, skerrow+hargrim 100.0, skerrow+ondrel 90.0 | 10 / 200 | 75.5 | 77/100 | 74/100 | outside | 1288 | 2697 | 0 of 792 | 128 | 0 | 0 |
+| 3v3 | arena01 | lumeth v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+ondrel 100.0, brimwick+quillon 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, ondrel+brimwick 100.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+quillon 100.0, quillon+brimwick 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+ondrel 100.0 | 10 / 200 | 100.0 | 100/100 | 100/100 | outside | 1053 | 2089 | 1 of 625 | 122 | 1 | 0 |
+| 3v3 | arena01 | ondrel v quillon | brimwick+durnhal 30.0, brimwick+hargrim 10.0, brimwick+lumeth 50.0, brimwick+skerrow 10.0, durnhal+brimwick 40.0, durnhal+hargrim 30.0, durnhal+lumeth 60.0, durnhal+skerrow 40.0, hargrim+brimwick 60.0, hargrim+durnhal 20.0, hargrim+lumeth 60.0, hargrim+skerrow 30.0, lumeth+brimwick 80.0, lumeth+durnhal 80.0, lumeth+hargrim 60.0, lumeth+skerrow 60.0, skerrow+brimwick 50.0, skerrow+durnhal 30.0, skerrow+hargrim 40.0, skerrow+lumeth 70.0 | 10 / 200 | 45.5 | 49/100 | 42/100 | in band | 1336 | 5288 | 3 of 797 | 128 | 3 | 0 |
+| 3v3 | arena01 | ondrel v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+quillon 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+lumeth 90.0, durnhal+quillon 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+lumeth 60.0, hargrim+quillon 100.0, lumeth+brimwick 90.0, lumeth+durnhal 90.0, lumeth+hargrim 90.0, lumeth+quillon 90.0, quillon+brimwick 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0 | 10 / 200 | 95.5 | 96/100 | 95/100 | outside | 1176 | 4953 | 2 of 672 | 120 | 1 | 0 |
+| 3v3 | arena01 | quillon v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+lumeth 90.0, brimwick+ondrel 100.0, durnhal+brimwick 100.0, durnhal+hargrim 90.0, durnhal+lumeth 100.0, durnhal+ondrel 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+lumeth 100.0, hargrim+ondrel 100.0, lumeth+brimwick 90.0, lumeth+durnhal 90.0, lumeth+hargrim 100.0, lumeth+ondrel 70.0, ondrel+brimwick 100.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+lumeth 90.0 | 10 / 200 | 96.0 | 97/100 | 95/100 | outside | 1142 | 4818 | 0 of 664 | 129 | 1 | 0 |
+| 3v3 | arena02 | brimwick v durnhal | hargrim+lumeth 80.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, hargrim+skerrow 100.0, lumeth+hargrim 100.0, lumeth+ondrel 70.0, lumeth+quillon 70.0, lumeth+skerrow 100.0, ondrel+hargrim 100.0, ondrel+lumeth 60.0, ondrel+quillon 70.0, ondrel+skerrow 100.0, quillon+hargrim 100.0, quillon+lumeth 90.0, quillon+ondrel 90.0, quillon+skerrow 100.0, skerrow+hargrim 100.0, skerrow+lumeth 30.0, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 10 / 200 | 88.0 | 88/100 | 88/100 | outside | 1306 | 4324 | 2 of 740 | 106 | 2 | 0 |
+| 3v3 | arena02 | brimwick v hargrim | durnhal+lumeth 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, durnhal+skerrow 100.0, lumeth+durnhal 100.0, lumeth+ondrel 50.0, lumeth+quillon 80.0, lumeth+skerrow 100.0, ondrel+durnhal 100.0, ondrel+lumeth 80.0, ondrel+quillon 100.0, ondrel+skerrow 100.0, quillon+durnhal 100.0, quillon+lumeth 80.0, quillon+ondrel 80.0, quillon+skerrow 100.0, skerrow+durnhal 100.0, skerrow+lumeth 70.0, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 10 / 200 | 92.0 | 93/100 | 91/100 | outside | 1257 | 4746 | 0 of 694 | 106 | 0 | 0 |
+| 3v3 | arena02 | brimwick v lumeth | durnhal+hargrim 30.0, durnhal+ondrel 30.0, durnhal+quillon 10.0, durnhal+skerrow 10.0, hargrim+durnhal 10.0, hargrim+ondrel 40.0, hargrim+quillon 10.0, hargrim+skerrow 0.0, ondrel+durnhal 20.0, ondrel+hargrim 0.0, ondrel+quillon 10.0, ondrel+skerrow 20.0, quillon+durnhal 10.0, quillon+hargrim 0.0, quillon+ondrel 30.0, quillon+skerrow 10.0, skerrow+durnhal 10.0, skerrow+hargrim 10.0, skerrow+ondrel 0.0, skerrow+quillon 10.0 | 10 / 200 | 13.5 | 14/100 | 13/100 | outside | 1339 | 2972 | 0 of 744 | 110 | 0 | 0 |
+| 3v3 | arena02 | brimwick v ondrel | durnhal+hargrim 100.0, durnhal+lumeth 30.0, durnhal+quillon 40.0, durnhal+skerrow 70.0, hargrim+durnhal 90.0, hargrim+lumeth 10.0, hargrim+quillon 60.0, hargrim+skerrow 70.0, lumeth+durnhal 20.0, lumeth+hargrim 40.0, lumeth+quillon 30.0, lumeth+skerrow 40.0, quillon+durnhal 50.0, quillon+hargrim 70.0, quillon+lumeth 20.0, quillon+skerrow 50.0, skerrow+durnhal 70.0, skerrow+hargrim 30.0, skerrow+lumeth 0.0, skerrow+quillon 10.0 | 10 / 200 | 45.0 | 46/100 | 44/100 | in band | 1393 | 5371 | 5 of 816 | 107 | 3 | 0 |
+| 3v3 | arena02 | brimwick v quillon | durnhal+hargrim 0.0, durnhal+lumeth 90.0, durnhal+ondrel 10.0, durnhal+skerrow 0.0, hargrim+durnhal 10.0, hargrim+lumeth 60.0, hargrim+ondrel 20.0, hargrim+skerrow 0.0, lumeth+durnhal 40.0, lumeth+hargrim 50.0, lumeth+ondrel 30.0, lumeth+skerrow 50.0, ondrel+durnhal 20.0, ondrel+hargrim 20.0, ondrel+lumeth 90.0, ondrel+skerrow 0.0, skerrow+durnhal 10.0, skerrow+hargrim 0.0, skerrow+lumeth 60.0, skerrow+ondrel 20.0 | 10 / 200 | 29.0 | 30/100 | 28/100 | outside | 1321 | 4701 | 2 of 792 | 110 | 0 | 0 |
+| 3v3 | arena02 | brimwick v skerrow | durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, hargrim+durnhal 100.0, hargrim+lumeth 90.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, lumeth+durnhal 90.0, lumeth+hargrim 100.0, lumeth+ondrel 60.0, lumeth+quillon 70.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+lumeth 50.0, ondrel+quillon 100.0, quillon+durnhal 90.0, quillon+hargrim 100.0, quillon+lumeth 80.0, quillon+ondrel 100.0 | 10 / 200 | 91.5 | 91/100 | 92/100 | outside | 1206 | 4465 | 1 of 694 | 106 | 0 | 0 |
+| 3v3 | arena02 | durnhal v hargrim | brimwick+lumeth 70.0, brimwick+ondrel 40.0, brimwick+quillon 40.0, brimwick+skerrow 20.0, lumeth+brimwick 60.0, lumeth+ondrel 80.0, lumeth+quillon 50.0, lumeth+skerrow 90.0, ondrel+brimwick 30.0, ondrel+lumeth 80.0, ondrel+quillon 50.0, ondrel+skerrow 30.0, quillon+brimwick 50.0, quillon+lumeth 40.0, quillon+ondrel 20.0, quillon+skerrow 40.0, skerrow+brimwick 50.0, skerrow+lumeth 100.0, skerrow+ondrel 30.0, skerrow+quillon 30.0 | 10 / 200 | 50.0 | 52/100 | 48/100 | in band | 1394 | 5395 | 1 of 807 | 114 | 7 | 0 |
+| 3v3 | arena02 | durnhal v lumeth | brimwick+hargrim 0.0, brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+ondrel 0.0, hargrim+quillon 0.0, hargrim+skerrow 10.0, ondrel+brimwick 0.0, ondrel+hargrim 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+hargrim 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 10 / 200 | 0.5 | 1/100 | 0/100 | outside | 1183 | 2667 | 0 of 664 | 106 | 1 | 0 |
+| 3v3 | arena02 | durnhal v ondrel | brimwick+hargrim 0.0, brimwick+lumeth 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+lumeth 10.0, hargrim+quillon 0.0, hargrim+skerrow 0.0, lumeth+brimwick 20.0, lumeth+hargrim 0.0, lumeth+quillon 0.0, lumeth+skerrow 0.0, quillon+brimwick 0.0, quillon+hargrim 10.0, quillon+lumeth 10.0, quillon+skerrow 10.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+lumeth 20.0, skerrow+quillon 0.0 | 10 / 200 | 4.0 | 6/100 | 2/100 | outside | 1304 | 4947 | 1 of 687 | 108 | 1 | 0 |
+| 3v3 | arena02 | durnhal v quillon | brimwick+hargrim 0.0, brimwick+lumeth 10.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+lumeth 20.0, hargrim+ondrel 0.0, hargrim+skerrow 0.0, lumeth+brimwick 10.0, lumeth+hargrim 0.0, lumeth+ondrel 30.0, lumeth+skerrow 0.0, ondrel+brimwick 0.0, ondrel+hargrim 0.0, ondrel+lumeth 50.0, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 10.0, skerrow+lumeth 20.0, skerrow+ondrel 0.0 | 10 / 200 | 7.5 | 8/100 | 7/100 | outside | 1260 | 3759 | 1 of 718 | 112 | 2 | 0 |
+| 3v3 | arena02 | durnhal v skerrow | brimwick+hargrim 40.0, brimwick+lumeth 40.0, brimwick+ondrel 50.0, brimwick+quillon 20.0, hargrim+brimwick 60.0, hargrim+lumeth 20.0, hargrim+ondrel 20.0, hargrim+quillon 50.0, lumeth+brimwick 60.0, lumeth+hargrim 60.0, lumeth+ondrel 60.0, lumeth+quillon 60.0, ondrel+brimwick 40.0, ondrel+hargrim 30.0, ondrel+lumeth 50.0, ondrel+quillon 30.0, quillon+brimwick 30.0, quillon+hargrim 50.0, quillon+lumeth 20.0, quillon+ondrel 30.0 | 10 / 200 | 41.0 | 42/100 | 40/100 | in band | 1333 | 4421 | 1 of 826 | 106 | 4 | 0 |
+| 3v3 | arena02 | hargrim v lumeth | brimwick+durnhal 0.0, brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+ondrel 0.0, durnhal+quillon 0.0, durnhal+skerrow 10.0, ondrel+brimwick 10.0, ondrel+durnhal 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+durnhal 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 10 / 200 | 1.0 | 2/100 | 0/100 | outside | 1158 | 3066 | 1 of 656 | 106 | 0 | 0 |
+| 3v3 | arena02 | hargrim v ondrel | brimwick+durnhal 20.0, brimwick+lumeth 10.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+lumeth 0.0, durnhal+quillon 0.0, durnhal+skerrow 0.0, lumeth+brimwick 20.0, lumeth+durnhal 0.0, lumeth+quillon 20.0, lumeth+skerrow 0.0, quillon+brimwick 20.0, quillon+durnhal 0.0, quillon+lumeth 10.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+lumeth 20.0, skerrow+quillon 0.0 | 10 / 200 | 6.0 | 8/100 | 4/100 | outside | 1273 | 5281 | 4 of 693 | 108 | 0 | 0 |
+| 3v3 | arena02 | hargrim v quillon | brimwick+durnhal 0.0, brimwick+lumeth 20.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+lumeth 0.0, durnhal+ondrel 0.0, durnhal+skerrow 0.0, lumeth+brimwick 20.0, lumeth+durnhal 0.0, lumeth+ondrel 40.0, lumeth+skerrow 10.0, ondrel+brimwick 0.0, ondrel+durnhal 0.0, ondrel+lumeth 30.0, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+lumeth 10.0, skerrow+ondrel 0.0 | 10 / 200 | 6.5 | 9/100 | 4/100 | outside | 1198 | 4053 | 1 of 683 | 111 | 0 | 0 |
+| 3v3 | arena02 | hargrim v skerrow | brimwick+durnhal 20.0, brimwick+lumeth 40.0, brimwick+ondrel 30.0, brimwick+quillon 40.0, durnhal+brimwick 50.0, durnhal+lumeth 0.0, durnhal+ondrel 20.0, durnhal+quillon 40.0, lumeth+brimwick 30.0, lumeth+durnhal 10.0, lumeth+ondrel 20.0, lumeth+quillon 70.0, ondrel+brimwick 30.0, ondrel+durnhal 40.0, ondrel+lumeth 50.0, ondrel+quillon 40.0, quillon+brimwick 50.0, quillon+durnhal 30.0, quillon+lumeth 50.0, quillon+ondrel 30.0 | 10 / 200 | 34.5 | 35/100 | 34/100 | outside | 1362 | 5186 | 4 of 805 | 105 | 1 | 0 |
+| 3v3 | arena02 | lumeth v ondrel | brimwick+durnhal 90.0, brimwick+hargrim 90.0, brimwick+quillon 80.0, brimwick+skerrow 90.0, durnhal+brimwick 70.0, durnhal+hargrim 90.0, durnhal+quillon 90.0, durnhal+skerrow 100.0, hargrim+brimwick 80.0, hargrim+durnhal 90.0, hargrim+quillon 60.0, hargrim+skerrow 90.0, quillon+brimwick 100.0, quillon+durnhal 80.0, quillon+hargrim 100.0, quillon+skerrow 90.0, skerrow+brimwick 90.0, skerrow+durnhal 80.0, skerrow+hargrim 90.0, skerrow+quillon 80.0 | 10 / 200 | 86.5 | 87/100 | 86/100 | outside | 1271 | 2813 | 0 of 781 | 109 | 0 | 0 |
+| 3v3 | arena02 | lumeth v quillon | brimwick+durnhal 100.0, brimwick+hargrim 70.0, brimwick+ondrel 80.0, brimwick+skerrow 80.0, durnhal+brimwick 80.0, durnhal+hargrim 70.0, durnhal+ondrel 80.0, durnhal+skerrow 50.0, hargrim+brimwick 100.0, hargrim+durnhal 30.0, hargrim+ondrel 90.0, hargrim+skerrow 80.0, ondrel+brimwick 80.0, ondrel+durnhal 70.0, ondrel+hargrim 50.0, ondrel+skerrow 90.0, skerrow+brimwick 50.0, skerrow+durnhal 60.0, skerrow+hargrim 40.0, skerrow+ondrel 70.0 | 10 / 200 | 71.0 | 74/100 | 68/100 | outside | 1291 | 2643 | 0 of 801 | 110 | 0 | 0 |
+| 3v3 | arena02 | lumeth v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+ondrel 100.0, brimwick+quillon 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, ondrel+brimwick 100.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+quillon 100.0, quillon+brimwick 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+ondrel 100.0 | 10 / 200 | 100.0 | 100/100 | 100/100 | outside | 1106 | 3793 | 0 of 626 | 107 | 0 | 0 |
+| 3v3 | arena02 | ondrel v quillon | brimwick+durnhal 20.0, brimwick+hargrim 30.0, brimwick+lumeth 100.0, brimwick+skerrow 30.0, durnhal+brimwick 50.0, durnhal+hargrim 0.0, durnhal+lumeth 100.0, durnhal+skerrow 0.0, hargrim+brimwick 50.0, hargrim+durnhal 0.0, hargrim+lumeth 90.0, hargrim+skerrow 10.0, lumeth+brimwick 70.0, lumeth+durnhal 90.0, lumeth+hargrim 70.0, lumeth+skerrow 50.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+hargrim 0.0, skerrow+lumeth 80.0 | 10 / 200 | 42.0 | 40/100 | 44/100 | in band | 1342 | 5324 | 9 of 798 | 110 | 3 | 0 |
+| 3v3 | arena02 | ondrel v skerrow | brimwick+durnhal 90.0, brimwick+hargrim 90.0, brimwick+lumeth 100.0, brimwick+quillon 90.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+quillon 100.0, hargrim+brimwick 90.0, hargrim+durnhal 90.0, hargrim+lumeth 90.0, hargrim+quillon 100.0, lumeth+brimwick 70.0, lumeth+durnhal 100.0, lumeth+hargrim 100.0, lumeth+quillon 90.0, quillon+brimwick 60.0, quillon+durnhal 60.0, quillon+hargrim 80.0, quillon+lumeth 100.0 | 10 / 200 | 90.0 | 86/100 | 94/100 | outside | 1220 | 4642 | 2 of 727 | 109 | 1 | 0 |
+| 3v3 | arena02 | quillon v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+lumeth 90.0, brimwick+ondrel 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+ondrel 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+lumeth 80.0, hargrim+ondrel 100.0, lumeth+brimwick 80.0, lumeth+durnhal 100.0, lumeth+hargrim 100.0, lumeth+ondrel 30.0, ondrel+brimwick 90.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+lumeth 50.0 | 10 / 200 | 91.0 | 93/100 | 89/100 | outside | 1221 | 4731 | 0 of 674 | 110 | 0 | 0 |
+| 3v3 | arena03 | brimwick v durnhal | hargrim+lumeth 90.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, hargrim+skerrow 100.0, lumeth+hargrim 90.0, lumeth+ondrel 80.0, lumeth+quillon 90.0, lumeth+skerrow 100.0, ondrel+hargrim 100.0, ondrel+lumeth 100.0, ondrel+quillon 100.0, ondrel+skerrow 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0, quillon+skerrow 100.0, skerrow+hargrim 100.0, skerrow+lumeth 90.0, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 10 / 200 | 97.0 | 98/100 | 96/100 | outside | 1242 | 5254 | 3 of 670 | 136 | 0 | 0 |
+| 3v3 | arena03 | brimwick v hargrim | durnhal+lumeth 90.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, durnhal+skerrow 100.0, lumeth+durnhal 100.0, lumeth+ondrel 80.0, lumeth+quillon 90.0, lumeth+skerrow 100.0, ondrel+durnhal 100.0, ondrel+lumeth 90.0, ondrel+quillon 100.0, ondrel+skerrow 100.0, quillon+durnhal 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0, quillon+skerrow 100.0, skerrow+durnhal 90.0, skerrow+lumeth 70.0, skerrow+ondrel 100.0, skerrow+quillon 100.0 | 10 / 200 | 95.5 | 95/100 | 96/100 | outside | 1188 | 3429 | 3 of 668 | 135 | 0 | 0 |
+| 3v3 | arena03 | brimwick v lumeth | durnhal+hargrim 10.0, durnhal+ondrel 0.0, durnhal+quillon 60.0, durnhal+skerrow 20.0, hargrim+durnhal 20.0, hargrim+ondrel 0.0, hargrim+quillon 20.0, hargrim+skerrow 20.0, ondrel+durnhal 0.0, ondrel+hargrim 0.0, ondrel+quillon 30.0, ondrel+skerrow 0.0, quillon+durnhal 0.0, quillon+hargrim 0.0, quillon+ondrel 30.0, quillon+skerrow 0.0, skerrow+durnhal 20.0, skerrow+hargrim 0.0, skerrow+ondrel 0.0, skerrow+quillon 10.0 | 10 / 200 | 12.0 | 10/100 | 14/100 | outside | 1338 | 2947 | 3 of 733 | 140 | 1 | 0 |
+| 3v3 | arena03 | brimwick v ondrel | durnhal+hargrim 70.0, durnhal+lumeth 0.0, durnhal+quillon 80.0, durnhal+skerrow 60.0, hargrim+durnhal 70.0, hargrim+lumeth 10.0, hargrim+quillon 80.0, hargrim+skerrow 70.0, lumeth+durnhal 10.0, lumeth+hargrim 20.0, lumeth+quillon 30.0, lumeth+skerrow 0.0, quillon+durnhal 30.0, quillon+hargrim 30.0, quillon+lumeth 0.0, quillon+skerrow 40.0, skerrow+durnhal 60.0, skerrow+hargrim 70.0, skerrow+lumeth 0.0, skerrow+quillon 0.0 | 10 / 200 | 36.5 | 36/100 | 37/100 | outside | 1361 | 5170 | 12 of 793 | 136 | 1 | 0 |
+| 3v3 | arena03 | brimwick v quillon | durnhal+hargrim 40.0, durnhal+lumeth 40.0, durnhal+ondrel 10.0, durnhal+skerrow 20.0, hargrim+durnhal 0.0, hargrim+lumeth 30.0, hargrim+ondrel 50.0, hargrim+skerrow 10.0, lumeth+durnhal 30.0, lumeth+hargrim 60.0, lumeth+ondrel 60.0, lumeth+skerrow 50.0, ondrel+durnhal 20.0, ondrel+hargrim 40.0, ondrel+lumeth 30.0, ondrel+skerrow 20.0, skerrow+durnhal 20.0, skerrow+hargrim 0.0, skerrow+lumeth 60.0, skerrow+ondrel 60.0 | 10 / 200 | 32.5 | 34/100 | 31/100 | outside | 1377 | 4898 | 11 of 808 | 129 | 0 | 0 |
+| 3v3 | arena03 | brimwick v skerrow | durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, hargrim+durnhal 100.0, hargrim+lumeth 90.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, lumeth+durnhal 100.0, lumeth+hargrim 100.0, lumeth+ondrel 90.0, lumeth+quillon 60.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+lumeth 100.0, ondrel+quillon 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0, quillon+ondrel 100.0 | 10 / 200 | 97.0 | 95/100 | 99/100 | outside | 1189 | 3521 | 1 of 674 | 119 | 1 | 0 |
+| 3v3 | arena03 | durnhal v hargrim | brimwick+lumeth 90.0, brimwick+ondrel 90.0, brimwick+quillon 30.0, brimwick+skerrow 70.0, lumeth+brimwick 80.0, lumeth+ondrel 80.0, lumeth+quillon 90.0, lumeth+skerrow 80.0, ondrel+brimwick 90.0, ondrel+lumeth 90.0, ondrel+quillon 70.0, ondrel+skerrow 10.0, quillon+brimwick 40.0, quillon+lumeth 100.0, quillon+ondrel 80.0, quillon+skerrow 50.0, skerrow+brimwick 40.0, skerrow+lumeth 80.0, skerrow+ondrel 50.0, skerrow+quillon 30.0 | 10 / 200 | 67.0 | 76/100 | 58/100 | outside | 1443 | 5339 | 9 of 785 | 126 | 2 | 0 |
+| 3v3 | arena03 | durnhal v lumeth | brimwick+hargrim 0.0, brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+ondrel 0.0, hargrim+quillon 0.0, hargrim+skerrow 0.0, ondrel+brimwick 0.0, ondrel+hargrim 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+hargrim 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 10 / 200 | 0.0 | 0/100 | 0/100 | outside | 1028 | 2014 | 0 of 612 | 128 | 0 | 0 |
+| 3v3 | arena03 | durnhal v ondrel | brimwick+hargrim 0.0, brimwick+lumeth 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+lumeth 0.0, hargrim+quillon 10.0, hargrim+skerrow 0.0, lumeth+brimwick 0.0, lumeth+hargrim 0.0, lumeth+quillon 0.0, lumeth+skerrow 10.0, quillon+brimwick 0.0, quillon+hargrim 0.0, quillon+lumeth 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+lumeth 0.0, skerrow+quillon 0.0 | 10 / 200 | 1.0 | 1/100 | 1/100 | outside | 1186 | 5022 | 0 of 654 | 127 | 0 | 0 |
+| 3v3 | arena03 | durnhal v quillon | brimwick+hargrim 0.0, brimwick+lumeth 0.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, hargrim+brimwick 0.0, hargrim+lumeth 20.0, hargrim+ondrel 0.0, hargrim+skerrow 0.0, lumeth+brimwick 10.0, lumeth+hargrim 10.0, lumeth+ondrel 20.0, lumeth+skerrow 20.0, ondrel+brimwick 0.0, ondrel+hargrim 0.0, ondrel+lumeth 0.0, ondrel+skerrow 0.0, skerrow+brimwick 0.0, skerrow+hargrim 0.0, skerrow+lumeth 10.0, skerrow+ondrel 0.0 | 10 / 200 | 4.5 | 2/100 | 7/100 | outside | 1235 | 4964 | 2 of 674 | 127 | 0 | 0 |
+| 3v3 | arena03 | durnhal v skerrow | brimwick+hargrim 50.0, brimwick+lumeth 90.0, brimwick+ondrel 90.0, brimwick+quillon 40.0, hargrim+brimwick 50.0, hargrim+lumeth 20.0, hargrim+ondrel 30.0, hargrim+quillon 60.0, lumeth+brimwick 60.0, lumeth+hargrim 100.0, lumeth+ondrel 80.0, lumeth+quillon 100.0, ondrel+brimwick 80.0, ondrel+hargrim 40.0, ondrel+lumeth 80.0, ondrel+quillon 70.0, quillon+brimwick 70.0, quillon+hargrim 60.0, quillon+lumeth 100.0, quillon+ondrel 90.0 | 10 / 200 | 68.0 | 68/100 | 68/100 | outside | 1409 | 5091 | 10 of 788 | 111 | 1 | 0 |
+| 3v3 | arena03 | hargrim v lumeth | brimwick+durnhal 0.0, brimwick+ondrel 0.0, brimwick+quillon 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+ondrel 0.0, durnhal+quillon 0.0, durnhal+skerrow 0.0, ondrel+brimwick 0.0, ondrel+durnhal 0.0, ondrel+quillon 0.0, ondrel+skerrow 0.0, quillon+brimwick 0.0, quillon+durnhal 0.0, quillon+ondrel 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+ondrel 0.0, skerrow+quillon 0.0 | 10 / 200 | 0.0 | 0/100 | 0/100 | outside | 1051 | 2046 | 1 of 628 | 127 | 0 | 0 |
+| 3v3 | arena03 | hargrim v ondrel | brimwick+durnhal 0.0, brimwick+lumeth 0.0, brimwick+quillon 10.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+lumeth 0.0, durnhal+quillon 0.0, durnhal+skerrow 10.0, lumeth+brimwick 0.0, lumeth+durnhal 0.0, lumeth+quillon 0.0, lumeth+skerrow 0.0, quillon+brimwick 0.0, quillon+durnhal 0.0, quillon+lumeth 0.0, quillon+skerrow 0.0, skerrow+brimwick 0.0, skerrow+durnhal 0.0, skerrow+lumeth 20.0, skerrow+quillon 10.0 | 10 / 200 | 2.5 | 4/100 | 1/100 | outside | 1206 | 4986 | 0 of 655 | 128 | 0 | 0 |
+| 3v3 | arena03 | hargrim v quillon | brimwick+durnhal 0.0, brimwick+lumeth 0.0, brimwick+ondrel 0.0, brimwick+skerrow 0.0, durnhal+brimwick 0.0, durnhal+lumeth 0.0, durnhal+ondrel 0.0, durnhal+skerrow 0.0, lumeth+brimwick 0.0, lumeth+durnhal 0.0, lumeth+ondrel 40.0, lumeth+skerrow 10.0, ondrel+brimwick 0.0, ondrel+durnhal 0.0, ondrel+lumeth 10.0, ondrel+skerrow 0.0, skerrow+brimwick 10.0, skerrow+durnhal 0.0, skerrow+lumeth 20.0, skerrow+ondrel 0.0 | 10 / 200 | 4.5 | 5/100 | 4/100 | outside | 1179 | 4122 | 1 of 673 | 124 | 0 | 0 |
+| 3v3 | arena03 | hargrim v skerrow | brimwick+durnhal 10.0, brimwick+lumeth 40.0, brimwick+ondrel 40.0, brimwick+quillon 60.0, durnhal+brimwick 70.0, durnhal+lumeth 10.0, durnhal+ondrel 60.0, durnhal+quillon 90.0, lumeth+brimwick 50.0, lumeth+durnhal 10.0, lumeth+ondrel 60.0, lumeth+quillon 70.0, ondrel+brimwick 90.0, ondrel+durnhal 20.0, ondrel+lumeth 50.0, ondrel+quillon 70.0, quillon+brimwick 90.0, quillon+durnhal 20.0, quillon+lumeth 80.0, quillon+ondrel 70.0 | 10 / 200 | 53.0 | 58/100 | 48/100 | in band | 1451 | 5008 | 9 of 812 | 110 | 2 | 0 |
+| 3v3 | arena03 | lumeth v ondrel | brimwick+durnhal 90.0, brimwick+hargrim 80.0, brimwick+quillon 0.0, brimwick+skerrow 100.0, durnhal+brimwick 70.0, durnhal+hargrim 100.0, durnhal+quillon 60.0, durnhal+skerrow 90.0, hargrim+brimwick 60.0, hargrim+durnhal 90.0, hargrim+quillon 60.0, hargrim+skerrow 90.0, quillon+brimwick 50.0, quillon+durnhal 70.0, quillon+hargrim 100.0, quillon+skerrow 100.0, skerrow+brimwick 60.0, skerrow+durnhal 80.0, skerrow+hargrim 100.0, skerrow+quillon 70.0 | 10 / 200 | 76.0 | 76/100 | 76/100 | outside | 1263 | 2820 | 0 of 753 | 134 | 1 | 0 |
+| 3v3 | arena03 | lumeth v quillon | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+ondrel 90.0, brimwick+skerrow 90.0, durnhal+brimwick 50.0, durnhal+hargrim 40.0, durnhal+ondrel 70.0, durnhal+skerrow 50.0, hargrim+brimwick 80.0, hargrim+durnhal 70.0, hargrim+ondrel 70.0, hargrim+skerrow 30.0, ondrel+brimwick 50.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+skerrow 100.0, skerrow+brimwick 50.0, skerrow+durnhal 90.0, skerrow+hargrim 90.0, skerrow+ondrel 80.0 | 10 / 200 | 75.0 | 78/100 | 72/100 | outside | 1294 | 2571 | 0 of 798 | 130 | 1 | 0 |
+| 3v3 | arena03 | lumeth v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+ondrel 100.0, brimwick+quillon 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+ondrel 100.0, durnhal+quillon 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+ondrel 100.0, hargrim+quillon 100.0, ondrel+brimwick 100.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+quillon 100.0, quillon+brimwick 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+ondrel 100.0 | 10 / 200 | 100.0 | 100/100 | 100/100 | outside | 1046 | 2041 | 0 of 607 | 113 | 0 | 0 |
+| 3v3 | arena03 | ondrel v quillon | brimwick+durnhal 50.0, brimwick+hargrim 90.0, brimwick+lumeth 80.0, brimwick+skerrow 20.0, durnhal+brimwick 30.0, durnhal+hargrim 10.0, durnhal+lumeth 40.0, durnhal+skerrow 20.0, hargrim+brimwick 50.0, hargrim+durnhal 20.0, hargrim+lumeth 70.0, hargrim+skerrow 0.0, lumeth+brimwick 80.0, lumeth+durnhal 70.0, lumeth+hargrim 50.0, lumeth+skerrow 70.0, skerrow+brimwick 10.0, skerrow+durnhal 20.0, skerrow+hargrim 10.0, skerrow+lumeth 80.0 | 10 / 200 | 43.5 | 40/100 | 47/100 | in band | 1321 | 5002 | 12 of 784 | 128 | 1 | 0 |
+| 3v3 | arena03 | ondrel v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+quillon 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+quillon 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+lumeth 100.0, hargrim+quillon 100.0, lumeth+brimwick 100.0, lumeth+durnhal 100.0, lumeth+hargrim 100.0, lumeth+quillon 100.0, quillon+brimwick 100.0, quillon+durnhal 100.0, quillon+hargrim 100.0, quillon+lumeth 100.0 | 10 / 200 | 100.0 | 100/100 | 100/100 | outside | 1151 | 3902 | 1 of 628 | 113 | 0 | 0 |
+| 3v3 | arena03 | quillon v skerrow | brimwick+durnhal 100.0, brimwick+hargrim 100.0, brimwick+lumeth 100.0, brimwick+ondrel 100.0, durnhal+brimwick 100.0, durnhal+hargrim 100.0, durnhal+lumeth 100.0, durnhal+ondrel 100.0, hargrim+brimwick 100.0, hargrim+durnhal 100.0, hargrim+lumeth 100.0, hargrim+ondrel 100.0, lumeth+brimwick 100.0, lumeth+durnhal 100.0, lumeth+hargrim 100.0, lumeth+ondrel 90.0, ondrel+brimwick 100.0, ondrel+durnhal 100.0, ondrel+hargrim 100.0, ondrel+lumeth 100.0 | 10 / 200 | 99.5 | 100/100 | 99/100 | outside | 1146 | 3245 | 0 of 629 | 127 | 0 | 0 |
 
 ### Budget hits
 
@@ -348,20 +412,22 @@ Win rate in percent over the cells the champion is in, as X or as Y.
 
 | Champion | 2v2 arena01 | 2v2 arena02 | 2v2 arena03 | 3v3 arena01 | 3v3 arena02 | 3v3 arena03 | All |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| brimwick | 46.8 | 53.9 | 47.4 | 51.6 | 50.1 | 52.3 | 50.3 |
-| hargrim | 14.0 | 7.2 | 14.5 | 14.3 | 15.1 | 16.9 | 13.6 |
-| lumeth | 89.1 | 86.6 | 80.0 | 92.1 | 88.3 | 87.2 | 87.2 |
-| ondrel | 58.0 | 55.8 | 65.5 | 63.2 | 60.1 | 70.7 | 62.2 |
-| quillon | 77.1 | 77.8 | 77.6 | 67.5 | 65.2 | 65.7 | 71.9 |
-| skerrow | 15.0 | 18.7 | 15.0 | 11.4 | 21.1 | 7.2 | 14.8 |
+| brimwick | 57.8 | 61.1 | 58.9 | 62.5 | 59.8 | 61.8 | 60.3 |
+| durnhal | 20.8 | 16.8 | 24.6 | 23.3 | 19.2 | 23.9 | 21.4 |
+| hargrim | 15.8 | 11.3 | 12.0 | 15.4 | 17.7 | 16.3 | 14.7 |
+| lumeth | 90.7 | 87.4 | 83.3 | 92.3 | 90.4 | 89.8 | 89.0 |
+| ondrel | 62.5 | 62.3 | 68.4 | 67.2 | 65.1 | 71.3 | 66.1 |
+| quillon | 80.4 | 83.4 | 81.6 | 72.7 | 72.5 | 73.3 | 77.3 |
+| skerrow | 22.1 | 27.7 | 21.2 | 16.7 | 25.3 | 13.8 | 21.1 |
 <!-- /balance:report -->
 
 ## 5. The cells after the tuning passes
 
 Sections 5.1 to 5.8 read the four-kit report at 9a9c653; 5.9 reads the six-kit
 block of #189 (generated at 3704221), 5.10 the block of #186, and 5.11 the
-block of #213, which #238 then extended with arena03 into the three-arena block
-of section 4.
+block of #213, which #238 then extended with arena03 into the 90-cell three-arena
+block; 5.12 reads the seven-kit block of section 4 (Durnhal in the harness roster,
+the energy orb on, #244; regenerated again for #187's capped one-hit area lead).
 
 After the tuning passes of #121 and #124 three cells are in the band and 21 are
 outside. Each is in band or accepted with its reason, with its reading. The
@@ -893,6 +959,166 @@ their deaths (bots.md, #222). A kit change stays the step after, if the standing
 stays; no share of any cell is stated as the cause, and the decision stays with the
 lead.
 
+### 5.12 The seven-kit report (batch #251, #244)
+
+Durnhal joins the harness roster and the harness plays the standard match: the
+energy orb on, at the arena's point of `data/orbs.json`, in every cell (spec
+section 6; rules.md 3.3). His kit is data (#204) and his bot profile is #211, so
+nothing about him is new here but his 36 cells: the six pairings against the six
+shipped kits, on the three arenas and in both modes. The block of section 4 was
+regenerated on the merged head, on the committed sources, after #187 capped the
+lead of a one-hit aim-placed area: 126 cells, 25 200 matches, 15 in band and no
+budget hit. Three things move at once and the reading keeps them apart — the orb,
+which rides on every cell of the seven kits, Durnhal himself, a new X, Y and fill
+of the six, and the cap, whose reach is wide because the capped areas are the
+Firecracker of Brimwick and the Binding Sigil of Lumeth and a Brimwick or Lumeth
+bot is in all 90 shared cells, as X, Y or one of the fills (against the #244
+block, which holds the orb and the fill already, the cap alone moves 68 of the
+90 and 24 of Durnhal's 36).
+Per champion over all of its cells the block reads Brimwick 60.3, Durnhal 21.4,
+Hargrim 14.7, Lumeth 89.0, Ondrel 66.1, Quillon 77.3 and Skerrow 21.1. The
+seven-kit block of #244, before the cap, is the reference the section compares
+against (its own head line and figures are in section 4).
+
+**Durnhal's 36 cells.** 4 are in band and 32 are out, the summed distance 950.0
+points, 26.4 a cell, second only to Lumeth's 29.3. Against the web of roster-v3.md
+section 1, which has him beat Lumeth, Skerrow and Hargrim and lose to Quillon
+and Brimwick, four of the five hold in direction and one is inverted. The mean
+over his six cells (the two modes on the three arenas), Durnhal's own rate:
+Brimwick 8.3, Hargrim 65.1, Lumeth 0.1, Ondrel 1.9, Quillon 2.4 and Skerrow
+50.8.
+
+| Mode | Arena | X v Y | Durnhal's rate | Standing |
+|------|-------|-------|----------------|----------|
+| 2v2 | arena01 | durnhal v brimwick | 10.0 | outside, 30.0 from the band |
+| 2v2 | arena01 | durnhal v hargrim | 63.0 | outside, 3.0 from the band |
+| 2v2 | arena01 | durnhal v lumeth | 0.0 | outside, 40.0 from the band |
+| 2v2 | arena01 | durnhal v ondrel | 0.5 | outside, 39.5 from the band |
+| 2v2 | arena01 | durnhal v quillon | 0.0 | outside, 40.0 from the band |
+| 2v2 | arena01 | durnhal v skerrow | 51.5 | in band |
+| 2v2 | arena02 | durnhal v brimwick | 9.0 | outside, 31.0 from the band |
+| 2v2 | arena02 | durnhal v hargrim | 64.0 | outside, 4.0 from the band |
+| 2v2 | arena02 | durnhal v lumeth | 0.0 | outside, 40.0 from the band |
+| 2v2 | arena02 | durnhal v ondrel | 1.5 | outside, 38.5 from the band |
+| 2v2 | arena02 | durnhal v quillon | 0.5 | outside, 39.5 from the band |
+| 2v2 | arena02 | durnhal v skerrow | 25.5 | outside, 14.5 from the band |
+| 2v2 | arena03 | durnhal v brimwick | 9.0 | outside, 31.0 from the band |
+| 2v2 | arena03 | durnhal v hargrim | 82.5 | outside, 22.5 from the band |
+| 2v2 | arena03 | durnhal v lumeth | 0.0 | outside, 40.0 from the band |
+| 2v2 | arena03 | durnhal v ondrel | 0.5 | outside, 39.5 from the band |
+| 2v2 | arena03 | durnhal v quillon | 0.0 | outside, 40.0 from the band |
+| 2v2 | arena03 | durnhal v skerrow | 55.5 | in band |
+| 3v3 | arena01 | durnhal v brimwick | 6.5 | outside, 33.5 from the band |
+| 3v3 | arena01 | durnhal v hargrim | 64.0 | outside, 4.0 from the band |
+| 3v3 | arena01 | durnhal v lumeth | 0.0 | outside, 40.0 from the band |
+| 3v3 | arena01 | durnhal v ondrel | 4.0 | outside, 36.0 from the band |
+| 3v3 | arena01 | durnhal v quillon | 2.0 | outside, 38.0 from the band |
+| 3v3 | arena01 | durnhal v skerrow | 63.0 | outside, 3.0 from the band |
+| 3v3 | arena02 | durnhal v brimwick | 12.0 | outside, 28.0 from the band |
+| 3v3 | arena02 | durnhal v hargrim | 50.0 | in band |
+| 3v3 | arena02 | durnhal v lumeth | 0.5 | outside, 39.5 from the band |
+| 3v3 | arena02 | durnhal v ondrel | 4.0 | outside, 36.0 from the band |
+| 3v3 | arena02 | durnhal v quillon | 7.5 | outside, 32.5 from the band |
+| 3v3 | arena02 | durnhal v skerrow | 41.0 | in band |
+| 3v3 | arena03 | durnhal v brimwick | 3.0 | outside, 37.0 from the band |
+| 3v3 | arena03 | durnhal v hargrim | 67.0 | outside, 7.0 from the band |
+| 3v3 | arena03 | durnhal v lumeth | 0.0 | outside, 40.0 from the band |
+| 3v3 | arena03 | durnhal v ondrel | 1.0 | outside, 39.0 from the band |
+| 3v3 | arena03 | durnhal v quillon | 4.5 | outside, 35.5 from the band |
+| 3v3 | arena03 | durnhal v skerrow | 68.0 | outside, 8.0 from the band |
+
+The one pairing left open by the web is Skerrow (roots and shields stop the
+dive): the cell is in band on two of the three arenas in 2v2 (arena01 and
+arena03; 3v3 keeps only arena02, and its arena01 cell left the band under the
+cap, 58.5 to 63.0), and the
+pairing is a near-even split (Durnhal 50.8), where the web expects him ahead.
+Against Lumeth the web expects the `wound` anti-heal (#158) to press her healing
+down; instead she takes all six of their cells (Durnhal's rate 0.0, 0.0, 0.0,
+0.0, 0.5 and 0.0), five of them without a loss, the widest of his six results
+and the one line of the web that is reversed. Against
+Quillon the web expects him to be kited from 13 m, and he is: 2.4 means Durnhal
+takes none of their six cells, and Quillon's own overall rate is 77.3. Against
+Brimwick the web expects her burst to ignore his shields; she takes all six of
+their cells (Durnhal 8.3 to her 91.8, 31.8 points over the band), so that is
+right in direction. Against Ondrel (1.9) the web has no line at all, because
+roster-v3.md section 1 fixes his counter web against the seven existing kits and
+his own row against Ysmeer waits for her series; the measured cell is a rout for
+Ondrel. Hargrim (65.1) is the one the web gives Durnhal, and he takes it, the
+most positive of his six. What every line shares is that the measured cell sits
+further from the band than the intent: the pattern is what the bots play. Durnhal
+stands at 2.4 m (`rangeMin` 0, his profile of #211) and throws Breaker Throw at a
+target walking away, so a melee tank of 160 health walks into the range of the
+kits that out-reach him, and his two fixed numbers (`wound` at 10 percent a
+stack, 240 ticks) are the ones a later pass would move. The reading is a
+candidate for such a package (decision 7 of #193: no tuning here), with the
+table above as its first evidence; the four cells in band are the ones such a
+candidate would have to hold.
+
+**What the orb, the Durnhal fill and the cap moved.** Of the 90 cells the six
+shipped kits shared with the six-kit block, 78 move at all and 12 move by more
+than the 7 points of one cell's noise (section 3); 62 move by less than 4. Three
+changes are confounded here: the orb and Durnhal, which the #244 block of section
+4 already held (the orb on every cell of every kit, Durnhal a new fill of every
+six-kit cell, so its fills go from 4 to 5 in 2v2 and from 12 to 20 in 3v3), and
+#187's cap, which this block adds on every cell with a Brimwick or Lumeth bot.
+The seeds are per fill, so the old fills of a 2v2 cell now play seeds 1 to 40
+instead of 1 to 50 (160 of the cell's 200 matches) and the new fill takes the
+other 40; in 3v3 the old fills play 1 to 10 instead of 1 to 16 (120 of 200). The
+move against the six-kit block is all three together, as the fill change of #189
+was read (5.9); the move against the #244 block is the cap alone (68 of the 90
+cells move, none by more than 6.5 points, and 24 of Durnhal's 36). No reading
+separates the orb from the fill; the cap is separated by the #244 block.
+
+Cells in band held in the shared 90, at 11, five left it while five entered. Left
+against the six-kit block: Hargrim v Skerrow in 2v2 on arena01 (43.0 to 32.5),
+2v2 on arena03 (45.0 to 32.5) and 3v3 on arena02 (40.6 to 34.5), Lumeth v Ondrel
+in 2v2 on arena03 (60.0 to 62.0), and Brimwick v Ondrel in 2v2 on arena01 (50.5
+to 61.0). Entered: Lumeth v Quillon in 2v2 on arena02 (65.5 to 56.5), Brimwick v
+Ondrel in 2v2 on arena03 (37.5 to 47.0) and 3v3 on arena02 (37.0 to 45.0) and
+arena01 (34.9 to 45.0), and Hargrim v Skerrow in 3v3 on arena03 (68.8 to 53.0).
+The summed distance of the shared 90 rises from 2205.9 to 2254.5 points, and the
+per-champion cell count is unchanged at 30. Per champion over its 30
+cells within the shared 90: Brimwick 50.3 to 54.0 (+3.7), Hargrim 13.7 to 10.7
+(-3.0), Lumeth 87.2 to 86.8 (-0.4), Ondrel 62.2 to 59.7 (-2.5), Quillon 71.8 to
+73.3 (+1.4) and Skerrow 14.7 to 15.5 (+0.7): the two kits that were nearest the
+band, Hargrim and Skerrow, move apart, the melee one down and the other up, while
+the ranged kits move the other way except Quillon. Every
+out-of-band cell of the six-kit block that was already accepted stays accepted as
+it was; the five that left the band are named above, and their reasons are those
+of 5.9 and 5.11 (the melee kits' standing on the approach, the ranged kits'
+reach), read here with the orb in. No cell is a tuning candidate on this reading
+alone except Durnhal's, and no kit change is made (decision 7 of #193).
+
+**Lumeth's orb contest.** bots.md, "The energy orb", records the flip mechanism:
+a ranged kit's reach is 9 to 13 m, so a champion that kites in and out of an
+enemy's reach flips the threat test that starts and stops the contest, and
+Lumeth's cells read 0 to 46 flips an orb round, the widest of the six. Here her
+30 shared cells move by 0.4 point on the mean (87.2 to 86.8), the smallest move
+of the six, and 21 of the 30 move by less than 3 points; the nine that move by
+3 points or more are 2v2 on arena02 Lumeth v Quillon (65.5 to 56.5, her cell
+that entered the band), 3v3 on arena03 Lumeth v Ondrel (69.8 to 76.0), 3v3 on
+arena03 Brimwick v Lumeth (6.8 to 12.0), 3v3 on arena01 Brimwick v Lumeth (4.7
+to 9.0), 3v3 on arena02 Lumeth v Ondrel (82.8 to 86.5), 2v2 on arena01 Lumeth v
+Ondrel (84.0 to 87.5), 2v2 on arena01 Lumeth v Quillon (69.5 to 66.0), 2v2 on
+arena03 Lumeth v Quillon (55.0 to 52.0) and 3v3 on arena02 Lumeth v Quillon
+(74.0 to 71.0). This move is not the orb alone: it is read against the six-kit
+block, so the Durnhal fill and #187's cap (Binding Sigil is a one-hit aim-placed
+area) ride on it too, as they do on the whole shared 90. So the
+flips, which the single-cell measurement is large enough to see, average out
+over her 30 cells: the three changes together move her standing by 0.4 of a
+point, and one of her
+cells swaps band membership (Lumeth v Quillon in 2v2 on arena02 enters it and
+Lumeth v Ondrel in 2v2 on arena03 leaves it), so her count is two either way. The
+effect is recorded, not fixed. No bots rule
+changes: the contest, the threat range (`rangeMax`, `enemyInReach`) and the
+delay ring stay as #225 built them, and no hysteresis is added for the flips
+(bots.md, "Not built yet").
+
+No match hit the budget of 60 000 ticks in any of the 126 cells, and the stall
+of #123 stays pinned and absent. The reproduction on the linux/amd64 runner
+(the manual workflow, `--check --mode`, one job a mode) is the acceptance check
+of the issue; the job ids are in the PR of batch #251.
+
 ## 6. Changes made
 
 Two numbers changed, both in #121; #124 changed none. The rates are X's, in
@@ -1066,19 +1292,20 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 
 ## 7. How to regenerate
 
-- `npm run balance` plays all 17 640 matches and writes the block of section 4.
+- `npm run balance` plays all 25 200 matches and writes the block of section 4.
   It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
-  stops with a message below that. A full run takes about 21 minutes on one
-  core of an Apple silicon laptop (1246.0 s for the block of section 4, Node
-  22.23.2, the three-arena block of #238; the cells are about 52 ms a 2v2 match
-  and 92 ms a 3v3 match, so 2v2 is about 8.0 minutes of it and 3v3 about 13.4).
+  stops with a message below that. A full run takes about 31 minutes on one
+  core of an Apple silicon laptop (the seven-kit block of #244 with the orb; the
+  cells are about 52 ms a 2v2 match and 92 ms a 3v3 match before the orb, and the
+  seven-kit block scales the six-kit three-arena 8.0 and 13.4 minutes by the
+  match counts, so 2v2 is about 11.2 minutes of it and 3v3 about 19.5).
   On the runner of the manual
   workflow the four-kit run took 12 to 16 minutes in one job (runs 38990892639
   at 933 s, 38997052269 at 953 s and 39005677735 at 737 s) and 6 min 28 s (2v2)
   and 11 min 26 s (3v3) in the check steps of the split (run 40461329366), 2.9
-  to 3.1 times the local time in 3v3. At six kits and three arenas the same
-  factor projects to about 23 to 25 minutes for 2v2 and about 39 to 42 for 3v3,
-  one mode a job. The wall time
+  to 3.1 times the local time in 3v3. At seven kits with the orb and three arenas
+  the same factor projects to about 34 minutes for 2v2 and about 59 for 3v3, one
+  mode a job. The wall time
   goes to stdout and never into the file.
 - It refuses to write when `data/`, `packages/sim/src`, `packages/bots/src` or
   `tools/balance` differ from HEAD, because the head line would then name a
@@ -1094,20 +1321,22 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 - `npm run balance -- --check` regenerates the block in memory and compares it
   with the committed one except for the head line. It exits 1 on a difference.
   Run it after any change to a kit, the sim or the bots.
-- The report was reproduced with `--check` on macOS (Apple silicon) with Node
-  22.23.2 (`played 17640 matches in 1230.1 s`, the three-arena check of the
-  committed block; the generating run before it took 1246.0 s, and the
-  two-arena block was 11760 matches in 842.7 s)
+- The report was reproduced with `--check` on the manual workflow of the
+  linux/amd64 runner (the seven-kit block of #244, the job ids in the PR); the
+  six-kit three-arena block was reproduced with `--check` on macOS (Apple
+  silicon) with Node 22.23.2 (`played 17640 matches in 1230.1 s`, the generating
+  run before it 1246.0 s, and the two-arena block 11760 matches in 842.7 s)
   and, for the four-kit report, Node 26.7.0. The linux/amd64 reproduction is the
   manual workflow `.github/workflows/balance.yml` (`workflow_dispatch` only,
   never on pull requests or pushes): trigger it with
   `gh workflow run balance.yml --ref <branch>`. It runs `npm ci` and
   `npm run balance -- --check --mode <mode>` on ubuntu, as two jobs side by
   side, one for 2v2 and one for 3v3 (a matrix by mode, so each stays inside its
-  `timeout-minutes`: 60 for 2v2 and 105 for 3v3, set from the projection of the
+  `timeout-minutes`: 90 for 2v2 and 150 for 3v3, set from the projection of the
   runner above, twice the check time of the mode because the failure step plays
-  the mode again, and a margin; the run below confirmed the two-arena pair at 45
-  and 75, and arena03 raises both by the same third). The seeds are
+  the mode again, and a margin; the run below confirmed the two-arena four-kit
+  pair at 45 and 75, arena03 raised both by a third, and the seven-kit orb block
+  raises them again by about the half). The seeds are
   never lowered to fit the runner: they set the noise of section 3, and a
   timeout is raised instead. On a difference a job prints the differing rows of
   its mode (its cell rows and budget-hit lines, from a fresh `--out` against the

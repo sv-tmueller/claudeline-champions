@@ -140,6 +140,17 @@ describe('abilityReach', () => {
     ).toBeNull();
   });
 
+  it('gives a spend verb no reach of its own: the damage it boosts rides the band that exists', () => {
+    expect(abilityReach(ability({ type: 'consumeCounter', bonusDamagePerStack: 4 }))).toBeNull();
+    expect(
+      abilityReach(ability({ type: 'consumeCounter', cooldownTicksPerStack: 120, slot: 'SPACE' })),
+    ).toBeNull();
+    expect(abilityReach(ability({ type: 'consumeCounter', bonusDamagePerStack: 4 }, bolt(21, 40)))).toEqual({
+      min: 0,
+      max: 14,
+    });
+  });
+
   it('takes the hull of the effects: the smallest min and the largest max', () => {
     expect(
       abilityReach(ability(area({ type: 'ahead', distance: 5 }, 1), arc(2), { type: 'heal', amount: 1 })),

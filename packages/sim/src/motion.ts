@@ -27,6 +27,11 @@ export interface DashCast {
   castId: number | null;
   /** Copied. Effects that fire where the dash ends. */
   then: readonly ThenEffect[];
+  /**
+   * The spend verb's per-cast damage bonus (rules 2.6, v3 design 4.4b), so the deferred `then`
+   * effects land with it like the rooted-at-fire path. Omitted (or 0) when there is none.
+   */
+  bonusDamage?: number | undefined;
 }
 
 function fail(what: 'dash' | 'teleport', problem: string): never {
@@ -71,7 +76,7 @@ export function startDash(
   if (!target.alive) return false;
 
   endDash(state, target, 'replaced');
-  target.dash = {
+  const dash: DashState = {
     dirX: dir.x,
     dirY: dir.y,
     stepLength: spec.distance / spec.ticks,
@@ -79,6 +84,9 @@ export function startDash(
     castId: cast.castId,
     then: [...cast.then],
   };
+  // The key is left out when absent: `checksum` throws on undefined and `cloneState` drops it.
+  if (cast.bonusDamage !== undefined && cast.bonusDamage > 0) dash.bonusDamage = cast.bonusDamage;
+  target.dash = dash;
   state.events.push({
     type: 'dashStarted',
     championId,

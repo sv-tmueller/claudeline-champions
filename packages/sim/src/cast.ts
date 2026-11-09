@@ -5,6 +5,7 @@ import {
   SELF_CAST_HEAL_PERCENT,
   ULTIMATE_ENERGY_COST,
 } from './constants';
+import { spendCounter } from './counter';
 import { direction } from './geometry';
 import { applyEffects, applyHeal } from './health';
 import { Button, SLOTS } from './input';
@@ -119,6 +120,10 @@ interface CastRef {
  * whose aim lies within the caster's own circle (inclusive) spawns nothing: its ally effects land
  * on her instead, a heal and each heal over time pulse at 60 percent (the self-cast rule, rules.md
  * section 2.5). No energy is paid and no hit is credited; a `then` projectile follows the rule too.
+ *
+ * `bonusDamage` is the spend verb's per-cast damage bonus (rules 2.6, v3 design 4.4b): `fire`
+ * spends the counter first and passes the total here, and every projectile, area and melee arc this
+ * call makes carries it into the hits it later lands.
  */
 function runEffects(
   state: GameState,
@@ -126,6 +131,7 @@ function runEffects(
   cast: CastRef,
   effects: readonly AbilityEffect[],
   then: { x: number; y: number } | null,
+  bonusDamage: number,
 ): void {
   const source = { sourceId: champion.id, slot: cast.slot };
   for (const effect of effects) {
@@ -145,7 +151,17 @@ function runEffects(
               list.push(ally);
             }
           }
-          applyEffects(state, champion.id, champion.id, list, { x: champion.x, y: champion.y }, cast.slot);
+          // The bonus of the spend verb (rules 2.6) lands here as it does on the spawned
+          // projectile's ally hit; the caster is the ally this aim applies the list to.
+          applyEffects(
+            state,
+            champion.id,
+            champion.id,
+            list,
+            { x: champion.x, y: champion.y },
+            cast.slot,
+            bonusDamage,
+          );
           break;
         }
         const fire = fireFrom(champion, then);
@@ -165,6 +181,7 @@ function runEffects(
             // `spawnProjectile` leaves the key out of the entity when this is undefined.
             allyEffects: effect.allyEffects,
             endArea: effect.endArea,
+            bonusDamage: bonusDamage > 0 ? bonusDamage : undefined,
           },
           cast.castId,
         );
@@ -185,6 +202,7 @@ function runEffects(
             effects: effect.effects,
             // `spawnArea` leaves the key out of the entity when this is undefined.
             fuseTicks: effect.fuseTicks,
+            bonusDamage: bonusDamage > 0 ? bonusDamage : undefined,
           },
           cast.castId,
         );
@@ -202,6 +220,7 @@ function runEffects(
           cosHalfAngle: effect.cosHalfAngle,
           effects: effect.effects,
           castId: cast.castId,
+          bonusDamage,
         });
         break;
       }
@@ -210,13 +229,13 @@ function runEffects(
         if (then) break;
         const fire = fireFrom(champion, null);
         if (hasStatus(champion, 'root')) {
-          runEffects(state, champion, cast, effect.then, { x: fire.dirX, y: fire.dirY });
+          runEffects(state, champion, cast, effect.then, { x: fire.dirX, y: fire.dirY }, bonusDamage);
         } else {
           startDash(
             state,
             champion.id,
             { dirX: fire.dirX, dirY: fire.dirY, distance: effect.distance, ticks: effect.ticks },
-            { castId: cast.castId, then: effect.then },
+            { castId: cast.castId, then: effect.then, bonusDamage },
           );
         }
         break;
@@ -241,11 +260,23 @@ function runEffects(
       case 'heal':
         applyHeal(state, champion.id, effect.amount, champion.id);
         break;
+      case 'consumeCounter':
+        // The spend itself happens in `fire`, before this runs, so this case is a no-op. It exists
+        // so the switch stays exhaustive over `AbilityEffect`.
+        break;
     }
   }
 }
 
-/** The cast fires: the windup is over (or there was none), so it is no longer in progress. */
+/**
+ * The cast fires: the windup is over (or there was none), so it is no longer in progress.
+ *
+ * A `consumeCounter` in the ability's effects (rules 2.6, v3 design 4.4b) spends the caster's whole
+ * counter here, before any effect of the cast lands, so the "exactly once per cast" rule is
+ * structural and the bonus rides on everything the cast makes. Its damage verb becomes the per-cast
+ * `bonusDamage` handed to `runEffects`; its cooldown verb cuts the named slot's current cooldown at
+ * this moment, clamped at 0, with no event of its own (the spend shows in the cooldown value).
+ */
 function fire(state: GameState, champion: ChampionState, cast: CastRef & { ex: boolean }): void {
   const kit = findKit(state, champion);
   state.events.push({
@@ -256,7 +287,22 @@ function fire(state: GameState, champion: ChampionState, cast: CastRef & { ex: b
     ex: cast.ex,
   });
   if (!kit) return;
-  runEffects(state, champion, cast, abilityOf(kit, cast.slot, cast.ex).effects, null);
+  const { effects } = abilityOf(kit, cast.slot, cast.ex);
+  let bonusDamage = 0;
+  for (let i = 0; i < effects.length; i++) {
+    const effect = effects[i] as AbilityEffect;
+    if (effect.type !== 'consumeCounter') continue;
+    const spent = spendCounter(state, champion);
+    if ('cooldownTicksPerStack' in effect) {
+      const index = SLOTS.indexOf(effect.slot);
+      const left = (champion.cooldowns[index] as number) - effect.cooldownTicksPerStack * spent;
+      champion.cooldowns[index] = left > 0 ? left : 0;
+    } else {
+      bonusDamage = effect.bonusDamagePerStack * spent;
+    }
+    break;
+  }
+  runEffects(state, champion, cast, effects, null, bonusDamage);
 }
 
 /** Step 3c: a windup in progress loses a turn and fires at 0. */
@@ -346,10 +392,12 @@ export function fireDashThen(state: GameState, champion: ChampionState, dash: Da
   for (let i = 0; i < casts.length; i++) {
     const record = casts[i] as CastRecord;
     if (record.id !== castId) continue;
+    // The then effects are hits of the cast that started the dash, so they land with its per-cast
+    // spend bonus, exactly as the rooted-at-fire path threads it through `runEffects`.
     runEffects(state, champion, { castId, slot: record.slot }, dash.then, {
       x: dash.dirX,
       y: dash.dirY,
-    });
+    }, dash.bonusDamage ?? 0);
     return;
   }
 }
