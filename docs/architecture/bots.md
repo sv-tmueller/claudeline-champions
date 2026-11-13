@@ -203,7 +203,7 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
 
 Profiles live in `packages/bots/src/profile.ts`, keyed by champion id:
 `profileFor(championId, kit?)`. Without a kit the table applies. Hargrim, Quillon,
-Skerrow, Lumeth, Ondrel, Brimwick and Durnhal have a rule: with a kit whose id
+Skerrow, Lumeth, Ondrel, Brimwick, Durnhal and Wrenna have a rule: with a kit whose id
 equals the champion id, `rangeMax` is the top of the base M1 reach band minus the 1 m range
 margin (see Casting), and `rangeMin` is the rule's literal, because no kit field
 holds it: roster-v1 words it as backing away from an enemy inside 6 m (Hargrim
@@ -213,7 +213,9 @@ kit id differs, M1 has no band, or the derived `rangeMax` is at most 1 or at mos
 `rangeMin`. Other ids keep the table even with a kit. Lumeth's M1 reaches 12 m,
 so her `rangeMax` with her kit is 11; Ondrel's reaches 10 m (20 m/s for 30
 ticks), so hers is 9, and Brimwick's 11 m (33 ticks), so hers is 10, the
-roster's 9 and 10. `KitDef` has no profile field and `createMatch` copies only
+roster's 9 and 10, and Wrenna's 14 m (24 m/s for 35 ticks), so hers is 13 (roster-v3 has no bot
+sketch for her, so her 10 to 13 m follows roster-v2's recipe: the low end of her intended 10 to
+14 m, and Longbow's reach less the margin). `KitDef` has no profile field and `createMatch` copies only
 the kit contract, so profiles stay in bots; the kit JSON must carry no bot
 fields.
 
@@ -226,6 +228,7 @@ fields.
 | ondrel   | 5        | 9        | M1 band top minus 1 m | zone controller, kites inside 5 m   |
 | brimwick | 7        | 10       | M1 band top minus 1 m | burst caster, kites inside 7 m      |
 | durnhal  | 0        | 3.5      | M1 band top minus 1 m | guardian, closes in and never kites |
+| wrenna   | 10       | 13       | M1 band top minus 1 m | marksman, kites inside 10 m         |
 | default  | 4        | 8        | the table             | any other champion id               |
 
 Every `rangeMax` exceeds 1 m, so a bot never needs to stand inside another
@@ -262,11 +265,14 @@ condition as `KIT_RULES`: a kit of the champion's own id) adds what no kit field
 holds. Roster-v1's bot profile sketches are its source, and for Ondrel and
 Brimwick roster-v2's (sections 2 and 3); see Openers and escapes for what each
 row means. A row also has `escapeWithin`: null for Hargrim, Quillon, Skerrow,
-Ondrel, Brimwick and Durnhal, who keep the common escape trigger, and 3 for Lumeth, whose
+Ondrel, Brimwick, Durnhal and Wrenna, who keep the common escape trigger, and 3 for Lumeth, whose
 trigger is her own; `allies`, the slots the champion presses at an ally
 (Lumeth's F, R, M2 and M1, the others none: see Ally slots under Casting); and
 `escapeOnly`, the escape slots the walk never presses on their own band (Durnhal's
-SPACE, the others none: see Openers and escapes, and Testing, the rules of #211).
+SPACE, the others none: see Openers and escapes, and Testing, the rules of #211); and
+`spendBase`, the EX slots that hold their EX variant back while the champion has counter stacks
+(Wrenna's E, the others none: see Order and variants under Casting, and Testing, the rules
+of #281).
 
 | Champion | Openers                                                                                                                                               | Escapes                                                 | Ultimate F                        |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------- |
@@ -277,6 +283,7 @@ SPACE, the others none: see Openers and escapes, and Testing, the rules of #211)
 | ondrel   | E (Undertow), kit band, target walking away                                                                                                           | SPACE (Reed Step), then R (Reed Screen)                 | pressed in reach                  |
 | brimwick | Q (Flash Powder), kit band, target walking toward her                                                                                                 | SPACE (Flare Step), then R (Smoke Pot)                  | held for a low or cornered target |
 | durnhal  | E (Breaker Throw), kit band, target walking away                                                                                                      | SPACE (Bulwark Charge), then R (Aegis Line)             | pressed in reach                  |
+| wrenna   | Q (Pinning Shot), kit band, target walking toward her                                                                                                 | SPACE (Tumble), then R (Fade Step)                      | pressed in reach                  |
 | other    | none                                                                                                                                                  | none                                                    | pressed in reach                  |
 
 ### Dodge
@@ -527,7 +534,12 @@ slot in F, R, E, Q, SPACE, M2, M1 that passes, one slot per think, skipping the 
 choice already tried. A slot listed in `kit.ex` casts its EX variant
 (buttons plus SHIFT) when the energy is at least 25, the variant has a band and F
 is not holding the energy back; otherwise it casts its base ability without
-SHIFT. F always casts its base ability and is never sent with SHIFT.
+SHIFT. F always casts its base ability and is never sent with SHIFT. A slot on the `spendBase`
+list of the rule (Wrenna's E, Heartseeker) casts its EX variant only with no counter stacks:
+while `counter.count` is above 0 it is pressed as the base shot, which spends the stacks (4
+damage a stack and no energy; the EX is 20 damage for 25 energy and spends nothing, so the base
+shot ties it at 1 stack and beats it from 2). One more Uint8 column of the kit cache and an
+integer read in `exFor`; nothing allocates.
 
 Energy reserve: F holds the energy back while F is ready (its cooldown is at
 most 1, as the cast gate reads it), its base ability has a reach band, the
@@ -609,8 +621,8 @@ rule lists: Hargrim Q, and the EX variants of Lumeth's M2 and R), and any slot
 of a champion without a kit. The rules press three kinds of slot that have no
 band: the base dash opener (Hargrim SPACE, Skerrow SPACE: its band is derived
 from the dash), the escape slots (Hargrim R, Quillon SPACE and R, Skerrow R,
-Lumeth E and SPACE, Ondrel SPACE and R, Brimwick SPACE and R, Durnhal SPACE and R, on an
-escape think only), and the ally slots (Lumeth M2, R and F, at an ally that needs them). On
+Lumeth E and SPACE, Ondrel SPACE and R, Brimwick SPACE and R, Durnhal SPACE and R, Wrenna
+SPACE and R, on an escape think only), and the ally slots (Lumeth M2, R and F, at an ally that needs them). On
 an escape think the dash openers are not pressed either (see the dash hold under
 Openers and escapes). Not every escape slot is without a band: Lumeth's E,
 Ondrel's SPACE and R and Brimwick's R reach an enemy with an area around them
@@ -693,8 +705,8 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 
 - An escape think is a think whose acted intent is retreat with the acted target within
   `ESCAPE_RANGE` = 6 m, inclusive, or kite with the acted target closer than `rangeMin`. One
-  trigger serves Hargrim, Quillon, Skerrow, Ondrel, Brimwick and Durnhal (their `rangeMin`
-  is 0, 6, 0, 5, 7 and 0; roster-v2 words the trigger of Ondrel and Brimwick as the common
+  trigger serves Hargrim, Quillon, Skerrow, Ondrel, Brimwick, Durnhal and Wrenna (their
+  `rangeMin` is 0, 6, 0, 5, 7, 0 and 10; roster-v2 words the trigger of Ondrel and Brimwick as the common
   one). For Skerrow it is decision 6 of batch #80: the roster words her escape as
   "health below 50 percent", which would vanish her in the middle of an engage and walk her
   straight back in; a retreat starts below 30 percent health, unless a finisher qualifies (then
@@ -709,7 +721,9 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 - On an escape think the escape slots count the trigger, with no band and no shot test, and
   `chooseEscape` (escape.ts) tries the slots of the rule in order before the usual order: Hargrim
   R; Quillon SPACE, then R; Skerrow R; Lumeth E, then SPACE; Ondrel SPACE, then R; Brimwick
-  SPACE, then R; Durnhal SPACE, then R. "SPACE, then R" is a priority order, not a sequence: the
+  SPACE, then R; Durnhal SPACE, then R; Wrenna SPACE, then R (Tumble, then Fade Step: the order
+  keeps Fade Step's cut of 120 ticks a stack for a Tumble that is on cooldown, and it spends all
+  her stacks). "SPACE, then R" is a priority order, not a sequence: the
   first slot that passes the gates is pressed, and Hush Ward is pressed only when Skip is on
   cooldown, has no landing or is otherwise refused. The gates are the cast gates of Casting
   (windup, cooldown at most 1, stun or silence, root with a dash, the run over the cast delay). The
@@ -1431,7 +1445,7 @@ match replays exactly from its input stream.
 
 - A full match to matchEnd in the headless runs of the first three kits: they run
   a fixed 3600 ticks of free play, and only Lumeth's four seeded runs, the 18
-  cells of Ondrel and Brimwick and the 12 of Durnhal play to the end (see Testing). A 3v3 with the six
+  cells of Ondrel and Brimwick and the 12 of Durnhal and the one of Wrenna play to the end (see Testing). A 3v3 with the six
   kits is not played in a bots test either; the balance report plays 3v3s over
   the six (`balance.md` section 5.9, #189).
 - A kit-derived speed for the areas: the lead uses the nominal 20 m/s for every
@@ -2599,8 +2613,44 @@ lost to Hargrim and Skerrow (22 and 44, 78 to 56 and 81 to 37) and 6 gained agai
 nothing that the sample can see: 102 against 100 wins, no
 pairing apart by more than 3 (the binomial spread of a 50 percent cell of 100 matches is 5).
 
+The rules of #281 (Wrenna's profile, roadmap #176 step 3.4), pinned in `profile.test.ts`, the new
+`wrenna.test.ts`, `headless-kits.test.ts` and `allocation.test.ts`. The profile: `PROFILES` has
+`profileOf(10, 13)` and `KIT_RULES` rangeMin 10, so with her kit rangeMax is 13 (Longbow's 14 m
+less the margin), the stand reach and the deadlock reach 13 as for every champion that keeps
+her range, and a latched Wrenna stands inside her M1 band and keeps building. The rules row:
+Q (Pinning Shot) on its kit band at a target walking toward her; escapes SPACE (Tumble) then R
+(Fade Step) on the common trigger, the kite inside 10 m; no hold of F, no wait, no ally slot,
+`spendBase: ['E']`. Longbow needs no rule: M1 is pressed on its band and builds the counter.
+The frozen scenes (a hard bot, the eight shipped kits, each red under its mutation): Longbow
+at 12 m is pressed and its hit sets the count to 1 (and at 13.05 m it is not); with 3 stacks,
+50 energy and the target at 14 m E is pressed without SHIFT, and the hit deals 16 + 3 x 4 = 28
+and leaves the count at 0 (with E dropped from `spendBase` SHIFT is pressed and the stacks are
+left); with no stacks and 25 energy it is the EX, with 24 the base shot; a kite think at 8 m
+with Tumble ready presses SPACE (with the order `['R', 'SPACE']` it presses R), and with Tumble
+on cooldown and 3 stacks it presses R, the count goes to 0 and Tumble's cooldown is 360 lower
+than the tick's own countdown leaves it; Q is pressed at a target walking toward her at 11 m and
+not at one that stands or walks away. The seeded cell (`wrenna.test.ts`, played on `EIGHT_SET`):
+Wrenna and Hargrim against Ondrel and Hargrim on arena02, seeds 101 to 104, match seed 7, normal
+tier, to matchEnd: it passes the oracle, no escape is blocked, no bot stalls for more than 120
+ticks (the worst is 15), it ends at tick 4206 with 913 as the longest ordinary round, and her
+tallies show 28 builds, 4 Heartseekers and 3 Fade Steps cast on stacks and no EX
+Heartseeker on stacks (the oracle fails one, `SPEND_BASE` in press-oracle.ts, which also
+fails the press at any other time). The cell the sub-plan named, Wrenna and Quillon against
+Hargrim and Quillon on arena01, ends too (at tick 4457, the longest ordinary round 1200, no stall) but
+its four Fade Steps all come at 0 stacks (they come early in a round, before a Longbow hit lands),
+so it shows no spend; it was chosen among the cells of Wrenna against each of the other
+seven kits, on arenas 01 and 02, by its spends. No pinned hash and no end tick of another kit
+moved: the whole bots project is green with the new kit set, and `spendBase` is an integer read
+that is 0 for every other kit. The oracle got `EIGHT_SET` (the bands of the eight kits: the
+bolts M1 14, M2 and its EX 12.83, Q 12 with `motion: 'closing'`, E and its EX 15.83, F 16.5;
+the clearances the bolt radii, 0.5 for F), the two escape rows (`wrenna:SPACE` is
+`{ teleport: null, dash: 5, after: null }`, `wrenna:R` follows it), `wrenna:SPACE` in the dash
+set, a literal rangeMin 10, `play`'s optional `before` and `after` hooks (the tallies read the
+counter on the state the bot thought on) and a table test that works every literal out again
+from `wrenna.json`.
+
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-one frozen scenes on arena 1 with the six shipped kits (a
+section. It builds twenty-two frozen scenes on arena 1 with the eight shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
@@ -2617,7 +2667,9 @@ and the aim override on every think, a dodge: a Quillon standing with two
 bolts at her, one along an axis and one on a diagonal, so the threat scan of
 both and the sidestep run on every think, an orb contest: a Hargrim 7 m from the
 orb with the orb up and the enemy far out of reach, so the nearer scan, the reach
-scan and the path to the orb run on every think, and an orb ignored: a Quillon
+scan and the path to the orb run on every think, a Wrenna spend: Heartseeker with 3
+stacks and 60 energy at 12 m, so the `spendBase` test of `exFor` runs on every think
+and E is pressed on each, and an orb ignored: a Quillon
 nearer the orb than an enemy in her reach, so the nearer scan passes and the reach
 test stops the contest on every think), warms each bot up with 20000 thinks,
 settles it in the default tiers (windows read like a round until one is under

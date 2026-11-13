@@ -4,7 +4,7 @@ import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 // The pre-match select: the page opens on it at a bare address, the picks update the rows and
 // the Start link without leaving the page, Start plays the setup, and an address that names a
 // key skips it. The match itself is covered by the other specs, which enter with a key.
-const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal'];
+const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna'];
 const PICKED = '?champion=quillon&difficulty=hard&arena=arena02&teamsize=3';
 const PANEL = '[data-select="panel"]';
 // The bare address, the one that opens the select; every spec that wants the default match
@@ -66,6 +66,25 @@ test('opens on the select at a bare address, with the defaults current and no ca
     expect(read.champions.map((row) => row.key)).toEqual(ROSTER);
     for (const row of read.champions) expect(row.available, `${row.key} is available`).toBe('true');
     expect(current(read.champions)).toEqual(['hargrim']);
+    // The champion row does not wrap (no rule of select.css lets it), so with eight entries every
+    // box must still lie inside the 1280 px viewport, whole and on one line. A ninth entry (Ysmeer)
+    // is about 1380 px by estimate and will need the wrap.
+    const viewport = page.viewportSize();
+    expect(viewport?.width).toBe(1280);
+    const boxes = await page.evaluate(
+      (selector) =>
+        [...document.querySelectorAll<HTMLElement>(`${selector} [data-part="select"] > *`)].map((entry) => {
+          const box = entry.getBoundingClientRect();
+          return { id: entry.getAttribute('data-champion'), left: box.left, right: box.right, top: box.top };
+        }),
+      PANEL,
+    );
+    expect(boxes).toHaveLength(ROSTER.length);
+    for (const box of boxes) {
+      expect(box.left, `${box.id} starts inside the viewport`).toBeGreaterThanOrEqual(0);
+      expect(box.right, `${box.id} ends inside the viewport`).toBeLessThanOrEqual(1280);
+      expect(box.top, `${box.id} is on the first line`).toBe(boxes[0]?.top);
+    }
     expect(current(read.arenas)).toEqual(['arena01']);
     expect(read.arenas.map((row) => row.key)).toEqual(['arena01', 'arena02', 'arena03']);
     expect(current(read.teams)).toEqual(['2']);

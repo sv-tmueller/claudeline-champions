@@ -2,8 +2,9 @@
 
 Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written, her kit is data (#270) and her
-model is built (her bot profile and client entry come in her own series, and
-she joins the balance harness at its last step, 3.4); Ysmeer's section is
+model is built, her bot profile and client entry are built and she is in the
+balance harness roster (#281, step 3.4; the committed block is still the
+seven-kit report); Ysmeer's section is
 written and her kit, her fuse and end area and her model come in her own series
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
@@ -347,10 +348,21 @@ the damage over time, the slow or the root. Every damaging slot (M1, M2, Q, E
 and F) carries a `damage`, so each earns energy by rules 3.1; SPACE and R carry
 none and earn none. EX variants sit on M2 and E, never on F, at 25 energy, and
 F costs 100. A number changes in the file, here and in the scripted fixture in
-the same change. Wrenna joins the balance harness in the last step of her
-series (v3 spec section 9.3), step 3.4: until then `HARNESS_KITS` in
-`tools/balance/inputs.ts` does not list her, and the balance block of
-[balance](balance.md) is not regenerated.
+the same change. Wrenna joined the balance harness in the last step of her
+series (v3 spec section 9.3), step 3.4 (#281): `HARNESS_KITS` in
+`tools/balance/inputs.ts` lists her, and the balance block of
+[balance](balance.md) is not regenerated for her, so it is still the seven-kit
+report and `npm run balance -- --check` fails on purpose until the nine-kit
+report of batch 21.
+
+**Bot profile (#281).** Roster-v3 has no bot sketch for her, so her profile
+follows roster-v2's recipe (see [bots](../architecture/bots.md)): she keeps 10
+to 13 m (the low end of her intended 10 to 14 m, and Longbow's 14 m less the
+margin), throws Pinning Shot at a target walking toward her, builds her counter
+with Longbow on its band, and escapes by Tumble, then Fade Step (which cuts
+Tumble by 120 ticks a stack, so it goes second). She spends the counter with the
+base Heartseeker while she holds stacks (the new `spendBase` field of her rule),
+since the EX ties the base shot at 1 stack, loses from 2 and costs 25 energy.
 
 As built (#270), where the sections above leave a choice open:
 

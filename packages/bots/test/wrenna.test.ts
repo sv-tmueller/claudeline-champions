@@ -135,8 +135,9 @@ describe('Pinning Shot, the opener on a target that closes in', () => {
 // Hargrim on arena02, on the eight shipped kits. The sub-plan named Wrenna and Quillon against
 // Hargrim and Quillon on arena01, a cell that ends without a stall but whose four Fade Steps all
 // come at 0 stacks, so it shows no spend; this cell (chosen from the 14 of the eight-kit cells of
-// the other kits by its spends: 4 Heartseekers and 3 Fade Steps on stacks) does. A cell takes
-// TIME locally and on the runner; the timeout of 60 s is at least twice the slowest cell
+// the other kits by its spends: 4 Heartseekers and 3 Fade Steps on stacks) does. The cell takes
+// 6.1 s locally (Linux x64, Node 24.22, load average 3 to 7), the slowest of the cells of the other
+// kits on the runner 17.1 s (durnhal.test.ts): the timeout of 60 s is at least twice that
 // (testing.md, Check suite, with the long-match precedent of durnhal.test.ts). A stall here is a
 // reason to report, not to move `rangeMin`.
 const CELL = cellOf('wrenna', 'ondrel', 'arena02', 4206, 913);

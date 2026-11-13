@@ -64,7 +64,10 @@ jobs of the three green runs of PR #219 (41207597802, 41210693459,
 figures were measured at a load average of about 240 on 18 CPUs with other
 jobs running, so they are not idle figures: the seven-model idle baseline was
 1.1 to 1.8 s for the Run test, 0.34 to 0.47 s and 0.41 to 0.54 s for the two
-others.
+others. The sampler has nine models since #281 (Wrenna's): the three cases below
+gain one case each, which read 2.0, 0.62 and 0.77 s locally on Linux x64 (Node 24,
+a load average of 3 to 7) beside Durnhal's 1.9, 0.61 and 0.72 s, so the figures
+and the timeouts stand.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
@@ -262,16 +265,17 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   and 11 903 on the bots of #213), and three of the four moved with the bots of #225, which contest
   it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
-  pairings, fills and the seed schedule, the cell plan (a seven-name kit list
-  gives 21 pairings and 126 cells over three arenas, with 5 and 20 fills, played
-  by nothing), the orb wiring (the seven-kit roster, each arena's loaded point,
+  pairings, fills and the seed schedule (32 and 6 seeds at eight kits), the cell plan (a
+  seven-name kit list gives 21 pairings and 126 cells over three arenas, with 5 and 20
+  fills, played by nothing; the shipped data has eight kits, 28 pairings and 6 and 30
+  fills), the orb wiring (the eight-kit roster, each arena's loaded point,
   and `matchConfig` set and left out),
   `playMatch` against a reference loop with the arena orb, the aggregation and
   the report text, the
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report; only the CLI row plays seven-kit cells (315 matches, one seed of the 2v2
-  mode, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
+  report; only the CLI row plays eight-kit cells (504 matches, one seed of the 2v2
+  mode, 84 rows, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
   success path is a
   36-match row on the four v1 kits (with the orb, timeout 180 s; the CLI's 3v3 row at six
   kits is 360 matches, so
@@ -340,11 +344,12 @@ it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
 and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: a full run plays 25 200 matches and takes about 31 minutes on
-Apple silicon. It plays every kit of `HARNESS_KITS` in
+`npm run check`: the full run of the eight kits now listed plays 31 248 matches
+(168 cells, at 32 seeds a 2v2 config and 6 a 3v3 config), about 38 minutes by
+match count on Apple silicon, not measured. It plays every kit of `HARNESS_KITS` in
 `tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
-step 1.3, #244, and Wrenna's file, #270, stays out until her step 3.4). Every
+step 1.3, #244, and Wrenna at her step 3.4, #281). Every
 cell plays the standard match, so it sets the arena's orb
 point from `data/orbs.json` (spec section 6).
 
@@ -357,7 +362,11 @@ orb and three arenas it is about
 31 minutes locally (2v2 11.2, 3v3 19.5, 12 600 matches each) and projects to
 about 34 (2v2) and 59 (3v3) on a runner, so the jobs have `timeout-minutes` of
 90 and 150, twice the projected check time (the failure step plays the mode
-again) and a margin. The
+again) and a margin. Those figures and timeouts are of the seven-kit block, which
+the document still holds: the roster is eight kits (#281), the committed block is
+the seven-kit report, so `npm run balance -- --check` and the manual workflow fail
+on purpose (168 cells against the committed 126) until the nine-kit report of batch
+21 rewrites the block and re-sizes the jobs. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 
@@ -467,8 +476,9 @@ enters on a bare `/`, through a constant, so a grep for `goto('/')` finds no
 other spec.
 
 - `select.spec.ts`: the pre-match select (`select.png`, at 1280x720). On `/` the
-  panel shows and no canvas exists; the champion row is the seven roster ids in
-  order, all available, with Hargrim, arena01, 2v2 and normal current and the
+  panel shows and no canvas exists; the champion row is the eight roster ids in
+  order, all available, each box inside the 1280 px viewport on one line (a ninth
+  entry will not fit and needs the wrap), with Hargrim, arena01, 2v2 and normal current and the
   Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
   each `data-current`, leaves the address search empty and makes the Start href
   `?champion=quillon&difficulty=hard&arena=arena02&teamsize=3`. Start plays it:
@@ -485,15 +495,16 @@ other spec.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
   timer against the tick, the hidden result panel with its champion, arena and
   team select (every href writes `teamsize`, with 2v2 current), and the launch
-  address `?champion=quillon`. Three rows next to it, `?champion=ondrel`,
-  `?champion=brimwick` and `?champion=durnhal`, read health 130 / 130, 120 / 120
-  and 160 / 160, the scoreboard's row 0 name (built hidden at startup, so
-  readable without Tab) as Ondrel, Brimwick and Durnhal, and the champion
+  address `?champion=quillon`. Four rows next to it, `?champion=ondrel`,
+  `?champion=brimwick`, `?champion=durnhal` and `?champion=wrenna`, read health 130 / 130,
+  120 / 120, 160 / 160 and 120 / 120, the scoreboard's row 0 name (built hidden at startup, so
+  readable without Tab) as Ondrel, Brimwick, Durnhal and Wrenna, and the champion
   glbs the page requests (collected with `page.on('request')` before `goto`)
   as the pick's own, Quillon's and Hargrim's, with no `placeholder.glb`; they
   are red when the roster has no such id, and a missing clip is a page error
   at load. Durnhal's row also writes `scene-durnhal.png` (1280x720), the one
-  in-game look at his model. A row on `/?arena=arena02`
+  in-game look at his model, and Wrenna's `scene-wrenna.png` with the HUD's counter pips
+  visible and three slots, the first e2e read of pips on a real kit. A row on `/?arena=arena02`
   (`scene-arena02.png`) checks `data-arena` and the human's position,
   (-1100, 200), which proves the sim got arena02 and not only the hook, and
   the arena links; the row on `/?arena=arena03` (`scene-arena03.png`) does the
@@ -503,8 +514,8 @@ other spec.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard` (twelve links:
-  seven champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
+  and every link of the other three rows carrying `difficulty=hard` (thirteen links:
+  eight champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
   normal as current. The default test lists eight `data-hud` elements (the
   eighth is `scoreboard`, hidden and not displayed) and reads
   `data-silenced="false"` on all seven slots, while only F reads
