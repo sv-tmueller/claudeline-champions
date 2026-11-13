@@ -44,7 +44,8 @@ first.
   ring, opt-in through `roundsToWin`; the energy orb, opt-in through
   `energyOrb` (the point from `data/orbs.json`, #218); the on-hit counter a kit
   may declare, built by the hits of one slot, decayed by a window and reset each
-  round, and its two spend verbs (#227, #245; no shipped kit has one); angles through `dmath.ts`; the sweep's
+  round, and its two spend verbs (#227, #245; Wrenna's kit of #270 is the first to
+  declare one); angles through `dmath.ts`; the sweep's
   heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules, the deadlock's entry
@@ -103,9 +104,11 @@ first.
 - Content: arena01, arena02 and arena03 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
   profiles since #165); Durnhal's kit as data (#204) with his bot profile
-  (#211); models for the eight roster ids and the placeholder, each rigged, with
-  six clips (the client registers and plays seven of the eight, and Wrenna's
-  model waits for roadmap step 3.4).
+  (#211); Wrenna's kit as data (#270), the first with a counter, which waits
+  for her bot profile and client entry at roadmap step 3.4; models for the
+  eight roster ids and the placeholder, each rigged, with six clips (the client
+  registers and plays seven of the eight, and Wrenna's model waits for roadmap
+  step 3.4).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion
@@ -116,9 +119,9 @@ first.
   `--mode 2v2|3v3` plays and checks one mode, which the manual workflow runs as
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
-  22.15 or later. It plays every kit of `data/kits`, the `HARNESS_KITS` of
-  `tools/balance/inputs.ts`, with the standard match (the arena's orb point of
-  `data/orbs.json`): 126 cells and 25 200 matches over three arenas, about 31
+  22.15 or later. It plays the `HARNESS_KITS` of `tools/balance/inputs.ts`
+  (Wrenna's file is not listed until step 3.4), with the standard match (the
+  arena's orb point of `data/orbs.json`): 126 cells and 25 200 matches over three arenas, about 31
   minutes on Apple silicon (the report of #244, seven kits with the orb, after
   the six-kit report of batch 15, #189, and arena03 of #238).
 - `tools/fixtures`: the scripted roster fixture search. `npm run
@@ -126,7 +129,7 @@ first.
   `roster-fixtures.test.ts` until an attempt covers everything the test
   requires, and writes that kit's fixture in the committed layout; it shares
   the format, the replay, the coverage and the oracle with the test through
-  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the seven committed
+  `packages/sim/test/roster-fixture.ts`. Its tests reproduce the committed roster
   fixtures byte for byte (see [Testing](testing.md#fixture-search)). It needs
   Node 22.15 or later.
 - `protocol`: the message types of the online design, `PROTOCOL_VERSION`, three

@@ -88,9 +88,11 @@ Sources:
 
 - **Pairing.** An unordered pair X v Y of different kits of the harness
   roster, so 21 pairings with seven kits. The roster is the fixed list
-  `HARNESS_KITS` in `tools/balance/inputs.ts`, every kit of `data/kits` in file
-  order, and a listed kit with no file is an error. Ondrel and Brimwick (#148)
-  joined the four v1 kits in the six-kit report (#189; [decision 3 of batch
+  `HARNESS_KITS` in `tools/balance/inputs.ts`, the listed kits of `data/kits`
+  in file order, and a listed kit with no file is an error. A kit file the list
+  leaves out is not played: Wrenna's (#270) joins at step 3.4 of roadmap #176,
+  and the block of section 4 is not regenerated before it. Ondrel and Brimwick
+  (#148) joined the four v1 kits in the six-kit report (#189; [decision 3 of batch
   #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667))
   and Durnhal (#204, his kit as data) joined them at step 1.3 of roadmap #176
   (#244), so the 126 cells, the 25 200 matches and the block of section 4 are

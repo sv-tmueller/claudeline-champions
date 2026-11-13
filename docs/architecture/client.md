@@ -692,8 +692,8 @@ result panel and the menu (`buildSelect` in `result-dom.ts`, so there is no
 third copy of the rows, with the label "Play as") and a Start link
 (`data-action="start"`). The first choice is `parseLaunch('', ...)`: Hargrim,
 normal, arena01, 2v2. The champion row is `selectEntries`, that is the roster
-ids in roster order, each available once its kit file loads; with seven kit files
-it lists all seven, and a kit file the client has not registered is not on it.
+ids in roster order, each available once its kit file loads; it lists every
+registered id, and a kit file the client has not registered is not on it.
 
 A pick is a plain click on a row entry, handled by one listener on the panel. An
 entry's href already is the next whole setup, so the click reads it back with

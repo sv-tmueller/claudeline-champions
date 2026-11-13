@@ -11,7 +11,11 @@ import { buildFixture, searchFixture } from './search.ts';
 // on the runner (CI run 39288426574, ubuntu-latest, Node 22), 0.33 to 0.60 s locally. The Ondrel and
 // Brimwick rows took 1.23 and 0.84 s on the runner (CI run 39330753693) and 0.36 and 0.32 s locally,
 // and the Durnhal row 0.68 s on the runner (job 122173425469 of #204) and 0.28 s locally, all under the
-// 2.5 s runner mark of the timeout rule (testing.md), so they carry no timeout of their own.
+// 2.5 s runner mark of the timeout rule (testing.md), so they carry no timeout of their own. The Wrenna
+// row (attempt 26) searches in about 1.5 s locally (1.9 s on a loaded machine, the same as Quillon's
+// attempt 23 there) and took 2.14 s on the runner (job 132029295648 of #274, ubuntu-latest, Node
+// 22.23.4), under the 2.5 s mark, so it carries no timeout either; the rule applies to it when the
+// runner passes 2.5 s.
 //
 // What a kit change does to a row (decisions 12 and 13 of batch #134, balance.md section 6.3):
 // - A change that turns the fixture coverage red rebuilds the fixture with the tool in the same
@@ -70,6 +74,7 @@ const ROWS: Row[] = [
   { kit: 'ondrel', attempt: 2, pins: [] },
   { kit: 'brimwick', attempt: 10, pins: [] },
   { kit: 'durnhal', attempt: 2, pins: [] },
+  { kit: 'wrenna', attempt: 26, pins: [] },
 ];
 
 function committed(kit: string): string {

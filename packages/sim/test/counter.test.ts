@@ -1,6 +1,7 @@
 // The on-hit counter (rules.md section 2.6, v3 design section 4.4a). The unit tests register casts
 // by hand and call `landHit`, as energy.test.ts does; the decay, the pause and the round reset run
-// through `step`. No shipped kit declares a counter, so every kit here is a test kit.
+// through `step`. Every kit here is a test kit; Wrenna's real kit and her Focus are pinned in
+// roster-kits.test.ts.
 import { describe, expect, it } from 'vitest';
 import { Button, checksum, cloneState, createMatch, debug, step } from '../src/index';
 import type { AbilityEffect, Effect, GameState, KitDef, MatchConfig, PlayerInput, Slot, SlotSpec } from '../src/index';
@@ -13,6 +14,7 @@ import { spawnProjectile } from '../src/projectile';
 import { nextRandom } from '../src/rng';
 import { nextId } from '../src/state';
 import { applyShield, applyStatus } from '../src/status';
+import { AbilityWatcher } from './ability-watch';
 import { arena01, checkAbilityInvariants, champion, input, openArena, place } from './helpers';
 import { STRIKER_ID, kitWith, testStriker } from './kits';
 
@@ -739,6 +741,63 @@ describe('spending the counter', () => {
     // 100 ticked down to 99 before the cast, then cut by 30 x 3 = 90.
     expect(champion(state, 0).cooldowns[SLOT_INDEX('SPACE')]).toBe(99 - 90);
     expect(champion(state, 0).cooldowns[SLOT_INDEX('R')]).toBe(0);
+  });
+
+  it('is clean under the ability oracle: the cut is a rule of the oracle, not a cooldown fault', () => {
+    const cut = (spend: number) =>
+      [{ type: 'consumeCounter', cooldownTicksPerStack: spend, slot: 'SPACE' }, bolt()] as AbilityEffect[];
+    for (const [count, spend, left] of [[3, 5, 30], [3, 600, 30], [0, 5, 30], [2, 5, 20]] as const) {
+      const state = spent(cut(spend));
+      setCount(state, count);
+      champion(state, 0).cooldowns[SLOT_INDEX('SPACE')] = left;
+      const watcher = new AbilityWatcher(state);
+      for (let i = 0; i < 3; i++) {
+        const inputs = [input(0, 0, 300, 0, Button.Q)];
+        watcher.beforeStep(state);
+        step(state, inputs);
+        watcher.afterStep(state, inputs);
+      }
+      expect(watcher.problems).toEqual([]);
+    }
+  });
+
+  it('is clean under the oracle when a windup spend names a slot that starts in the same step', () => {
+    // The windup cast cuts SPACE when it fires, and a new cast can start in the same step and reset
+    // SPACE to its full cooldown (step.ts runs advanceWindup, then startCast); the oracle must read
+    // that reset, not the full cooldown minus the cut.
+    const q: SlotSpec = {
+      cooldownTicks: 600,
+      windupTicks: 2,
+      movement: 'free',
+      effects: [{ type: 'consumeCounter', cooldownTicksPerStack: 30, slot: 'SPACE' }, bolt()],
+    };
+    const state = createMatch(CONFIG, openArena(), 1, [
+      { ...kitWith('arch', { Q: q }), counter: { from: 'M1', cap: 3, windowTicks: 360 } },
+      kitWith('dps'),
+    ]);
+    place(state, 0, -3, 0);
+    place(state, 2, 3, 0);
+    setCount(state, 3);
+    const space = SLOT_INDEX('SPACE');
+    const watcher = new AbilityWatcher(state);
+    let started = -1;
+    let reset = -1;
+    for (let i = 0; i < 6; i++) {
+      const inputs = [input(0, 0, 300, 0, Button.Q | Button.SPACE)];
+      watcher.beforeStep(state);
+      step(state, inputs);
+      watcher.afterStep(state, inputs);
+      const fired = state.events.some((e) => e.type === 'castFired' && e.championId === 0 && e.slot === 'Q');
+      const spaceStarted = state.events.some((e) => e.type === 'castStarted' && e.championId === 0 && e.slot === 'SPACE');
+      if (fired && spaceStarted) {
+        started = i;
+        reset = champion(state, 0).cooldowns[space] as number;
+      }
+    }
+    // The step the windup ends is the step SPACE starts, and the sim leaves SPACE at its full cooldown.
+    expect(started).toBeGreaterThanOrEqual(0);
+    expect(reset).toBe(kitWith('arch').slots.SPACE.cooldownTicks);
+    expect(watcher.problems).toEqual([]);
   });
 
   it('clamps the cut at 0 and never touches another slot', () => {
