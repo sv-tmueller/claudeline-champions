@@ -165,14 +165,14 @@ The commands and file list are in `tools/blender/README.md`.
 
 ### Rig
 
-One rig for all nine models, in Blender coordinates (Z up). Every bone has
+One rig for all ten models, in Blender coordinates (Z up). Every bone has
 roll 0 and is not connected to its parent. L is +Y, the champion's left when
 it faces +X. The validator checks the names and the parents.
 
 | Bone | Parent | Head | Tail | Carries (rigid, weight 1.0) |
 |------|--------|------|------|-----------------------------|
 | `Hips` | node `Rig` | (0, 0, 0.80) | (0, 0, 0.90) | nothing; the root that moves the whole body |
-| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, every champion's head piece, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap, Wrenna's quiver |
+| `Spine` | `Hips` | (0, 0, 0.90) | (0, 0, 1.70) | torso, head, chest plate, visor, every champion's head piece, Hargrim's shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap, Wrenna's quiver, Ysmeer's star motes |
 | `Arm_L` | `Spine` | (0, 0.34, 1.40) | (0, 0.34, 0.80) | the left arm box, Durnhal's shield, Wrenna's bow |
 | `Arm_R` | `Spine` | (0, -0.34, 1.40) | (0, -0.34, 0.80) | the right arm box, Quillon's staff, Skerrow's blade, Durnhal's hammer |
 | `Leg_L` | `Hips` | (0, 0.12, 0.80) | (0, 0.12, 0.00) | the left leg box |
@@ -243,8 +243,8 @@ In the Channels column a bare bone name means that bone's rotation.
   client holds the last frame.
 - The cue and head-piece meshes ride the bones that move them: Hargrim's
   shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap,
-  Wrenna's quiver and every champion's head piece on `Spine` (the `Attack` yaw,
-  the `Hit` lean), Quillon's staff, Skerrow's blade and Durnhal's hammer on
+  Wrenna's quiver, Ysmeer's star motes and every champion's head piece on
+  `Spine` (the `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's blade and Durnhal's hammer on
   `Arm_R` (the `Attack` swing, the `Hit` lift) and Durnhal's shield and
   Wrenna's bow on `Arm_L` (the `Cast` raise). All clips are shared, with no
   per-champion poses.
