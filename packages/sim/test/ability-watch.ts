@@ -487,14 +487,38 @@ export class AbilityWatcher {
         this.check(started.cost === (started.slot === 'F' ? 100 : started.ex ? 25 : 0), `cast cost ${started.cost}`, state);
       }
 
-      // Cooldowns: a slot that started is its cooldown; the others lose one while alive.
+      // Cooldowns: a slot that started is its cooldown; the others lose one while alive. Every cast
+      // that fires in the step (one that ends its windup, and one that starts with a windup of 0, can
+      // both fire in one turn) with a top-level `consumeCounter` of the cooldown verb (rules 2.6)
+      // cuts the named slot by `cooldownTicksPerStack` for each stack the champion held before the
+      // step, never below 0. The first of them spends the whole counter, so only it cuts. A cut whose
+      // cast fired before the slot's own castStarted in the events is skipped on that slot: the sim
+      // cuts when a windup ends, then a new cast resets the slot to its full cooldown (step.ts
+      // advanceWindup, then startCast). Written out again here: the oracle does not import
+      // `counter.ts` or `cast.ts`.
       if (kit && snap.alive && c.alive) {
+        const cuts: { slot: Slot; ticks: number; beforeStart: boolean }[] = [];
+        const startedAt = started ? state.events.indexOf(started) : -1;
+        let held = (before.champions[c.id] as ChampionState).counter?.count ?? 0;
+        for (const firedNow of fired) {
+          if (firedNow.type !== 'castFired') continue;
+          const spec = kit.slots[firedNow.slot];
+          const ability = firedNow.ex && spec.ex ? spec.ex : spec;
+          for (const effect of ability.effects) {
+            if (effect.type !== 'consumeCounter') continue;
+            if ('cooldownTicksPerStack' in effect) {
+              const beforeStart = startedAt >= 0 && state.events.indexOf(firedNow) < startedAt;
+              cuts.push({ slot: effect.slot, ticks: effect.cooldownTicksPerStack * held, beforeStart });
+            }
+            held = 0;
+            break;
+          }
+        }
         c.cooldowns.forEach((value, i) => {
           const slot = (['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const)[i] as Slot;
-          const expected =
-            started?.type === 'castStarted' && started.slot === slot
-              ? kit.slots[slot].cooldownTicks
-              : Math.max(0, (snap.cooldowns[i] as number) - 1);
+          const reset = started?.type === 'castStarted' && started.slot === slot;
+          let expected = reset ? kit.slots[slot].cooldownTicks : Math.max(0, (snap.cooldowns[i] as number) - 1);
+          for (const cut of cuts) if (cut.slot === slot && !(reset && cut.beforeStart)) expected = Math.max(0, expected - cut.ticks);
           this.check(value === expected, `champion ${c.id} cooldown ${slot} is ${value}, expected ${expected}`, state);
         });
       }
