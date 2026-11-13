@@ -3066,6 +3066,20 @@ describe('Wrenna', () => {
       rig.clean();
     });
 
+    it('cuts on the step that another cast finishes its windup too: the oracle reads every cast fired', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 2);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('M2'));
+      rig.run(17);
+      expect(rig.events('castFired').at(-1)?.e.slot).toBe('M1');
+      rig.step(press('R'));
+      expect(rig.events('castFired').slice(-2).map(({ e }) => e.slot)).toEqual(['M2', 'R']);
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 19 - 240);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+
     it('brings a Tumble under 360 ticks to 0 and never below', () => {
       const rig = new Rig(wrenna, { 2: FOE });
       buildFocus(rig, 3);

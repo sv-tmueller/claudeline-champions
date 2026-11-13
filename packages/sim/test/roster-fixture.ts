@@ -162,6 +162,13 @@ export const EXPECTED: Record<string, Expected> = {
     thens: ['SPACE/false'],
     statuses: ['wound', 'slow', 'root', 'knockback', 'shield'],
   },
+  // Tumble's `then` is empty, and Tumble and Fade Step carry no damage, so neither gains energy.
+  wrenna: {
+    fired: ['M1/false', 'M2/false', 'M2/true', 'SPACE/false', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
+    gains: ['M1/false', 'M2/false', 'M2/true', 'Q/false', 'E/false', 'E/true', 'F/false'],
+    thens: [],
+    statuses: ['dot', 'slow', 'haste', 'root', 'shield'],
+  },
 };
 
 /** Collects what the coverage test needs from the events of every step. */
@@ -237,6 +244,7 @@ export const SEEDS: Record<string, number> = {
   ondrel: 5559,
   brimwick: 5560,
   durnhal: 5561,
+  wrenna: 5562,
 };
 
 export interface Observer {

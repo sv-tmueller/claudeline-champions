@@ -487,22 +487,24 @@ export class AbilityWatcher {
         this.check(started.cost === (started.slot === 'F' ? 100 : started.ex ? 25 : 0), `cast cost ${started.cost}`, state);
       }
 
-      // Cooldowns: a slot that started is its cooldown; the others lose one while alive. A cast that
-      // fires with a top-level `consumeCounter` of the cooldown verb (rules 2.6) then cuts the named
-      // slot by `cooldownTicksPerStack` for each stack the champion held before the step, never
-      // below 0. Written out again here: the oracle does not import `counter.ts` or `cast.ts`.
+      // Cooldowns: a slot that started is its cooldown; the others lose one while alive. Every cast
+      // that fires in the step (one that ends its windup, and one that starts with a windup of 0, can
+      // both fire in one turn) with a top-level `consumeCounter` of the cooldown verb (rules 2.6)
+      // cuts the named slot by `cooldownTicksPerStack` for each stack the champion held before the
+      // step, never below 0. The first of them spends the whole counter, so only it cuts. Written
+      // out again here: the oracle does not import `counter.ts` or `cast.ts`.
       if (kit && snap.alive && c.alive) {
-        let cut: { slot: Slot; ticks: number } | null = null;
-        const firedNow = fired.find((f) => f.type === 'castFired');
-        if (firedNow?.type === 'castFired') {
+        const cuts: { slot: Slot; ticks: number }[] = [];
+        let held = (before.champions[c.id] as ChampionState).counter?.count ?? 0;
+        for (const firedNow of fired) {
+          if (firedNow.type !== 'castFired') continue;
           const spec = kit.slots[firedNow.slot];
           const ability = firedNow.ex && spec.ex ? spec.ex : spec;
           for (const effect of ability.effects) {
-            if (effect.type === 'consumeCounter' && 'cooldownTicksPerStack' in effect) {
-              const stacks = (before.champions[c.id] as ChampionState).counter?.count ?? 0;
-              cut = { slot: effect.slot, ticks: effect.cooldownTicksPerStack * stacks };
-              break;
-            }
+            if (effect.type !== 'consumeCounter') continue;
+            if ('cooldownTicksPerStack' in effect) cuts.push({ slot: effect.slot, ticks: effect.cooldownTicksPerStack * held });
+            held = 0;
+            break;
           }
         }
         c.cooldowns.forEach((value, i) => {
@@ -511,7 +513,7 @@ export class AbilityWatcher {
             started?.type === 'castStarted' && started.slot === slot
               ? kit.slots[slot].cooldownTicks
               : Math.max(0, (snap.cooldowns[i] as number) - 1);
-          if (cut !== null && cut.slot === slot) expected = Math.max(0, expected - cut.ticks);
+          for (const cut of cuts) if (cut.slot === slot) expected = Math.max(0, expected - cut.ticks);
           this.check(value === expected, `champion ${c.id} cooldown ${slot} is ${value}, expected ${expected}`, state);
         });
       }
