@@ -1,0 +1,146 @@
+{
+  "id": "wrenna",
+  "maxHealth": 120,
+  "moveSpeed": 5.5,
+  "support": false,
+  "ex": ["M2", "E"],
+  "counter": { "from": "M1", "cap": 3, "windowTicks": 360 },
+  "slots": {
+    "M1": {
+      "cooldownTicks": 42,
+      "windupTicks": 6,
+      "movement": "free",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 24,
+          "radius": 0.25,
+          "lifetimeTicks": 35,
+          "pierce": false,
+          "effects": [{ "type": "damage", "amount": 11 }]
+        }
+      ]
+    },
+    "M2": {
+      "cooldownTicks": 360,
+      "windupTicks": 18,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 22,
+          "radius": 0.35,
+          "lifetimeTicks": 35,
+          "pierce": false,
+          "effects": [
+            { "type": "damage", "amount": 12 },
+            { "type": "applyStatus", "status": { "type": "dot", "perPulse": 2, "ticks": 180 } }
+          ]
+        }
+      ],
+      "ex": {
+        "windupTicks": 18,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "projectile",
+            "speed": 22,
+            "radius": 0.35,
+            "lifetimeTicks": 35,
+            "pierce": false,
+            "effects": [
+              { "type": "damage", "amount": 12 },
+              { "type": "applyStatus", "status": { "type": "dot", "perPulse": 2, "ticks": 180 } },
+              { "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 120 } }
+            ]
+          }
+        ]
+      }
+    },
+    "SPACE": {
+      "cooldownTicks": 540,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "dash", "distance": 5, "ticks": 15, "then": [] },
+        { "type": "applyStatus", "status": { "type": "haste", "percent": 25, "ticks": 90 } }
+      ]
+    },
+    "Q": {
+      "cooldownTicks": 660,
+      "windupTicks": 18,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 20,
+          "radius": 0.4,
+          "lifetimeTicks": 36,
+          "pierce": false,
+          "effects": [
+            { "type": "damage", "amount": 9 },
+            { "type": "applyStatus", "status": { "type": "root", "ticks": 60 } }
+          ]
+        }
+      ]
+    },
+    "E": {
+      "cooldownTicks": 480,
+      "windupTicks": 30,
+      "movement": "slowed",
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 25,
+          "radius": 0.25,
+          "lifetimeTicks": 38,
+          "pierce": false,
+          "effects": [{ "type": "damage", "amount": 16 }]
+        },
+        { "type": "consumeCounter", "bonusDamagePerStack": 4 }
+      ],
+      "ex": {
+        "windupTicks": 30,
+        "movement": "slowed",
+        "effects": [
+          {
+            "type": "projectile",
+            "speed": 25,
+            "radius": 0.25,
+            "lifetimeTicks": 38,
+            "pierce": true,
+            "effects": [{ "type": "damage", "amount": 20 }]
+          }
+        ]
+      }
+    },
+    "R": {
+      "cooldownTicks": 780,
+      "windupTicks": 0,
+      "movement": "free",
+      "effects": [
+        { "type": "consumeCounter", "cooldownTicksPerStack": 120, "slot": "SPACE" },
+        { "type": "shield", "absorb": 25, "ticks": 180 }
+      ]
+    },
+    "F": {
+      "cooldownTicks": 600,
+      "windupTicks": 36,
+      "movement": "locked",
+      "effects": [
+        {
+          "type": "area",
+          "placement": { "type": "aim", "range": 13 },
+          "radius": 3,
+          "durationTicks": 120,
+          "intervalTicks": 30,
+          "targets": "enemies",
+          "effects": [
+            { "type": "damage", "amount": 12 },
+            { "type": "applyStatus", "status": { "type": "slow", "percent": 30, "ticks": 60 } }
+          ]
+        }
+      ]
+    }
+  }
+}

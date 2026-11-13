@@ -1,6 +1,7 @@
 // The on-hit counter (rules.md section 2.6, v3 design section 4.4a). The unit tests register casts
 // by hand and call `landHit`, as energy.test.ts does; the decay, the pause and the round reset run
-// through `step`. No shipped kit declares a counter, so every kit here is a test kit.
+// through `step`. Every kit here is a test kit; Wrenna's real kit and her Focus are pinned in
+// roster-kits.test.ts.
 import { describe, expect, it } from 'vitest';
 import { Button, checksum, cloneState, createMatch, debug, step } from '../src/index';
 import type { AbilityEffect, Effect, GameState, KitDef, MatchConfig, PlayerInput, Slot, SlotSpec } from '../src/index';

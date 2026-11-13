@@ -4,10 +4,12 @@ import { orbPointFor, parseArenaDef } from '@claudeline/sim';
 import type { ArenaDef, KitDef, OrbPoint } from '@claudeline/sim';
 
 /**
- * The kits the harness plays: every kit of data/kits, in file name order (loadInputs returns them in
- * that order, and inputs.test.ts pins it). The list, not the directory, fixes the run, the committed
- * block and the CI times, so a kit added to data/kits joins the report only when it is listed here.
- * Durnhal joined it at step 1.3 of the roster-v3 build order (#244): the roster is now the seven kits.
+ * The kits the harness plays: the kits of data/kits that are listed here, in file name order
+ * (loadInputs returns them in that order, and inputs.test.ts pins it). The list, not the directory,
+ * fixes the run, the committed block and the CI times, so a kit added to data/kits joins the report
+ * only when it is listed here. Durnhal joined it at step 1.3 of the roster-v3 build order (#244).
+ * Wrenna has a kit file (#270) and joins in step 3.4, so inputs.test.ts pins her as the one file
+ * outside the list.
  */
 export const HARNESS_KITS: readonly string[] = [
   'brimwick',
