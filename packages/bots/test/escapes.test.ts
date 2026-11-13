@@ -107,7 +107,7 @@ describe('the escape of a latched advance', () => {
     expect(input?.moveX, 'it advances: the latch is set').toBe(1);
 
     // The target closes to 4 m, in reach: the latch holds her standing, and a fresh bot at 4 m
-    // would kite instead, so the intent is asserted too.
+    // kites (kite and retreat tie there), so the intent is asserted too.
     (state.champions[2] as ChampionState).x = me.x + 4;
     input = undefined;
     for (let i = 0; i < THINKS && input === undefined; i++) {
