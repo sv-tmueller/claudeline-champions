@@ -787,8 +787,11 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   error and no draw.
 - The deadlock rule's latched advance is a retreat, so a latched Quillon that a target closes on
   within 6 m blinks away. The #58 scene of the Deadlock section passes with both kit sets; the
-  fallback if that ever fails is to leave the latched advance out of the trigger. `escapes.test.ts`
-  pins the blink (`the escape of a latched advance`): a Quillon latched on a target 16 m off presses
+  fallback if that ever fails is to leave the latched advance out of the trigger, but that is not a
+  narrow one: while the team is behind it would also mute every retreat escape outside `latchReach`
+  (Hargrim at 4 m with a `latchReach` of 2.5, Iron Hide, Lumeth's and others), as the mutation of
+  PR #266 showed by turning 13 rows red; a narrower fallback would have to leave out only the
+  latched case. `escapes.test.ts` pins the blink (`the escape of a latched advance`): a Quillon latched on a target 16 m off presses
   Skip, aimed 4 m straight away, from the latched stand once the target closes to 4 m, and the row
   goes red with the latched advance left out of the trigger, and with the latch dropped it alone
   goes red: she flees instead of standing.
@@ -2097,7 +2100,9 @@ retreatAdvance 9.1 to 8.9 of the damage; the deaths 30.5 percent in reach (was
 to 15.67; dealt 7.87 to 8.09 and 10.38 to 10.77. 33 of the 36 cells move, the
 largest by 12.0 points (2v2 arena01 Brimwick v Hargrim, 90.0 to 78.0, a fill that
 fights a Hargrim that is now closer), none across the band and none to a budget
-hit. The regenerated block is in balance.md, section 4 and 5.11.
+hit. The regenerated block is the one balance.md section 5.11 reads. The six-kit
+block at 094b42e is read in section 5.13 (against 5.11's block), and so is the
+seven-kit block of section 4 at 0246028.
 
 The rule of #222 (`deadlock.test.ts`, `latchReach` in `profile.ts`, see Deadlock
 and Profiles): the deadlock rule's entry test and the latched stand of
