@@ -1,9 +1,10 @@
 # Roster v3: champions seven to nine
 
 Status: in progress; Durnhal's section is written, his kit is data and his
-model is built, and Wrenna's section is written and her model is built (her
-kit and counter come in her own series); Ysmeer's section is written and her
-kit, her fuse and end area and her model come in her own series
+model is built, and Wrenna's section is written, her kit is data (#270) and her
+model is built (her bot profile and client entry come in her own series, and
+she joins the balance harness at its last step, 3.4); Ysmeer's section is
+written and her kit, her fuse and end area and her model come in her own series
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -308,9 +309,9 @@ the two spend verbs, which belong to the counter.
   Pinning Shot and Heartseeker, build nothing, and neither does Arrow Storm.
 - **Spend:** the two verbs are part 4.4b (v3 spec section 4.4b, #245), and rules.md section 2.6 gives the rule. `consumeCounter` is a top-level effect with `{ bonusDamagePerStack: 4 }` on Heartseeker and with `{ cooldownTicksPerStack: 120, slot: 'SPACE' }` on Fade Step. It spends the whole counter on the tick the cast fires and does nothing at 0, so Fade Step with no Focus is a plain shield of 25. 120 ticks per stack is 2 s, so 3 stacks cut 360 of Tumble's 540 ticks, and a cooldown never goes below 0. The damage range applies to the total: 16 + 4 times 3 is 28, under 30.
 
-**Kit data (not built yet).** `data/kits/wrenna.json` is step 3.3 of the build
+**Kit data (built, #270).** `data/kits/wrenna.json` is step 3.3 of the build
 order, after the on-hit counter (step 3.1, #227) and the spend verbs (step
-3.2). This section fixes the numbers it will use. The conversions are ticks =
+3.2). This section fixes the numbers it uses. The conversions are ticks =
 seconds x 60, a damage over time of T over S s is `perPulse` T times 0.5 over
 S, with `ticks` S times 60 (one tick every 30 ticks, as Skerrow's Rend), and
 "N pulses of I s" is an `area` with `intervalTicks` I times 60 and
@@ -347,7 +348,30 @@ and F) carries a `damage`, so each earns energy by rules 3.1; SPACE and R carry
 none and earn none. EX variants sit on M2 and E, never on F, at 25 energy, and
 F costs 100. A number changes in the file, here and in the scripted fixture in
 the same change. Wrenna joins the balance harness in the last step of her
-series (v3 spec section 9.3).
+series (v3 spec section 9.3), step 3.4: until then `HARNESS_KITS` in
+`tools/balance/inputs.ts` does not list her, and the balance block of
+[balance](balance.md) is not regenerated.
+
+As built (#270), where the sections above leave a choice open:
+
+- The key order is the one of `hargrim.json` (`id`, `maxHealth`, `moveSpeed`,
+  `support`, `ex`), then `counter`, then `slots`.
+- The `consumeCounter` marker sits where the table names the effect: after the
+  projectile on Heartseeker (`[projectile, consumeCounter]`, so the EX differs
+  from it at `effects[0].pierce`, `effects[0].effects[0].amount` and
+  `effects[1]`) and before the shield on Fade Step (`[consumeCounter, shield]`).
+  Where it sits changes nothing, since `fire` scans the list before any effect
+  runs.
+- Tumble is `dash` of 5 m in 15 ticks with an empty `then`, then a haste on
+  self, the shape of Hargrim's Rush. Tumble and Fade Step carry no damage, so
+  neither earns energy.
+- The roster test walks the damage total after the spend bonus: Heartseeker is
+  16 + 4 x 3 = 28, under 30, and a kit that puts the marker on a pulsing area
+  adds the bonus to every damage of every pulse. The ability oracle of the sim
+  tests knows the cooldown verb (it lowers the named slot by the verb per stack
+  held, never below 0).
+- Her scripted fixture, `scripted-roster-wrenna-arena01-2v2.json`, is match seed
+  5562, built by `npm run fixtures:search -- wrenna`.
 
 **Range table.** The intended range of this section, in the shape of
 [roster v2](roster-v2.md) section 1. The table over all nine is in section 3.

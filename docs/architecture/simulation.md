@@ -1001,9 +1001,9 @@ A kit may declare one counter (`KitDef.counter`, rules.md section 2.6, v3 design
 sections 4.4a and 4.4b). A champion whose
 kit declares it carries `counter: { count, lastHitTick }` from `createMatch` on,
 at `{ 0, 0 }`; any other champion has no `counter` key at all (never
-`undefined`, so `checksum` does not throw), and no shipped kit declares one, so
-every committed fixture keeps its checksum. Both numbers are in the checksum.
-`lastHitTick` is the `state.tick` of the step the hit landed in.
+`undefined`, so `checksum` does not throw), and only Wrenna's kit (#270) declares
+one, so every other committed fixture keeps its checksum. Both numbers are in
+the checksum. `lastHitTick` is the `state.tick` of the step the hit landed in.
 
 - **Build.** `landHit` calls `buildCounter` (`counter.ts`) after the effects are
   applied and before the `credited` early return, when the hit is `damaging` in
