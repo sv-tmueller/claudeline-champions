@@ -17,6 +17,7 @@ import {
   createTeleportTally,
   jsonKits,
   kitOf,
+  eightKits,
   rosterKits,
   sevenKits,
   sixKits,
@@ -109,6 +110,11 @@ export const ESCAPES: Record<string, EscapeRow> = {
   // only when Bulwark Charge is not ready, rooted or without a landing.
   'durnhal:SPACE': { slot: 'SPACE', teleport: null, dash: 5, after: null },
   'durnhal:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: null, dash: 5 } },
+  // Tumble: a 5 m dash with a landing of its own, the first escape of Wrenna and an escape only (no
+  // band below); Fade Step follows it, pressed only when Tumble is not ready, rooted or without a
+  // landing, and spends the counter to cut Tumble's cooldown.
+  'wrenna:SPACE': { slot: 'SPACE', teleport: null, dash: 5, after: null },
+  'wrenna:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: null, dash: 5 } },
 };
 
 /**
@@ -297,6 +303,30 @@ const DURNHAL_CLEARANCES: Record<string, number> = {
   'durnhal:F': 0.5,
 };
 
+// data/kits/wrenna.json, in the eight-kit set only: Longbow, Poison Dart, Pinning Shot and Heartseeker
+// are bolts (speed times lifetime in ticks over 60), Pinning Shot an opener at a target walking
+// toward her; Heartseeker and its EX variant share a reach. The Rain of Arrows is the area at the
+// aim (range 13, radius 3) plus 0.5. Tumble and Fade Step reach nobody (a dash and a shield), so
+// neither has a band: they are pressed as escapes, the rows in `ESCAPES`.
+const WRENNA_BANDS: Record<string, Band> = {
+  'wrenna:M1': { min: 0, max: (24 * 35) / 60 },
+  'wrenna:M2': { min: 0, max: (22 * 35) / 60 },
+  'wrenna:M2:ex': { min: 0, max: (22 * 35) / 60 },
+  'wrenna:Q': { min: 0, max: (20 * 36) / 60, motion: 'closing' },
+  'wrenna:E': { min: 0, max: (25 * 38) / 60 },
+  'wrenna:E:ex': { min: 0, max: (25 * 38) / 60 },
+  'wrenna:F': { min: 0, max: 13 + 3 + 0.5 },
+};
+const WRENNA_CLEARANCES: Record<string, number> = {
+  'wrenna:M1': 0.25,
+  'wrenna:M2': 0.35,
+  'wrenna:M2:ex': 0.35,
+  'wrenna:Q': 0.4,
+  'wrenna:E': 0.25,
+  'wrenna:E:ex': 0.25,
+  'wrenna:F': 0.5,
+};
+
 export const KIT_SETS: KitSet[] = [
   {
     // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal
@@ -381,6 +411,15 @@ export const SEVEN_SET: KitSet = {
   clearances: { ...SIX_SET.clearances, ...DURNHAL_CLEARANCES },
 };
 
+/** The eight shipped kits: the seven and Wrenna's, for the runs of #281. */
+export const EIGHT_SET: KitSet = {
+  ...SEVEN_SET,
+  name: 'the eight shipped kits',
+  kits: eightKits,
+  bands: { ...SEVEN_SET.bands, ...WRENNA_BANDS },
+  clearances: { ...SEVEN_SET.clearances, ...WRENNA_CLEARANCES },
+};
+
 /** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
@@ -391,6 +430,7 @@ const DASHES = new Set([
   'lumeth:SPACE',
   'ondrel:SPACE',
   'durnhal:SPACE',
+  'wrenna:SPACE',
 ]);
 
 /**
@@ -401,6 +441,12 @@ const DASHES = new Set([
  * Dance) is not one: the dash stops at an obstacle and the teleport needs a line of sight.
  */
 export const MELEE = new Set(['hargrim:M1', 'skerrow:M1', 'skerrow:E', 'skerrow:E:ex', 'durnhal:M1']);
+/**
+ * The EX variants that are not cast while the champion holds counter stacks: the base ability
+ * spends them (the `spendBase` rule, bots.md, Order and variants). Written from Wrenna's kit
+ * text: Heartseeker adds 4 damage a stack and costs no energy, the EX costs 25 and adds nothing.
+ */
+const SPEND_BASE = new Set(['wrenna:E:ex']);
 const MARGIN = 1;
 const EX_COST = 25;
 const ULTIMATE_COST = 100;
@@ -591,6 +637,9 @@ export function pressProblems(
       }
     }
   }
+  if (SPEND_BASE.has(key) && (c.counter?.count ?? 0) > 0) {
+    problems.push(`${key} cast with ${c.counter?.count} counter stacks that the base ability spends`);
+  }
   if (cooldown > 1) problems.push(`cooldown ${cooldown} above 1`);
   const cost = pressed.slot === 'F' ? ULTIMATE_COST : pressed.ex ? EX_COST : 0;
   if (c.energy < cost) problems.push(`energy ${c.energy} below ${cost}`);
@@ -682,12 +731,27 @@ export interface Played {
 }
 
 /**
+ * Optional observers of `play`: `before` runs on the state the bots thought on, ahead of the step,
+ * with the inputs they returned; `after` runs on the stepped state, with its events. Neither may
+ * change the state.
+ */
+export interface PlayHooks {
+  before?: (state: GameState, inputs: readonly PlayerInput[]) => void;
+  after?: (state: GameState) => void;
+}
+
+/**
   * Plays `ticks` ticks of a match of bots (`TICKS` by default), or until its matchEnd, and checks
   * every tick: the bots leave the state alone, every input is valid, every press passes the oracle
   * of `set` on the state the bot thought on and the sim starts it (or something explains why not),
   * the invariants hold, and the stall tracker is fed.
  */
-export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played {
+export function play(
+  set: KitSet,
+  run: MatchRun,
+  ticks: number = TICKS,
+  hooks: PlayHooks = {},
+): Played {
   const { state, bots } = run;
   const tracker = createStallTracker(state, bots);
   const started = state.champions.map(() => 0);
@@ -747,6 +811,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       });
     });
     tracker.observe(inputs);
+    hooks.before?.(state, inputs);
     const tick = state.tick;
     // Before the step, only on a tick with an escape teleport press: the state the bots thought on
     // and the real inputs, for the turn-order model of the champions ahead of the caster. The inputs
@@ -757,6 +822,7 @@ export function play(set: KitSet, run: MatchRun, ticks: number = TICKS): Played 
       : null;
     // The inputs are the bots' own records; step reads them and keeps no reference.
     step(state, inputs);
+    hooks.after?.(state);
 
     for (const press of pending) {
       expect(

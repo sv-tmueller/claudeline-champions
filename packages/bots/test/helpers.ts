@@ -7,6 +7,7 @@ import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
+import wrennaJson from '../../../data/kits/wrenna.json';
 import {
   Button,
   CHAMPION_RADIUS,
@@ -101,6 +102,15 @@ export function sixKits(): KitDef[] {
  */
 export function sevenKits(): KitDef[] {
   return [...sixKits(), structuredClone(durnhalJson) as unknown as KitDef];
+}
+
+/**
+ * The eight shipped kits: `sevenKits()` and the shipped Wrenna (#281). `sevenKits()` keeps its
+ * seven, so the pins that read a Wrenna with no kit stay as they are, and `createMatch` keeps only
+ * the kits in use.
+ */
+export function eightKits(): KitDef[] {
+  return [...sevenKits(), structuredClone(wrennaJson) as unknown as KitDef];
 }
 
 function validAxis(v: number): boolean {
@@ -216,6 +226,19 @@ export function configBrimwick(): MatchConfig {
     players: [
       { championId: 'hargrim', team: 'A' },
       { championId: 'brimwick', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
+/** Hargrim and Wrenna against Hargrim and Quillon: the marksman on team A, so champion 1. */
+export function configWrenna(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'wrenna', team: 'A' },
       { championId: 'hargrim', team: 'B' },
       { championId: 'quillon', team: 'B' },
     ],

@@ -20,7 +20,8 @@ import {
   configMirror,
   configOndrel,
   configSkerrow,
-  sixKits,
+  configWrenna,
+  eightKits,
 } from './helpers';
 import { spawnBolt } from './scenes';
 
@@ -371,7 +372,7 @@ function put(state: GameState, id: number, x: number, y: number): void {
 }
 
 /**
- * A frozen mirror match on arena01 with the six shipped kits (`createMatch` keeps only the kits in
+ * A frozen mirror match on arena01 with the eight shipped kits (`createMatch` keeps only the kits in
  * use, so a scene of the first four is the match it always was): nothing steps inside a scene, and
  * `think` never mutates the state, so the same think repeats. Champions 0 and 3 are dead unless
  * a scene needs them; the bot is `id`, on a normal tier (reaction delay 15, cast delay 8) with
@@ -387,7 +388,7 @@ function scene(
   config: MatchConfig = configMirror(),
   seed = 5,
 ): Scene {
-  const state = createMatch(config, arena01, 1, sixKits());
+  const state = createMatch(config, arena01, 1, eightKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', seed);
   arrange(state, bot);
@@ -636,6 +637,28 @@ function buildScenes(): Scene[] {
         me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 24, windupLeft: 12 };
       },
       configBrimwick(),
+    ),
+    // A Wrenna spend: Wrenna 12 m from a Hargrim on a clear lane, 3 counter stacks and 60 energy
+    // (the EX variant is affordable), Heartseeker ready and every other slot cooling down: the
+    // spend-base test of `exFor` (stacks above 0, so the base shot) runs on every think, in the
+    // run of every slot and in the choice, and E is pressed on every one. She stands (12 m is
+    // inside her stand reach).
+    scene(
+      'wrenna spend',
+      1,
+      'engage',
+      true,
+      false,
+      (state) => {
+        put(state, 1, -6, -3);
+        put(state, 2, 6, -3);
+        const me = ch(state, 1);
+        me.energy = 60;
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('E')] = 0;
+        (me.counter as NonNullable<ChampionState['counter']>).count = 3;
+      },
+      configWrenna(),
     ),
     // A dodge: Quillon 8 m from Hargrim on a clear lane, every slot on cooldown, so she stands and
     // presses nothing, and two bolts of the Hargrim's team aimed at her, one flying along an axis

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor, rulesFor } from '../src/profile';
-import { jsonKits, profileOf, rosterKits, sevenKits, sixKits } from './helpers';
+import { eightKits, jsonKits, profileOf, rosterKits, sevenKits, sixKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -143,6 +143,7 @@ describe('rulesFor', () => {
       escapeWithin: null,
       allies: [],
       escapeOnly: [],
+      spendBase: [],
     };
     expect(rulesFor('hargrim')).toEqual(none);
     expect(rulesFor('hargrim', quillon)).toEqual(none);
@@ -241,6 +242,7 @@ describe('rulesFor Ondrel and Brimwick', () => {
       escapeWithin: null,
       allies: [],
       escapeOnly: [],
+      spendBase: [],
     };
     for (const id of ['ondrel', 'brimwick']) {
       expect(rulesFor(id), id).toEqual(none);
@@ -300,6 +302,64 @@ describe('Durnhal, the melee guardian of #211', () => {
   });
 });
 
+describe('Wrenna, the marksman of roadmap 3.4', () => {
+  const kits = eightKits();
+  const wrenna = kits.find((k) => k.id === 'wrenna') as KitDef;
+
+  it('reads rangeMax from the base M1 band of 14 m, less the margin: 13 m, rangeMin 10, stand and latch reach 13', () => {
+    expect(profileFor('wrenna', wrenna)).toEqual(profileOf(10, 13));
+    expect(profileFor('wrenna', wrenna).standReach).toBe(13);
+    expect(profileFor('wrenna', wrenna).latchReach).toBe(13);
+  });
+
+  it('keeps the table of 10 and 13 with no kit, no M1 band or a kit of another id', () => {
+    expect(profileFor('wrenna')).toEqual(profileOf(10, 13));
+    expect(profileFor('wrenna', quietKit('wrenna'))).toEqual(profileOf(10, 13));
+    expect(profileFor('wrenna', quietKit('hargrim'))).toEqual(profileOf(10, 13));
+  });
+
+  it('derives rangeMax instead of hard-coding it: 21 m/s for 40 ticks reaches 14 m, so 13; for 45 ticks 15.75, so 14.75', () => {
+    expect(profileFor('wrenna', withM1(quietKit('wrenna'), boltSlot(21, 40)))).toEqual(profileOf(10, 13));
+    expect(profileFor('wrenna', withM1(quietKit('wrenna'), boltSlot(21, 45)))).toEqual(profileOf(10, 14.75));
+  });
+
+  it('falls back to the table when the derived rangeMax is at most rangeMin', () => {
+    // 21 m/s for 30 ticks reaches 10.5 m: rangeMax 9.5, not above rangeMin 10.
+    expect(profileFor('wrenna', withM1(quietKit('wrenna'), boltSlot(21, 30)))).toEqual(profileOf(10, 13));
+  });
+
+  it('has the Pinning Shot opener on a target walking toward her, and Tumble then Fade Step as escapes', () => {
+    const rules = rulesFor('wrenna', wrenna);
+    expect(rules.openers).toEqual([{ slot: 'Q', band: null, motion: 'closing', when: null }]);
+    expect(rules.escapes).toEqual(['SPACE', 'R']);
+    expect(rules.holdF).toBe(false);
+    expect(rules.wait).toBeNull();
+    expect(rules.escapeWithin).toBeNull();
+    expect(rules.allies).toEqual([]);
+    expect(rules.escapeOnly).toEqual([]);
+    expect(Object.isFrozen(rules)).toBe(true);
+    expect(Object.isFrozen(rules.openers)).toBe(true);
+    expect(Object.isFrozen(rules.escapes)).toBe(true);
+  });
+
+  it('spends the base Heartseeker: spendBase is E, frozen, and empty for every other kit', () => {
+    const rules = rulesFor('wrenna', wrenna);
+    expect(rules.spendBase).toEqual(['E']);
+    expect(Object.isFrozen(rules.spendBase)).toBe(true);
+    for (const kit of kits) {
+      if (kit.id === 'wrenna') continue;
+      expect(rulesFor(kit.id, kit).spendBase, kit.id).toEqual([]);
+      expect(Object.isFrozen(rulesFor(kit.id, kit).spendBase), kit.id).toBe(true);
+    }
+  });
+
+  it('gives her no rule without her kit or with a kit of another id', () => {
+    expect(rulesFor('wrenna').spendBase).toEqual([]);
+    expect(rulesFor('wrenna').escapes).toEqual([]);
+    expect(rulesFor('wrenna', kits.find((k) => k.id === 'hargrim') as KitDef).spendBase).toEqual([]);
+  });
+});
+
 describe('the stand reach (#213)', () => {
   const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
 
@@ -314,8 +374,8 @@ describe('the stand reach (#213)', () => {
   });
 
   it('is rangeMax for every champion that keeps its range, with a kit and without', () => {
-    const roster = sixKits();
-    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick']) {
+    const roster = eightKits();
+    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick', 'wrenna']) {
       const kit = roster.find((k) => k.id === id) as KitDef;
       expect(profileFor(id, kit).standReach, id).toBe(profileFor(id, kit).rangeMax);
       expect(profileFor(id).standReach, `${id} without a kit`).toBe(profileFor(id).rangeMax);
@@ -349,8 +409,8 @@ describe('the deadlock reach (#222)', () => {
   });
 
   it('is rangeMax for every champion that keeps its range, with a kit and without', () => {
-    const roster = sixKits();
-    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick']) {
+    const roster = eightKits();
+    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick', 'wrenna']) {
       const kit = roster.find((k) => k.id === id) as KitDef;
       expect(profileFor(id, kit).latchReach, id).toBe(profileFor(id, kit).rangeMax);
       expect(profileFor(id).latchReach, `${id} without a kit`).toBe(profileFor(id).rangeMax);

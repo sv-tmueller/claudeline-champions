@@ -67,6 +67,7 @@ const PROFILES = new Map<string, BotProfile>([
   ['ondrel', profileOf(5, 9)],
   ['brimwick', profileOf(7, 10)],
   ['durnhal', profileOf(0, 3.5)],
+  ['wrenna', profileOf(10, 13)],
 ]);
 
 /**
@@ -81,6 +82,7 @@ const KIT_RULES = new Map<string, number>([
   ['ondrel', 5],
   ['brimwick', 7],
   ['durnhal', 0],
+  ['wrenna', 10],
 ]);
 
 /**
@@ -182,9 +184,16 @@ export interface ChampionRules {
    * profile.test.ts). The kit cache zeroes the base band of these slots, so the walk does not press
    * one on it and only `chooseEscape` does (see `refreshKitCache`). Durnhal's
    * Bulwark Charge (#211): with rangeMin 0 its band would cover every engage, and its knock-away
-   * would push a target out of the stand reach. Empty for the other six.
+   * would push a target out of the stand reach. Empty for the other seven.
    */
   readonly escapeOnly: readonly Slot[];
+  /**
+   * The EX slots that spend a built counter on the base ability: while `me.counter.count` is above
+   * 0, the EX variant of a listed slot is not cast (see `exFor` in casting.ts), so the base ability
+   * is pressed and spends the stacks. Wrenna's Heartseeker: the base shot adds 4 damage a stack and
+   * saves 25 energy, and ties the EX at 1 stack and beats it from 2. Empty for the other seven.
+   */
+  readonly spendBase: readonly Slot[];
 }
 
 /** No rule: every slot is pressed on its kit band alone. */
@@ -196,6 +205,7 @@ const NO_RULES: ChampionRules = Object.freeze({
   escapeWithin: null,
   allies: Object.freeze([]),
   escapeOnly: Object.freeze([]),
+  spendBase: Object.freeze([]),
 });
 
 /**
@@ -230,6 +240,13 @@ const NO_RULES: ChampionRules = Object.freeze({
  * Bulwark Charge, a dash with a knock-away, then Aegis Line, a self shield, are his escapes on the
  * common trigger, a retreat with the target within 6 m (rangeMin is 0, so he never kites); Bulwark
  * Charge is an escape only, see `escapeOnly`. He does not hold Last Bastion, see `holdF`.
+ * Wrenna (roadmap 3.4, docs/design/roster-v3.md; roster-v3 has no bot sketch for her, so this
+ * follows roster-v2's recipe): Pinning Shot keeps its kit band and needs a target walking toward
+ * her (it roots the one that walks in); Tumble, a dash with a landing found like Glide's, then Fade
+ * Step are her escapes on the common trigger, a kite inside rangeMin (10). Fade Step is second, so
+ * its cut of Tumble's cooldown is not wasted on a Tumble that is ready. Longbow (M1) builds the
+ * counter on its band and needs no rule. Heartseeker is pressed as the base shot while the counter
+ * stands, see `spendBase`.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -287,6 +304,19 @@ const RULES = new Map<string, ChampionRules>([
       ['SPACE'],
     ),
   ],
+  [
+    'wrenna',
+    rule(
+      [{ slot: 'Q', band: null, motion: 'closing', when: null }],
+      ['SPACE', 'R'],
+      false,
+      null,
+      null,
+      [],
+      [],
+      ['E'],
+    ),
+  ],
 ]);
 
 /** A frozen row: the row, its lists, each opener and each literal band, and the wait. */
@@ -298,6 +328,7 @@ function rule(
   escapeWithin: number | null = null,
   allies: Slot[] = [],
   escapeOnly: Slot[] = [],
+  spendBase: Slot[] = [],
 ): ChampionRules {
   const frozen = openers.map((opener) =>
     Object.freeze({
@@ -319,6 +350,7 @@ function rule(
     escapeWithin,
     allies: Object.freeze([...allies]),
     escapeOnly: Object.freeze([...escapeOnly]),
+    spendBase: Object.freeze([...spendBase]),
   });
 }
 
