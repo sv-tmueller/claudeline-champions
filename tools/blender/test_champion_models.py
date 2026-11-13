@@ -41,8 +41,19 @@ IDS = {
     "brimwick",
     "durnhal",
     "wrenna",
+    "ysmeer",
 }
-ROSTER = ("hargrim", "quillon", "lumeth", "skerrow", "ondrel", "brimwick", "durnhal", "wrenna")
+ROSTER = (
+    "hargrim",
+    "quillon",
+    "lumeth",
+    "skerrow",
+    "ondrel",
+    "brimwick",
+    "durnhal",
+    "wrenna",
+    "ysmeer",
+)
 # The health bar's back starts at BAR_Y - BAR_HEIGHT / 2 - BORDER = 2.1 - 0.09 - 0.04
 # = 1.97 m (health-bars.ts), so a model must end below that.
 MAX_TOP = 1.90
@@ -687,8 +698,8 @@ def rounded(position):
 #
 # The cues: hargrim's two shoulder blocks, quillon's staff, skerrow's blade,
 # ondrel's reed bundle, durnhal's shield on Arm_L with his hammer on Arm_R and
-# wrenna's bow on Arm_L with her quiver on Spine (docs/design/roster-v1.md,
-# roster-v2.md and roster-v3.md). Brimwick's cue is his fuse cap and that same
+# wrenna's bow on Arm_L with her quiver on Spine and ysmeer's two star motes on
+# Spine (docs/design/roster-v1.md, roster-v2.md and roster-v3.md). Brimwick's cue is his fuse cap and that same
 # box is his head piece too: it carries the `head` tag alone, so the
 # 24-vertices-per-box count does not count it twice. Lumeth's cue is the one
 # that is not a box -- see RING_CUES below.
@@ -762,6 +773,20 @@ BOXES = {
         # back, turned -55 degrees about Y (the lead's decision, not a hood).
         ("head", ("Spine", (0.0, 0.0, 1.72), (0.34, 0.34, 0.12))),
         ("head", ("Spine", (-0.05, 0.0, 1.72), (0.05, 0.10, 0.24), (0.0, -55.0, 0.0))),
+    ),
+    "ysmeer": (
+        # Two star motes: 0.12 m cubes turned 45 degrees about Z, front-left and
+        # back-right. The lower one stays at least 62 mm above the floor.
+        ("cue", ("Spine", (0.08, 0.34, 1.74), (0.12, 0.12, 0.12), (0.0, 0.0, 45.0))),
+        ("cue", ("Spine", (-0.08, -0.34, 1.62), (0.12, 0.12, 0.12), (0.0, 0.0, 45.0))),
+        # A star crown: three flat bars turned 0, +60 and -60 degrees about Z, a
+        # six-point star with one point over the visor. The bottom is 1.67 m, so
+        # the visor rule holds. The bar length is the number the floor bounds: at
+        # Death key 30 the back point is 16.7 mm up, and a 0.48 m bar would sink
+        # 3.3 mm.
+        ("head", ("Spine", (0.0, 0.0, 1.69), (0.44, 0.08, 0.04), (0.0, 0.0, 0.0))),
+        ("head", ("Spine", (0.0, 0.0, 1.69), (0.44, 0.08, 0.04), (0.0, 0.0, 60.0))),
+        ("head", ("Spine", (0.0, 0.0, 1.69), (0.44, 0.08, 0.04), (0.0, 0.0, -60.0))),
     ),
 }
 CUE_TOLERANCE = 1e-4
