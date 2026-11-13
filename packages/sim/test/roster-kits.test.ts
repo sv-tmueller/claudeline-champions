@@ -1,5 +1,5 @@
 // The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json`, `lumeth.json`,
-// `ondrel.json`, `brimwick.json` and `durnhal.json`, whose numbers come from docs/design/roster-v1.md,
+// `ondrel.json`, `brimwick.json`, `durnhal.json` and `wrenna.json`, whose numbers come from docs/design/roster-v1.md,
 // docs/design/roster-v2.md and docs/design/roster-v3.md (ticks = seconds x 60, one hit =
 // durationTicks 1 / intervalTicks 1, and the lingering areas of Ondrel carry the three rules of
 // roster-v2 section 0).
@@ -16,6 +16,7 @@ import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
 import durnhalJson from '../../../data/kits/durnhal.json';
+import wrennaJson from '../../../data/kits/wrenna.json';
 import { Button, SLOTS, createMatch, debug, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -31,6 +32,7 @@ const KITS = [
   { stem: 'ondrel', json: ondrelJson },
   { stem: 'brimwick', json: brimwickJson },
   { stem: 'durnhal', json: durnhalJson },
+  { stem: 'wrenna', json: wrennaJson },
 ];
 
 const hargrim = validateKit(hargrimJson);
@@ -40,6 +42,7 @@ const lumeth = validateKit(lumethJson);
 const ondrel = validateKit(ondrelJson);
 const brimwick = validateKit(brimwickJson);
 const durnhal = validateKit(durnhalJson);
+const wrenna = validateKit(wrennaJson);
 
 function mirror(id: string) {
   return {
@@ -99,6 +102,7 @@ describe('the kit stats', () => {
     expect(stats(ondrel)).toEqual({ id: 'ondrel', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(brimwick)).toEqual({ id: 'brimwick', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(durnhal)).toEqual({ id: 'durnhal', maxHealth: 160, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
+    expect(stats(wrenna)).toEqual({ id: 'wrenna', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
   });
 
   it('gives a path-precise message for a number outside the contract', () => {
@@ -117,21 +121,40 @@ interface Visit {
   path: string;
   slot: Slot;
   effect: Effect | AbilityEffect;
+  /**
+   * What the spend verb adds to a damage of this ability at the counter cap: `bonusDamagePerStack`
+   * times the cap when the ability carries that verb (rules 2.6), else 0. On an `endArea` leaf and
+   * its pulses the walker adds it too, but the sim gives an endArea no bonusDamage
+   * (projectile.ts spawnEndArea), so there the number is a safe over-estimate; the pulses of a plain
+   * `area` are priced as the sim deals them.
+   */
+  bonus: number;
 }
 
-function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, out: Visit[]): void {
+/** The most a damage verb of this ability gains from the spend: the bonus per stack times the cap. */
+function spendBonus(kit: KitDef, ability: AbilitySpec): number {
+  let bonus = 0;
+  for (const effect of ability.effects) {
+    if (effect.type === 'consumeCounter' && 'bonusDamagePerStack' in effect) {
+      bonus = effect.bonusDamagePerStack * (kit.counter?.cap ?? 0);
+    }
+  }
+  return bonus;
+}
+
+function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, bonus: number, out: Visit[]): void {
   const visit = (effect: AbilityEffect, path: string) => {
-    out.push({ path, slot, effect });
+    out.push({ path, slot, effect, bonus });
     if (effect.type === 'projectile' || effect.type === 'area' || effect.type === 'meleeArc') {
-      effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit }));
+      effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit, bonus }));
     }
     if (effect.type === 'projectile') {
-      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit }));
+      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit, bonus }));
       // Spec 4.3 and rules 2.8: the endArea obeys every area rule, so its leaves are held to the
       // same catalogue ranges as a plain `area` leaf at the same path (finding 2 of the round-2
       // report: they were never visited).
       effect.endArea?.effects.forEach((hit, i) =>
-        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit }),
+        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit, bonus }),
       );
     }
     if (effect.type === 'dash') effect.then.forEach((t, i) => visit(t, `${path}.then[${i}]`));
@@ -143,8 +166,8 @@ function visitKit(kit: KitDef): Visit[] {
   const out: Visit[] = [];
   for (const slot of SLOTS) {
     const spec = kit.slots[slot];
-    visitAbility(`${kit.id}.slots.${slot}`, slot, spec, out);
-    if (spec.ex) visitAbility(`${kit.id}.slots.${slot}.ex`, slot, spec.ex, out);
+    visitAbility(`${kit.id}.slots.${slot}`, slot, spec, spendBonus(kit, spec), out);
+    if (spec.ex) visitAbility(`${kit.id}.slots.${slot}.ex`, slot, spec.ex, spendBonus(kit, spec.ex), out);
   }
   return out;
 }
@@ -175,6 +198,7 @@ function catalogProblems(kit: KitDef): string[] {
     slot: Slot,
     area: { durationTicks: number; intervalTicks: number; effects: readonly Effect[]; fuseTicks?: number },
     flight: number,
+    bonus: number,
   ): void => {
     const { fuseTicks } = area;
     if (fuseTicks === undefined && area.durationTicks <= 1) return;
@@ -188,7 +212,8 @@ function catalogProblems(kit: KitDef): string[] {
     for (const type of ['damage', 'heal']) {
       const hits = area.effects.filter((hit): hit is Extract<Effect, { amount: number }> => hit.type === type);
       if (hits.length === 0) continue;
-      const total = hits.reduce((sum, hit) => sum + hit.amount, 0) * pulses;
+      // The spend bonus rides on every damage effect of every pulse (rules 2.6): it is added per effect.
+      const total = hits.reduce((sum, hit) => sum + hit.amount + (type === 'damage' ? bonus : 0), 0) * pulses;
       if (!within(total, 8, top)) bad(base, `${type} total ${total} over ${pulses} pulses is not 8 to ${top}`);
     }
     if (pulses > 1) {
@@ -341,12 +366,14 @@ function catalogProblems(kit: KitDef): string[] {
     }
   }
 
-  for (const { path, slot, effect } of visitKit(kit)) {
+  for (const { path, slot, effect, bonus } of visitKit(kit)) {
     switch (effect.type) {
       case 'damage':
       case 'heal': {
         const top = slot === 'F' ? 60 : 30;
-        if (!within(effect.amount, 8, top)) bad(`${path}.amount`, `${effect.type} ${effect.amount} is not 8 to ${top}`);
+        // The damage total after the spend bonus at the counter cap; a heal takes none.
+        const total = effect.amount + (effect.type === 'damage' ? bonus : 0);
+        if (!within(total, 8, top)) bad(`${path}.amount`, `${effect.type} ${total} is not 8 to ${top}`);
         break;
       }
       case 'applyStatus': {
@@ -392,7 +419,7 @@ function catalogProblems(kit: KitDef): string[] {
         // The three lingering-area rules of roster-v2 section 0 and the fuse rules of rules 2.7. An
         // unfused one-hit area is outside all of them; a fused one-hit area is held to the fuse range,
         // the damage total and the cooldown, and keeps the one-hit exception for stun, root and silence.
-        lingerRules(path, slot, effect, 0);
+        lingerRules(path, slot, effect, 0, bonus);
         break;
       case 'projectile':
         if (!within(effect.speed, 12, 25)) bad(`${path}.speed`, `projectile speed ${effect.speed} is not 12 to 25`);
@@ -401,7 +428,7 @@ function catalogProblems(kit: KitDef): string[] {
         // rules, with the projectile's flight added to the duration-under-cooldown bound because the
         // area spawns where the projectile ends (rules 2.7, roster-v2 0, finding 1).
         if (effect.endArea !== undefined) {
-          lingerRules(`${path}.endArea`, slot, effect.endArea, effect.lifetimeTicks);
+          lingerRules(`${path}.endArea`, slot, effect.endArea, effect.lifetimeTicks, bonus);
         }
         break;
       default:
@@ -440,6 +467,24 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(durnhal)).toEqual([]);
   });
 
+  it('hold for the Wrenna kit', () => {
+    expect(catalogProblems(wrenna)).toEqual([]);
+  });
+
+  it('name the Heartseeker when a bonus of 5 per stack lifts its 16 to 31 at the cap', () => {
+    const copy = copyOf(wrenna);
+    const spend = copy.slots.E.effects[1];
+    if (spend?.type !== 'consumeCounter' || !('bonusDamagePerStack' in spend)) throw new Error('Wrenna E has no damage spend');
+    spend.bonusDamagePerStack = 5;
+    expect(catalogProblems(copy)).toEqual(['wrenna.slots.E.effects[0].effects[0].amount: damage 31 is not 8 to 30']);
+  });
+
+  it('name Arrow Storm when it carries the spend: 12 + 12 on each of four pulses is 96 over the 60 of an ultimate', () => {
+    const copy = copyOf(wrenna);
+    copy.slots.F.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 4 });
+    expect(catalogProblems(copy)).toEqual(['wrenna.slots.F.effects[0]: damage total 96 over 4 pulses is not 8 to 60']);
+  });
+
   it('name the path of a number outside them', () => {
     const copy = copyOf(hargrim);
     const dash = copy.slots.F.effects[0];
@@ -451,6 +496,27 @@ describe('the catalog ranges', () => {
     stun.status.ticks = 121;
     expect(catalogProblems(copy)).toEqual([
       'hargrim.slots.F.effects[0].then[0].effects[1].status.ticks: stun of 121 ticks is outside 30 to 120',
+    ]);
+  });
+
+  it('add the spend bonus at the counter cap to every damage of the ability that spends', () => {
+    const copy = copyOf(hargrim);
+    copy.counter = { from: 'M1', cap: 3, windowTicks: 360 };
+    // 12 + 7 x 3 = 33 on the cast that spends; the other slots are not priced with the bonus.
+    copy.slots.M1.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 7 });
+    expect(catalogProblems(copy)).toEqual(['hargrim.slots.M1.effects[0].effects[0].amount: damage 33 is not 8 to 30']);
+    // At 6 per stack the total is 12 + 18 = 30, which is inside the range.
+    copy.slots.M1.effects[1] = { type: 'consumeCounter', bonusDamagePerStack: 6 };
+    expect(catalogProblems(copy)).toEqual([]);
+  });
+
+  it('add the spend bonus to every pulse of a lingering area of the ability that spends', () => {
+    const copy = copyOf(ondrel);
+    copy.counter = { from: 'M1', cap: 3, windowTicks: 360 };
+    // Three pulses of 8 are 24; with 1 x 3 on each they are 33, over the 30 of a skill.
+    copy.slots.M2.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 1 });
+    expect(catalogProblems(copy)).toEqual([
+      'ondrel.slots.M2.effects[0]: damage total 33 over 3 pulses is not 8 to 30',
     ]);
   });
 
@@ -578,6 +644,23 @@ describe('the EX variants', () => {
     expect(exDiff(brimwick, 'E')).toEqual(['windupTicks', 'effects[0].effects[0].amount', 'effects[0].effects[1].distance'].sort());
     expect(exDiff(durnhal, 'M2')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
     expect(exDiff(durnhal, 'E')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
+    expect(exDiff(wrenna, 'M2')).toEqual(['effects[0].effects[2]']);
+    expect(exDiff(wrenna, 'E')).toEqual(['effects[0].pierce', 'effects[0].effects[0].amount', 'effects[1]'].sort());
+  });
+});
+
+describe('the on-hit counter of the roster', () => {
+  it('is Wrenna Focus on M1, and no other kit declares one', () => {
+    expect(wrenna.counter).toEqual({ from: 'M1', cap: 3, windowTicks: 360 });
+    for (const { stem, json } of KITS) {
+      if (stem !== 'wrenna') expect('counter' in json, stem).toBe(false);
+    }
+  });
+
+  it('is spent by Heartseeker and Fade Step only, as the marker at these paths', () => {
+    const spends = (kit: KitDef) => visitKit(kit).filter(({ effect }) => effect.type === 'consumeCounter').map(({ path }) => path);
+    expect(spends(wrenna)).toEqual(['wrenna.slots.E.effects[1]', 'wrenna.slots.R.effects[0]']);
+    for (const kit of [hargrim, quillon, skerrow, lumeth, ondrel, brimwick, durnhal]) expect(spends(kit), kit.id).toEqual([]);
   });
 });
 
@@ -1265,7 +1348,7 @@ describe('the endArea rules', () => {
   });
 });
 
-describe('every slot of the seven kits', () => {
+describe('every slot of the shipped kits', () => {
   interface Row {
     kit: KitDef;
     slot: Slot;
@@ -1340,6 +1423,15 @@ describe('every slot of the seven kits', () => {
     { kit: durnhal, slot: 'E', ex: true, cooldown: 420, windup: 18, walk: 2.75, cost: 25 },
     { kit: durnhal, slot: 'R', ex: false, cooldown: 840, windup: 0, cost: 0 },
     { kit: durnhal, slot: 'F', ex: false, cooldown: 600, windup: 30, walk: 0, cost: 100 },
+    { kit: wrenna, slot: 'M1', ex: false, cooldown: 42, windup: 6, walk: 5.5, cost: 0 },
+    { kit: wrenna, slot: 'M2', ex: false, cooldown: 360, windup: 18, walk: 2.75, cost: 0 },
+    { kit: wrenna, slot: 'M2', ex: true, cooldown: 360, windup: 18, walk: 2.75, cost: 25 },
+    { kit: wrenna, slot: 'SPACE', ex: false, cooldown: 540, windup: 0, cost: 0 },
+    { kit: wrenna, slot: 'Q', ex: false, cooldown: 660, windup: 18, walk: 2.75, cost: 0 },
+    { kit: wrenna, slot: 'E', ex: false, cooldown: 480, windup: 30, walk: 2.75, cost: 0 },
+    { kit: wrenna, slot: 'E', ex: true, cooldown: 480, windup: 30, walk: 2.75, cost: 25 },
+    { kit: wrenna, slot: 'R', ex: false, cooldown: 780, windup: 0, cost: 0 },
+    { kit: wrenna, slot: 'F', ex: false, cooldown: 600, windup: 36, walk: 0, cost: 100 },
   ];
 
   it.each(rows)('$kit.id $slot ex=$ex casts with its cooldown, windup, cost and walk rule', (row) => {
@@ -2760,5 +2852,286 @@ describe('Durnhal', () => {
 
   it('keeps no lingering area: every area is one hit', () => {
     expect(lingeringPaths(durnhal)).toEqual([]);
+  });
+});
+
+describe('Wrenna', () => {
+  const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
+  const focus = (rig: Rig) => champion(rig.state, 0).counter;
+  const SPACE = SLOTS.indexOf('SPACE');
+  const FOE: Spot = [X0 + 8, 0];
+
+  /** Holds Longbow on the enemy 8 m ahead until the count reads `n`, and stops on the step of that hit. */
+  function buildFocus(rig: Rig, n: number): void {
+    for (let i = 0; i < 400 && (focus(rig)?.count ?? 0) < n; i++) rig.step(press('M1'));
+    expect(focus(rig)?.count).toBe(n);
+  }
+
+  it('M1 Longbow flies 14 m in 35 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(6 + 35, press('M1'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(6);
+    expect(spawned?.e.radius).toBe(0.25);
+    expect(spawned?.e.vx).toBe(24);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 6 + 1).toBe(35);
+    expect(expired?.e.x).toBeCloseTo(X0 + 840 / 60, 9);
+    rig.clean();
+  });
+
+  it('M1 Longbow does 11 damage at 8 m and builds one Focus on the tick of the hit', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    rig.run(6 + 25, press('M1'));
+    expect(damages(rig)).toEqual([[2, 11, 109]]);
+    expect(rig.applied()).toEqual([]);
+    expectStopsOnHit(rig);
+    expect(focus(rig)).toEqual({ count: 1, lastHitTick: rig.events('damage')[0]?.step });
+    rig.clean();
+  });
+
+  it('builds Focus one per Longbow hit up to 3, and a fourth hit keeps 3 and moves the window', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    const stamps: number[] = [];
+    for (const n of [1, 2, 3]) {
+      buildFocus(rig, n);
+      stamps.push(focus(rig)?.lastHitTick ?? 0);
+    }
+    expect(stamps[0]).toBeLessThan(stamps[1] as number);
+    expect(stamps[1]).toBeLessThan(stamps[2] as number);
+    const hits = rig.events('damage').length;
+    for (let i = 0; i < 400 && rig.events('damage').length === hits; i++) rig.step(press('M1'));
+    expect(rig.events('damage').length).toBe(hits + 1);
+    expect(focus(rig)?.count).toBe(3);
+    expect(focus(rig)?.lastHitTick).toBeGreaterThan(stamps[2] as number);
+    rig.clean();
+  });
+
+  it('builds no Focus from Barbed Arrow, Pinning Shot, Heartseeker or Arrow Storm, though each hits', () => {
+    const casts: [Slot, number, number][] = [['M2', 18 + 30, 0], ['Q', 18 + 30, 0], ['E', 30 + 25, 0], ['F', 36 + 1, 100]];
+    for (const [slot, steps, energy] of casts) {
+      const rig = new Rig(wrenna, { 2: FOE }, energy);
+      rig.run(steps, press(slot, { aim: FOE }));
+      expect(rig.events('damage').map(({ e }) => e.targetId), slot).toEqual([2]);
+      expect(focus(rig), slot).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    }
+  });
+
+  it('loses all Focus 360 steps after the last hit and not one step sooner', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    buildFocus(rig, 3);
+    const last = focus(rig)?.lastHitTick;
+    rig.run(359);
+    expect(focus(rig)).toEqual({ count: 3, lastHitTick: last });
+    rig.step();
+    expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+    rig.clean();
+  });
+
+  it('M2 Barbed Arrow flies 12.83 m in 35 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(18 + 35, press('M2'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.35);
+    expect(spawned?.e.vx).toBe(22);
+    const [expired] = rig.events('projectileExpired');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(35);
+    expect(expired?.e.x).toBeCloseTo(X0 + 770 / 60, 9);
+    rig.clean();
+  });
+
+  it('M2 Barbed Arrow does 12 damage, then six pulses of 2 over 180 ticks', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    rig.run(18 + 22 + 190, press('M2'));
+    expect(damages(rig)).toEqual([[2, 12, 108], [2, 2, 106], [2, 2, 104], [2, 2, 102], [2, 2, 100], [2, 2, 98], [2, 2, 96]]);
+    expect(rig.applied()).toEqual([[2, 'dot', 180]]);
+    rig.clean();
+  });
+
+  it('M2 EX Barbed Arrow adds a slow of 30 percent for 120 ticks to the same shot', () => {
+    const rig = new Rig(wrenna, { 2: FOE }, 25);
+    rig.run(18 + 22 + 190, press('M2', { ex: true }));
+    expect(damages(rig)).toEqual([[2, 12, 108], [2, 2, 106], [2, 2, 104], [2, 2, 102], [2, 2, 100], [2, 2, 98], [2, 2, 96]]);
+    expect(rig.applied()).toEqual([[2, 'dot', 180], [2, 'slow', 120]]);
+    rig.clean();
+  });
+
+  it('SPACE Tumble dashes 5 m in 15 ticks with haste of 25 percent on self and fires nothing at the end', () => {
+    const rig = new Rig(wrenna);
+    rig.step(press('SPACE'));
+    expect(rig.applied()).toEqual([[0, 'haste', 90]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 25 }]);
+    rig.run(14);
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 5, 15]]);
+    expect(rig.events('dashEnded').map(({ step, e }) => [step, e.reason])).toEqual([[14, 'complete']]);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.clean();
+  });
+
+  it('Q Pinning Shot flies 12 m in 36 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(18 + 36, press('Q'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.4);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(36);
+    expect(expired?.e.x).toBeCloseTo(X0 + 720 / 60, 9);
+    rig.clean();
+  });
+
+  it('Q Pinning Shot does 9 damage and roots for 60 ticks', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    rig.run(18 + 30, press('Q'));
+    expect(damages(rig)).toEqual([[2, 9, 111]]);
+    expect(rig.applied()).toEqual([[2, 'root', 60]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'root' }]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E Heartseeker flies 15.83 m in 38 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(30 + 38, press('E'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(30);
+    expect(spawned?.e.radius).toBe(0.25);
+    expect(spawned?.e.vx).toBe(25);
+    const [expired] = rig.events('projectileExpired');
+    expect((expired?.step ?? 0) - 30 + 1).toBe(38);
+    expect(expired?.e.x).toBeCloseTo(X0 + 950 / 60, 9);
+    rig.clean();
+  });
+
+  describe('Heartseeker spends the Focus', () => {
+    it.each([
+      [0, 16],
+      [1, 20],
+      [2, 24],
+      [3, 28],
+    ])('with %i Focus it hits for %i, and the count is still held through the windup', (stacks, amount) => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, stacks);
+      const hurt = 120 - 11 * stacks;
+      rig.step(press('E'));
+      rig.run(29);
+      expect(focus(rig)?.count).toBe(stacks);
+      rig.step();
+      expect(rig.events('castFired').map(({ e }) => [e.slot, e.ex]).at(-1)).toEqual(['E', false]);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.run(25);
+      expect(rig.events('damage').at(-1)?.e).toMatchObject({ targetId: 2, amount, health: hurt - amount });
+      rig.clean();
+    });
+
+    it('EX with 3 Focus pierces for 20, costs 25 and leaves the Focus for Fade Step', () => {
+      const rig = new Rig(wrenna, { 2: [X0 + 5, 0], 3: FOE }, 25);
+      buildFocus(rig, 3);
+      const energy = champion(rig.state, 0).energy;
+      expect(energy).toBeGreaterThanOrEqual(25);
+      rig.step(press('E', { ex: true }));
+      expect(rig.events('castStarted').at(-1)?.e).toMatchObject({ slot: 'E', ex: true, cost: 25 });
+      expect(champion(rig.state, 0).energy).toBe(energy - 25);
+      rig.run(30 + 40);
+      expect(focus(rig)?.count).toBe(3);
+      const hits = rig.events('damage').slice(-2).map(({ e }) => [e.targetId, e.amount]);
+      expect(hits).toEqual([[2, 20], [3, 20]]);
+      expect(rig.events('projectileExpired').at(-1)?.e.reason).toBe('lifetime');
+      rig.clean();
+    });
+  });
+
+  describe('Fade Step spends the Focus', () => {
+    it('with 3 Focus cuts 360 ticks from Tumble on top of its tick, shields 25 for 180 and clears the count', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 3);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 1 - 360);
+      expect(rig.applied().at(-1)).toEqual([0, 'shield', 180]);
+      expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 25 }]);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      expect(champion(rig.state, 0).cooldowns[SLOTS.indexOf('R')]).toBe(780);
+      rig.clean();
+    });
+
+    it('with 2 Focus cuts 240 ticks', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 2);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 1 - 240);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+
+    it('cuts on the step that another cast finishes its windup too: the oracle reads every cast fired', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 2);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('M2'));
+      rig.run(17);
+      expect(rig.events('castFired').at(-1)?.e.slot).toBe('M1');
+      rig.step(press('R'));
+      expect(rig.events('castFired').slice(-2).map(({ e }) => e.slot)).toEqual(['M2', 'R']);
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 19 - 240);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+
+    it('brings a Tumble under 360 ticks to 0 and never below', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 3);
+      champion(rig.state, 0).cooldowns[SPACE] = 200;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(0);
+      rig.clean();
+    });
+
+    it('with no Focus is a plain shield and Tumble only ticks down', () => {
+      const rig = new Rig(wrenna);
+      champion(rig.state, 0).cooldowns[SPACE] = 300;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(299);
+      expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 25 }]);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+  });
+
+  it('F Arrow Storm lands where it is aimed and pulses on steps 36, 66, 96 and 126: 12 damage and a slow each', () => {
+    const rig = new Rig(wrenna, { 2: FOE, 3: [X0 + 8, 3.6] }, 100);
+    rig.run(36 + 120, press('F', { aim: FOE }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(36);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 8, 9);
+    expect(spawned?.e.radius).toBe(3);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [36, [2]],
+      [66, [2]],
+      [96, [2]],
+      [126, [2]],
+    ]);
+    expect(damages(rig)).toEqual([[2, 12, 108], [2, 12, 96], [2, 12, 84], [2, 12, 72]]);
+    expect(rig.applied().filter(([, status]) => status === 'slow')).toEqual([[2, 'slow', 60], [2, 'slow', 60], [2, 'slow', 60], [2, 'slow', 60]]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([155]);
+    expect(rig.health(3)).toBe(120);
+    rig.clean();
+  });
+
+  it('F Arrow Storm aimed far ahead lands 13 m away', () => {
+    const rig = new Rig(wrenna, {}, 100);
+    rig.run(36 + 1, press('F', { aim: [X0 + 20, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.x).toBeCloseTo(X0 + 13, 9);
+    rig.clean();
+  });
+
+  it('keeps one lingering area, Arrow Storm, and no wound', () => {
+    expect(lingeringPaths(wrenna)).toEqual(['wrenna.slots.F.effects[0]']);
+    expect(woundPaths(wrenna)).toEqual([]);
   });
 });

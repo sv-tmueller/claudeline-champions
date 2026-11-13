@@ -229,14 +229,21 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   (match flow, orb off), `scripted-orb-arena01-2v2.json` (#218, the only one
   with `energyOrb`, played by `orb-fixture.test.ts` and covered by its own
   coverage test; the other fixtures leave the key out, so they keep their
-  checksums) and the seven roster fixtures. `orb.test.ts` holds the unit rows
+  checksums) and the roster fixtures, one per kit. `orb.test.ts` holds the unit rows
   of the orb: the switch, the warning and pickup ticks, the cap, the draw for a
   tie across seeds 1 to 32 and the point's validation. `counter.test.ts` (#227)
-  holds the unit rows of the on-hit counter with test kits, since no shipped kit
-  declares one: the build per hit and its cap, each pinned reading (EX, shield,
-  invulnerable, pulses, dead caster, no cast), the decay boundary, the frozen
-  pause, the round reset and a run that equals the same run without the
-  declaration, counter keys stripped.
+  holds the unit rows of the on-hit counter with test kits, so a rule is tested
+  apart from any shipped kit: the build per hit and its cap, each pinned reading
+  (EX, shield, invulnerable, pulses, dead caster, no cast), the decay boundary,
+  the frozen pause, the round reset and a run that equals the same run without
+  the declaration, counter keys stripped. Wrenna's real kit (#270, the first
+  with a counter) is pinned in `roster-kits.test.ts`: Focus build and decay, and
+  both spends. The ability oracle of `ability-watch.ts` knows the cooldown
+  verb: a slot that did not start a cast loses one tick, and the slot a fired
+  `consumeCounter` names also loses its verb per stack held before the step,
+  never below 0. Only the first spend of a step cuts, as it takes the whole
+  counter, and a cut by a windup cast that fired before the named slot's own
+  cast started in the step is skipped, because the new cast resets the slot.
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
 - The client's energy orb tests (#224): `orb-view.test.ts` plays the standard 2v2
   with the orb on, on the real sim and the real feedback and sound routing, in
@@ -275,7 +282,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   seed 6) and asserts that it ends in a decision, with no end tick. The same
   project holds the fixture search's tests (`tools/fixtures/*.test.ts`): the
   format against the committed bytes, the pure search cases, the reproduction of
-  the seven roster fixtures and the CLI (see [Fixture search](#fixture-search)).
+  the roster fixtures and the CLI (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a
@@ -335,9 +342,10 @@ and budget-hit lines only. It needs Node 22.15 or later, for
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
 `npm run check`: a full run plays 25 200 matches and takes about 31 minutes on
 Apple silicon. It plays every kit of `HARNESS_KITS` in
-`tools/balance/inputs.ts` (the seven files of `data/kits`, so a kit added to the
+`tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
-step 1.3, #244). Every cell plays the standard match, so it sets the arena's orb
+step 1.3, #244, and Wrenna's file, #270, stays out until her step 3.4). Every
+cell plays the standard match, so it sets the arena's orb
 point from `data/orbs.json` (spec section 6).
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
@@ -386,10 +394,10 @@ What it does:
   every platform: no `Math.hypot` and no transcendental function. The tools lint
   does not ban them, so review enforces it.
 
-`tools/fixtures/reproduce.test.ts` runs the search on the seven committed
+`tools/fixtures/reproduce.test.ts` runs the search on the committed roster
 fixtures and compares the bytes: Hargrim's attempt 1, Quillon's attempt 23,
-Ondrel's attempt 2, Brimwick's attempt 10 and Durnhal's attempt 2 on the current
-kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
+Ondrel's attempt 2, Brimwick's attempt 10, Durnhal's attempt 2 and Wrenna's
+attempt 26 on the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
 searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put back in
 memory, as #125 changed those numbers and regenerated only the checkpoints),
 with the checkpoints of the current kits. Each row of the test names the kit
@@ -420,13 +428,13 @@ failed pre-check (decision 13 of batch #134):
   Skerrow on 2 and Lumeth on 5, and Lumeth on 6 after #191, whose self-cast
   rule moved only her checkpoints and checksum).
 
-A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148, and
-batch 16 for Durnhal, #204):
+A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148,
+batch 16 for Durnhal, #204, and #270 for Wrenna):
 
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
    energy gains, the dash `then`s and the statuses) and to `SEEDS` (the next
-   match seed, 5562 and up) in `packages/sim/test/roster-fixture.ts`. The tool
+   match seed that no kit of `SEEDS` has) in `packages/sim/test/roster-fixture.ts`. The tool
    stops with a message that names the file when either is missing.
 3. Run `npm run fixtures:search -- <id>`. When no attempt within the limit
    covers, the kit's `EXPECTED` asks for something a mirror may never show:
@@ -440,7 +448,9 @@ batch 16 for Durnhal, #204):
    above, and apply the timeout rule of the check suite to a reproduce row whose
    runner time passes 2.5 s. The rows of Ondrel (attempt 2), Brimwick (attempt
    10) and Durnhal (attempt 2) took 1.23, 0.84 and 0.68 s on the runner (0.36,
-   0.32 and 0.28 s locally), so they have no timeout of their own.
+   0.32 and 0.28 s locally), so they have no timeout of their own. Wrenna's row
+   (attempt 26) takes about 1.5 s locally and 2.14 s on the runner (job
+   132029295648 of #274, ubuntu-latest, Node 22.23.4), also under the mark.
 
 ## Playwright e2e
 

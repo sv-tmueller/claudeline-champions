@@ -8,12 +8,15 @@ import { HARNESS_KITS, loadInputs } from './inputs.ts';
 const ROOT = new URL('../../', import.meta.url);
 
 describe('the harness roster', () => {
-  it('plays the seven kits of data/kits, in file order', () => {
+  it('plays the listed kits of data/kits, in file order, and leaves out the kits not yet joined', () => {
     expect(HARNESS_KITS).toEqual(['brimwick', 'durnhal', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
     const files = readdirSync(fileURLToPath(new URL('data/kits/', ROOT))).filter((n) => n.endsWith('.json'));
-    expect(files).toHaveLength(7);
     expect(files).toContain('durnhal.json');
     for (const id of HARNESS_KITS) expect(files).toContain(`${id}.json`);
+    // A kit joins the harness in its own step, so the files outside the list are exactly the kits
+    // built ahead of it. Wrenna joins in step 3.4 of the roster-v3 build order (v3 spec 9.3).
+    const unlisted = files.map((n) => n.replace(/\.json$/, '')).filter((id) => !HARNESS_KITS.includes(id));
+    expect(unlisted).toEqual(['wrenna']);
     expect(loadInputs(ROOT).kits.map((kit) => kit.id)).toEqual([...HARNESS_KITS]);
   });
 
