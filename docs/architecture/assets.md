@@ -244,10 +244,10 @@ In the Channels column a bare bone name means that bone's rotation.
 - The cue and head-piece meshes ride the bones that move them: Hargrim's
   shoulder blocks, Lumeth's halo, Ondrel's reed bundle, Brimwick's fuse cap,
   Wrenna's quiver, Ysmeer's star motes and every champion's head piece on
-  `Spine` (the `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's blade and Durnhal's hammer on
-  `Arm_R` (the `Attack` swing, the `Hit` lift) and Durnhal's shield and
-  Wrenna's bow on `Arm_L` (the `Cast` raise). All clips are shared, with no
-  per-champion poses.
+  `Spine` (the `Attack` yaw, the `Hit` lean), Quillon's staff, Skerrow's blade
+  and Durnhal's hammer on `Arm_R` (the `Attack` swing, the `Hit` lift) and
+  Durnhal's shield and Wrenna's bow on `Arm_L` (the `Cast` raise). All clips are
+  shared, with no per-champion poses.
 - A head piece tops out at 1.85 m at rest, below the whole-model 1.90 m bound,
   because `Run` lifts `Hips` 0.035 m: a 1.85 m rest top is 1.885 m posed,
   under the 1.90 m clip limit with room for the `Hit` lean. The bound is per

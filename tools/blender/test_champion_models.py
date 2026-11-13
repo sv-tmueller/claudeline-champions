@@ -699,10 +699,10 @@ def rounded(position):
 # The cues: hargrim's two shoulder blocks, quillon's staff, skerrow's blade,
 # ondrel's reed bundle, durnhal's shield on Arm_L with his hammer on Arm_R and
 # wrenna's bow on Arm_L with her quiver on Spine and ysmeer's two star motes on
-# Spine (docs/design/roster-v1.md, roster-v2.md and roster-v3.md). Brimwick's cue is his fuse cap and that same
-# box is his head piece too: it carries the `head` tag alone, so the
-# 24-vertices-per-box count does not count it twice. Lumeth's cue is the one
-# that is not a box -- see RING_CUES below.
+# Spine (docs/design/roster-v1.md, roster-v2.md and roster-v3.md). Brimwick's
+# cue is his fuse cap and that same box is his head piece too: it carries the
+# `head` tag alone, so the 24-vertices-per-box count does not count it twice.
+# Lumeth's cue is the one that is not a box -- see RING_CUES below.
 #
 # The head pieces (issue #239) are one to three boxes on Spine. Every one tops
 # out at or under 1.85 m at rest -- the Run clip lifts Hips 0.035 m and the

@@ -343,7 +343,7 @@ def add_bow_and_quiver(bm):  # wrenna, bow archer, a bow in the left hand and a 
     carry(bm, "Spine", common.add_box, (-0.10, 0.0, 1.30), (0.08, 0.10, 0.44), BODY, (0.0, -8.0, 0.0))
 
 
-def add_star_motes(bm):  # ysmeer, star mage: two star motes drifting by the torso
+def add_star_motes(bm):  # ysmeer, star caster: two star motes drifting beside the head
     # Two 0.12 m cubes turned 45 degrees about Z, so they show as diamonds from
     # the camera, one front-left and one back-right. Both ride Spine, so the
     # Attack yaw and the Hit lean carry them. The lower one stays at least 62 mm
@@ -441,7 +441,7 @@ def add_wrenna_cap(bm):  # wrenna, bow archer: an archer's cap with a swept-back
     )
 
 
-def add_ysmeer_crown(bm):  # ysmeer, star mage: a six-point star crown of three flat bars
+def add_ysmeer_crown(bm):  # ysmeer, star caster: a six-point star crown of three flat bars
     # Three bars turned 0, +60 and -60 degrees about Z make a six-point star with
     # one point straight over the visor. The bottom is 1.67 m, so the visor rule
     # holds, and the top is 1.71 m. The bar length is the number the floor

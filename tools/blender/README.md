@@ -187,13 +187,14 @@ not vertical.
   mark the front.
 - Body and accent are flat colours.
 - All ten files share the node layout, the origin, the facing, the body
-  geometry, the rig, the clips and the accent. A roster champion differs only
-  in the body colour, one cue and one head piece, both in the body colour so
-  the accent still marks only the front. A cue can be several boxes: one on
-  Spine for Ondrel and Brimwick, two on Spine for Hargrim, and three on the two
-  arms for Durnhal, three on `Arm_L` for Wrenna plus her quiver on Spine, and
-  two on Spine for Ysmeer. A head piece is one to three boxes on Spine, so the `Attack` yaw and the `Hit`
-  lean carry it. Brimwick's fuse cap is his cue and his head piece at once.
+  geometry, the rig, the clips and the accent. A roster champion differs only in
+  the body colour, one cue and one head piece, both in the body colour so the
+  accent still marks only the front. A cue can be several boxes: one on Spine
+  for Ondrel and Brimwick, two on Spine for Hargrim, and three on the two arms
+  for Durnhal, three on `Arm_L` for Wrenna plus her quiver on Spine, and two on
+  Spine for Ysmeer. A head piece is one to three boxes on Spine, so the `Attack`
+  yaw and the `Hit` lean carry it. Brimwick's fuse cap is his cue and his head
+  piece at once.
 - The scene lists `Rig`, whose children are the joint `Hips` and the skinned
   mesh `Champion`. The rest pose is the static geometry, so the bind pose
   equals it and a model with no clip playing looks as it did unrigged. Every
@@ -234,7 +235,7 @@ not vertical.
 | `brimwick` | burst caster | (0.74, 0.12, 0.00) | `#df6100` | fuse cap on top of the head, top at 1.82 m | the same fuse cap, top at 1.82 m |
 | `durnhal` | guardian tank | (0.19, 0.18, 0.00) | `#797600` | box shield on the left arm and a hammer in the right hand, top at 1.34 m | visored helm with a nose ridge, top at 1.82 m |
 | `wrenna` | bow archer | (0.445, 0.093, 0.175) | `#b25674` | bow in the left hand and a quiver on the back, top at 1.52 m | archer's cap with a swept-back feather, top at 1.81 m |
-| `ysmeer` | star mage | (0.000, 0.060, 0.165) | `#004571` | two star motes by the torso, top at 1.80 m | star crown of three flat bars, top at 1.71 m |
+| `ysmeer` | star caster | (0.000, 0.060, 0.165) | `#004571` | two star motes beside the head, top at 1.80 m | star crown of three flat bars, top at 1.71 m |
 
 The accent is (0.95, 0.65, 0.10) in every file. The colours obey two rules,
 checked by `test_champion_models.py`. No body has a blue channel more than 45

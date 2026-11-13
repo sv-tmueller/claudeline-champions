@@ -780,19 +780,18 @@ distance of a dash.
 **Model.** Cue: two star motes, two boxes in the body material, so the accent
 still marks only the front. Each is a cube of 0.12 m turned 45 degrees about Z,
 so from the 55 degree camera it shows as a diamond, and both ride `Spine`, so
-the `Attack` yaw and the `Hit` lean carry them. One is front-left at
-(0.08, 0.34, 1.74) and one back-right at (-0.08, -0.34, 1.62): a mote on each
-side of the torso, one high and one low. Both stay inside the 0.5 m ground
-radius, at 0.4323 m. The pose
-tables stay shared, with no per-champion pose. With the head piece below, the
-model's top is the front-left mote's 1.8000 m at rest, and the clip tops are
-1.8096 m (Idle), 1.8222 m (Run), 1.8000 m (Attack), 1.8093 m (Cast), 1.8150 m
-(Hit) and 1.8281 m (Death), all under 1.90 m, with every clip's low at
-0.0000 m. The lowest new vertex is the crown's back point at key 30 of `Death`
-(on the back, `Hips` at -85 degrees and -0.64 m), 16.7 mm above the floor, and
-the motes stay at least 62 mm up in every clip. The model is 648 vertices and
-312 triangles. [C3: the byte count and the four byte-identical builds, once
-`ysmeer.glb` is committed; about 42.0 KB by estimate.]
+the `Attack` yaw and the `Hit` lean carry them. One is front-left at (0.08,
+0.34, 1.74) and one back-right at (-0.08, -0.34, 1.62): a mote on each side of
+the head, one high and one low. Both stay inside the 0.5 m ground radius, at
+0.4323 m. The pose tables stay shared, with no per-champion pose. With the head
+piece below, the model's top is the front-left mote's 1.8000 m at rest, and the
+clip tops are 1.8096 m (Idle), 1.8222 m (Run), 1.8000 m (Attack), 1.8093 m
+(Cast), 1.8150 m (Hit) and 1.8281 m (Death), all under 1.90 m, with every clip's
+low at 0.0000 m. The lowest new vertex is the crown's back point at key 30 of
+`Death` (on the back, `Hips` at -85 degrees and -0.64 m), 16.7 mm above the
+floor, and the motes stay at least 62 mm up in every clip. The model is 648
+vertices and 312 triangles. [C3: the byte count and the four byte-identical
+builds, once `ysmeer.glb` is committed; about 42.0 KB by estimate.]
 
 Body colour: night blue, linear (0.000, 0.060, 0.165), about `#004571`. In 8-bit
 sRGB b minus g is 44, one under the overlay cap of 45, so the overlay rule
