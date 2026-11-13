@@ -1224,6 +1224,24 @@ describe('the endArea rules', () => {
     // A lingering area beside a bolt whose endArea is a one-hit area: only the plain area lingers.
     expect(catalogProblems(shape([plain, shot(300, endArea(1))]))).toEqual([]);
 
+    // A one-hit endArea lingers too: spawned where the projectile runs out of lifetime, it runs a tick
+    // behind and is still in the arena at the end of that step (issue #276). Beside a 340-tick area
+    // the slot holds two live areas, the projectile ended by `lifetime`, not a wall.
+    const lifetimeEnd = shape([plain, shot(20, endArea(1))]);
+    {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(lifetimeEnd)]);
+      let live = 0;
+      const reasons: string[] = [];
+      for (let i = 0; i < 330; i++) {
+        step(state, [input(0, 0, 0, 0, Button.M2)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+        for (const e of state.events) if (e.type === 'projectileExpired') reasons.push(e.reason);
+      }
+      expect(reasons).toEqual(['lifetime']);
+      expect(live).toBe(2);
+    }
+    expect(catalogProblems(lifetimeEnd)).toEqual([message([340, 21])]);
+
     // The admitted shape keeps max live = 1 in the sim, over three cooldowns: one lingering area
     // (100 ticks) whose effect is a plain area, and a bolt whose 300-tick flight ends in a one-hit
     // area long after the slot's own area has gone.
@@ -1374,6 +1392,16 @@ describe('the endArea rules', () => {
     expect(catalogProblems(tie)).toEqual([]);
     expect(maxLive(tie)).toBe(1);
     expect(catalogProblems(swapped(plain(10, 352), plain(0, 352)))).toEqual([message('base', 'EX')]);
+
+    // The same tie on an endArea shot (flight 1): an area spawned at a lifetime end runs one tick
+    // behind a plain one and lives a tick longer (issue #276), so its last present tick is 359 for
+    // `endArea(350)` and 360 for `endArea(351)`, the tick the recharge appears the EX area.
+    const endTie = swapped(shotAbility(10, endArea(350)), plain(0, 350));
+    expect(maxLive(endTie)).toBe(1);
+    expect(catalogProblems(endTie)).toEqual([]);
+    const endOver = swapped(shotAbility(10, endArea(351)), plain(0, 351));
+    expect(maxLive(endOver)).toBe(2);
+    expect(catalogProblems(endOver)).toEqual([message('base', 'EX')]);
   });
 });
 
