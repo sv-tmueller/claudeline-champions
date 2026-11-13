@@ -1652,7 +1652,7 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     effects: [{ ...bolt(lifetimeTicks, durationTicks), endArea: { ...area(durationTicks), fuseTicks } }],
   });
 
-  it('E16 prices the fuse and the last tick of an endArea, which every endArea has since #276', () => {
+  it('E16 prices the fuse and the last tick of an endArea, which the walker gives every endArea since #276', () => {
     // A lifetime-end endArea is live for `fuse + duration` ticks from `windup + flight - 1` (issue
     // #276), so the pair with a plain area cast at the 360 recharge is exact at the boundary. Windup 6
     // and a 5-tick flight put the area on tick 10, so with a 60-tick fuse a 291-tick duration is
