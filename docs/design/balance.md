@@ -17,8 +17,8 @@ band (the note of section 4). The six-kit report added Ondrel and Brimwick to
 the harness, and section 5.9 reads the block it generated at 3704221 (60 cells,
 8 of them in band). The block was regenerated after the bots stopped refusing a
 melee press the sim lands (issue #186): 7 of 60 in band, read in section 5.10.
-Arena03 (#238) then extended that block into the three-arena six-kit block of
-#189 (section 5.11 reads it): 90 cells and 11 in band. The deadlock reach of
+Arena03 (#238) then extended the block of #213 (section 5.11) into the 90-cell
+three-arena block: 90 cells and 11 in band. The deadlock reach of
 #222 (batch 18) regenerated that six-kit block on its branch (at 094b42e): 90
 cells and 12 in band, read in section 5.13. The seven-kit report (issue #244),
 on main and without the reach, added Durnhal and turned the energy orb on in
@@ -872,8 +872,8 @@ package changes no kit and no bots rule.
 Note (2026-10-27, #186): the open question above, whether the profiles or the
 kits move first, is read in section 5.10 on a measurement. The figures of this
 section stay those of the block of #189, which the #186 block replaced; section
-5.10 lists what moved, and #238 extended that block with arena03 into the
-three-arena six-kit block of #189, which section 5.11 reads.
+5.10 lists what moved, and #238 extended the block of #213 with arena03 into the
+90-cell three-arena block that section 5.11 reads.
 
 ### 5.10 The melee presses of #186 (batch 16)
 
@@ -886,9 +886,9 @@ after a dash or a teleport, every area, and the stand, the finisher and the
 deadlock checks keep the 0.5 m test. It changes no kit and no sim rule. No
 identity row of the bots tests moves (all 16 hashes are the same on main and on
 the branch), but the change acts only near obstacles, in long matches, and moves
-18 of the 36 cells of Hargrim and Skerrow, so the block was regenerated (`npm
-run balance` on Node 22.23.2: 11 760 matches, 991.8 s, with two other runs on
-the machine).
+18 of the 36 cells of Hargrim and Skerrow, so the block was regenerated
+(`npm run balance` on Node 22.23.2: 11 760 matches, 991.8 s, with two other
+runs on the machine).
 
 **The block against the block of #189.** Cells in band: 7 of 60 (8). One cell
 leaves the band: 3v3 on arena02, Brimwick v Ondrel, 40.6 to 38.5, 1.5 points
