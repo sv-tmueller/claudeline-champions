@@ -2649,8 +2649,18 @@ set, a literal rangeMin 10, `play`'s optional `before` and `after` hooks (the ta
 counter on the state the bot thought on) and a table test that works every literal out again
 from `wrenna.json`.
 
+The heap check got one Wrenna scene (Heartseeker with 3 stacks and 60 energy at 12 m, E pressed on
+every think, so the `spendBase` test of `exFor` runs), as its own Maglev-only test after the two
+-0 pins and not among the twenty-one scenes: as a scene it left the two pins at 32 B a think in 3
+of 4 runs of the Node 26.7 job on the runner (0 B in the runs without it). A Wrenna think reads
+32 B a think in Maglev alone, here and on the runner, whichever slot she presses (E on 3 stacks, the
+EX at 0, M1), with `spendBase` empty, with Quillon's range or without the `counter` key on the
+champions, where Quillon in the same place reads 0 B: the cause is Maglev's and is not isolated.
+The default tiers read the same loads through Turbofan, and the browser runs those; the Maglev
+scene is bounded by the 128 B of the default tiers (not the 8 B of Maglev) until the cause is found.
+
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-two frozen scenes on arena 1 with the eight shipped kits (a
+section. It builds twenty-one frozen scenes on arena 1 with the eight shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
@@ -2667,9 +2677,7 @@ and the aim override on every think, a dodge: a Quillon standing with two
 bolts at her, one along an axis and one on a diagonal, so the threat scan of
 both and the sidestep run on every think, an orb contest: a Hargrim 7 m from the
 orb with the orb up and the enemy far out of reach, so the nearer scan, the reach
-scan and the path to the orb run on every think, a Wrenna spend: Heartseeker with 3
-stacks and 60 energy at 12 m, so the `spendBase` test of `exFor` runs on every think
-and E is pressed on each, and an orb ignored: a Quillon
+scan and the path to the orb run on every think, an orb ignored: a Quillon
 nearer the orb than an enemy in her reach, so the nearer scan passes and the reach
 test stops the contest on every think), warms each bot up with 20000 thinks,
 settles it in the default tiers (windows read like a round until one is under
