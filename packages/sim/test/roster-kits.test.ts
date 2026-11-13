@@ -1573,6 +1573,10 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     // (tick 361, or 362), when the 2-tick area is gone: the pair is accepted, and the sim agrees.
     pin(dashAndArea(0, 4, 2), dashThen(346, 15, 2), { base: null, EX: null });
     pin(dashAndArea(0, 4, 2), dashThen(346, 16, 2), { base: null, EX: null });
+    // The threshold is exact: a 3-tick EX area is still live on tick 361, where a base cast on the first tick that does not cancel meets it.
+    pin(dashAndArea(0, 4, 2), dashThen(346, 15, 3), { base: null, EX: 361 });
+    // A base windup of 1 moves the first start that does not cancel one tick earlier, to 361, and its area meets the EX area on 362.
+    pin(dashAndArea(1, 4, 2), dashThen(346, 16, 3), { base: null, EX: 362 });
     // With a plain area on the base there is no dash to cancel with: the EX area is live on tick 360
     // (15 ticks) or appears on tick 361 (16 ticks), where a base cast then holds two.
     pin(plain(0, 2), dashThen(346, 15, 2), { base: null, EX: 360 });
