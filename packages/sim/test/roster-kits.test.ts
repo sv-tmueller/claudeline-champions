@@ -252,7 +252,7 @@ function catalogProblems(kit: KitDef): string[] {
   // The fix is per slot: at most one area-producing effect of an ability may leave a *lingering*
   // area, and the base and its EX must not overlap either. Two non-lingering (plain, one-hit,
   // unfused) areas are gone by the step's end and never counted twice, which is why the shipped
-  // Lumeth F may carry two of them. A one-hit `endArea` is not one of them: it lingers (issue #276). A lone lingering effect stays under the cooldown (the per-effect bound
+  // Lumeth F may carry two of them. A one-hit `endArea` is not one of them: the walker counts it as lingering, at its lifetime-end case (issue #276). A lone lingering effect stays under the cooldown (the per-effect bound
   // below), so one lingering effect per ability is the one-live-area rule within that ability
   // (roster-v2 section 0, rules 2.8). A sum of the lifetimes under the cooldown is not enough: two
   // bolts that each fly 100 ticks and leave a 79-tick area sum to 358 against the 360 cooldown yet
@@ -302,8 +302,8 @@ function catalogProblems(kit: KitDef): string[] {
   };
   /**
    * Whether an area is still in the arena at the end of the step that spawns it. A plain one-hit area
-   * is gone by then; a one-hit `endArea` is not, because a lifetime end gives it a tick (issue #276),
-   * so every `endArea` lingers.
+   * is gone by then; a one-hit `endArea` that spawns at a lifetime end is not, because that end gives it a tick
+   * (issue #276), so the walker counts every `endArea` as lingering.
    */
   const lingers = (effect: AbilityEffect): boolean => {
     if (effect.type === 'area') return effect.fuseTicks !== undefined || effect.durationTicks > 1;
@@ -1660,7 +1660,7 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     pin(fusedShot(6, 5, 290, 60), plain(0, 2), { base: null, EX: null });
     pin(fusedShot(6, 5, 291, 60), plain(0, 2), { base: 360, EX: null });
     pin(fusedShot(6, 5, 292, 60), plain(0, 2), { base: 360, EX: null });
-    // A one-hit unfused endArea lingers: the area of a lifetime end is live on the step it spawns, so a
+    // A one-hit unfused endArea lingers in the walker's model: the area of a lifetime end is live on the step it spawns, so a
     // 20-tick flight from windup 340 puts it on tick 359 and one more tick of windup on 360, the tick
     // the recharge appears the second area. A plain one-hit area would never be seen.
     pinPair(shot(340, 20, 1), plain(0, 2), null, null);
