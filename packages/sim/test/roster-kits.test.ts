@@ -117,21 +117,37 @@ interface Visit {
   path: string;
   slot: Slot;
   effect: Effect | AbilityEffect;
+  /**
+   * What the spend verb adds to a damage of this ability at the counter cap: `bonusDamagePerStack`
+   * times the cap when the ability carries that verb (rules 2.6), else 0.
+   */
+  bonus: number;
 }
 
-function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, out: Visit[]): void {
+/** The most a damage verb of this ability gains from the spend: the bonus per stack times the cap. */
+function spendBonus(kit: KitDef, ability: AbilitySpec): number {
+  let bonus = 0;
+  for (const effect of ability.effects) {
+    if (effect.type === 'consumeCounter' && 'bonusDamagePerStack' in effect) {
+      bonus = effect.bonusDamagePerStack * (kit.counter?.cap ?? 0);
+    }
+  }
+  return bonus;
+}
+
+function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, bonus: number, out: Visit[]): void {
   const visit = (effect: AbilityEffect, path: string) => {
-    out.push({ path, slot, effect });
+    out.push({ path, slot, effect, bonus });
     if (effect.type === 'projectile' || effect.type === 'area' || effect.type === 'meleeArc') {
-      effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit }));
+      effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit, bonus }));
     }
     if (effect.type === 'projectile') {
-      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit }));
+      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit, bonus }));
       // Spec 4.3 and rules 2.8: the endArea obeys every area rule, so its leaves are held to the
       // same catalogue ranges as a plain `area` leaf at the same path (finding 2 of the round-2
       // report: they were never visited).
       effect.endArea?.effects.forEach((hit, i) =>
-        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit }),
+        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit, bonus }),
       );
     }
     if (effect.type === 'dash') effect.then.forEach((t, i) => visit(t, `${path}.then[${i}]`));
@@ -143,8 +159,8 @@ function visitKit(kit: KitDef): Visit[] {
   const out: Visit[] = [];
   for (const slot of SLOTS) {
     const spec = kit.slots[slot];
-    visitAbility(`${kit.id}.slots.${slot}`, slot, spec, out);
-    if (spec.ex) visitAbility(`${kit.id}.slots.${slot}.ex`, slot, spec.ex, out);
+    visitAbility(`${kit.id}.slots.${slot}`, slot, spec, spendBonus(kit, spec), out);
+    if (spec.ex) visitAbility(`${kit.id}.slots.${slot}.ex`, slot, spec.ex, spendBonus(kit, spec.ex), out);
   }
   return out;
 }
@@ -175,6 +191,7 @@ function catalogProblems(kit: KitDef): string[] {
     slot: Slot,
     area: { durationTicks: number; intervalTicks: number; effects: readonly Effect[]; fuseTicks?: number },
     flight: number,
+    bonus: number,
   ): void => {
     const { fuseTicks } = area;
     if (fuseTicks === undefined && area.durationTicks <= 1) return;
@@ -188,7 +205,8 @@ function catalogProblems(kit: KitDef): string[] {
     for (const type of ['damage', 'heal']) {
       const hits = area.effects.filter((hit): hit is Extract<Effect, { amount: number }> => hit.type === type);
       if (hits.length === 0) continue;
-      const total = hits.reduce((sum, hit) => sum + hit.amount, 0) * pulses;
+      // The spend bonus rides on every damage effect of every pulse (rules 2.6): it is added per effect.
+      const total = hits.reduce((sum, hit) => sum + hit.amount + (type === 'damage' ? bonus : 0), 0) * pulses;
       if (!within(total, 8, top)) bad(base, `${type} total ${total} over ${pulses} pulses is not 8 to ${top}`);
     }
     if (pulses > 1) {
@@ -341,12 +359,14 @@ function catalogProblems(kit: KitDef): string[] {
     }
   }
 
-  for (const { path, slot, effect } of visitKit(kit)) {
+  for (const { path, slot, effect, bonus } of visitKit(kit)) {
     switch (effect.type) {
       case 'damage':
       case 'heal': {
         const top = slot === 'F' ? 60 : 30;
-        if (!within(effect.amount, 8, top)) bad(`${path}.amount`, `${effect.type} ${effect.amount} is not 8 to ${top}`);
+        // The damage total after the spend bonus at the counter cap; a heal takes none.
+        const total = effect.amount + (effect.type === 'damage' ? bonus : 0);
+        if (!within(total, 8, top)) bad(`${path}.amount`, `${effect.type} ${total} is not 8 to ${top}`);
         break;
       }
       case 'applyStatus': {
@@ -392,7 +412,7 @@ function catalogProblems(kit: KitDef): string[] {
         // The three lingering-area rules of roster-v2 section 0 and the fuse rules of rules 2.7. An
         // unfused one-hit area is outside all of them; a fused one-hit area is held to the fuse range,
         // the damage total and the cooldown, and keeps the one-hit exception for stun, root and silence.
-        lingerRules(path, slot, effect, 0);
+        lingerRules(path, slot, effect, 0, bonus);
         break;
       case 'projectile':
         if (!within(effect.speed, 12, 25)) bad(`${path}.speed`, `projectile speed ${effect.speed} is not 12 to 25`);
@@ -401,7 +421,7 @@ function catalogProblems(kit: KitDef): string[] {
         // rules, with the projectile's flight added to the duration-under-cooldown bound because the
         // area spawns where the projectile ends (rules 2.7, roster-v2 0, finding 1).
         if (effect.endArea !== undefined) {
-          lingerRules(`${path}.endArea`, slot, effect.endArea, effect.lifetimeTicks);
+          lingerRules(`${path}.endArea`, slot, effect.endArea, effect.lifetimeTicks, bonus);
         }
         break;
       default:
@@ -451,6 +471,27 @@ describe('the catalog ranges', () => {
     stun.status.ticks = 121;
     expect(catalogProblems(copy)).toEqual([
       'hargrim.slots.F.effects[0].then[0].effects[1].status.ticks: stun of 121 ticks is outside 30 to 120',
+    ]);
+  });
+
+  it('add the spend bonus at the counter cap to every damage of the ability that spends', () => {
+    const copy = copyOf(hargrim);
+    copy.counter = { from: 'M1', cap: 3, windowTicks: 360 };
+    // 12 + 7 x 3 = 33 on the cast that spends; the other slots are not priced with the bonus.
+    copy.slots.M1.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 7 });
+    expect(catalogProblems(copy)).toEqual(['hargrim.slots.M1.effects[0].effects[0].amount: damage 33 is not 8 to 30']);
+    // At 6 per stack the total is 12 + 18 = 30, which is inside the range.
+    copy.slots.M1.effects[1] = { type: 'consumeCounter', bonusDamagePerStack: 6 };
+    expect(catalogProblems(copy)).toEqual([]);
+  });
+
+  it('add the spend bonus to every pulse of a lingering area of the ability that spends', () => {
+    const copy = copyOf(ondrel);
+    copy.counter = { from: 'M1', cap: 3, windowTicks: 360 };
+    // Three pulses of 8 are 24; with 1 x 3 on each they are 33, over the 30 of a skill.
+    copy.slots.M2.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 1 });
+    expect(catalogProblems(copy)).toEqual([
+      'ondrel.slots.M2.effects[0]: damage total 33 over 3 pulses is not 8 to 30',
     ]);
   });
 

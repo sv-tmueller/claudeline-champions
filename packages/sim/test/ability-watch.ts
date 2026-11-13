@@ -487,14 +487,31 @@ export class AbilityWatcher {
         this.check(started.cost === (started.slot === 'F' ? 100 : started.ex ? 25 : 0), `cast cost ${started.cost}`, state);
       }
 
-      // Cooldowns: a slot that started is its cooldown; the others lose one while alive.
+      // Cooldowns: a slot that started is its cooldown; the others lose one while alive. A cast that
+      // fires with a top-level `consumeCounter` of the cooldown verb (rules 2.6) then cuts the named
+      // slot by `cooldownTicksPerStack` for each stack the champion held before the step, never
+      // below 0. Written out again here: the oracle does not import `counter.ts` or `cast.ts`.
       if (kit && snap.alive && c.alive) {
+        let cut: { slot: Slot; ticks: number } | null = null;
+        const firedNow = fired.find((f) => f.type === 'castFired');
+        if (firedNow?.type === 'castFired') {
+          const spec = kit.slots[firedNow.slot];
+          const ability = firedNow.ex && spec.ex ? spec.ex : spec;
+          for (const effect of ability.effects) {
+            if (effect.type === 'consumeCounter' && 'cooldownTicksPerStack' in effect) {
+              const stacks = (before.champions[c.id] as ChampionState).counter?.count ?? 0;
+              cut = { slot: effect.slot, ticks: effect.cooldownTicksPerStack * stacks };
+              break;
+            }
+          }
+        }
         c.cooldowns.forEach((value, i) => {
           const slot = (['M1', 'M2', 'SPACE', 'Q', 'E', 'R', 'F'] as const)[i] as Slot;
-          const expected =
+          let expected =
             started?.type === 'castStarted' && started.slot === slot
               ? kit.slots[slot].cooldownTicks
               : Math.max(0, (snap.cooldowns[i] as number) - 1);
+          if (cut !== null && cut.slot === slot) expected = Math.max(0, expected - cut.ticks);
           this.check(value === expected, `champion ${c.id} cooldown ${slot} is ${value}, expected ${expected}`, state);
         });
       }

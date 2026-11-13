@@ -13,6 +13,7 @@ import { spawnProjectile } from '../src/projectile';
 import { nextRandom } from '../src/rng';
 import { nextId } from '../src/state';
 import { applyShield, applyStatus } from '../src/status';
+import { AbilityWatcher } from './ability-watch';
 import { arena01, checkAbilityInvariants, champion, input, openArena, place } from './helpers';
 import { STRIKER_ID, kitWith, testStriker } from './kits';
 
@@ -739,6 +740,24 @@ describe('spending the counter', () => {
     // 100 ticked down to 99 before the cast, then cut by 30 x 3 = 90.
     expect(champion(state, 0).cooldowns[SLOT_INDEX('SPACE')]).toBe(99 - 90);
     expect(champion(state, 0).cooldowns[SLOT_INDEX('R')]).toBe(0);
+  });
+
+  it('is clean under the ability oracle: the cut is a rule of the oracle, not a cooldown fault', () => {
+    const cut = (spend: number, slot: 'SPACE' | 'R') =>
+      [{ type: 'consumeCounter', cooldownTicksPerStack: spend, slot }, bolt()] as AbilityEffect[];
+    for (const [count, spend, left] of [[3, 5, 30], [3, 600, 30], [0, 5, 30], [2, 5, 20]] as const) {
+      const state = spent(cut(spend, 'SPACE'));
+      setCount(state, count);
+      champion(state, 0).cooldowns[SLOT_INDEX('SPACE')] = left;
+      const watcher = new AbilityWatcher(state);
+      for (let i = 0; i < 3; i++) {
+        const inputs = [input(0, 0, 300, 0, Button.Q)];
+        watcher.beforeStep(state);
+        step(state, inputs);
+        watcher.afterStep(state, inputs);
+      }
+      expect(watcher.problems).toEqual([]);
+    }
   });
 
   it('clamps the cut at 0 and never touches another slot', () => {
