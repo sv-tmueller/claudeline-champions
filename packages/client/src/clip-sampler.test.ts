@@ -35,7 +35,7 @@ import { BONE_NAMES, HIPS_POSITION, STRIDE, createClipRig, poseChampion, sampleC
 // The sampler plays the six clips of a champion model by itself, on the clip data, and
 // poses the bones. three's AnimationMixer is the oracle of these tests, not the frame path.
 
-const MODEL_IDS = ['placeholder', 'hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal'] as const;
+const MODEL_IDS = ['placeholder', 'hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna'] as const;
 const modelsDir = fileURLToPath(new URL('../../../assets/models/champions/', import.meta.url));
 
 async function loadModel(id: string): Promise<GLTF> {
@@ -497,7 +497,8 @@ const WALKS: { speed: number; facing: number; name: string }[] = [
 ];
 
 describe('the floor and the top through every transition', () => {
-  // Eight cases, one per model; no case is the slowest in every run. Runner (ubuntu-latest,
+  // Nine cases, one per model (the figures below are of eight: Wrenna's case read 2.0 s here on Linux
+  // x64, Node 22, beside Durnhal's 1.9 s, so the timeout stands); no case is the slowest in every run. Runner (ubuntu-latest,
   // Node 22): 3.3 to 7.2 s green on PR #219 (runs 41207597802, 41210693459, 41211772728), 3.3 to 7.9,
   // 4.2 to 8.0 and 3.7 to 7.6 s red on 5820f16 (runs 39001711657, 39008413462, 39009180211 x3);
   // 2.5 to 4.0 s locally (Apple M5 Pro, Node 22.23.2, full npm run test, eight models, at a
@@ -530,7 +531,8 @@ describe('the floor and the top through every transition', () => {
     expect(w.figures().low).toBeGreaterThanOrEqual(FLOOR);
   });
 
-  // Eight cases, one per model. Runner (ubuntu-latest, Node 22): 1.0 to 2.7 s green on PR #219
+  // Nine cases, one per model (the figures below are of eight: Wrenna's case read 0.62 s here on Linux
+  // x64, Node 22, beside Durnhal's 0.61 s, so the timeout stands). Runner (ubuntu-latest, Node 22): 1.0 to 2.7 s green on PR #219
   // (runs 41207597802, 41210693459, 41211772728), 1.9 to 2.6, 1.1 to 2.2 and 1.9 to 2.6 s red on
   // 5820f16 (runs 39001711657, 39008413462, 39009180211 x3); 0.79 to 1.16 s locally (Apple M5
   // Pro, Node 22.23.2, full npm run test, eight models, at a load average of about 240; the
@@ -593,7 +595,8 @@ describe('the floor and the top through every transition', () => {
     }
   });
 
-  // Eight cases, one per model. Runner (ubuntu-latest, Node 22): 1.3 to 3.0 s green on PR #219
+  // Nine cases, one per model (the figures below are of eight: Wrenna's case read 0.77 s here on Linux
+  // x64, Node 22, beside Durnhal's 0.72 s, so the timeout stands). Runner (ubuntu-latest, Node 22): 1.3 to 3.0 s green on PR #219
   // (runs 41207597802, 41210693459, 41211772728), 1.2 to 2.9, 1.1 to 1.5 and 1.1 to 3.0 s red on
   // 5820f16 (runs 39001711657, 39008413462, 39009180211 x3); 0.91 to 1.25 s locally (Apple M5
   // Pro, Node 22.23.2, full npm run test, eight models, at a load average of about 240; the

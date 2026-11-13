@@ -9,6 +9,7 @@ import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
+import wrennaJson from '../../../data/kits/wrenna.json';
 
 // createMatch validates a kit, so the cast needs no check of its own.
 export const HARGRIM_KIT = hargrimJson as unknown as KitDef;
@@ -26,4 +27,7 @@ export const SKERROW_KIT = skerrowJson as unknown as KitDef;
 export const ONDREL_KIT = ondrelJson as unknown as KitDef;
 // Not in TEST_KITS either: every area of Brimwick lasts one tick, so none ever reaches a view.
 export const BRIMWICK_KIT = brimwickJson as unknown as KitDef;
+// Not in TEST_KITS: the first champion with an on-hit counter (Longbow builds it, Heartseeker and Fade
+// Step spend it), so the first whose HUD shows pips. match-setup.test.ts plays her on every arena.
+export const WRENNA_KIT = wrennaJson as unknown as KitDef;
 export const TEST_KITS: readonly KitDef[] = [HARGRIM_KIT, QUILLON_KIT];

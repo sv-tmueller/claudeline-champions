@@ -12,11 +12,12 @@ import {
 import { describe, expect, it } from 'vitest';
 import arena01Json from '../../../data/arenas/arena01.json';
 import arena02Json from '../../../data/arenas/arena02.json';
+import arena03Json from '../../../data/arenas/arena03.json';
 import orbsJson from '../../../data/orbs.json';
 import { createBotDriver } from './bot-driver';
 import type { Launch } from './launch';
 import { LOCAL_SEED, createLocalMatch, playableTeamSize } from './match-setup';
-import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS } from './test-kits';
+import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS, WRENNA_KIT } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
@@ -340,6 +341,60 @@ describe('a match of bots on arena02', () => {
     expect(state.match?.score[winner as 'A' | 'B']).toBe(DEFAULT_ROUNDS_TO_WIN);
     expect(state.tick).toBeLessThanOrEqual(ARENA02_BUDGET_TICKS);
     expect(ARENA02_BUDGET_TICKS).toBe(Math.ceil((ARENA02_END_TICK + 2 * 1000 + 7000) / 1000) * 1000);
+  });
+});
+
+// Wrenna (roadmap 3.4, #281) on the shipped kit files: the first pick with an on-hit counter. The
+// match is the one the page starts, so on every arena and at both sizes she is champion 0 with 120
+// health and no stacks, the size is the one `playableTeamSize` allows, and 600 ticks of the bot
+// driver (the human sends no input, as in the e2e specs) step without a throw.
+describe('a Wrenna pick on the shipped kits', () => {
+  const ARENAS = [
+    ['arena01', arena],
+    ['arena02', arena02],
+    ['arena03', parseArenaDef(arena03Json)],
+  ] as const;
+  const KITS_WRENNA: readonly KitDef[] = [...KITS_3V3, WRENNA_KIT];
+
+  describe.each(ARENAS)('on %s', (arenaId, played) => {
+    it.each([2, 3] as const)('builds the match of a team size of %i asked, with her at champion 0, and steps 600 ticks', (asked) => {
+      const orb = orbPointFor(orbsJson, played);
+      const { state, botIds } = createLocalMatch(
+        { ...launch('wrenna'), arena: arenaId, teamSize: asked },
+        played,
+        KITS_WRENNA,
+        DEFAULT_ROUNDS_TO_WIN,
+        orb,
+      );
+      const size = playableTeamSize(asked, played);
+      expect(state.champions).toHaveLength(2 * size);
+      expect(botIds).toEqual(Array.from({ length: 2 * size - 1 }, (_, index) => index + 1));
+      const wrenna = state.champions[0];
+      expect([wrenna?.championId, wrenna?.team, wrenna?.maxHealth, wrenna?.health]).toEqual(['wrenna', 'A', 120, 120]);
+      expect(wrenna?.counter).toEqual({ count: 0, lastHitTick: 0 });
+      expect(state.kits.map((kit) => kit.id)).toContain('wrenna');
+      expect(state.arena.id).toBe(arenaId);
+
+      const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
+      const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
+      for (let tick = 0; tick < 600; tick++) {
+        driver.think(state, inputs);
+        step(state, inputs);
+      }
+      expect(state.tick).toBe(600);
+    });
+  });
+
+  it('puts the quillon and the lumeth beside her in the 3v3, against the usual enemy row', () => {
+    const { state } = createLocalMatch(launch3('wrenna'), arena, KITS_WRENNA);
+    expect(state.champions.map((c) => [c.championId, c.team])).toEqual([
+      ['wrenna', 'A'],
+      ['quillon', 'A'],
+      ['lumeth', 'A'],
+      ['hargrim', 'B'],
+      ['quillon', 'B'],
+      ['lumeth', 'B'],
+    ]);
   });
 });
 
