@@ -123,7 +123,10 @@ interface Visit {
   effect: Effect | AbilityEffect;
   /**
    * What the spend verb adds to a damage of this ability at the counter cap: `bonusDamagePerStack`
-   * times the cap when the ability carries that verb (rules 2.6), else 0.
+   * times the cap when the ability carries that verb (rules 2.6), else 0. On an `endArea` leaf and
+   * its pulses the walker adds it too, but the sim gives an endArea no bonusDamage
+   * (projectile.ts spawnEndArea), so there the number is a safe over-estimate; the pulses of a plain
+   * `area` are priced as the sim deals them.
    */
   bonus: number;
 }

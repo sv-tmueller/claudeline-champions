@@ -241,7 +241,9 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   both spends. The ability oracle of `ability-watch.ts` knows the cooldown
   verb: a slot that did not start a cast loses one tick, and the slot a fired
   `consumeCounter` names also loses its verb per stack held before the step,
-  from every cast fired in the step.
+  never below 0. Only the first spend of a step cuts, as it takes the whole
+  counter, and a cut by a windup cast that fired before the named slot's own
+  cast started in the step is skipped, because the new cast resets the slot.
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
 - The client's energy orb tests (#224): `orb-view.test.ts` plays the standard 2v2
   with the orb on, on the real sim and the real feedback and sound routing, in
@@ -447,7 +449,8 @@ batch 16 for Durnhal, #204, and #270 for Wrenna):
    runner time passes 2.5 s. The rows of Ondrel (attempt 2), Brimwick (attempt
    10) and Durnhal (attempt 2) took 1.23, 0.84 and 0.68 s on the runner (0.36,
    0.32 and 0.28 s locally), so they have no timeout of their own. Wrenna's row
-   (attempt 26) takes about 1.5 s locally and has no runner time yet.
+   (attempt 26) takes about 1.5 s locally and 2.14 s on the runner (job
+   132029295648 of #274, ubuntu-latest, Node 22.23.4), also under the mark.
 
 ## Playwright e2e
 
