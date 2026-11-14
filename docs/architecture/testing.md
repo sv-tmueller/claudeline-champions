@@ -10,8 +10,9 @@ Source: spec section 9.
 
 CI is split by cost:
 
-- Typecheck, lint, unit tests and the asset checks run on pull requests that
-  touch code, drafts included, and on pushes to main.
+- Typecheck, lint, unit tests and the asset checks run on every pull
+  request, drafts and docs-only ones included, and on pushes to main that touch
+  code.
 - The bots' heap check (`packages/bots/test/allocation.test.ts`) runs in its
   own job on the Node majors the unit job does not run, through
   `vitest.heap.config.ts`: Node 26.7.0 (pinned; V8 14.6) in the default tiers
@@ -29,7 +30,10 @@ CI is split by cost:
   that are ready for review and on pushes to main. They skip draft pull
   requests. They start only after the typecheck, lint, unit test and asset
   check job passes.
-- Changes that touch only `docs/` or Markdown files do not trigger CI.
+- Changes that touch only `docs/` or Markdown files run the full CI on pull
+  requests, because the required checks must always report and `assets:test`
+  reads `docs/architecture/assets.md`. A push to main that touches only those
+  files does not trigger CI.
 - The balance workflow (`.github/workflows/balance.yml`) is not part of CI.
   It runs only by hand (see [Balance reproduction](#balance-reproduction)).
 
