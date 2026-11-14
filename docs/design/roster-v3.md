@@ -5,9 +5,9 @@ model is built, and Wrenna's section is written, her kit is data (#270) and her
 model is built, her bot profile and client entry are built and she is in the
 balance harness roster (#281, step 3.4; the committed block is still the
 seven-kit report); Ysmeer's section is written and her model is built (#273,
-roadmap step 4.2) with her hud palette colour, but she has no kit, no bot
-profile and no select entry yet: her kit, her fuse and end area come in her own
-series (#271)
+roadmap step 4.2), but she has no kit, no bot profile and no select entry yet
+(roadmap step 4.3); her kit, her fuse and end area come in her own series
+(#271)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
