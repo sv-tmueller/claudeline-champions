@@ -57,9 +57,10 @@ first.
   6 to 8 m and her Quiet Dart opener, and no dash pressed on an escape think for
   any kit (#98); aim leading and three tiers; the contest of the energy orb (a
   bot walks to it once it is collectible when no enemy is in its own reach and it
-  is nearer than every enemy, #225). A think allocates nothing in the
-  steady state and a plan search only its path
-  (`packages/bots/test/allocation.test.ts`). Lumeth has Binding Sigil beside an
+  is nearer than every enemy, #225). A think allocates 0 B in the optimizing
+  tiers in the steady state and a plan search only its path
+  (`packages/bots/test/allocation.test.ts`; baseline code after a first-time deopt
+  does allocate, see [Bots](bots.md#what-the-rule-guarantees-in-a-match-290)). Lumeth has Binding Sigil beside an
   ally, the 3 m escape trigger with Lantern Burst and Glide, and her ally slots:
   Mend Bolt, Soothing Surge, Aegis Veil and Dawnbloom pressed at the ally that
   needs them, with the bolts aimed at it through their windup. Her leash to an
@@ -211,12 +212,18 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [batch #63 decision 14](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6002137472).
   Recorded in [the arena design](../design/arenas.md#8-the-arenas) and pinned
   in `tools/blender/test_arena_principles.py`.
-- The bot think allocates nothing, returns the bot's own record, and has a heap
-  check and an identity harness:
+- The bot think allocates 0 B in the optimizing tiers, returns the bot's own record, and
+  has a heap check and an identity harness:
   [batch #53 decision 7](https://github.com/sv-tmueller/claudeline-champions/issues/53#issuecomment-5996786969),
   [batch #63 decision 4](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6001535132),
   [batch #63 decision 19](https://github.com/sv-tmueller/claudeline-champions/issues/63#issuecomment-6003600257),
   [the harness](https://github.com/sv-tmueller/claudeline-champions/pull/72#issuecomment-6003754462).
+  Amended by #290 (the rule is what the optimizing tiers guarantee, not every tick of a
+  match; it stands for the default match after its warm-up and not for every shipped
+  configuration, and first-time deopts of the others are tracked in #303):
+  [the owner's decision on #290](https://github.com/sv-tmueller/claudeline-champions/issues/290#issuecomment-6881084227),
+  [the lead's decision after the second measurement](https://github.com/sv-tmueller/claudeline-champions/issues/294#issuecomment-6881795100),
+  [the lead's decisions on the developer's report](https://github.com/sv-tmueller/claudeline-champions/issues/294#issuecomment-6884318728).
   Recorded in [Bots](bots.md#allocation) and its [API](bots.md#api).
 - The `Platform` settings methods are asynchronous, so the Electron port reaches
   files over IPC without a signature change, and only those two are built:

@@ -165,21 +165,23 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * between the two.
  *
  * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
- * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 21 scenes, the plan
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 23 scenes, the plan
  * step 2784 B clear and 2400 to 2416 B fallback, the draw block and the dodge block 0 B, both -0
  * pins and the computeCues pin 0 B.
  *
  *   mutation                                       red in, and what it reads
- *   Number.isFinite for `t - t === 0` in aim       all 16 scenes 16 B; block 240 B; both pins 16 B
+ *   Number.isFinite for `t - t === 0` in aim       all 23 scenes 16 B; draw block 240 B, dodge
+ *                                                  block 144 B; both -0 pins 16 B
  *   aimU a closure variable of createBot           the draw block, 16 B
  *   steerTowardInto's distance through hypot2      8 scenes 80 to 160 B; plan 2944 B clear
- *   Number.isFinite in cellIndexAt                 3 scenes 16, 80 and 96 B; plan 2912 B; the
+ *   Number.isFinite in cellIndexAt                 5 scenes 16 to 96 B; plan 2912 B; the
  *                                                  landing pin 32 B
  *   clearShotWith's length through hypot2          6 scenes 16 to 1600 B
  *   segmentClear through hypot2                    11 scenes 2416 to 5984 B; plan 740 KB
  *   waitsFor with a double argument (#103)         the opener press scene, 16 B
  *   bestDistance of the sight scan a local         the kite, no clear shot scene, 16 B
- *   `+ 0` for `+ 0.5 - 0.5` in aim                 the aim pin, 768 B
+ *   `+ 0` for `+ 0.5 - 0.5` in aim                 the aim pin, 944 B (main's own file reads
+ *                                                  944 B too: 768 B was an older figure)
  *   `+ 0` for `+ 0.5 - 0.5` in landingInto         the landing pin, 288 B
  *   a bare Math.round in landingInto               the landing pin (no aim of +0 is made)
  *   rng.ts:next for the draw in aim                the draw block, 24 to 32 B
@@ -723,6 +725,11 @@ function buildScenes(): Scene[] {
     // spend-base test of `exFor` (stacks above 0, so the base shot) runs on every think, in the
     // run of every slot and in the choice, and E is pressed on every one. She stands (12 m is
     // inside her stand reach).
+    // Known limit (#303): this scene has to stay a list entry of this test. As a test of its own
+    // after the two -0 pins it reads 32 B a think in every Maglev run (before them, the press pin
+    // after it reads 32 B too): V8 marks all the bots' Maglev code for deoptimization once at that
+    // point (`dependent prototype chain changed`) and the next bot's `move` then stays in baseline
+    // code (status 16385) for 21 800 thinks. Why V8 does not tier it up again is not understood.
     scene(
       'wrenna spend',
       1,
@@ -818,11 +825,12 @@ describe('think allocation', () => {
   // (runs 39001711657, 39008413462, 39009180211 x3), then 6.9, 5.0 and 4.8 s on the settled check
   // (the three attempts of run 40339535608 of PR #184, one settle window of 10 to 58 ms a scene
   // each); 1.6 s locally (Apple M5 Pro, Node 22.23.2, full npm run test); 8.2 s with the two orb
-  // scenes (#225, 21 scenes: job 125568510485 of run 41530318344, the unit job of the draft pull
+  // scenes (#225, 21 scenes then, 23 now: job 125568510485 of run 41530318344, the unit job of the draft pull
   // request, Node 22), and 16.4 s on a loaded Linux machine (load average 25 on 6 CPUs). Timeout: the
   // smallest of 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite):
-  // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 2 to 4 s locally (the `{ slot, ex }` mutation of
-  // bots.md, all 17 scenes at the cap), inside it. The heap jobs (Node 24 and 26, both tiers)
+  // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 14.2 to 14.7 s on a Linux host with Node 22.23.3
+  // (the `{ slot, ex }` mutation of bots.md, all 23 scenes at the cap; main's file reads 14.3 to
+  // 14.6 s there, so the figure is the scene count's and not this file's), inside it. The heap jobs (Node 24 and 26, both tiers)
   // read 3.6 to 5.3 s.
   it('allocates under the limit per think in every scene', { timeout: 20_000 }, () => {
     const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
@@ -1112,7 +1120,7 @@ describe('think allocation', () => {
   // from its first run. Each scene is warmed up where its aim is whole, then moved 1 to 3 m so
   // the aim lands in [-0.5, 0) cm, and the lower of the two windows after the move must read under
   // the limit (the first window alone reads 16 B in a run of this test by itself).
-  // Red under `+ 0` in aim (768 B) and in landingInto (288 B), Node 26.7, Maglev alone.
+  // Red under `+ 0` in aim (944 B) and in landingInto (288 B), Node 26.7, Maglev alone.
   function expectNoDeoptAtMinusZero(s: Scene, move: (state: GameState) => void): void {
     const { figures, hits: zeros } = windowsAfter(
       s,

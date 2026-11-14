@@ -20,9 +20,10 @@ CI is split by cost:
   --no-turbofan --no-concurrent-recompilation --no-use-osr`; the last two
   switch off background compilation and OSR, which the browser keeps on, so
   that the figures do not depend on compile timing), and Node 24 in the
-  default tiers. Wrenna's spend scene (#281) runs in the default tiers only and
-  is left out of the Maglev run until #290 is fixed, so her `spendBase` branch
-  has no Maglev coverage yet. The unit job runs it on Node 22. The job has no
+  default tiers. Wrenna's spend scene (#281) is a list entry of the scene test
+  in both tiers (#290 put it back into the Maglev run), so her `spendBase`
+  branch has Maglev coverage; as a test of its own after the -0 pins it would read
+  32 B, a known limit (#303). The unit job runs it on Node 22. The job has no
   `needs:`, runs on drafts in parallel with the unit job and takes about half a
   minute.
   See [bots](bots.md), Testing.
@@ -51,8 +52,10 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
 
 - The list is every file that took 10 s or more in job 132439224766, slowest
   first, except that `packages/bots/test/allocation.test.ts` goes first. It has
-  always run first, and its readings depend on the load around it (#290), so its
-  run conditions stay as they were. `tests/vitest-sequencer.test.ts` fails if a
+  always run first, and its readings depend on the load around it and on what the
+  tests before it allocated (a major GC inside a measured window deoptimizes the
+  shared Maglev code of dead bots, #290; the test keeps its bots alive since), so
+  its run conditions stay as they were. `tests/vitest-sequencer.test.ts` fails if a
   listed path does not exist, so a renamed file cannot silently drop back to the
   end.
 - The rule: a file that reads 10 s or more in a unit job, on a slow runner
@@ -166,7 +169,10 @@ and the timeouts stand.
   scenes) the unit job reads 8.2 s (job 125568510485, 8152 ms), twice which is 16.3 s,
   so the timeout is 20 s; on a loaded machine (load average 25 on 6 CPUs) it read 16.4 s
   and failed the old 15 s. The "brimwick windup" scene of #187 (the 22nd) adds 1.2 s
-  locally for the one window, well inside the budget.
+  locally for the one window, well inside the budget. With Wrenna's scene (the 23rd) on a
+  six-core Linux host: 3.55 to 3.75 s in the Maglev project, 3.8 to 4.0 s in the default
+  tiers, and 14.2 to 14.7 s for a red run to the cap of the settle on Node 22.23.3 (the
+  `{ slot, ex }` mutation; main's file reads 14.3 to 14.6 s there), so the timeout stays 20 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (eight models): 2.5 to 4.0 s locally, 3.3 to
   7.2 s green, 3.3 to 8.0 s red, timeout 20 s.
@@ -887,6 +893,12 @@ other spec.
   but fall in windows with events (see the heap probe).
 
 ### The heap probe
+
+The probe's sampler is not free of side effects (#290): started and stopped with garbage
+included, the CDP sampling profiler forces a Mark-Compact each time (43 against 2 over a 3v3 match
+with a Wrenna champion). A major GC clears the weak objects embedded in optimized code and throws
+it back to baseline, so a per-function figure of a window can be inflated, and has to be read with
+the tier of the function (bots.md, "What the rule guarantees in a match"). Tracked in #304.
 
 Two specs count the allocations of the per-frame code over windows of frames,
 with the sampling heap profiler and garbage included, so a plain heap delta is
