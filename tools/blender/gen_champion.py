@@ -4,8 +4,8 @@ Usage: tools/blender/run.sh tools/blender/gen_champion.py -- \
     --champion placeholder --out assets/models/champions/placeholder.glb
 
 The ids are placeholder (the generic model), hargrim, quillon, lumeth, skerrow,
-ondrel, brimwick, durnhal and wrenna. They share the placeholder's body and
-accent and differ only in the body colour, one cue and one head piece,
+ondrel, brimwick, durnhal, wrenna and ysmeer. They share the placeholder's body
+and accent and differ only in the body colour, one cue and one head piece,
 Durnhal's, Wrenna's and the head pieces in parts on more than one bone, listed
 in tools/blender/README.md.
 
@@ -43,6 +43,7 @@ BODY_COLOURS = {
     "brimwick": (0.74, 0.12, 0.00),  # burnt orange
     "durnhal": (0.19, 0.18, 0.00),  # olive brass
     "wrenna": (0.445, 0.093, 0.175),  # plum, about #b25674
+    "ysmeer": (0.000, 0.060, 0.165),  # night blue, about #004571
 }
 
 # The shared rig in Blender coordinates: (name, parent, head, tail). Every part
@@ -342,6 +343,15 @@ def add_bow_and_quiver(bm):  # wrenna, bow archer, a bow in the left hand and a 
     carry(bm, "Spine", common.add_box, (-0.10, 0.0, 1.30), (0.08, 0.10, 0.44), BODY, (0.0, -8.0, 0.0))
 
 
+def add_star_motes(bm):  # ysmeer, star caster: two star motes drifting beside the head
+    # Two 0.12 m cubes turned 45 degrees about Z, so they show as diamonds from
+    # the camera, one front-left and one back-right. Both ride Spine, so the
+    # Attack yaw and the Hit lean carry them. The lower one stays at least 62 mm
+    # above the floor in every shared clip.
+    for center in ((0.08, 0.34, 1.74), (-0.08, -0.34, 1.62)):
+        carry(bm, "Spine", common.add_box, center, (0.12, 0.12, 0.12), BODY, (0.0, 0.0, 45.0))
+
+
 CUES = {
     "placeholder": None,
     "hargrim": add_shoulder_blocks,
@@ -352,6 +362,7 @@ CUES = {
     "brimwick": add_fuse_cap,
     "durnhal": add_shield_and_hammer,
     "wrenna": add_bow_and_quiver,
+    "ysmeer": add_star_motes,
 }
 
 # The head piece is the second half of a champion's silhouette, added in the
@@ -430,6 +441,16 @@ def add_wrenna_cap(bm):  # wrenna, bow archer: an archer's cap with a swept-back
     )
 
 
+def add_ysmeer_crown(bm):  # ysmeer, star caster: a six-point star crown of three flat bars
+    # Three bars turned 0, +60 and -60 degrees about Z make a six-point star with
+    # one point straight over the visor. The bottom is 1.67 m, so the visor rule
+    # holds, and the top is 1.71 m. The bar length is the number the floor
+    # bounds: at Death key 30, where the body lies on its back, the crown's back
+    # point is 16.7 mm above the floor, and a 0.48 m bar would sink 3.3 mm.
+    for turn in (0.0, 60.0, -60.0):
+        carry(bm, "Spine", common.add_box, (0.0, 0.0, 1.69), (0.44, 0.08, 0.04), BODY, (0.0, 0.0, turn))
+
+
 HEAD_PIECES = {
     "placeholder": None,
     "hargrim": add_hargrim_helm,
@@ -441,6 +462,7 @@ HEAD_PIECES = {
     "brimwick": None,
     "durnhal": add_durnhal_helm,
     "wrenna": add_wrenna_cap,
+    "ysmeer": add_ysmeer_crown,
 }
 
 

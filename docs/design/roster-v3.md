@@ -1,9 +1,13 @@
 # Roster v3: champions seven to nine
 
 Status: in progress; Durnhal's section is written, his kit is data and his
-model is built, and Wrenna's section is written and her model is built (her
-kit and counter come in her own series); Ysmeer's section is written and her
-kit, her fuse and end area and her model come in her own series
+model is built, and Wrenna's section is written, her kit is data (#270) and her
+model is built, her bot profile and client entry are built and she is in the
+balance harness roster (#281, step 3.4; the committed block is still the
+seven-kit report); Ysmeer's section is written and her model is built (#273,
+roadmap step 4.2), but she has no kit, no bot profile and no select entry yet
+(roadmap step 4.3); her kit, her fuse and end area come in her own series
+(#271)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -308,9 +312,9 @@ the two spend verbs, which belong to the counter.
   Pinning Shot and Heartseeker, build nothing, and neither does Arrow Storm.
 - **Spend:** the two verbs are part 4.4b (v3 spec section 4.4b, #245), and rules.md section 2.6 gives the rule. `consumeCounter` is a top-level effect with `{ bonusDamagePerStack: 4 }` on Heartseeker and with `{ cooldownTicksPerStack: 120, slot: 'SPACE' }` on Fade Step. It spends the whole counter on the tick the cast fires and does nothing at 0, so Fade Step with no Focus is a plain shield of 25. 120 ticks per stack is 2 s, so 3 stacks cut 360 of Tumble's 540 ticks, and a cooldown never goes below 0. The damage range applies to the total: 16 + 4 times 3 is 28, under 30.
 
-**Kit data (not built yet).** `data/kits/wrenna.json` is step 3.3 of the build
+**Kit data (built, #270).** `data/kits/wrenna.json` is step 3.3 of the build
 order, after the on-hit counter (step 3.1, #227) and the spend verbs (step
-3.2). This section fixes the numbers it will use. The conversions are ticks =
+3.2). This section fixes the numbers it uses. The conversions are ticks =
 seconds x 60, a damage over time of T over S s is `perPulse` T times 0.5 over
 S, with `ticks` S times 60 (one tick every 30 ticks, as Skerrow's Rend), and
 "N pulses of I s" is an `area` with `intervalTicks` I times 60 and
@@ -346,8 +350,42 @@ the damage over time, the slow or the root. Every damaging slot (M1, M2, Q, E
 and F) carries a `damage`, so each earns energy by rules 3.1; SPACE and R carry
 none and earn none. EX variants sit on M2 and E, never on F, at 25 energy, and
 F costs 100. A number changes in the file, here and in the scripted fixture in
-the same change. Wrenna joins the balance harness in the last step of her
-series (v3 spec section 9.3).
+the same change. Wrenna joined the balance harness in the last step of her
+series (v3 spec section 9.3), step 3.4 (#281): `HARNESS_KITS` in
+`tools/balance/inputs.ts` lists her, and the balance block of
+[balance](balance.md) is not regenerated for her, so it is still the seven-kit
+report and `npm run balance -- --check` fails on purpose until the nine-kit
+report of batch 21.
+
+**Bot profile (#281).** Roster-v3 has no bot sketch for her, so her profile
+follows roster-v2's recipe (see [bots](../architecture/bots.md)): she keeps 10
+to 13 m (the low end of her intended 10 to 14 m, and Longbow's 14 m less the
+margin), throws Pinning Shot at a target walking toward her, builds her counter
+with Longbow on its band, and escapes by Tumble, then Fade Step (which cuts
+Tumble by 120 ticks a stack, so it goes second). She spends the counter with the
+base Heartseeker while she holds stacks (the new `spendBase` field of her rule),
+since the EX ties the base shot at 1 stack, loses from 2 and costs 25 energy.
+
+As built (#270), where the sections above leave a choice open:
+
+- The key order is the one of `hargrim.json` (`id`, `maxHealth`, `moveSpeed`,
+  `support`, `ex`), then `counter`, then `slots`.
+- The `consumeCounter` marker sits where the table names the effect: after the
+  projectile on Heartseeker (`[projectile, consumeCounter]`, so the EX differs
+  from it at `effects[0].pierce`, `effects[0].effects[0].amount` and
+  `effects[1]`) and before the shield on Fade Step (`[consumeCounter, shield]`).
+  Where it sits changes nothing, since `fire` scans the list before any effect
+  runs.
+- Tumble is `dash` of 5 m in 15 ticks with an empty `then`, then a haste on
+  self, the shape of Hargrim's Rush. Tumble and Fade Step carry no damage, so
+  neither earns energy.
+- The roster test walks the damage total after the spend bonus: Heartseeker is
+  16 + 4 x 3 = 28, under 30, and a kit that puts the marker on a pulsing area
+  adds the bonus to every damage of every pulse. The ability oracle of the sim
+  tests knows the cooldown verb (it lowers the named slot by the verb per stack
+  held, never below 0).
+- Her scripted fixture, `scripted-roster-wrenna-arena01-2v2.json`, is match seed
+  5562, built by `npm run fixtures:search -- wrenna`.
 
 **Range table.** The intended range of this section, in the shape of
 [roster v2](roster-v2.md) section 1. The table over all nine is in section 3.
@@ -753,7 +791,49 @@ cooldowns, the windups, the lifetime of a projectile, the radius and the
 duration of an area, the length of a fuse chosen inside the catalog, and the
 distance of a dash.
 
-**Model.** Not part of this section. Her model, colour and cue are built in
-step 4.2 of the build order, under the colour rule of v3 spec section 3:
-distinct from the six shipped champions, Durnhal, Wrenna and the HUD's
-reserved team colours.
+**Model.** Cue: two star motes, two boxes in the body material, so the accent
+still marks only the front. Each is a cube of 0.12 m turned 45 degrees about Z,
+so from the 55 degree camera it shows as a diamond, and both ride `Spine`, so
+the `Attack` yaw and the `Hit` lean carry them. One is front-left at (0.08,
+0.34, 1.74) and one back-right at (-0.08, -0.34, 1.62): a mote on each side of
+the head, one high and one low. Both stay inside the 0.5 m ground radius, at
+0.4323 m. The pose tables stay shared, with no per-champion pose. With the head
+piece below, the model's top is the front-left mote's 1.8000 m at rest, and the
+clip tops are 1.8096 m (Idle), 1.8222 m (Run), 1.8000 m (Attack), 1.8093 m
+(Cast), 1.8150 m (Hit) and 1.8281 m (Death), all under 1.90 m, with every clip's
+low at 0.0000 m. The lowest new vertex is the crown's back point at key 30 of
+`Death` (on the back, `Hips` at -85 degrees and -0.64 m), 16.7 mm above the
+floor, and the motes stay at least 62 mm up in every clip. The model is 648
+vertices, 312 triangles and 42 036 bytes, and four builds are byte-identical.
+
+Body colour: night blue, linear (0.000, 0.060, 0.165), about `#004571`. In 8-bit
+sRGB b minus g is 44, one under the overlay cap of 45, so the overlay rule
+holds (`overlay None`). The distances to the bodies are Skerrow 83.5, Quillon
+83.5, Ondrel 113.7, Durnhal 172.7, the placeholder 178.2, Wrenna 178.8, Hargrim
+183.0, Lumeth 211.7 and Brimwick 251.6; to the client colours the dead grey
+94.0, the energy orb 149.7, the ally bar 164.0, the ally projectile 222.8, the
+enemy bar 257.4, the enemy projectile 265.0, the debug overlay 299.9, the
+impact ring 295.6 and the hit flash 346.1; to the arena floor 177.9, the trim
+220.8 and the accent 287.6. The HUD, result, menu and select colours are at
+least 132.4 away (the four panels). Every pair is at least 83.5, so no
+existing margin moves, and the pair with Skerrow and Quillon is the
+second-tightest of the roster after Skerrow against the black panels at 83.1.
+Violet and indigo break the b - g rule. Gold, silver and white sit within 80 of
+the accent, the impact ring, the HUD energy colour, the hit flash or the trim,
+so night blue is the only on-theme family that passes. Two on-theme colours
+were measured and set aside: aqua `#00fed6`, nearest the ally bar and the ally
+projectile, so an enemy Ysmeer would read as ally-coloured, and pale star
+yellow `#ffffa0`, nearest the accent, so the visor would stop marking the
+front.
+
+The head piece is a star crown: three flat bars of 0.44 m by 0.08 m by 0.04 m on
+`Spine` in the body material, all centred at (0, 0, 1.69) and turned 0, +60 and
+-60 degrees about Z, which makes a six-point star with one point straight over
+the visor. The top is 1.71 m and the bottom 1.67 m, so the crown sits above the
+accent visor (which ends at 1.61 m) and the visor stays the front mark, and the
+top is far under the 1.85 m rest bound. Treated alone, the crown's ground radius
+is 0.2236 m, inside 0.5 m, so the model's 0.4323 m footprint is the motes'. The
+bar length is the number the shared `Death` clip fixes: at key 30 the crown's
+back point is 16.7 mm above the floor, and a 0.48 m bar would sink 3.3 mm. No
+box corner coincides with another box or with the body, and only Z turns are
+used.

@@ -133,6 +133,11 @@ export interface KitCache {
    */
   baseMelee: Uint8Array;
   exMelee: Uint8Array;
+  /**
+   * 1 when the slot spends a built counter on its base ability (`ChampionRules.spendBase`): while
+   * the champion holds stacks (`counter.count` above 0) its EX variant is not cast (see `exFor`).
+   */
+  spendBase: Uint8Array;
   /** The slots of the escape rule in priority order, as indices into SLOTS, ended by -1. */
   escapeOrder: Int8Array;
   /** 1 when the slot is in `escapeOrder`. */
@@ -260,6 +265,7 @@ export function createKitCache(): KitCache {
     exDash: new Uint8Array(SLOTS.length),
     baseMelee: new Uint8Array(SLOTS.length),
     exMelee: new Uint8Array(SLOTS.length),
+    spendBase: new Uint8Array(SLOTS.length),
     escapeOrder: new Int8Array(SLOTS.length).fill(-1),
     isEscape: new Uint8Array(SLOTS.length),
     escapeRange: new Float64Array(SLOTS.length),
@@ -304,6 +310,7 @@ export function refreshKitCache(
     cache.exDash[i] = 0;
     cache.baseMelee[i] = 0;
     cache.exMelee[i] = 0;
+    cache.spendBase[i] = 0;
     cache.isEscape[i] = 0;
     cache.escapeRange[i] = 0;
     cache.escapeFixed[i] = 0;
@@ -375,6 +382,10 @@ export function refreshKitCache(
     cache.waitBand[0] = rules.wait.band[0];
     cache.waitBand[1] = rules.wait.band[1];
     cache.waitBand[2] = rules.wait.maxTicks;
+  }
+  for (const slot of rules.spendBase) {
+    if (kit === undefined) break;
+    cache.spendBase[SLOTS.indexOf(slot)] = 1;
   }
   cache.escapeWithin[0] = kit !== undefined && rules.escapeWithin !== null ? rules.escapeWithin : -1;
   cache.holdF = kit !== undefined && rules.holdF;
@@ -575,11 +586,13 @@ const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
 /**
  * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
  * `kit.ex`, has a variant with a reach band (the cache holds one only then), the champion has
- * the energy, and F is not holding the energy back (`cues.reserve`, see `computeCues`). F never
- * has an EX variant.
+ * the energy, F is not holding the energy back (`cues.reserve`, see `computeCues`), and the slot is
+ * not one that spends a built counter on its base ability while the champion holds stacks
+ * (`KitCache.spendBase`: Wrenna's Heartseeker). F never has an EX variant.
  */
 function exFor(cache: KitCache, index: number, me: ChampionState, cues: CastCues): boolean {
   if (cache.hasEx[index] !== 1 || me.energy < EX_ENERGY_COST) return false;
+  if (cache.spendBase[index] === 1 && me.counter !== undefined && me.counter.count > 0) return false;
   return !cues.reserve;
 }
 

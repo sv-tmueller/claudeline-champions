@@ -1,5 +1,5 @@
 // The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json`, `lumeth.json`,
-// `ondrel.json`, `brimwick.json`, `durnhal.json` and `ysmeer.json`, whose numbers come from docs/design/roster-v1.md,
+// `ondrel.json`, `brimwick.json`, `durnhal.json`, `wrenna.json` and `ysmeer.json`, whose numbers come from docs/design/roster-v1.md,
 // docs/design/roster-v2.md and docs/design/roster-v3.md (ticks = seconds x 60, one hit =
 // durationTicks 1 / intervalTicks 1, and the lingering areas of Ondrel carry the three rules of
 // roster-v2 section 0).
@@ -16,6 +16,7 @@ import lumethJson from '../../../data/kits/lumeth.json';
 import ondrelJson from '../../../data/kits/ondrel.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
 import durnhalJson from '../../../data/kits/durnhal.json';
+import wrennaJson from '../../../data/kits/wrenna.json';
 import ysmeerJson from '../../../data/kits/ysmeer.json';
 import { Button, SLOTS, createMatch, debug, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
@@ -32,6 +33,7 @@ const KITS = [
   { stem: 'ondrel', json: ondrelJson },
   { stem: 'brimwick', json: brimwickJson },
   { stem: 'durnhal', json: durnhalJson },
+  { stem: 'wrenna', json: wrennaJson },
   { stem: 'ysmeer', json: ysmeerJson },
 ];
 
@@ -42,6 +44,7 @@ const lumeth = validateKit(lumethJson);
 const ondrel = validateKit(ondrelJson);
 const brimwick = validateKit(brimwickJson);
 const durnhal = validateKit(durnhalJson);
+const wrenna = validateKit(wrennaJson);
 const ysmeer = validateKit(ysmeerJson);
 
 function mirror(id: string) {
@@ -102,6 +105,7 @@ describe('the kit stats', () => {
     expect(stats(ondrel)).toEqual({ id: 'ondrel', maxHealth: 130, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(brimwick)).toEqual({ id: 'brimwick', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(durnhal)).toEqual({ id: 'durnhal', maxHealth: 160, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
+    expect(stats(wrenna)).toEqual({ id: 'wrenna', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(ysmeer)).toEqual({ id: 'ysmeer', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
   });
 
@@ -121,21 +125,40 @@ interface Visit {
   path: string;
   slot: Slot;
   effect: Effect | AbilityEffect;
+  /**
+   * What the spend verb adds to a damage of this ability at the counter cap: `bonusDamagePerStack`
+   * times the cap when the ability carries that verb (rules 2.6), else 0. On an `endArea` leaf and
+   * its pulses the walker adds it too, but the sim gives an endArea no bonusDamage
+   * (projectile.ts spawnEndArea), so there the number is a safe over-estimate; the pulses of a plain
+   * `area` are priced as the sim deals them.
+   */
+  bonus: number;
 }
 
-function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, out: Visit[]): void {
+/** The most a damage verb of this ability gains from the spend: the bonus per stack times the cap. */
+function spendBonus(kit: KitDef, ability: AbilitySpec): number {
+  let bonus = 0;
+  for (const effect of ability.effects) {
+    if (effect.type === 'consumeCounter' && 'bonusDamagePerStack' in effect) {
+      bonus = effect.bonusDamagePerStack * (kit.counter?.cap ?? 0);
+    }
+  }
+  return bonus;
+}
+
+function visitAbility(prefix: string, slot: Slot, ability: AbilitySpec, bonus: number, out: Visit[]): void {
   const visit = (effect: AbilityEffect, path: string) => {
-    out.push({ path, slot, effect });
+    out.push({ path, slot, effect, bonus });
     if (effect.type === 'projectile' || effect.type === 'area' || effect.type === 'meleeArc') {
-      effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit }));
+      effect.effects.forEach((hit, i) => out.push({ path: `${path}.effects[${i}]`, slot, effect: hit, bonus }));
     }
     if (effect.type === 'projectile') {
-      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit }));
+      effect.allyEffects?.forEach((hit, i) => out.push({ path: `${path}.allyEffects[${i}]`, slot, effect: hit, bonus }));
       // Spec 4.3 and rules 2.8: the endArea obeys every area rule, so its leaves are held to the
       // same catalogue ranges as a plain `area` leaf at the same path (finding 2 of the round-2
       // report: they were never visited).
       effect.endArea?.effects.forEach((hit, i) =>
-        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit }),
+        out.push({ path: `${path}.endArea.effects[${i}]`, slot, effect: hit, bonus }),
       );
     }
     if (effect.type === 'dash') effect.then.forEach((t, i) => visit(t, `${path}.then[${i}]`));
@@ -147,8 +170,8 @@ function visitKit(kit: KitDef): Visit[] {
   const out: Visit[] = [];
   for (const slot of SLOTS) {
     const spec = kit.slots[slot];
-    visitAbility(`${kit.id}.slots.${slot}`, slot, spec, out);
-    if (spec.ex) visitAbility(`${kit.id}.slots.${slot}.ex`, slot, spec.ex, out);
+    visitAbility(`${kit.id}.slots.${slot}`, slot, spec, spendBonus(kit, spec), out);
+    if (spec.ex) visitAbility(`${kit.id}.slots.${slot}.ex`, slot, spec.ex, spendBonus(kit, spec.ex), out);
   }
   return out;
 }
@@ -179,6 +202,7 @@ function catalogProblems(kit: KitDef): string[] {
     slot: Slot,
     area: { durationTicks: number; intervalTicks: number; effects: readonly Effect[]; fuseTicks?: number },
     flight: number,
+    bonus: number,
   ): void => {
     const { fuseTicks } = area;
     if (fuseTicks === undefined && area.durationTicks <= 1) return;
@@ -192,7 +216,8 @@ function catalogProblems(kit: KitDef): string[] {
     for (const type of ['damage', 'heal']) {
       const hits = area.effects.filter((hit): hit is Extract<Effect, { amount: number }> => hit.type === type);
       if (hits.length === 0) continue;
-      const total = hits.reduce((sum, hit) => sum + hit.amount, 0) * pulses;
+      // The spend bonus rides on every damage effect of every pulse (rules 2.6): it is added per effect.
+      const total = hits.reduce((sum, hit) => sum + hit.amount + (type === 'damage' ? bonus : 0), 0) * pulses;
       if (!within(total, 8, top)) bad(base, `${type} total ${total} over ${pulses} pulses is not 8 to ${top}`);
     }
     if (pulses > 1) {
@@ -229,9 +254,9 @@ function catalogProblems(kit: KitDef): string[] {
   // still hold two live areas of the slot at once.
   //
   // The fix is per slot: at most one area-producing effect of an ability may leave a *lingering*
-  // area, and the base and its EX must not overlap either. Two non-lingering (one-hit, unfused)
-  // areas are gone by the step's end and never counted twice, which is why the shipped Lumeth F may
-  // carry two of them. A lone lingering effect stays under the cooldown (the per-effect bound
+  // area, and the base and its EX must not overlap either. Two non-lingering (plain, one-hit,
+  // unfused) areas are gone by the step's end and never counted twice, which is why the shipped
+  // Lumeth F may carry two of them. A one-hit `endArea` is not one of them: the walker counts it as lingering, at its lifetime-end case (issue #276). A lone lingering effect stays under the cooldown (the per-effect bound
   // below), so one lingering effect per ability is the one-live-area rule within that ability
   // (roster-v2 section 0, rules 2.8). A sum of the lifetimes under the cooldown is not enough: two
   // bolts that each fly 100 ticks and leave a 79-tick area sum to 358 against the 360 cooldown yet
@@ -239,12 +264,18 @@ function catalogProblems(kit: KitDef): string[] {
   //
   // Finding 1 of the round-3 report: the count above is per *ability*, so a slot whose base and EX
   // each carry exactly one lingering area passed the walker while the slot held two live areas of
-  // itself. The two abilities share the slot cooldown, so the second is cast `cooldownTicks` after
-  // the first, and the windup is the lever: with a later windup on the first ability its area is
+  // itself. The two abilities share the slot cooldown, so the second is cast no sooner than the
+  // cooldown, and the windup is the lever: with a later windup on the first ability its area is
   // still live when the recharge fires the second. The shipped Ondrel M2 carries one lingering area
   // on each of its base and EX (both windup 24), so the bound is not a flat count across the slot:
-  // it compares the two abilities' live windows, cast `cooldownTicks` apart, and rejects only a real
-  // overlap.
+  // it compares the two abilities' live windows and rejects only a real overlap.
+  //
+  // Issue #262 (the rounds-4 and 5 findings of PR #260): the area of a `dash.then` appears when the
+  // dash ends, so `appear` pays `dash.ticks - 1`; the second cast starts when the cooldown is out and
+  // the first windup is over, and no earlier than the first dash is over when the second ability
+  // dashes too (a second dash cancels the first). There is no lower conjunct: the player picks the
+  // tick of the second cast, so a first area that appears after the earliest second area is gone is
+  // still met by a later cast. E8 to E15 pin each rule against the sim in both cast orders.
   const flightTicks = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return 0;
     // The projectile ends `lifetimeTicks` after it spawns, so the area appears on the last of them.
@@ -259,59 +290,90 @@ function catalogProblems(kit: KitDef): string[] {
     }
     return 0;
   };
-  /** The ticks from an area's first live step to its last: `expireAreas` takes one off on the spawn step. */
+  /**
+   * The ticks an area is live (in the arena at the end of a step), from its first live step: `expireAreas`
+   * takes one off on the spawn step. An `endArea` is counted at its latest case, a lifetime end, which
+   * is spawned after the pulse phase and so runs one tick behind an obstacle or edge spawn and lives
+   * one more (issue #276, projectile.ts `spawnEndArea`): the walker prices every `endArea` that way,
+   * since the projectile may fly its whole lifetime.
+   */
   const liveSpan = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return (effect.fuseTicks ?? 0) + effect.durationTicks - 1;
     if (effect.type === 'projectile' && effect.endArea !== undefined) {
-      return (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks - 1;
+      return (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks;
     }
     return 0;
   };
+  /**
+   * Whether an area is still in the arena at the end of the step that spawns it. A plain one-hit area
+   * is gone by then; a one-hit `endArea` that spawns at a lifetime end is not, because that end gives it a tick
+   * (issue #276), so the walker counts every `endArea` as lingering.
+   */
   const lingers = (effect: AbilityEffect): boolean => {
     if (effect.type === 'area') return effect.fuseTicks !== undefined || effect.durationTicks > 1;
-    if (effect.type === 'projectile' && effect.endArea !== undefined) {
-      return effect.endArea.fuseTicks !== undefined || effect.endArea.durationTicks > 1;
-    }
-    return false;
+    return effect.type === 'projectile' && effect.endArea !== undefined;
   };
   /**
-   * One lingering area of an ability, as the tick of the slot's cooldown clock on which it is first
-   * live (`first`, counted from the cast) and the first tick it is gone (`until`, exclusive):
-   * `expireAreas` takes one off on the spawn step, so it is present on `[first, until)`.
+   * One lingering area of an ability, counted from the tick the ability's cast starts: `appear` is the
+   * first tick it is live and `gone` the first tick it is not (`expireAreas` takes one off on the spawn
+   * step), so it is present on `[appear, gone)`. `appear` is the windup, plus `dash.ticks - 1` when the
+   * area is a dash's `then` (the dash finishes that many ticks after it starts, then `fireDashThen`
+   * places the area), plus `lifetimeTicks - 1` for an `endArea` (the projectile runs out, then the area
+   * is placed before `expireAreas`). `dashTicks` is the length of the top-level dash the area rides, if any.
    */
   interface LiveArea {
     lifetime: number;
-    first: number;
-    until: number;
+    appear: number;
+    gone: number;
+    dashTicks: number | undefined;
   }
   const liveAreas = (ability: AbilitySpec): LiveArea[] => {
     const out: LiveArea[] = [];
-    const walk = (effects: readonly AbilityEffect[]): void => {
+    // `dashTicks` is set inside a dash's `then`; the dash's ticks minus one is the spawn delay.
+    const walk = (effects: readonly AbilityEffect[], dashTicks: number | undefined): void => {
       for (const effect of effects) {
         if (areaLifetime(effect) > 0 && lingers(effect)) {
-          const first = ability.windupTicks + flightTicks(effect);
-          out.push({ lifetime: areaLifetime(effect), first, until: first + liveSpan(effect) });
+          const appear =
+            ability.windupTicks + (dashTicks === undefined ? 0 : dashTicks - 1) + flightTicks(effect);
+          out.push({ lifetime: areaLifetime(effect), appear, gone: appear + liveSpan(effect), dashTicks });
         }
-        if (effect.type === 'dash') walk(effect.then);
+        if (effect.type === 'dash') walk(effect.then, effect.ticks);
       }
     };
-    walk(ability.effects);
+    walk(ability.effects, undefined);
     return out;
   };
-  /** The problem when the ability cast first has an area still live as the other ability fires. */
+  /** Whether the ability starts a dash of its own (a top-level `dash`; `validateKit` keeps one out of a `then`). */
+  const hasDash = (ability: AbilitySpec): boolean => ability.effects.some((effect) => effect.type === 'dash');
+  /**
+   * The problem when the ability cast first can leave an area live as the other's area appears, for a
+   * second cast made on any tick from its earliest start on (the player picks the tick; rules 2.7 holds
+   * for every one, not only for a held button). The earliest start is `S`, when the cooldown is out and
+   * the first windup is over. If the first area rides its dash and the second ability starts a dash
+   * of its own, a second dash that starts by tick `first.windup + first.dashTicks - 1` cancels the first
+   * (the area is never placed), so the start is moved to the first tick that does not: `S'`. A later
+   * start only moves the second area later, so the pair holds two live areas on some start exactly when
+   * the second area, cast at `S'`, appears before the first is gone; the tick it names is the first tick
+   * on which any start shows both (the later of the second area's earliest appearance and the first's).
+   * The model has no early wall stop, no blocked or rooted dash, and only these two casts.
+   */
   const overlap = (
     first: LiveArea,
+    firstAbility: AbilitySpec,
     firstName: string,
     second: LiveArea,
+    secondAbility: AbilitySpec,
     secondName: string,
     cooldownTicks: number,
   ): string | undefined => {
-    // The second area's first live step is `cooldownTicks + second.first` on the first cast's clock;
-    // the first area is still present on `first.until - 1`, so they overlap iff `until > cooldown + first`.
-    if (first.until <= cooldownTicks + second.first) return undefined;
+    let start = Math.max(cooldownTicks, firstAbility.windupTicks);
+    if (first.dashTicks !== undefined && hasDash(secondAbility)) {
+      start = Math.max(start, firstAbility.windupTicks + first.dashTicks - secondAbility.windupTicks);
+    }
+    if (start + second.appear >= first.gone) return undefined;
     return (
       `a slot keeps one live area of its own, but the ${firstName} area is still live ` +
-      `${cooldownTicks + second.first} ticks after the ${firstName} cast, when the ${secondName} area appears`
+      `${Math.max(start + second.appear, first.appear)} ticks after the ${firstName} cast, when the ${secondName} area appears`
     );
   };
   for (const slot of SLOTS) {
@@ -320,7 +382,7 @@ function catalogProblems(kit: KitDef): string[] {
       { ability: spec, name: 'base', base: `${kit.id}.slots.${slot}` },
     ];
     if (spec.ex) abilities.push({ ability: spec.ex, name: 'EX', base: `${kit.id}.slots.${slot}.ex` });
-    const perAbility = abilities.map(({ ability, name, base }) => ({ name, base, areas: liveAreas(ability) }));
+    const perAbility = abilities.map(({ ability, name, base }) => ({ ability, name, base, areas: liveAreas(ability) }));
     for (const { base, areas } of perAbility) {
       if (areas.length < 2) continue;
       const lifetimes = areas.map((area) => area.lifetime);
@@ -329,28 +391,30 @@ function catalogProblems(kit: KitDef): string[] {
         `a slot keeps one live area of its own, but ${lifetimes.length} of its area-producing effects linger (${lifetimes.join(' + ')} ticks)`,
       );
     }
-    // The base and its EX share the slot's cooldown, so the second is cast `cooldownTicks` after the
-    // first; either may be cast first. With exactly one lingering area each, the slot holds two live
-    // areas exactly when one ability's area is still present on the step the other's appears.
+    // The base and its EX share the slot's cooldown; either may be cast first, the second on any tick
+    // from its earliest start. With exactly one lingering area each, the slot holds two live areas
+    // exactly when the second area, cast as early as `overlap` allows, appears before the first is gone.
     const [a, b] = perAbility;
     if (perAbility.length === 2 && a?.areas.length === 1 && b?.areas.length === 1) {
       const areaA = a.areas[0];
       const areaB = b.areas[0];
       if (areaA && areaB) {
         const problem =
-          overlap(areaA, a.name, areaB, b.name, spec.cooldownTicks) ??
-          overlap(areaB, b.name, areaA, a.name, spec.cooldownTicks);
+          overlap(areaA, a.ability, a.name, areaB, b.ability, b.name, spec.cooldownTicks) ??
+          overlap(areaB, b.ability, b.name, areaA, a.ability, a.name, spec.cooldownTicks);
         if (problem !== undefined) bad(`${kit.id}.slots.${slot}`, problem);
       }
     }
   }
 
-  for (const { path, slot, effect } of visitKit(kit)) {
+  for (const { path, slot, effect, bonus } of visitKit(kit)) {
     switch (effect.type) {
       case 'damage':
       case 'heal': {
         const top = slot === 'F' ? 60 : 30;
-        if (!within(effect.amount, 8, top)) bad(`${path}.amount`, `${effect.type} ${effect.amount} is not 8 to ${top}`);
+        // The damage total after the spend bonus at the counter cap; a heal takes none.
+        const total = effect.amount + (effect.type === 'damage' ? bonus : 0);
+        if (!within(total, 8, top)) bad(`${path}.amount`, `${effect.type} ${total} is not 8 to ${top}`);
         break;
       }
       case 'applyStatus': {
@@ -396,7 +460,7 @@ function catalogProblems(kit: KitDef): string[] {
         // The three lingering-area rules of roster-v2 section 0 and the fuse rules of rules 2.7. An
         // unfused one-hit area is outside all of them; a fused one-hit area is held to the fuse range,
         // the damage total and the cooldown, and keeps the one-hit exception for stun, root and silence.
-        lingerRules(path, slot, effect, 0);
+        lingerRules(path, slot, effect, 0, bonus);
         break;
       case 'projectile':
         if (!within(effect.speed, 12, 25)) bad(`${path}.speed`, `projectile speed ${effect.speed} is not 12 to 25`);
@@ -405,7 +469,7 @@ function catalogProblems(kit: KitDef): string[] {
         // rules, with the projectile's flight added to the duration-under-cooldown bound because the
         // area spawns where the projectile ends (rules 2.7, roster-v2 0, finding 1).
         if (effect.endArea !== undefined) {
-          lingerRules(`${path}.endArea`, slot, effect.endArea, effect.lifetimeTicks);
+          lingerRules(`${path}.endArea`, slot, effect.endArea, effect.lifetimeTicks, bonus);
         }
         break;
       default:
@@ -444,6 +508,24 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(durnhal)).toEqual([]);
   });
 
+  it('hold for the Wrenna kit', () => {
+    expect(catalogProblems(wrenna)).toEqual([]);
+  });
+
+  it('name the Heartseeker when a bonus of 5 per stack lifts its 16 to 31 at the cap', () => {
+    const copy = copyOf(wrenna);
+    const spend = copy.slots.E.effects[1];
+    if (spend?.type !== 'consumeCounter' || !('bonusDamagePerStack' in spend)) throw new Error('Wrenna E has no damage spend');
+    spend.bonusDamagePerStack = 5;
+    expect(catalogProblems(copy)).toEqual(['wrenna.slots.E.effects[0].effects[0].amount: damage 31 is not 8 to 30']);
+  });
+
+  it('name Arrow Storm when it carries the spend: 12 + 12 on each of four pulses is 96 over the 60 of an ultimate', () => {
+    const copy = copyOf(wrenna);
+    copy.slots.F.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 4 });
+    expect(catalogProblems(copy)).toEqual(['wrenna.slots.F.effects[0]: damage total 96 over 4 pulses is not 8 to 60']);
+  });
+
   it('hold for the Ysmeer kit', () => {
     expect(catalogProblems(ysmeer)).toEqual([]);
   });
@@ -459,6 +541,27 @@ describe('the catalog ranges', () => {
     stun.status.ticks = 121;
     expect(catalogProblems(copy)).toEqual([
       'hargrim.slots.F.effects[0].then[0].effects[1].status.ticks: stun of 121 ticks is outside 30 to 120',
+    ]);
+  });
+
+  it('add the spend bonus at the counter cap to every damage of the ability that spends', () => {
+    const copy = copyOf(hargrim);
+    copy.counter = { from: 'M1', cap: 3, windowTicks: 360 };
+    // 12 + 7 x 3 = 33 on the cast that spends; the other slots are not priced with the bonus.
+    copy.slots.M1.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 7 });
+    expect(catalogProblems(copy)).toEqual(['hargrim.slots.M1.effects[0].effects[0].amount: damage 33 is not 8 to 30']);
+    // At 6 per stack the total is 12 + 18 = 30, which is inside the range.
+    copy.slots.M1.effects[1] = { type: 'consumeCounter', bonusDamagePerStack: 6 };
+    expect(catalogProblems(copy)).toEqual([]);
+  });
+
+  it('add the spend bonus to every pulse of a lingering area of the ability that spends', () => {
+    const copy = copyOf(ondrel);
+    copy.counter = { from: 'M1', cap: 3, windowTicks: 360 };
+    // Three pulses of 8 are 24; with 1 x 3 on each they are 33, over the 30 of a skill.
+    copy.slots.M2.effects.push({ type: 'consumeCounter', bonusDamagePerStack: 1 });
+    expect(catalogProblems(copy)).toEqual([
+      'ondrel.slots.M2.effects[0]: damage total 33 over 3 pulses is not 8 to 30',
     ]);
   });
 
@@ -586,8 +689,25 @@ describe('the EX variants', () => {
     expect(exDiff(brimwick, 'E')).toEqual(['windupTicks', 'effects[0].effects[0].amount', 'effects[0].effects[1].distance'].sort());
     expect(exDiff(durnhal, 'M2')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
     expect(exDiff(durnhal, 'E')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
+    expect(exDiff(wrenna, 'M2')).toEqual(['effects[0].effects[2]']);
+    expect(exDiff(wrenna, 'E')).toEqual(['effects[0].pierce', 'effects[0].effects[0].amount', 'effects[1]'].sort());
     expect(exDiff(ysmeer, 'M2')).toEqual(['effects[0].effects[1]', 'effects[0].radius'].sort());
     expect(exDiff(ysmeer, 'E')).toEqual(['effects[0].endArea']);
+  });
+});
+
+describe('the on-hit counter of the roster', () => {
+  it('is Wrenna Focus on M1, and no other kit declares one', () => {
+    expect(wrenna.counter).toEqual({ from: 'M1', cap: 3, windowTicks: 360 });
+    for (const { stem, json } of KITS) {
+      if (stem !== 'wrenna') expect('counter' in json, stem).toBe(false);
+    }
+  });
+
+  it('is spent by Heartseeker and Fade Step only, as the marker at these paths', () => {
+    const spends = (kit: KitDef) => visitKit(kit).filter(({ effect }) => effect.type === 'consumeCounter').map(({ path }) => path);
+    expect(spends(wrenna)).toEqual(['wrenna.slots.E.effects[1]', 'wrenna.slots.R.effects[0]']);
+    for (const kit of [hargrim, quillon, skerrow, lumeth, ondrel, brimwick, durnhal, ysmeer]) expect(spends(kit), kit.id).toEqual([]);
   });
 });
 
@@ -1113,21 +1233,42 @@ describe('the endArea rules', () => {
     const twoBolts = shape([shot(100, endArea(79)), shot(100, endArea(79))]);
     expect(catalogProblems(twoBolts)).toEqual([message([179, 179])]);
 
-    // A lingering area beside a one-hit area is fine: the one-hit area is gone in the step it
+    // A lingering area beside a plain one-hit area is fine: the one-hit area is gone in the step it
     // spawns (shipped Lumeth F carries two one-hit areas), so only one area of the slot lingers.
     const oneHit = { type: 'area', radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 20 }] };
     expect(catalogProblems(shape([plain, oneHit]))).toEqual([]);
     // Two one-hit areas, the shipped Lumeth F shape, linger neither.
     expect(catalogProblems(shape([oneHit, oneHit]))).toEqual([]);
-    // A lingering area beside a bolt whose endArea is a one-hit area: only the plain area lingers.
-    expect(catalogProblems(shape([plain, shot(300, endArea(1))]))).toEqual([]);
+    // A lingering area beside a bolt whose endArea is a one-hit area is not fine since issue #276: the
+    // endArea of a lifetime end is still in the arena after its spawn step, so it lingers, and the
+    // walker prices every endArea that way (this long flight would reach the edge first, where a
+    // one-hit area is gone at once, but the walker does not model the stop).
+    expect(catalogProblems(shape([plain, shot(300, endArea(1))]))).toEqual([message([340, 301])]);
+
+    // A one-hit endArea lingers too: spawned where the projectile runs out of lifetime, it runs a tick
+    // behind and is still in the arena at the end of that step (issue #276). Beside a 340-tick area
+    // the slot holds two live areas, the projectile ended by `lifetime`, not a wall.
+    const lifetimeEnd = shape([plain, shot(20, endArea(1))]);
+    {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(lifetimeEnd)]);
+      let live = 0;
+      const reasons: string[] = [];
+      for (let i = 0; i < 330; i++) {
+        step(state, [input(0, 0, 0, 0, Button.M2)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+        for (const e of state.events) if (e.type === 'projectileExpired') reasons.push(e.reason);
+      }
+      expect(reasons).toEqual(['lifetime']);
+      expect(live).toBe(2);
+    }
+    expect(catalogProblems(lifetimeEnd)).toEqual([message([340, 21])]);
 
     // The admitted shape keeps max live = 1 in the sim, over three cooldowns: one lingering area
-    // (100 ticks) whose effect is a plain area, and a bolt whose 300-tick flight ends in a one-hit
-    // area long after the slot's own area has gone.
+    // (100 ticks) whose effect is a plain area, beside a plain one-hit area that is gone in the step
+    // it spawns. (A one-hit endArea no longer fits here: it lingers, see above.)
     const fits = shape([
       { type: 'area', radius: 2, durationTicks: 100, intervalTicks: 100, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 10 }] },
-      shot(300, endArea(1)),
+      oneHit,
     ]);
     expect(catalogProblems(fits)).toEqual([]);
     const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(fits)]);
@@ -1272,6 +1413,274 @@ describe('the endArea rules', () => {
     expect(catalogProblems(tie)).toEqual([]);
     expect(maxLive(tie)).toBe(1);
     expect(catalogProblems(swapped(plain(10, 352), plain(0, 352)))).toEqual([message('base', 'EX')]);
+
+    // The same tie on an endArea shot (flight 1): an area spawned at a lifetime end runs one tick
+    // behind a plain one and lives a tick longer (issue #276), so its last present tick is 359 for
+    // `endArea(350)` and 360 for `endArea(351)`, the tick the recharge appears the EX area.
+    const endTie = swapped(shotAbility(10, endArea(350)), plain(0, 350));
+    expect(maxLive(endTie)).toBe(1);
+    expect(catalogProblems(endTie)).toEqual([]);
+    const endOver = swapped(shotAbility(10, endArea(351)), plain(0, 351));
+    expect(maxLive(endOver)).toBe(2);
+    expect(catalogProblems(endOver)).toEqual([message('base', 'EX')]);
+  });
+});
+
+describe('the roster walker’s one-live-area bound against the sim', () => {
+  // Issue #262. The walker prices a base ability and its EX as a pair: the first is cast at tick 0 and
+  // the second as early as the cooldown is out and the first windup is over, or on any later tick
+  // (the player picks the tick). Rules 2.7 says a slot never has two of its own areas alive, so the
+  // bound must hold for a second cast made at any tick, not only the earliest. Every pin below is
+  // checked in the sim, on the walker's own `openArena()` (no obstacles), in both cast orders: the
+  // second cast is pressed on each tick in turn, and only the ticks on which it really starts count.
+  // An accepted order must peak at one live area of the slot over every start; a rejected order must
+  // peak at two, and the walker's message must name the first tick on which any start shows two.
+  interface Shape {
+    windupTicks: number;
+    effects: unknown[];
+  }
+  const area = (durationTicks: number) => ({
+    type: 'area',
+    radius: 2,
+    durationTicks,
+    intervalTicks: durationTicks,
+    targets: 'enemies',
+    placement: { type: 'self' },
+    effects: [{ type: 'damage', amount: 10 }],
+  });
+  const bolt = (lifetimeTicks: number, durationTicks: number) => ({
+    type: 'projectile',
+    speed: 25,
+    radius: 0.2,
+    lifetimeTicks,
+    pierce: false,
+    effects: [{ type: 'damage', amount: 10 }],
+    endArea: area(durationTicks),
+  });
+  /** An `area` at the fire step. */
+  const plain = (windupTicks: number, durationTicks: number): Shape => ({ windupTicks, effects: [area(durationTicks)] });
+  /** A dash of `ticks` whose `then` leaves the area where it ends. */
+  const dashThen = (windupTicks: number, ticks: number, durationTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ type: 'dash', distance: 4, ticks, then: [area(durationTicks)] }],
+  });
+  /** A projectile of `lifetimeTicks` that leaves the area where it ends. */
+  const shot = (windupTicks: number, lifetimeTicks: number, durationTicks: number): Shape => ({
+    windupTicks,
+    effects: [bolt(lifetimeTicks, durationTicks)],
+  });
+  /** A dash that places the shot where it ends: both delays. */
+  const dashThenShot = (windupTicks: number, ticks: number, lifetimeTicks: number, durationTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ type: 'dash', distance: 4, ticks, then: [bolt(lifetimeTicks, durationTicks)] }],
+  });
+  /** A top-level dash with nothing to place, beside an area at the fire step. */
+  const dashAndArea = (windupTicks: number, ticks: number, durationTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ type: 'dash', distance: 4, ticks, then: [] }, area(durationTicks)],
+  });
+  const slotKit = (base: Shape, ex: Shape): KitDef => {
+    const copy = copyOf(quillon);
+    (copy.slots as unknown as Record<string, unknown>)['M2'] = {
+      cooldownTicks: 360,
+      movement: 'free',
+      ...base,
+      ex: { movement: 'free', ...ex },
+    };
+    return validateKit(copy);
+  };
+  const message = (first: 'base' | 'EX', second: 'base' | 'EX', tick: number) =>
+    `quillon.slots.M2: a slot keeps one live area of its own, but the ${first} area is still live ${tick} ticks after the ${first} cast, when the ${second} area appears`;
+
+  const owned = (state: GameState): number => state.areas.filter((a) => a.ownerId === 0).length;
+  /** Nothing of champion 0's is left to appear or to count: no windup, dash, shot or area. */
+  const quiet = (state: GameState): boolean =>
+    champion(state, 0).cast === null &&
+    champion(state, 0).dash === null &&
+    state.projectiles.every((p) => p.ownerId !== 0) &&
+    owned(state) === 0;
+  const advance = (state: GameState, buttons: number): void => {
+    champion(state, 0).energy = 100;
+    step(state, [input(0, 0, 0, 0, buttons)]);
+  };
+  const started = (state: GameState): boolean =>
+    state.events.some((e) => e.type === 'castStarted' && e.championId === 0 && e.slot === 'M2');
+
+  interface Verdict {
+    /** The most areas of champion 0 ever live at once, over every legal start of the second cast. */
+    peak: number;
+    /** The first tick (from the first cast) on which any start of the second cast shows two live. */
+    both: number | undefined;
+  }
+  /**
+   * Casts M2 (the EX when `firstEx`) at tick 0, then the other ability on each later tick in turn,
+   * once, a single press: only the ticks on which that cast really starts are runs. Each run goes on
+   * until the slot is quiet. The shared prefix is forked, so a scan costs one pass.
+   */
+  const simulate = (kit: KitDef, firstEx: boolean): Verdict => {
+    const first = firstEx ? Button.M2 | Button.SHIFT : Button.M2;
+    const second = firstEx ? Button.M2 : Button.M2 | Button.SHIFT;
+    const state = createMatch(mirror(kit.id), openArena(), 7, [kit]);
+    const verdict: Verdict = { peak: 0, both: undefined };
+    const note = (s: GameState, tick: number): void => {
+      const live = owned(s);
+      verdict.peak = Math.max(verdict.peak, live);
+      if (live >= 2 && (verdict.both === undefined || tick < verdict.both)) verdict.both = tick;
+    };
+    advance(state, first);
+    expect(state.events.some((e) => e.type === 'castStarted' && e.championId === 0 && e.ex === firstEx)).toBe(true);
+    note(state, 0);
+    for (let tick = 1; tick < 4000 && !quiet(state); tick++) {
+      const fork = structuredClone(state);
+      advance(fork, second);
+      if (started(fork)) {
+        note(fork, tick);
+        for (let t = tick + 1; t < tick + 4000 && !quiet(fork); t++) {
+          advance(fork, 0);
+          note(fork, t);
+        }
+        expect(quiet(fork)).toBe(true);
+      }
+      advance(state, 0);
+      note(state, tick);
+    }
+    expect(quiet(state)).toBe(true);
+    return verdict;
+  };
+
+  /** Where the walker rejects: the tick it names per first ability, or null when that order is accepted. */
+  interface Expected {
+    base: number | null;
+    EX: number | null;
+  }
+  const pin = (base: Shape, ex: Shape, expected: Expected): void => {
+    const kit = slotKit(base, ex);
+    const messages =
+      expected.base !== null
+        ? [message('base', 'EX', expected.base)]
+        : expected.EX !== null
+          ? [message('EX', 'base', expected.EX)]
+          : [];
+    expect(catalogProblems(kit)).toEqual(messages);
+    expect(simulate(kit, false)).toEqual(expected.base === null ? { peak: 1, both: undefined } : { peak: 2, both: expected.base });
+    expect(simulate(kit, true)).toEqual(expected.EX === null ? { peak: 1, both: undefined } : { peak: 2, both: expected.EX });
+  };
+  /** The same pair with either ability carrying `a`: `aFirst` is the verdict when `a` is cast first. */
+  const pinPair = (a: Shape, b: Shape, aFirst: number | null, bFirst: number | null): void => {
+    pin(a, b, { base: aFirst, EX: bFirst });
+    pin(b, a, { base: bFirst, EX: aFirst });
+  };
+
+  it('E8 prices the dash ticks of a dash.then area: a 359-tick area is live past the recharge from 4 dash ticks', () => {
+    // The sim places a dash.then area `ticks - 1` after the windup (the dash finishes, then
+    // `fireDashThen`), so its last live tick moves with the dash. A 3-tick dash puts it on [2, 360),
+    // gone before the recharge; 4 ticks reach tick 360, where the second cast's area appears.
+    pinPair(dashThen(0, 3, 359), plain(0, 359), null, null);
+    pinPair(dashThen(0, 4, 359), plain(0, 359), 360, null);
+    pinPair(dashThen(0, 5, 359), plain(0, 359), 360, null);
+    // The controls: a 1-tick dash, and equal windups with no dash.
+    pinPair(dashThen(0, 1, 359), plain(0, 359), null, null);
+    pinPair(plain(0, 359), plain(0, 359), null, null);
+  });
+
+  it('E9 keeps a plain area exact at the 351 / 352 / 353 boundary', () => {
+    // Windup 10 and a 351-tick area is last live on tick 359; one tick more and it is live when the
+    // recharge makes the second cast on tick 360.
+    pinPair(plain(10, 351), plain(0, 351), null, null);
+    pinPair(plain(10, 352), plain(0, 352), 360, null);
+    pinPair(plain(10, 353), plain(0, 353), 360, null);
+  });
+
+  it('E10 keeps an endArea shot exact at the 41 / 42 / 43 boundary', () => {
+    // A 20-tick flight puts the area on `windup + 19`, and a 300-tick endArea spawned at a lifetime end
+    // lives a tick longer than a plain one (issue #276): windup 41 is last live on tick 360 - 1 and 42
+    // is not.
+    pinPair(shot(41, 20, 300), plain(0, 300), null, null);
+    pinPair(shot(42, 20, 300), plain(0, 300), 360, null);
+    pinPair(shot(43, 20, 300), plain(0, 300), 360, null);
+    // A dash then a shot pays both delays: the area appears on `(dash - 1) + (flight - 1)`, so with
+    // a 3-tick flight and a 356-tick area a 3-tick dash is last live on tick 359 and a 4-tick one is not.
+    pinPair(dashThenShot(0, 3, 3, 356), plain(0, 356), null, null);
+    pinPair(dashThenShot(0, 4, 3, 356), plain(0, 356), 360, null);
+  });
+
+  it('E11 starts the second cast when the cooldown is out and the first windup is over', () => {
+    // The EX cast first with a 2-tick area at windup 359 / 360 / 361, the base second with an area at
+    // windup 0. The base cannot be cast before the EX windup is over, so past a 360 windup its area
+    // appears on tick 361 or later, while the EX area is last live on tick `windup`.
+    pin(plain(0, 2), plain(359, 2), { base: null, EX: null });
+    pin(plain(0, 2), plain(360, 2), { base: null, EX: 360 });
+    pin(plain(0, 2), plain(361, 2), { base: null, EX: 361 });
+    // The control: against a base at windup 1 the second area appears a tick later, after the first
+    // one's last live tick (361), so the pair is accepted. The cooldown alone as the start rejected it.
+    pin(plain(1, 2), plain(361, 2), { base: null, EX: null });
+  });
+
+  it('E12 lets a second dash cancel the first dash, so the first area never appears', () => {
+    // The EX dashes 15 ticks from windup 346 and would leave its 2-tick area on tick 360 (361 for 16
+    // dash ticks), the tick of the recharge. The base's own dash (windup 0), cast on tick 360, cancels
+    // the EX dash, so that area is never placed. The walker starts the base once the EX dash is over
+    // (tick 361, or 362), when the 2-tick area is gone: the pair is accepted, and the sim agrees.
+    pin(dashAndArea(0, 4, 2), dashThen(346, 15, 2), { base: null, EX: null });
+    pin(dashAndArea(0, 4, 2), dashThen(346, 16, 2), { base: null, EX: null });
+    // The threshold is exact: a 3-tick EX area is still live on tick 361, where a base cast on the first tick that does not cancel meets it.
+    pin(dashAndArea(0, 4, 2), dashThen(346, 15, 3), { base: null, EX: 361 });
+    // A base windup of 1 moves the first start that does not cancel one tick earlier, to 361, and its area meets the EX area on 362.
+    pin(dashAndArea(1, 4, 2), dashThen(346, 16, 3), { base: null, EX: 362 });
+    // With a plain area on the base there is no dash to cancel with: the EX area is live on tick 360
+    // (15 ticks) or appears on tick 361 (16 ticks), where a base cast then holds two.
+    pin(plain(0, 2), dashThen(346, 15, 2), { base: null, EX: 360 });
+    pin(plain(0, 2), dashThen(346, 16, 2), { base: null, EX: 361 });
+  });
+
+  it('E13 accepts the dash-then-area pairs of round 5, which the cooldown alone as the start falsely rejected', () => {
+    // Round 5, finding 1: base 12 dash ticks at windup 0, EX 15 dash ticks at windup 357.
+    pinPair(dashThen(0, 12, 2), dashThen(357, 15, 2), null, null);
+    // Finding 2's neighbours at EX windup 359: dash ticks (1, 2), (2, 3) and (12, 13).
+    pinPair(dashThen(0, 1, 2), dashThen(359, 2, 2), null, null);
+    pinPair(dashThen(0, 2, 2), dashThen(359, 3, 2), null, null);
+    pinPair(dashThen(0, 12, 2), dashThen(359, 13, 2), null, null);
+  });
+
+  it('E14 rejects a second cast made later than the earliest, where the first area appears after it', () => {
+    // Round-4 finding 2: the base shot (windup 359, 20-tick flight) leaves its 2-tick area on tick
+    // 378. The EX cast at 360 is gone by then, but an EX cast at 378 is not: the slot holds two, and
+    // the message names tick 378, not 360 (the 416ac6e message was false, the rejection right).
+    pin(shot(359, 20, 2), plain(0, 2), { base: 378, EX: null });
+    // Round-5 finding 3: a dash then a fused area against a plain fused area holds two live areas when
+    // the second cast is made late enough: the bound is for a cast on any tick, not a held button.
+    pin(
+      { windupTicks: 359, effects: [{ type: 'dash', distance: 4, ticks: 400, then: [{ ...area(100), fuseTicks: 30, intervalTicks: 100 }] }] },
+      { windupTicks: 5, effects: [{ ...area(100), fuseTicks: 30, intervalTicks: 100 }] },
+      { base: 758, EX: null },
+    );
+  });
+
+  /** A shot whose endArea has a fuse: the first pulse, and the live span, start `fuseTicks` later. */
+  const fusedShot = (windupTicks: number, lifetimeTicks: number, durationTicks: number, fuseTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ ...bolt(lifetimeTicks, durationTicks), endArea: { ...area(durationTicks), fuseTicks } }],
+  });
+
+  it('E16 prices the fuse and the last tick of an endArea, which the walker gives every endArea since #276', () => {
+    // A lifetime-end endArea is live for `fuse + duration` ticks from `windup + flight - 1` (issue
+    // #276), so the pair with a plain area cast at the 360 recharge is exact at the boundary. Windup 6
+    // and a 5-tick flight put the area on tick 10, so with a 60-tick fuse a 291-tick duration is
+    // last live on tick 360 and 290 on tick 359. Without the fuse in the span both would be accepted.
+    pin(fusedShot(6, 5, 290, 60), plain(0, 2), { base: null, EX: null });
+    pin(fusedShot(6, 5, 291, 60), plain(0, 2), { base: 360, EX: null });
+    pin(fusedShot(6, 5, 292, 60), plain(0, 2), { base: 360, EX: null });
+    // A one-hit unfused endArea lingers in the walker's model: the area of a lifetime end is live on the step it spawns, so a
+    // 20-tick flight from windup 340 puts it on tick 359 and one more tick of windup on 360, the tick
+    // the recharge appears the second area. A plain one-hit area would never be seen.
+    pinPair(shot(340, 20, 1), plain(0, 2), null, null);
+    pinPair(shot(341, 20, 1), plain(0, 2), 360, null);
+  });
+
+  it('E15 leaves the shipped Ondrel M2 accepted, and the sim holds one live area of it at every start', () => {
+    expect(catalogProblems(ondrel)).toEqual([]);
+    expect(simulate(ondrel, false)).toEqual({ peak: 1, both: undefined });
+    expect(simulate(ondrel, true)).toEqual({ peak: 1, both: undefined });
   });
 });
 
@@ -1350,6 +1759,15 @@ describe('every slot of the shipped kits', () => {
     { kit: durnhal, slot: 'E', ex: true, cooldown: 420, windup: 18, walk: 2.75, cost: 25 },
     { kit: durnhal, slot: 'R', ex: false, cooldown: 840, windup: 0, cost: 0 },
     { kit: durnhal, slot: 'F', ex: false, cooldown: 600, windup: 30, walk: 0, cost: 100 },
+    { kit: wrenna, slot: 'M1', ex: false, cooldown: 42, windup: 6, walk: 5.5, cost: 0 },
+    { kit: wrenna, slot: 'M2', ex: false, cooldown: 360, windup: 18, walk: 2.75, cost: 0 },
+    { kit: wrenna, slot: 'M2', ex: true, cooldown: 360, windup: 18, walk: 2.75, cost: 25 },
+    { kit: wrenna, slot: 'SPACE', ex: false, cooldown: 540, windup: 0, cost: 0 },
+    { kit: wrenna, slot: 'Q', ex: false, cooldown: 660, windup: 18, walk: 2.75, cost: 0 },
+    { kit: wrenna, slot: 'E', ex: false, cooldown: 480, windup: 30, walk: 2.75, cost: 0 },
+    { kit: wrenna, slot: 'E', ex: true, cooldown: 480, windup: 30, walk: 2.75, cost: 25 },
+    { kit: wrenna, slot: 'R', ex: false, cooldown: 780, windup: 0, cost: 0 },
+    { kit: wrenna, slot: 'F', ex: false, cooldown: 600, windup: 36, walk: 0, cost: 100 },
     { kit: ysmeer, slot: 'M1', ex: false, cooldown: 42, windup: 6, walk: 5.5, cost: 0 },
     { kit: ysmeer, slot: 'M2', ex: false, cooldown: 300, windup: 24, walk: 2.75, cost: 0 },
     { kit: ysmeer, slot: 'M2', ex: true, cooldown: 300, windup: 24, walk: 2.75, cost: 25 },
@@ -2782,6 +3200,287 @@ describe('Durnhal', () => {
   });
 });
 
+describe('Wrenna', () => {
+  const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
+  const focus = (rig: Rig) => champion(rig.state, 0).counter;
+  const SPACE = SLOTS.indexOf('SPACE');
+  const FOE: Spot = [X0 + 8, 0];
+
+  /** Holds Longbow on the enemy 8 m ahead until the count reads `n`, and stops on the step of that hit. */
+  function buildFocus(rig: Rig, n: number): void {
+    for (let i = 0; i < 400 && (focus(rig)?.count ?? 0) < n; i++) rig.step(press('M1'));
+    expect(focus(rig)?.count).toBe(n);
+  }
+
+  it('M1 Longbow flies 14 m in 35 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(6 + 35, press('M1'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(6);
+    expect(spawned?.e.radius).toBe(0.25);
+    expect(spawned?.e.vx).toBe(24);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 6 + 1).toBe(35);
+    expect(expired?.e.x).toBeCloseTo(X0 + 840 / 60, 9);
+    rig.clean();
+  });
+
+  it('M1 Longbow does 11 damage at 8 m and builds one Focus on the tick of the hit', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    rig.run(6 + 25, press('M1'));
+    expect(damages(rig)).toEqual([[2, 11, 109]]);
+    expect(rig.applied()).toEqual([]);
+    expectStopsOnHit(rig);
+    expect(focus(rig)).toEqual({ count: 1, lastHitTick: rig.events('damage')[0]?.step });
+    rig.clean();
+  });
+
+  it('builds Focus one per Longbow hit up to 3, and a fourth hit keeps 3 and moves the window', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    const stamps: number[] = [];
+    for (const n of [1, 2, 3]) {
+      buildFocus(rig, n);
+      stamps.push(focus(rig)?.lastHitTick ?? 0);
+    }
+    expect(stamps[0]).toBeLessThan(stamps[1] as number);
+    expect(stamps[1]).toBeLessThan(stamps[2] as number);
+    const hits = rig.events('damage').length;
+    for (let i = 0; i < 400 && rig.events('damage').length === hits; i++) rig.step(press('M1'));
+    expect(rig.events('damage').length).toBe(hits + 1);
+    expect(focus(rig)?.count).toBe(3);
+    expect(focus(rig)?.lastHitTick).toBeGreaterThan(stamps[2] as number);
+    rig.clean();
+  });
+
+  it('builds no Focus from Barbed Arrow, Pinning Shot, Heartseeker or Arrow Storm, though each hits', () => {
+    const casts: [Slot, number, number][] = [['M2', 18 + 30, 0], ['Q', 18 + 30, 0], ['E', 30 + 25, 0], ['F', 36 + 1, 100]];
+    for (const [slot, steps, energy] of casts) {
+      const rig = new Rig(wrenna, { 2: FOE }, energy);
+      rig.run(steps, press(slot, { aim: FOE }));
+      expect(rig.events('damage').map(({ e }) => e.targetId), slot).toEqual([2]);
+      expect(focus(rig), slot).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    }
+  });
+
+  it('loses all Focus 360 steps after the last hit and not one step sooner', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    buildFocus(rig, 3);
+    const last = focus(rig)?.lastHitTick;
+    rig.run(359);
+    expect(focus(rig)).toEqual({ count: 3, lastHitTick: last });
+    rig.step();
+    expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+    rig.clean();
+  });
+
+  it('M2 Barbed Arrow flies 12.83 m in 35 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(18 + 35, press('M2'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.35);
+    expect(spawned?.e.vx).toBe(22);
+    const [expired] = rig.events('projectileExpired');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(35);
+    expect(expired?.e.x).toBeCloseTo(X0 + 770 / 60, 9);
+    rig.clean();
+  });
+
+  it('M2 Barbed Arrow does 12 damage, then six pulses of 2 over 180 ticks', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    rig.run(18 + 22 + 190, press('M2'));
+    expect(damages(rig)).toEqual([[2, 12, 108], [2, 2, 106], [2, 2, 104], [2, 2, 102], [2, 2, 100], [2, 2, 98], [2, 2, 96]]);
+    expect(rig.applied()).toEqual([[2, 'dot', 180]]);
+    rig.clean();
+  });
+
+  it('M2 EX Barbed Arrow adds a slow of 30 percent for 120 ticks to the same shot', () => {
+    const rig = new Rig(wrenna, { 2: FOE }, 25);
+    rig.run(18 + 22 + 190, press('M2', { ex: true }));
+    expect(damages(rig)).toEqual([[2, 12, 108], [2, 2, 106], [2, 2, 104], [2, 2, 102], [2, 2, 100], [2, 2, 98], [2, 2, 96]]);
+    expect(rig.applied()).toEqual([[2, 'dot', 180], [2, 'slow', 120]]);
+    rig.clean();
+  });
+
+  it('SPACE Tumble dashes 5 m in 15 ticks with haste of 25 percent on self and fires nothing at the end', () => {
+    const rig = new Rig(wrenna);
+    rig.step(press('SPACE'));
+    expect(rig.applied()).toEqual([[0, 'haste', 90]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 25 }]);
+    rig.run(14);
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 5, 15]]);
+    expect(rig.events('dashEnded').map(({ step, e }) => [step, e.reason])).toEqual([[14, 'complete']]);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.clean();
+  });
+
+  it('Q Pinning Shot flies 12 m in 36 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(18 + 36, press('Q'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.4);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(36);
+    expect(expired?.e.x).toBeCloseTo(X0 + 720 / 60, 9);
+    rig.clean();
+  });
+
+  it('Q Pinning Shot does 9 damage and roots for 60 ticks', () => {
+    const rig = new Rig(wrenna, { 2: FOE });
+    rig.run(18 + 30, press('Q'));
+    expect(damages(rig)).toEqual([[2, 9, 111]]);
+    expect(rig.applied()).toEqual([[2, 'root', 60]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'root' }]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  it('E Heartseeker flies 15.83 m in 38 sweeps', () => {
+    const rig = new Rig(wrenna);
+    rig.run(30 + 38, press('E'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(30);
+    expect(spawned?.e.radius).toBe(0.25);
+    expect(spawned?.e.vx).toBe(25);
+    const [expired] = rig.events('projectileExpired');
+    expect((expired?.step ?? 0) - 30 + 1).toBe(38);
+    expect(expired?.e.x).toBeCloseTo(X0 + 950 / 60, 9);
+    rig.clean();
+  });
+
+  describe('Heartseeker spends the Focus', () => {
+    it.each([
+      [0, 16],
+      [1, 20],
+      [2, 24],
+      [3, 28],
+    ])('with %i Focus it hits for %i, and the count is still held through the windup', (stacks, amount) => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, stacks);
+      const hurt = 120 - 11 * stacks;
+      rig.step(press('E'));
+      rig.run(29);
+      expect(focus(rig)?.count).toBe(stacks);
+      rig.step();
+      expect(rig.events('castFired').map(({ e }) => [e.slot, e.ex]).at(-1)).toEqual(['E', false]);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.run(25);
+      expect(rig.events('damage').at(-1)?.e).toMatchObject({ targetId: 2, amount, health: hurt - amount });
+      rig.clean();
+    });
+
+    it('EX with 3 Focus pierces for 20, costs 25 and leaves the Focus for Fade Step', () => {
+      const rig = new Rig(wrenna, { 2: [X0 + 5, 0], 3: FOE }, 25);
+      buildFocus(rig, 3);
+      const energy = champion(rig.state, 0).energy;
+      expect(energy).toBeGreaterThanOrEqual(25);
+      rig.step(press('E', { ex: true }));
+      expect(rig.events('castStarted').at(-1)?.e).toMatchObject({ slot: 'E', ex: true, cost: 25 });
+      expect(champion(rig.state, 0).energy).toBe(energy - 25);
+      rig.run(30 + 40);
+      expect(focus(rig)?.count).toBe(3);
+      const hits = rig.events('damage').slice(-2).map(({ e }) => [e.targetId, e.amount]);
+      expect(hits).toEqual([[2, 20], [3, 20]]);
+      expect(rig.events('projectileExpired').at(-1)?.e.reason).toBe('lifetime');
+      rig.clean();
+    });
+  });
+
+  describe('Fade Step spends the Focus', () => {
+    it('with 3 Focus cuts 360 ticks from Tumble on top of its tick, shields 25 for 180 and clears the count', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 3);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 1 - 360);
+      expect(rig.applied().at(-1)).toEqual([0, 'shield', 180]);
+      expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 25 }]);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      expect(champion(rig.state, 0).cooldowns[SLOTS.indexOf('R')]).toBe(780);
+      rig.clean();
+    });
+
+    it('with 2 Focus cuts 240 ticks', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 2);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 1 - 240);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+
+    it('cuts on the step that another cast finishes its windup too: the oracle reads every cast fired', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 2);
+      champion(rig.state, 0).cooldowns[SPACE] = 540;
+      rig.step(press('M2'));
+      rig.run(17);
+      expect(rig.events('castFired').at(-1)?.e.slot).toBe('M1');
+      rig.step(press('R'));
+      expect(rig.events('castFired').slice(-2).map(({ e }) => e.slot)).toEqual(['M2', 'R']);
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(540 - 19 - 240);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+
+    it('brings a Tumble under 360 ticks to 0 and never below', () => {
+      const rig = new Rig(wrenna, { 2: FOE });
+      buildFocus(rig, 3);
+      champion(rig.state, 0).cooldowns[SPACE] = 200;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(0);
+      rig.clean();
+    });
+
+    it('with no Focus is a plain shield and Tumble only ticks down', () => {
+      const rig = new Rig(wrenna);
+      champion(rig.state, 0).cooldowns[SPACE] = 300;
+      rig.step(press('R'));
+      expect(champion(rig.state, 0).cooldowns[SPACE]).toBe(299);
+      expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 25 }]);
+      expect(focus(rig)).toEqual({ count: 0, lastHitTick: 0 });
+      rig.clean();
+    });
+  });
+
+  it('F Arrow Storm lands where it is aimed and pulses on steps 36, 66, 96 and 126: 12 damage and a slow each', () => {
+    const rig = new Rig(wrenna, { 2: FOE, 3: [X0 + 8, 3.6] }, 100);
+    rig.run(36 + 120, press('F', { aim: FOE }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(36);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 8, 9);
+    expect(spawned?.e.radius).toBe(3);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [36, [2]],
+      [66, [2]],
+      [96, [2]],
+      [126, [2]],
+    ]);
+    expect(damages(rig)).toEqual([[2, 12, 108], [2, 12, 96], [2, 12, 84], [2, 12, 72]]);
+    expect(rig.applied().filter(([, status]) => status === 'slow')).toEqual([[2, 'slow', 60], [2, 'slow', 60], [2, 'slow', 60], [2, 'slow', 60]]);
+    expect(rig.events('areaExpired').map(({ step }) => step)).toEqual([155]);
+    expect(rig.health(3)).toBe(120);
+    rig.clean();
+  });
+
+  it('F Arrow Storm aimed far ahead lands 13 m away', () => {
+    const rig = new Rig(wrenna, {}, 100);
+    rig.run(36 + 1, press('F', { aim: [X0 + 20, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.x).toBeCloseTo(X0 + 13, 9);
+    rig.clean();
+  });
+
+  it('keeps one lingering area, Arrow Storm, and no wound', () => {
+    expect(lingeringPaths(wrenna)).toEqual(['wrenna.slots.F.effects[0]']);
+    expect(woundPaths(wrenna)).toEqual([]);
+  });
+});
+
 describe('Ysmeer', () => {
   const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
   const gains = (rig: Rig) => rig.events('energyGained').map(({ e }) => [e.championId, e.targetId, e.amount]);
@@ -2926,8 +3625,8 @@ describe('Ysmeer', () => {
     expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 30 }]);
     // Three pulses, one credit: the energy is earned once per target per cast.
     expect(gains(rig)).toEqual([[0, 2, 10]]);
-    // The area lives its 90 ticks from the spawn step, which is the same step the areas expire.
-    expect(steps(rig, 'areaExpired')).toEqual([73 + 90 - 1]);
+    // A lifetime-end area spawns after the step's area pass, so its 90 ticks start the step after the spawn.
+    expect(steps(rig, 'areaExpired')).toEqual([73 + 90]);
     rig.clean();
   });
 
@@ -2987,6 +3686,8 @@ describe('Ysmeer', () => {
     expect(area?.e.y).toBe(expired?.e.y);
     expect(area?.e.radius).toBe(2);
     expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([[58, [2]]]);
+    // A one-hit area runs its single tick on the step after the lifetime spawn and expires with it.
+    expect(steps(rig, 'areaExpired')).toEqual([58]);
     expect(damages(rig)).toEqual([[2, 14, 106]]);
     expect(rig.applied()).toEqual([]);
     expect(gains(rig)).toEqual([[0, 2, 10]]);

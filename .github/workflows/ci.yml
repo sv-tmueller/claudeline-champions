@@ -3,9 +3,8 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+    # No path filter on pull requests: the required checks must always report,
+    # and assets:test reads docs/architecture/assets.md.
   push:
     branches: [main]
     paths-ignore:

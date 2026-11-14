@@ -294,7 +294,12 @@ with D = 1 and I = 1 it applies once and expires in the same step. A fused
 area (fuse F, rules 2.7) spawns with `ticksToNextApply` F and `remainingTicks`
 F + D, so its pulses fall F steps later (the first on the tick F after the cast
 tick, or the step F + 1 after a dev spawn between steps), at F + kI, and a one-hit
-fused area pulses and expires in the same step. Entities
+fused area pulses and expires in the same step. An exception is the area a
+projectile's `endArea` spawns at a lifetime end (see Projectiles): it is placed
+in phase 6, after the pulses, and the same step's area expiry counts that spawn
+step, so it is given one extra tick of `remainingTicks` and runs one step behind
+every other area, a one-hit one pulsing and expiring on the step after it
+spawns. Entities
 spawned between steps act from the next step on.
 
 A status lasting D ticks affects exactly D turns of its holder, whether it was
@@ -351,7 +356,13 @@ a fast projectile cannot tunnel through a champion or a thin wall.
   `castId` and its owner, so its hits earn energy for the cast and the cast
   record outlives the projectile until the area ends. A contact-spawn pulses in
   phase 5 of the same step; a lifetime-spawn is pushed after phase 5 and first
-  pulses the next step.
+  pulses the next step. The area expiry of that same step (phase 6, right after
+  `expireProjectiles`) would take a tick off a lifetime-spawn that a
+  contact-spawn does not lose before its first pulse, so `expireProjectiles` spawns
+  it with `durationTicks + 1`: it runs one step behind a contact-spawn on every
+  tick it has, its expiry included (`areaExpired` one step later, and a one-hit
+  area still pulses, once, on the next step). A lifetime-spawn with a fuse F
+  first pulses on step F + 1 after the spawn and expires on step F + D.
 
 ## Areas
 
@@ -1001,9 +1012,9 @@ A kit may declare one counter (`KitDef.counter`, rules.md section 2.6, v3 design
 sections 4.4a and 4.4b). A champion whose
 kit declares it carries `counter: { count, lastHitTick }` from `createMatch` on,
 at `{ 0, 0 }`; any other champion has no `counter` key at all (never
-`undefined`, so `checksum` does not throw), and no shipped kit declares one, so
-every committed fixture keeps its checksum. Both numbers are in the checksum.
-`lastHitTick` is the `state.tick` of the step the hit landed in.
+`undefined`, so `checksum` does not throw), and only Wrenna's kit (#270) declares
+one, so every other committed fixture keeps its checksum. Both numbers are in
+the checksum. `lastHitTick` is the `state.tick` of the step the hit landed in.
 
 - **Build.** `landHit` calls `buildCounter` (`counter.ts`) after the effects are
   applied and before the `credited` early return, when the hit is `damaging` in

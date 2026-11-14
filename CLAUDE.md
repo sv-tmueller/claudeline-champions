@@ -24,15 +24,19 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # combat.png, death.png, match.png, result.png,
                                  # ring.png, scene-arena02.png,
                                  # scene-arena03.png, scene-durnhal.png,
-                                 # match-arena02.png, match-3v3.png,
+                                 # scene-wrenna.png, match-arena02.png,
+                                 # match-3v3.png,
                                  # match-3v3-arena02.png, menu.png,
                                  # scoreboard.png, select.png, lingering.png,
                                  # orb.png, fuse.png
                                  # in test-results/*/
-npm run balance                  # bot-versus-bot win-rate report: plays 25200
-                                 # matches (seven kits, the energy orb on) and
+npm run balance                  # bot-versus-bot win-rate report: plays 31248
+                                 # matches (eight kits, the energy orb on) and
                                  # writes the block of docs/design/balance.md,
-                                 # about 31 minutes on Apple silicon. Flags
+                                 # about 38 minutes by match count, not
+                                 # measured. The committed block is still the
+                                 # seven-kit one, so --check fails until the
+                                 # nine-kit report. Flags
                                  # after `--`: --check compares a fresh run with
                                  # the committed block, --out <file> writes
                                  # there instead, --seeds N plays the seeds 1 to
@@ -40,7 +44,7 @@ npm run balance                  # bot-versus-bot win-rate report: plays 25200
                                  # (needs --out or --check; --check then compares
                                  # only that mode's rows). Seeds per config: the
                                  # largest even number at or under 200 over the
-                                 # cell's fills (40 in 2v2, 10 in 3v3). Needs
+                                 # cell's fills (32 in 2v2, 6 in 3v3). Needs
                                  # Node 22.15. The manual workflow
                                  # .github/workflows/balance.yml runs --check
                                  # --mode on a runner, one job per mode.
@@ -50,10 +54,10 @@ npm run assets:test              # tools/blender unit tests; the Blender ones sk
 npm run build                    # production client bundle; CI runs it, check does not
 ```
 
-CI runs typecheck, lint, unit tests and the asset checks on pull requests that
-touch code and on pushes to main, and the bots heap job (`vitest.heap.config.ts`
-on Node 26.7.0 and Node 24) runs on the same triggers. Build and e2e run only on
-ready pull requests and on main.
+CI runs typecheck, lint, unit tests and the asset checks on every pull request,
+docs-only ones included, and on pushes to main that touch code. The bots heap
+job (`vitest.heap.config.ts` on Node 26.7.0 and Node 24) runs on the same
+triggers. Build and e2e run only on ready pull requests and on main.
 
 ## Package dependency rules
 

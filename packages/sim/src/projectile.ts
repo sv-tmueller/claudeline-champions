@@ -96,8 +96,20 @@ function readEndArea(spec: EndAreaSpec | undefined, pierce: boolean): EndAreaSpe
  * Spec 4.3: spawns the projectile's endArea at (x, y), when it has one. Never called on a champion
  * hit or at round end. The area takes the projectile's `castId`, so its hits keep earning energy
  * for the cast.
+ *
+ * `late` is 1 for a lifetime end and 0 for an obstacle or edge stop. A lifetime end is phase 6, after
+ * the areas have pulsed, and the same step's `expireAreas` takes a tick off the new area, which an
+ * area spawned in phase 4 does not lose before its first pulse. The extra tick puts it back: the
+ * area runs one tick behind the obstacle spawn on every tick it has, its last one included, so a
+ * one-hit one still pulses, on the next step (rules 2.8).
  */
-function spawnEndArea(state: GameState, p: ProjectileState, x: number, y: number): void {
+function spawnEndArea(
+  state: GameState,
+  p: ProjectileState,
+  x: number,
+  y: number,
+  late: 0 | 1,
+): void {
   const area = p.endArea;
   if (area === undefined) return;
   spawnArea(
@@ -107,7 +119,7 @@ function spawnEndArea(state: GameState, p: ProjectileState, x: number, y: number
       x,
       y,
       radius: area.radius,
-      durationTicks: area.durationTicks,
+      durationTicks: area.durationTicks + late,
       intervalTicks: area.intervalTicks,
       targets: area.targets,
       effects: area.effects,
@@ -272,7 +284,7 @@ function expireAt(
     y,
   });
   // Spec 4.3: never on a champion hit ('hit'), and never at round end, which does not come here.
-  if (reason !== 'hit') spawnEndArea(state, p, x, y);
+  if (reason !== 'hit') spawnEndArea(state, p, x, y, 0);
 }
 
 /**
@@ -396,7 +408,7 @@ export function expireProjectiles(state: GameState): void {
       y: p.y,
     });
     // Spec 4.3: a lifetime end spawns the endArea too, at the projectile's final position.
-    spawnEndArea(state, p, p.x, p.y);
+    spawnEndArea(state, p, p.x, p.y, 1);
     return false;
   });
 }

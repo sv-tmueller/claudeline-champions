@@ -10,8 +10,9 @@ Source: spec section 9.
 
 CI is split by cost:
 
-- Typecheck, lint, unit tests and the asset checks run on pull requests that
-  touch code, drafts included, and on pushes to main.
+- Typecheck, lint, unit tests and the asset checks run on every pull
+  request, drafts and docs-only ones included, and on pushes to main that touch
+  code.
 - The bots' heap check (`packages/bots/test/allocation.test.ts`) runs in its
   own job on the Node majors the unit job does not run, through
   `vitest.heap.config.ts`: Node 26.7.0 (pinned; V8 14.6) in the default tiers
@@ -19,14 +20,20 @@ CI is split by cost:
   --no-turbofan --no-concurrent-recompilation --no-use-osr`; the last two
   switch off background compilation and OSR, which the browser keeps on, so
   that the figures do not depend on compile timing), and Node 24 in the
-  default tiers. The unit job runs it on Node 22. The job has no `needs:`,
-  runs on drafts in parallel with the unit job and takes about half a minute.
+  default tiers. Wrenna's spend scene (#281) runs in the default tiers only and
+  is left out of the Maglev run until #290 is fixed, so her `spendBase` branch
+  has no Maglev coverage yet. The unit job runs it on Node 22. The job has no
+  `needs:`, runs on drafts in parallel with the unit job and takes about half a
+  minute.
   See [bots](bots.md), Testing.
 - Build and the Playwright e2e specs (`e2e/*.spec.ts`) run on pull requests
   that are ready for review and on pushes to main. They skip draft pull
   requests. They start only after the typecheck, lint, unit test and asset
   check job passes.
-- Changes that touch only `docs/` or Markdown files do not trigger CI.
+- Changes that touch only `docs/` or Markdown files run the full CI on pull
+  requests, because the required checks must always report and `assets:test`
+  reads `docs/architecture/assets.md`. A push to main that touches only those
+  files does not trigger CI.
 - The balance workflow (`.github/workflows/balance.yml`) is not part of CI.
   It runs only by hand (see [Balance reproduction](#balance-reproduction)).
 
@@ -64,7 +71,10 @@ jobs of the three green runs of PR #219 (41207597802, 41210693459,
 figures were measured at a load average of about 240 on 18 CPUs with other
 jobs running, so they are not idle figures: the seven-model idle baseline was
 1.1 to 1.8 s for the Run test, 0.34 to 0.47 s and 0.41 to 0.54 s for the two
-others.
+others. The sampler has nine models since #281 (Wrenna's): the three cases below
+gain one case each, which read 2.0, 0.62 and 0.77 s locally on Linux x64 (Node 24,
+a load average of 3 to 7) beside Durnhal's 1.9, 0.61 and 0.72 s, so the figures
+and the timeouts stand.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
@@ -220,6 +230,10 @@ are the only matches the package commits (the optional orb-on determinism row wa
 for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
 unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.
 
+The Wrenna cell (`wrenna.test.ts`, one seeded 2v2 match) read 11.0 s on the runner
+(unit job of run 43544274291, 9fe3ec7). Twice that is 22 s, above the 20 s top of
+the rule, so it keeps the 60 s timeout of the long-match precedent.
+
 ## Test types
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
@@ -229,14 +243,21 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   (match flow, orb off), `scripted-orb-arena01-2v2.json` (#218, the only one
   with `energyOrb`, played by `orb-fixture.test.ts` and covered by its own
   coverage test; the other fixtures leave the key out, so they keep their
-  checksums) and the seven roster fixtures. `orb.test.ts` holds the unit rows
+  checksums) and the roster fixtures, one per kit. `orb.test.ts` holds the unit rows
   of the orb: the switch, the warning and pickup ticks, the cap, the draw for a
   tie across seeds 1 to 32 and the point's validation. `counter.test.ts` (#227)
-  holds the unit rows of the on-hit counter with test kits, since no shipped kit
-  declares one: the build per hit and its cap, each pinned reading (EX, shield,
-  invulnerable, pulses, dead caster, no cast), the decay boundary, the frozen
-  pause, the round reset and a run that equals the same run without the
-  declaration, counter keys stripped.
+  holds the unit rows of the on-hit counter with test kits, so a rule is tested
+  apart from any shipped kit: the build per hit and its cap, each pinned reading
+  (EX, shield, invulnerable, pulses, dead caster, no cast), the decay boundary,
+  the frozen pause, the round reset and a run that equals the same run without
+  the declaration, counter keys stripped. Wrenna's real kit (#270, the first
+  with a counter) is pinned in `roster-kits.test.ts`: Focus build and decay, and
+  both spends. The ability oracle of `ability-watch.ts` knows the cooldown
+  verb: a slot that did not start a cast loses one tick, and the slot a fired
+  `consumeCounter` names also loses its verb per stack held before the step,
+  never below 0. Only the first spend of a step cuts, as it takes the whole
+  counter, and a cut by a windup cast that fired before the named slot's own
+  cast started in the step is skipped, because the new cast resets the slot.
 - Integration tests: bot-versus-bot headless matches. See [bots](bots.md).
 - The client's energy orb tests (#224): `orb-view.test.ts` plays the standard 2v2
   with the orb on, on the real sim and the real feedback and sound routing, in
@@ -255,16 +276,17 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   and 11 903 on the bots of #213), and three of the four moved with the bots of #225, which contest
   it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
-  pairings, fills and the seed schedule, the cell plan (a seven-name kit list
-  gives 21 pairings and 126 cells over three arenas, with 5 and 20 fills, played
-  by nothing), the orb wiring (the seven-kit roster, each arena's loaded point,
+  pairings, fills and the seed schedule (32 and 6 seeds at eight kits), the cell plan (a
+  seven-name kit list gives 21 pairings and 126 cells over three arenas, with 5 and 20
+  fills, played by nothing; the shipped data has eight kits, 28 pairings and 6 and 30
+  fills), the orb wiring (the eight-kit roster, each arena's loaded point,
   and `matchConfig` set and left out),
   `playMatch` against a reference loop with the arena orb, the aggregation and
   the report text, the
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report; only the CLI row plays seven-kit cells (315 matches, one seed of the 2v2
-  mode, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
+  report; only the CLI row plays eight-kit cells (504 matches, one seed of the 2v2
+  mode, 84 rows, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
   success path is a
   36-match row on the four v1 kits (with the orb, timeout 180 s; the CLI's 3v3 row at six
   kits is 360 matches, so
@@ -275,7 +297,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
   seed 6) and asserts that it ends in a decision, with no end tick. The same
   project holds the fixture search's tests (`tools/fixtures/*.test.ts`): the
   format against the committed bytes, the pure search cases, the reproduction of
-  the seven roster fixtures and the CLI (see [Fixture search](#fixture-search)).
+  the roster fixtures and the CLI (see [Fixture search](#fixture-search)).
 - Protocol tests (the `protocol` Vitest project, `packages/protocol/test`): the
   round trips and one golden text of all sixteen messages, the key-order and
   stray-field tests, a reject table with the edge pair of every bound, and a
@@ -322,7 +344,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
 
 ## Balance reproduction
 
-`npm run balance` plays all 25 200 matches of the report in
+`npm run balance` plays all 31 248 matches of the eight listed kits for the report in
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
@@ -333,11 +355,13 @@ it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
 and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: a full run plays 25 200 matches and takes about 31 minutes on
-Apple silicon. It plays every kit of `HARNESS_KITS` in
-`tools/balance/inputs.ts` (the seven files of `data/kits`, so a kit added to the
+`npm run check`: the full run of the eight kits now listed plays 31 248 matches
+(168 cells, at 32 seeds a 2v2 config and 6 a 3v3 config), about 38 minutes by
+match count on Apple silicon, not measured. It plays every kit of `HARNESS_KITS` in
+`tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
-step 1.3, #244). Every cell plays the standard match, so it sets the arena's orb
+step 1.3, #244, and Wrenna at her step 3.4, #281). Every
+cell plays the standard match, so it sets the arena's orb
 point from `data/orbs.json` (spec section 6).
 
 `.github/workflows/balance.yml` runs `npm run balance -- --check --mode <mode>`
@@ -349,7 +373,11 @@ orb and three arenas it is about
 31 minutes locally (2v2 11.2, 3v3 19.5, 12 600 matches each) and projects to
 about 34 (2v2) and 59 (3v3) on a runner, so the jobs have `timeout-minutes` of
 90 and 150, twice the projected check time (the failure step plays the mode
-again) and a margin. The
+again) and a margin. Those figures and timeouts are of the seven-kit block, which
+the document still holds: the roster is eight kits (#281), the committed block is
+the seven-kit report, so `npm run balance -- --check` and the manual workflow fail
+on purpose (168 cells against the committed 126) until the nine-kit report of batch
+21 rewrites the block and re-sizes the jobs. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 
@@ -386,10 +414,10 @@ What it does:
   every platform: no `Math.hypot` and no transcendental function. The tools lint
   does not ban them, so review enforces it.
 
-`tools/fixtures/reproduce.test.ts` runs the search on the seven committed
+`tools/fixtures/reproduce.test.ts` runs the search on the committed roster
 fixtures and compares the bytes: Hargrim's attempt 1, Quillon's attempt 23,
-Ondrel's attempt 2, Brimwick's attempt 10 and Durnhal's attempt 2 on the current
-kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
+Ondrel's attempt 2, Brimwick's attempt 10, Durnhal's attempt 2 and Wrenna's
+attempt 26 on the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
 searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put back in
 memory, as #125 changed those numbers and regenerated only the checkpoints),
 with the checkpoints of the current kits. Each row of the test names the kit
@@ -420,13 +448,13 @@ failed pre-check (decision 13 of batch #134):
   Skerrow on 2 and Lumeth on 5, and Lumeth on 6 after #191, whose self-cast
   rule moved only her checkpoints and checksum).
 
-A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148, and
-batch 16 for Durnhal, #204):
+A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148,
+batch 16 for Durnhal, #204, and #270 for Wrenna):
 
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
    energy gains, the dash `then`s and the statuses) and to `SEEDS` (the next
-   match seed, 5562 and up) in `packages/sim/test/roster-fixture.ts`. The tool
+   match seed that no kit of `SEEDS` has) in `packages/sim/test/roster-fixture.ts`. The tool
    stops with a message that names the file when either is missing.
 3. Run `npm run fixtures:search -- <id>`. When no attempt within the limit
    covers, the kit's `EXPECTED` asks for something a mirror may never show:
@@ -440,7 +468,9 @@ batch 16 for Durnhal, #204):
    above, and apply the timeout rule of the check suite to a reproduce row whose
    runner time passes 2.5 s. The rows of Ondrel (attempt 2), Brimwick (attempt
    10) and Durnhal (attempt 2) took 1.23, 0.84 and 0.68 s on the runner (0.36,
-   0.32 and 0.28 s locally), so they have no timeout of their own.
+   0.32 and 0.28 s locally), so they have no timeout of their own. Wrenna's row
+   (attempt 26) takes about 1.5 s locally and 2.14 s on the runner (job
+   132029295648 of #274, ubuntu-latest, Node 22.23.4), also under the mark.
 
 ## Playwright e2e
 
@@ -457,8 +487,9 @@ enters on a bare `/`, through a constant, so a grep for `goto('/')` finds no
 other spec.
 
 - `select.spec.ts`: the pre-match select (`select.png`, at 1280x720). On `/` the
-  panel shows and no canvas exists; the champion row is the seven roster ids in
-  order, all available, with Hargrim, arena01, 2v2 and normal current and the
+  panel shows and no canvas exists; the champion row is the eight roster ids in
+  order, all available, each box inside the 1280 px viewport on one line (a ninth
+  entry will not fit and needs the wrap), with Hargrim, arena01, 2v2 and normal current and the
   Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
   each `data-current`, leaves the address search empty and makes the Start href
   `?champion=quillon&difficulty=hard&arena=arena02&teamsize=3`. Start plays it:
@@ -475,15 +506,16 @@ other spec.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
   timer against the tick, the hidden result panel with its champion, arena and
   team select (every href writes `teamsize`, with 2v2 current), and the launch
-  address `?champion=quillon`. Three rows next to it, `?champion=ondrel`,
-  `?champion=brimwick` and `?champion=durnhal`, read health 130 / 130, 120 / 120
-  and 160 / 160, the scoreboard's row 0 name (built hidden at startup, so
-  readable without Tab) as Ondrel, Brimwick and Durnhal, and the champion
+  address `?champion=quillon`. Four rows next to it, `?champion=ondrel`,
+  `?champion=brimwick`, `?champion=durnhal` and `?champion=wrenna`, read health 130 / 130,
+  120 / 120, 160 / 160 and 120 / 120, the scoreboard's row 0 name (built hidden at startup, so
+  readable without Tab) as Ondrel, Brimwick, Durnhal and Wrenna, and the champion
   glbs the page requests (collected with `page.on('request')` before `goto`)
   as the pick's own, Quillon's and Hargrim's, with no `placeholder.glb`; they
   are red when the roster has no such id, and a missing clip is a page error
   at load. Durnhal's row also writes `scene-durnhal.png` (1280x720), the one
-  in-game look at his model. A row on `/?arena=arena02`
+  in-game look at his model, and Wrenna's `scene-wrenna.png` with the HUD's counter pips
+  visible and three slots, the first e2e read of pips on a real kit. A row on `/?arena=arena02`
   (`scene-arena02.png`) checks `data-arena` and the human's position,
   (-1100, 200), which proves the sim got arena02 and not only the hook, and
   the arena links; the row on `/?arena=arena03` (`scene-arena03.png`) does the
@@ -493,8 +525,8 @@ other spec.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard` (twelve links:
-  seven champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
+  and every link of the other three rows carrying `difficulty=hard` (thirteen links:
+  eight champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
   normal as current. The default test lists eight `data-hud` elements (the
   eighth is `scoreboard`, hidden and not displayed) and reads
   `data-silenced="false"` on all seven slots, while only F reads
