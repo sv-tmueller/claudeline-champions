@@ -37,6 +37,59 @@ CI is split by cost:
 - The balance workflow (`.github/workflows/balance.yml`) is not part of CI.
   It runs only by hand (see [Balance reproduction](#balance-reproduction)).
 
+The unit job's time is mostly `npm run test`, and Vitest's order decides how
+much of the job the three workers spend busy (#285). The runner has 4 vCPUs, so
+Vitest starts 3 workers. Its default order groups the files by project name, and
+the `tools` project came last: on job 132439224766 (main at 4eb2778, the job 527
+s, Vitest 444 s) `tools/balance/harness.test.ts` (135 s) started at 310 s and
+`tools/balance/run.test.ts` (106 s) at 317 s, and for the last 128 s only one or
+two workers were busy (the files' times add up to 1154 s, so 2.6 workers busy on
+average). `tests/vitest-sequencer.ts`, registered in `vitest.config.ts`, moves
+the files on its `SLOW_FIRST` list to the front, in list order, and leaves every
+other file in Vitest's order. No test is cut, skipped or changed: main's 4251
+passed and 6 skipped are the same, and the sequencer's own test file adds 7.
+
+- The list is every file that took 10 s or more in job 132439224766, slowest
+  first, except that `packages/bots/test/allocation.test.ts` goes first. It has
+  always run first, and its readings depend on the load around it (#290), so its
+  run conditions stay as they were. `tests/vitest-sequencer.test.ts` fails if a
+  listed path does not exist, so a renamed file cannot silently drop back to the
+  end.
+- The rule: a file that reads 10 s or more in a unit job, on a slow runner
+  included, goes on the list at its place by time. A new champion's bot file
+  (`packages/bots/test/<kit>.test.ts`) takes this check on its first CI run.
+- The result, on the same runner speed: 2.9 workers busy in every attempt
+  (2.88), against 2.6, and the job 374 and 369 s on two fast runners (Vitest 302
+  and 304 s, typecheck 15 s). On slow runners the job reads 469 s (job
+  132456632009, Vitest 391 s, typecheck 18 s) and 510 s (job 132458686040, Vitest
+  429 s, typecheck 20 s), against 527 s on the unordered run. The three workers
+  cannot do better than the files' times divided by 3: 1237 s of file time is 412
+  s, and the run took 429 s. The slow reading is above the trigger of 480 s, and
+  the order and the worker count are used up, so what is left is the re-size.
+- One worker per CPU (`--maxWorkers=100%`, four workers) was tried in CI only and
+  dropped. The work is CPU-bound, so each file took 38 percent longer with four
+  workers than with three (the files' times add up to 1210 s against 870 s on
+  two runners of the same speed) and the wall time did not fall: Vitest 315 s
+  (job 132452763764, 384 s) against 302 and 304 s on a fast runner, and 414 s
+  (job 132454443211, 496 s, typecheck 21 s) against 429 s on a slow one, which
+  is within the spread between runners. The change was not worth the risk to
+  the timeouts, which are sized from three-worker runner times. The bots heap
+  check passed in all four attempts.
+
+| Run (SHA) | Workers | Job | Job s | Typecheck s | Vitest s | File-time sum s | Workers busy |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| main, 4eb2778 | 3, default order | 132439224766 | 527 | 20 to 21 | 444.4 | 1154 | 2.6 |
+| 09a6ad4, attempt 1 | 3, slow files first | 132449462016 | 374 | 15 | 302.5 | 870 | 2.88 |
+| 09a6ad4, attempt 2 | 3, slow files first | 132451025209 | 369 | 15 | 303.9 | 875 | 2.88 |
+| 2119bc3, attempt 1 | 4 | 132452763764 | 384 | 16 | 315.4 | 1210 | 3.84 |
+| 2119bc3, attempt 2 | 4 | 132454443211 | 496 | 21 | 414.5 | 1594 | 3.85 |
+| f0dee39, attempt 1 | 3, slow files first | 132456632009 | 469 | 18 | 390.6 | 1125 | 2.88 |
+| f0dee39, attempt 2 | 3, slow files first | 132458686040 | 510 | 20 | 429.1 | 1237 | 2.88 |
+
+Rescan with the log command above, then add the job id and the times to this
+table. The typecheck step's seconds (15 on a fast runner, 20 and over on a slow
+one) tell the runner's speed, because every step slows by the same factor.
+
 Vitest's default test timeout is 5 s, and the GitHub runner is slower and less
 steady than a development machine: the same code read 2.9, 3.9 and 5.9 s for
 one test on three runs in a day. A unit test whose runner time passes 2.5 s
@@ -198,7 +251,11 @@ s, `brimwick.test.ts` 120 s, `tools/balance/harness.test.ts` 90 s,
 runner time has spread 2x in a day (2.9 to 5.9 s, see Check suite), and a day
 that slow for the whole job would pass the 10 minutes from 5 minutes on, so the
 job keeps less than that margin. The trigger: once a unit job on main passes
-about 8 minutes, cut the cell count of these three files.
+about 8 minutes (480 s), no test is cut. The remedies, in order, are the run
+order (the slow files start first, see Check suite), one Vitest worker more than
+the default (tried on #285 and dropped, with the figures there), and last
+re-sizing `timeout-minutes` and this trigger together, with the reason written
+here. The cost of the cells is the price of the coverage, and #285 decided to keep it.
 
 `durnhal.test.ts` (#211) has the same timeouts, set by the same rule. A cell
 takes 4.3 to 10.3 s locally (Linux x64, Node 22.23.4, load about 4, the file alone
