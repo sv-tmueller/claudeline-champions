@@ -22,6 +22,12 @@ import { defineConfig } from 'vitest/config';
 // browser keeps both on, so this project measures what Maglev's code boxes and not how the browser
 // tiers the bots up: that is the live probe's job.
 //
+// Those two flags do not pin everything. A major GC that lands in a measured window clears the
+// weak objects embedded in the shared Maglev code of bots that have died, deoptimizes it, and the
+// window reads 32 B a think (480 B in a block of 15) from baseline code. The test keeps every bot
+// it makes alive for that reason (`madeScenes` in allocation.test.ts, #290), and no flag is
+// needed: the GC is left on, as in the browser.
+//
 // The Maglev project needs Node 26: on Node 22 its guard and its checks fail on V8 12.4, so the
 // whole config is red there by design, and the Node 22 command is `--project bots-heap`.
 //

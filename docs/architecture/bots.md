@@ -828,9 +828,15 @@ unused on purpose (`lowHealth` is 0 for a row that does not hold F).
 
 ## Allocation
 
-A think allocates nothing in the steady state: the bot runs in the frame path of the
-browser, and `packages/bots/test/allocation.test.ts` measures it (see Testing). What
-makes that true, and what stays outside it:
+A think allocates 0 B in the optimizing tiers (Maglev and TurboFan) in the steady state: the
+bot runs in the frame path of the browser, and `packages/bots/test/allocation.test.ts`
+guards that (see Testing: the default tiers read TurboFan, the Maglev project Maglev alone).
+It is a statement about optimized code, not about every tick of a match: baseline and
+interpreter code box every double load and every double result, so no change of source
+reaches 0 B there, and a function that first reaches a cold branch drops to baseline code
+for some hundred ticks (the browser measurements, below, are in "What the rule guarantees in a
+match (#290)", which lists the configurations measured). What makes the optimized figure true, and what
+stays outside it:
 
 - Every record a think reads or writes is made once, in `createBot`, and rewritten
   field by field: the decision and the acted decision, the delay ring, the move
@@ -1128,9 +1134,85 @@ What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks and the settle), it runs frozen states (one kit, one cast state,
 so no polymorphic feedback), the median of single thinks hides the plans and
 the aim draw, and Node 22's V8 is not the browser's. The Maglev-only run is in
-the CI now (see Testing; it leaves out Wrenna's spend scene, so her `spendBase` branch, until #290 is fixed), on Node 26.7 and not in the browser: Node builds have
+the CI now (see Testing; it covers Wrenna's `spendBase` branch too), on Node 26.7 and not in the browser: Node builds have
 no pointer compression, so a Smi is 32 bits there and 31 in Chromium, and an
 int32 above 2^30 boxes only in the browser. The live probe stays the authority.
+
+### What the rule guarantees in a match (#290)
+
+The Node check cannot say whether a browser think is free of drops out of optimized code, so
+#290 measured it in Chromium. Method: Chromium 153.0.8010.12 (Playwright's), headless, with
+`--js-flags=--expose-gc --min-semi-space-size=64 --max-semi-space-size=64 --allow-natives-syntax`
+and `--enable-precise-memory-info`, the match on the paused clock (the frames of the live
+probe's driver), no sampling profiler. A scratch copy of `bot-driver.ts` read
+`performance.memory.usedJSHeapSize` before and after every live `think`; a no-op think reads
+16 B through that wrapper, a boxed double is 12 B in Chromium (pointer compression), the tier of
+each function was read after every window of 30 ticks with `%GetOptimizationStatus` and decoded
+with controls (25 Maglev, 41 TurboFan, 65 Ignition, 16385 Sparkplug), and `--trace-opt
+--trace-deopt` gave the events. The scripts are scratch and not committed. The Node check
+runs V8 14.6 (Node 26.7.0), which is not the V8 of Chromium 153.
+
+What baseline code costs. In the interpreter or Sparkplug every double field load and every
+double result is boxed: with `cues.dot` of `computeCues` replaced by 0 a call read 30 B instead
+of 162 B, so that one statement is about 11 boxes. No source rewrite makes that 0 B; the target is
+no time outside Maglev or TurboFan, not no boxes there.
+
+The measured example, `computeCues` in the default match (hargrim 2v2 on arena01, normal
+tier). On main (5a95dfa) a statement behind `cues.reserve && me.energy >= ULTIMATE_ENERGY_COST`
+(the load of `cache.baseClearance[F_INDEX]` and the compare with the stand clearance) was
+compiled without type feedback, and its first think, at about tick 3535, deoptimized the
+function (offset 388, `Insufficient type feedback for generic named access`). It then ran in
+Sparkplug for 17 steady windows, ticks 3509 to 4019, about 540 ticks: 960 of the 1080 thinks of
+those windows in both runs (1015 and 1016 over all 30 steady windows) read 156 or 168 B, 13 or 14
+boxes. After the hoist (the three reads on every call and one store, #302) `computeCues` was in Maglev in 30 of 30
+steady windows in 3 runs, no think read 156 or 168 B, and the median of a window was 0 B in 29 of
+30 windows; the 30th, at tick 3209, reads a median of 24 B on main too (a class of 24 to 48 B
+thinks that is not attributed to a function and is tracked in #303). The hoist's else value is a
+const of `casting.ts` and not the imported `SIGHT_CLEARANCE`. What was measured: with the import
+in the select the Node pin (Maglev alone, under Vitest) read 16 B a think while a wide ultimate
+stands in reach at full energy, and with a const of the module it reads 0 B. The mechanism is not
+established, and the browser was not measured with the import. The const is a copy, pinned equal
+to the import by `reserve.test.ts`. A Maglev pin in the heap check guards the
+hoist (see Testing).
+
+The default match is free of such a drop after its warm-up: a traced run of the head
+(`--trace-opt --trace-deopt`, Chromium 153.0.8010.12, no hook, no wrapper) shows no deopt of a
+function of `packages/bots/src` from the first window after the warm-up (tick 3029, the round that
+begins after tick 2100) to the end of the match at tick 4289.
+
+The other shipped configurations still have first-time deopts after the warm-up. Traced the same
+way, from the first printed window on (the warm-up ends with the round that begins after tick 2100):
+
+- hargrim 3v3 on arena01: `chooseEscape @176` (`Insufficient type feedback for generic named
+  access`), tick 4139.
+- hargrim 2v2 on arena02: `hasStatus @7` and `@27` (the name is also in the sim), `finisher @108`
+  (compare), `decide @287` (call), ticks 5909 to 6869.
+- hargrim 2v2 on arena03: `computeCues @267`, `dodgeInto @123`, `@52` and later `@806`, `hasStatus`,
+  `chooseCast` and `hasStatus` once by `embedded weak objects cleared`, and `think @691` (wrong
+  call target) at tick 12 239; one wave of `dependent prototype chain changed` at tick 9749.
+- quillon 3v3 on arena02: `computeCues @267` at tick 4859.
+- lumeth 3v3 on arena03: `dodgeInto` (`embedded weak objects cleared`, tick 3269), `dodgeInto
+  @404`, `decide @51` and `orbUpInto @51` at tick 3989.
+
+They are the same on main, which also has `computeCues @388` in the default match, on arena02 and
+arena03 and in the quillon 3v3 (the hoist removes it in each; the hargrim 3v3 on arena01 has none). In
+Chromium's bytecode `computeCues @267` is `cache.hasBase[F_INDEX]`, the first load of the
+`cues.reserve` chain, though the reason text says named access, so a reported offset can be the
+start of a block and not the failing operation. Outside the steady state too, and not measured
+here beyond the second measurement's trace of main: rounds 1 and 2 of the default match have 21
+`Insufficient type feedback` deopts in 12 functions (`chooseCast` 4, `decide` 3, `updateRuns` 3,
+`scoreIntentsInto` 2, `dodgeInto` 2 and one each of `think`, `exFor`, `follow`, `orbUpInto`,
+`chooseTarget`, `lineOfSight` and `computeCues @109`). All of these are tracked in #303.
+
+The profiler caveat. The CDP sampling profiler of the live probe, with garbage included, forces a
+Mark-Compact in every sampled window (one per window): 43 against 2 over the same 3v3 match with a
+Wrenna champion, per `--trace-gc`. Each one clears the weak objects embedded in optimized code
+(`embedded weak objects cleared`) and throws the code back to baseline. So a per-function figure
+of the sampler can be inflated, the live probe's included, and has to be read with the tier of
+the function. The first measurement's 250 B a think in `dodgeInto` was this effect: without the
+profiler `dodgeInto` stayed in TurboFan (Maglev under `--no-turbofan`) in all 32 windows and
+read 0 B. Tracked in #304. (Node's `HeapProfiler.startSampling` forced one Mark-Compact at its
+stop in the heap test's lab runs.)
 
 ### The default tiers on the runner
 
@@ -2651,17 +2733,21 @@ counter on the state the bot thought on) and a table test that works every liter
 from `wrenna.json`.
 
 The heap check got one Wrenna scene (Heartseeker with 3 stacks and 60 energy at 12 m, E pressed on
-every think, so the `spendBase` test of `exFor` runs), a twenty-third scene of the scene test in
-the default tiers, under the same 128 B as every other scene (0 B in 3 of 3 runs). It is not in
-the Maglev run (the 8 B limit stays what it was for every scene): in Maglev alone any scene added
-to that list leaves the two -0 pins at 32 B a think in about half the runs, and this is so on main
-without Wrenna or the eight kits too (main's test with a copy of the orb ignored scene appended:
-5 of 8 runs on Node 26.7.0), so the cause is the test's and not hers. Her scene, as a test of its
-own, reads 32 B in every Maglev run. Neither reading is understood yet, and no limit is relaxed
-for them: the Maglev run does not cover her `spendBase` branch until the heap test is fixed (#290, which also puts her scene back in that run).
+every think, so the `spendBase` test of `exFor` runs), a twenty-third scene of the scene test,
+under the same 128 B as every other scene in the default tiers (0 B in 3 of 3 runs) and the 8 B
+limit in Maglev alone, where it reads 0 B and the `spendBase` branch is covered by a mutation row
+(#290 put it back in that run, after #286 had left it out). Her scene is a list entry of the scene
+test and has to stay one. Known limit: as a test of its own after the two -0 pins it reads 32 B a
+think in every Maglev run (and the press pin after it, when it runs before the pins, reads 32 B
+too). V8 marks all the bots' Maglev code for deoptimization once at that point (`dependent
+prototype chain changed`), and the new bot's `move` then stays in Sparkplug (status 16385) for
+21 800 thinks while `think`, `aim` and `computeCues` tier up again; the profiler puts the bytes in
+`move`, 33 B a think. `gc()` before her warm-up and keeping every bot alive did not change it,
+Quillon in her place reads 32 B in 1 of 4 runs, and a fresh process reads 0 B. Why V8 does not tier
+`move` up there is not understood; tracked in #303.
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-two frozen scenes (twenty-three in the default tiers: see above) on arena 1 with the eight shipped kits (a
+section. It builds twenty-three frozen scenes on arena 1 with the eight shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
@@ -2768,6 +2854,26 @@ runs on the runner with the first flag alone. With both flags none of 27 copies
 read it locally, and the final head's job was green in 5 of 5 runs on the
 runner. That timing is the likely cause and not a proven one: Rosetta and
 Docker did not reproduce the runner, and a hardware difference is not excluded.
+The two flags do not pin everything. A major GC that falls inside a measured window clears the
+weak objects that the shared Maglev code of `move` and `seekShot` embeds from bots that have
+died (the scenes of an earlier test), marks the code for deoptimization (`embedded weak objects
+cleared`) and the window reads 32 B a think, two boxes, from baseline code (480 B in a block of
+15 thinks). That is why one more scene moved the two -0 pins to 32 B in about half the runs
+(#290): the scene shifted where the GC fell. Traced runs on Node 26.7.0 with a copy of the orb
+ignored scene: in every red run an incremental Mark-Compact fell inside window 0 of the first pin,
+and `%GetOptimizationStatus` read `move` 16385 (Sparkplug) and `seekShot` 131073 after both
+windows; in green runs the GC fell after the pins and every status read 25 (Maglev). The test
+keeps every bot of the file reachable (`madeScenes`), so no bot the scene list made ever dies. That
+stops the collection of dead bots and nothing more: bots that think in the same test before the
+scene list was built still leave the first two scenes (press, engage stand) at 32 B (the tester's
+variant, 40 bots of 1500 thinks each: 32 B in 16 of 16 runs on the head of #302, 10 of 10 with the
+bots dropped, and on main in 4 of 4, where the press pin reads 32 B too; both -0 pins read 0 B on
+the head in all 26 runs), so bots made through `scene()` are not safe from it either; tracked in #303. Main plus the copy read
+6 of 16 runs red before and 0 of 48 after (the copy first, in the middle
+and last); with Wrenna's scene as a list entry 10 of 12 runs were red before and 0 of 36 after.
+The final head read 0 of 108 runs red over the file, copies of `orb ignored` and of `wrenna
+spend` first, in the middle and last, and copies of the landing pin and of the computeCues pin,
+and 0 of 18 in three batches of six copies in parallel.
 The limits are literals of their own: 8 B a think for the scenes (they read 0
 B; the smallest mutation is one 16 B box a think), and 2900 B clear and 2500 B
 fallback for the plan step (clean 2784 B and 2400 to 2416 B: Maglev allocates a
@@ -2784,11 +2890,26 @@ with `rng.next`, 0 B with the draw written out in `aim`, limit 8 B. The two -0
 pins warm the press scene and the escape press scene up on whole-centimetre
 aims, move the bots 1 to 3 m so that the aim and the landing fall in [-0.5, 0)
 cm, count the aims of +0 that result (440 and 1200 of 1200 thinks) and read the
-lower of the two windows after the move against 8 B: 768 B (aim) and 288 B
-(landing) under `+ 0`, 0 B clean. The mutation table in the header of the test
+lower of the two windows after the move against 8 B: 944 B (aim) and 288 B
+(landing) under `+ 0`, 0 B clean. A third pin of the same shape guards `computeCues`: Quillon
+stands 8 m from Hargrim on an open lane with F ready, everything else on cooldown and herself
+silenced, is warmed up at 99 energy and set to 100, so the wide-ultimate branch that no scene
+reaches runs for the first time in the first window. It reads 0 B with the hoist, 224 B with
+main's `computeCues` and 16 B with the import in the select, in 3 of 3 runs each, and a read
+back of `computeCues`' clearance on fresh scratch objects (0.6 at 100, 0.5 at 99) shows that the
+scene reaches the branch. A scene added to the list that reaches the branch first would warm it and
+make the pin unable to fail. The mutation table in the header of the test
 reverts each fix of a Maglev boxing site alone, on Node 26.7 in Maglev alone,
-red in 3 of 3 runs, with the clean figures beside it (all 17 scenes at 0 B, the
-plan step 2784 B and 2400 to 2416 B, the blocks and both pins 0 B). Two
+red in 3 of 3 runs, with the clean figures beside it (all 23 scenes at 0 B, the
+plan step 2784 B and 2400 to 2416 B, the blocks and the three pins 0 B). The rows added by
+#290 are `spendBase` (a double stored in a module variable: 32 B in Wrenna's scene) and
+`computeCues` (above). Re-run on the final head: the `+ 0` pins (944 and 288 B), the bare
+`Math.round` in `landingInto` (the landing pin's check that a +0 aim occurs fails), both
+`Number.isFinite` rows (all 23 scenes 16 B, the draw block 240 B and the dodge block 144 B; five
+scenes 16 to 96 B with the plan at 2912 B), `rng.ts:next` for the draw (32, 32, 24 B) and for the
+coin (32 B), `waitsFor`, `bestDistance` and the orb row (64 and 80 B), each 3 of 3, and the
+`{ slot, ex }` row in the default tiers on Node 22.23.3 (200 to 360 B in every scene, a red run of
+14.2 to 14.7 s, the same as main's file). Two
 mutations stay at 0 B and are listed there as unguarded: `Number.isFinite` for
 the final aim test, and `needsPlan`'s distance through `hypot2`.
 

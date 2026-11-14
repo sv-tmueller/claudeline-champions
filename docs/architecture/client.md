@@ -281,7 +281,8 @@ difficulty, seed)` makes one bot per driven id with the seed `seed * 100 + id`
 (the local seed is 1), and `think(state, inputs)` writes `inputs[id]` for each
 before `step` in every tick. The human's entry is the shared input object and
 is left alone. The glue is one indexed loop over a list built once. A bot's
-`think` allocates nothing in the steady state and returns the bot's own
+`think` allocates 0 B in the optimizing tiers in the steady state (a first-time deopt drops it to
+baseline code for some hundred ticks; see [bots](bots.md#what-the-rule-guarantees-in-a-match-290)) and returns the bot's own
 `PlayerInput`, which its next think overwrites; `step` copies it, so the driver
 writes the bot's record into `inputs` as it is.
 
