@@ -132,9 +132,10 @@ in the menu. The listener is event code, not frame path.
 Two keys are not game input. F3 toggles the debug overlay. F4 fires a debug
 shot from the local champion towards the aim point, and Shift+F4 spawns a fused
 one-hit area at the aim point (fuse 90 ticks, radius 2.5 m, 30 damage to the
-enemy team, through `debug.spawnArea`): no champion the client plays has a fuse (Ysmeer's kit is data
-since #271, but she has no select entry until roadmap step 4.3), so this is
-how `e2e/fuse.spec.ts` shows the armed look. Both are dev-only keys.
+enemy team, through `debug.spawnArea`): no champion in the client's select has a
+fuse (Ysmeer's kit is data since #271, but she has no select entry until
+roadmap step 4.3), so this is how `e2e/fuse.spec.ts` shows the armed look. Both
+are dev-only keys.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
 that; it is a review step: run `npm run build`, then
@@ -329,10 +330,12 @@ sim steps first and the views read its state afterwards.
   heap-probe window plays a fused area, so that path is not measured. The
   armed look ends in the step of the first `areaTick`, and a fused one-hit area,
   which pulses and expires in that step, is released from the armed look to
-  nothing. No champion the client plays has a fuse yet (Ysmeer's does, from #271, and joins the select at roadmap step 4.3); `entity-views-fuse.test.ts` plays the
-  armed look on the real sim and `e2e/fuse.spec.ts` (`fuse.png`) in the browser. The pool of 16 covers the most Ondrel has
-  alive, five, since each lingering duration is shorter than its slot's cooldown
-  (roster-v2.md section 0), so a slot never has two of its own areas alive.
+  nothing. No champion in the client's select has a fuse yet (Ysmeer's does, from
+  #271, and joins the select at roadmap step 4.3); `entity-views-fuse.test.ts`
+  plays the armed look on the real sim and `e2e/fuse.spec.ts` (`fuse.png`) in
+  the browser. The pool of 16 covers the most Ondrel has alive, five, since each
+  lingering duration is shorter than its slot's cooldown (roster-v2.md section
+  0), so a slot never has two of its own areas alive.
   `entity-views-lingering.test.ts` plays each path of Ondrel on the real sim and
   kits and reads the radius, the placement and the release;
   `e2e/lingering.spec.ts` reads `data-areas` in the browser.

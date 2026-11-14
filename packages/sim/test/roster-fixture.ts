@@ -169,9 +169,9 @@ export const EXPECTED: Record<string, Expected> = {
     thens: [],
     statuses: ['dot', 'slow', 'haste', 'root', 'shield'],
   },
-  // Drift's `then` is empty, and Drift and Eclipse carry no damage, so neither gains energy. The
-  // Falling Star fuses (M2, M2 EX and F) and the end areas (Gravity Well, Comet EX) pulse a number of
-  // ticks after their cast, so the run has to leave an enemy in them.
+  // Drift's `then` is empty, and Drift and Eclipse carry no damage, so neither gains energy. The fuses
+  // of Falling Star and Supernova and the end areas (Gravity Well, Comet EX) pulse a number of ticks
+  // after their cast, so the run has to leave an enemy in them.
   ysmeer: {
     fired: ['M1/false', 'M2/false', 'M2/true', 'SPACE/false', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
     gains: ['M1/false', 'M2/false', 'M2/true', 'Q/false', 'E/false', 'E/true', 'F/false'],

@@ -195,7 +195,7 @@ A `projectile` effect may carry `endArea`: an `area` effect whose `placement` is
 - **Round end.** A projectile cleared when the round is decided leaves no area: the round end pause takes the projectile away without an end tick.
 - **The client** draws the spawned area from the existing `areaSpawned` event and the area entity, with no new event kind and no client source change.
 - **Pulse timing.** An area spawned where a projectile stops on an obstacle or the edge pulses on the tick it spawns; one spawned at a lifetime end runs one tick behind: it first pulses the next tick (or its fuse ends a tick later) and it ends a tick later, so a one-hit one pulses and ends on the tick after it spawns. Nothing else differs.
-- Ysmeer's kit of roster-v3 (#271) is the first shipped kit with an `endArea`: Gravity Well (a pulsing slow field) and the Comet EX (a one-hit area), both spawned at a lifetime end.
+- Ysmeer's kit of roster-v3 (#271) is the first shipped kit with an `endArea`: Gravity Well (a pulsing slow field) and the Comet EX (a one-hit area), both spawned where the projectile ends.
 
 ## 3. Energy economy
 

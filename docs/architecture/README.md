@@ -125,9 +125,10 @@ first.
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
   22.15 or later. It plays the `HARNESS_KITS` of `tools/balance/inputs.ts`
-  (eight since #281, every kit file), with the standard match (the arena's orb
-  point of `data/orbs.json`): 168 cells and 31 248 matches over three arenas, at 32
-  seeds a 2v2 config and 6 a 3v3 config. The committed block is still the
+  (eight since #281, every kit file but `ysmeer.json`, which waits for roadmap
+  step 4.3), with the standard match (the arena's orb point of
+  `data/orbs.json`): 168 cells and 31 248 matches over three arenas, at 32 seeds
+  a 2v2 config and 6 a 3v3 config. The committed block is still the
   seven-kit report of #244 (126 cells, 25 200 matches, about 31 minutes on Apple
   silicon), so `--check` and the manual workflow fail on purpose until the
   nine-kit report of batch 21 rewrites it.

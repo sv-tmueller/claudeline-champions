@@ -3777,6 +3777,8 @@ describe('Ysmeer', () => {
     expect(q.pierce).toBe(false);
     expect([q.endArea.durationTicks, q.endArea.intervalTicks]).toEqual([90, 30]);
     expect(q.endArea.effects.map((e) => e.type)).toEqual(['damage', 'applyStatus']);
+    const status = q.endArea.effects[1];
+    expect(status?.type === 'applyStatus' ? status.status.type : undefined).toBe('slow');
     for (const [slot, ex] of [['M2', false], ['M2', true], ['F', false]] as const) {
       const area = areaOf(ysmeer, slot, { ex });
       expect([area.durationTicks, area.intervalTicks]).toEqual([1, 1]);

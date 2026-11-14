@@ -175,12 +175,18 @@ cross the codec for the first time. Timed on one machine (Linux x64, Node 24.22.
 with the hook bodies timed by a line that was removed again, with her file and
 with it moved out of `data/kits`: the 2v2 hook 2.0 against 1.9 s and the 3v3 hook
 7.8 and 7.7 against 4.6 and 4.4 s, the loopback file 13.0 and 12.9 against 8.8 and
-8.7 s, and `room.test.ts` with the loopback file 13.0 against 9.0 s. The runner is
-about 1.7 times slower than this machine (the 4.5 s over 2.7 s of the header of
-`loopback.test.ts`), so the 3v3 hook is about 13 s there, under half of its 60 s,
-and the 3v3 row "matches a local sim of the same seed" read 2.1 s locally, about 3.6
-s there, under half of its 15 s. No timeout moves; read the runner log of this
-change for the hook, which the log does not time.
+8.7 s, and `room.test.ts` with the loopback file 13.0 against 9.0 s. The runner
+read slower than that machine, by the unit job of this change (run 43596034449,
+Node 22.23.4): the loopback file took 29.0 s, against 13.0 s locally (about 2.2
+times) and against 16.1 and 21.8 s on the last two pushes to main (runs
+43594168597 and 43551194321), and the rows "matches a local sim of the same
+seed, kits and inputs at every tick" read 1.16 s (2v2) and 4.05 s (3v3). The log
+has no time for a `beforeAll`, so the 3v3 hook is derived: the file less the two
+rows is 23.8 s, and less the 2v2 hook at 2.2 times its 2.0 s locally (about 4.4
+s) leaves about 19 s. That is under half of its 60 s, so the rule needs no
+second pass, and the 3v3 row's 4.05 s is under half of its 15 s. The ratio of the
+header of `loopback.test.ts` (4.5 s over 2.7 s, about 1.7) underestimated the
+runner here, as it did for Durnhal's file above. No timeout moves.
 
 `tools/balance/harness.test.ts` "plays 36 cells over the shipped data" (the four
 v1 kits) has a 200 s timeout (150 s before arena03 of #238, and 120 s before the
@@ -487,8 +493,9 @@ batch 16 for Durnhal, #204, and #270 and #271 for Wrenna and Ysmeer):
    0.32 and 0.28 s locally), so they have no timeout of their own. Wrenna's row
    (attempt 26) takes about 1.5 s locally and 2.14 s on the runner (job
    132029295648 of #274, ubuntu-latest, Node 22.23.4), also under the mark.
-   Ysmeer's row (attempt 7) takes 0.7 s locally; read its runner time in the
-   unit job of the pull request.
+   Ysmeer's row (attempt 7) takes 0.7 s locally and 1.78 s on the runner (the
+   unit job of #295, run 43596034449, ubuntu-latest, Node 22.23.4), also under
+   the mark.
 
 ## Playwright e2e
 
@@ -608,10 +615,10 @@ other spec.
   timeout is more than twice that. It does not use `__runProbeFrames`.
 - `fuse.spec.ts`: the armed look of a fused area (`fuse.png`, at 1280x720), on
   the dev-only sandbox with a paused clock and tick budgets, like
-  `lingering.spec.ts`. No champion the client plays has a fuse (Ysmeer's kit is data
-  since #271; her select entry is roadmap step 4.3), so Shift+F4 spawns one at the
-  aim through `debug.spawnArea` (fuse 90 ticks, radius 2.5 m, one hit of 30
-  damage to the enemy team; client.md, Input). After the warmup the cursor goes
+  `lingering.spec.ts`. No champion in the client's select has a fuse (Ysmeer's
+  kit is data since #271; her select entry is roadmap step 4.3), so Shift+F4
+  spawns one at the aim through `debug.spawnArea` (fuse 90 ticks, radius 2.5 m,
+  one hit of 30 damage to the enemy team; client.md, Input). After the warmup the cursor goes
   to the pixel of champion 2 (12, 2) at the probe viewport, one frame samples
   it, and Shift+F4 reads `debugAreas` 1 and `debugShots` 0. `data-areas` then
   reads 1 within 3 ticks, at 30 ticks and at 60, with `data-bar2` 100 each time;
