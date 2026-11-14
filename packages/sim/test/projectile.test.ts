@@ -928,17 +928,20 @@ describe('a projectile that spawns an endArea where it ends (spec 4.3)', () => {
   });
 
   /**
-   * Plays a projectile that ends at `reason`'s place with an enemy (id 2) inside the endArea and
-   * returns the steps, counted from the area's spawn step, of its pulses (with the target ids),
-   * the damage the enemy takes and its expiry.
+   * Plays a projectile that ends at `path`'s place (its lifetime end, a blocking wall, or the arena
+   * edge) with an enemy (id 2) inside the endArea and returns the steps, counted from the area's
+   * spawn step, of its pulses (with the target ids), the damage the enemy takes and its expiry.
    */
-  function timeline(path: 'lifetime' | 'obstacle', over: Partial<typeof endArea> & { fuseTicks?: number }) {
+  function timeline(path: 'lifetime' | 'obstacle' | 'edge', over: Partial<typeof endArea> & { fuseTicks?: number }) {
     const wall: Obstacle = { type: 'rect', x: 0, y: 0, w: 0.5, h: 4, height: 1, blocksProjectiles: true };
     const state = path === 'obstacle' ? open([wall]) : open();
     const shape = { ...endArea, ...over };
     if (path === 'obstacle') {
       place(state, 2, -1.2, 1.2);
       spawnProjectile(state, spec({ x: -5, y: 0, speed: 120, endArea: shape }));
+    } else if (path === 'edge') {
+      place(state, 2, 14, 9.2);
+      spawnProjectile(state, spec({ x: -5, y: 8, speed: 120, endArea: shape }));
     } else {
       place(state, 2, -4.1667, 9.2);
       spawnProjectile(state, spec({ x: -5, y: 8, speed: 10, lifetimeTicks: 5, endArea: shape }));
@@ -977,6 +980,9 @@ describe('a projectile that spawns an endArea where it ends (spec 4.3)', () => {
     expect(contact.damage).toEqual(pulses);
     expect(contact.expired).toEqual([gone]);
     expect(contact.live).toBe(0);
+
+    // The arena edge is a stop like a wall: same phase, same timeline, a different `reason`.
+    expect(timeline('edge', over)).toEqual({ ...contact, ended: 'boundary' });
 
     const lifetime = timeline('lifetime', over);
     expect(lifetime.ended).toBe('lifetime');
