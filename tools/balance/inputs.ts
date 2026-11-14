@@ -8,8 +8,8 @@ import type { ArenaDef, KitDef, OrbPoint } from '@claudeline/sim';
  * (loadInputs returns them in that order, and inputs.test.ts pins it). The list, not the directory,
  * fixes the run, the committed block and the CI times, so a kit added to data/kits joins the report
  * only when it is listed here. Durnhal joined it at step 1.3 of the roster-v3 build order (#244) and
- * Wrenna at step 3.4 (#281), so inputs.test.ts pins the kit files outside the list by name (none
- * today; Ysmeer's will be the first).
+ * Wrenna at step 3.4 (#281), so inputs.test.ts pins the kit files outside the list by name
+ * (today only Ysmeer's, whose file is built and which joins at step 4.3).
  */
 export const HARNESS_KITS: readonly string[] = [
   'brimwick',
