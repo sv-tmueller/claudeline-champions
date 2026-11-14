@@ -2865,9 +2865,10 @@ and `%GetOptimizationStatus` read `move` 16385 (Sparkplug) and `seekShot` 131073
 windows; in green runs the GC fell after the pins and every status read 25 (Maglev). The test
 keeps every bot of the file reachable (`madeScenes`), so no bot the scene list made ever dies. That
 stops the collection of dead bots and nothing more: bots that think in the same test before the
-scene list was built still leave the first scenes and the press pin at 32 B, on main alike (the
-tester: 32 B in 16 of 16 runs on this head, 10 of 10 with the bots dropped, 4 of 4 on main), so
-bots made through `scene()` are not safe from it either; tracked in #303. Main plus the copy read
+scene list was built still leave the first two scenes (press, engage stand) at 32 B (the tester's
+variant, 40 bots of 1500 thinks each: 32 B in 16 of 16 runs on the head of #302, 10 of 10 with the
+bots dropped, and on main in 4 of 4, where the press pin reads 32 B too; both -0 pins read 0 B on
+the head in all 26 runs), so bots made through `scene()` are not safe from it either; tracked in #303. Main plus the copy read
 6 of 16 runs red before and 0 of 48 after (the copy first, in the middle
 and last); with Wrenna's scene as a list entry 10 of 12 runs were red before and 0 of 36 after.
 The final head read 0 of 108 runs red over the file, copies of `orb ignored` and of `wrenna

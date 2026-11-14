@@ -393,9 +393,9 @@ function put(state: GameState, id: number, x: number, y: number): void {
  * again: longer than the two windows of a pin. Where that GC fell depended on how much the tests
  * before had allocated, so one more scene moved it onto the pins in about half the runs. Left
  * reachable, the bots this function made never die, so no GC clears what their code embeds. That
- * is all it does: a bot that thinks before the scene list is built in the same test still leaves
- * the first scenes and the press pin at 32 B, on main alike, and making it through `scene()` does
- * not help (#303).
+ * is all it does: bots that think before the scene list is built in the same test (the tester's
+ * variant: 40 bots, 1500 thinks each) still leave the first two scenes, press and engage stand, at
+ * 32 B, and on main the press pin too; making them through `scene()` does not help (#303).
  * Node 26.7 in Maglev alone, 16 runs each: main with a copy of the scene `orb ignored` at its end
  * read both -0 pins at 32 B in 6 runs; with the scenes kept, that copy at the start, in the middle
  * and at the end read them at 0 B in all 48 (see bots.md, Allocation).
@@ -833,7 +833,7 @@ describe('think allocation', () => {
   // smallest of 10, 15 and 20 s at least twice the slowest runner time (testing.md, Check suite):
   // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 14.2 to 14.7 s on a Linux host with Node 22.23.3
   // (the `{ slot, ex }` mutation of bots.md, all 23 scenes at the cap; main's file reads 14.3 to
-  // 14.6 s there, the same as main's file, so not this change's), inside it. The heap jobs (Node 24 and 26, both tiers)
+  // 14.6 s there, so the time is not this change's), inside it. The heap jobs (Node 24 and 26, both tiers)
   // read 3.6 to 5.3 s.
   it('allocates under the limit per think in every scene', { timeout: 20_000 }, () => {
     const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
