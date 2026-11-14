@@ -1,5 +1,5 @@
 // The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json`, `lumeth.json`,
-// `ondrel.json`, `brimwick.json`, `durnhal.json` and `wrenna.json`, whose numbers come from docs/design/roster-v1.md,
+// `ondrel.json`, `brimwick.json`, `durnhal.json`, `wrenna.json` and `ysmeer.json`, whose numbers come from docs/design/roster-v1.md,
 // docs/design/roster-v2.md and docs/design/roster-v3.md (ticks = seconds x 60, one hit =
 // durationTicks 1 / intervalTicks 1, and the lingering areas of Ondrel carry the three rules of
 // roster-v2 section 0).
@@ -17,6 +17,7 @@ import ondrelJson from '../../../data/kits/ondrel.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
 import durnhalJson from '../../../data/kits/durnhal.json';
 import wrennaJson from '../../../data/kits/wrenna.json';
+import ysmeerJson from '../../../data/kits/ysmeer.json';
 import { Button, SLOTS, createMatch, debug, step } from '../src/index';
 import type { AbilityEffect, AbilitySpec, Effect, GameState, KitDef, PlayerInput, SimEvent, Slot } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -33,6 +34,7 @@ const KITS = [
   { stem: 'brimwick', json: brimwickJson },
   { stem: 'durnhal', json: durnhalJson },
   { stem: 'wrenna', json: wrennaJson },
+  { stem: 'ysmeer', json: ysmeerJson },
 ];
 
 const hargrim = validateKit(hargrimJson);
@@ -43,6 +45,7 @@ const ondrel = validateKit(ondrelJson);
 const brimwick = validateKit(brimwickJson);
 const durnhal = validateKit(durnhalJson);
 const wrenna = validateKit(wrennaJson);
+const ysmeer = validateKit(ysmeerJson);
 
 function mirror(id: string) {
   return {
@@ -103,6 +106,7 @@ describe('the kit stats', () => {
     expect(stats(brimwick)).toEqual({ id: 'brimwick', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(durnhal)).toEqual({ id: 'durnhal', maxHealth: 160, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
     expect(stats(wrenna)).toEqual({ id: 'wrenna', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
+    expect(stats(ysmeer)).toEqual({ id: 'ysmeer', maxHealth: 120, moveSpeed: 5.5, support: false, ex: ['M2', 'E'] });
   });
 
   it('gives a path-precise message for a number outside the contract', () => {
@@ -522,6 +526,10 @@ describe('the catalog ranges', () => {
     expect(catalogProblems(copy)).toEqual(['wrenna.slots.F.effects[0]: damage total 96 over 4 pulses is not 8 to 60']);
   });
 
+  it('hold for the Ysmeer kit', () => {
+    expect(catalogProblems(ysmeer)).toEqual([]);
+  });
+
   it('name the path of a number outside them', () => {
     const copy = copyOf(hargrim);
     const dash = copy.slots.F.effects[0];
@@ -683,6 +691,8 @@ describe('the EX variants', () => {
     expect(exDiff(durnhal, 'E')).toEqual(['effects[0].effects[0].amount', 'effects[0].effects[1].status.stacks'].sort());
     expect(exDiff(wrenna, 'M2')).toEqual(['effects[0].effects[2]']);
     expect(exDiff(wrenna, 'E')).toEqual(['effects[0].pierce', 'effects[0].effects[0].amount', 'effects[1]'].sort());
+    expect(exDiff(ysmeer, 'M2')).toEqual(['effects[0].effects[1]', 'effects[0].radius'].sort());
+    expect(exDiff(ysmeer, 'E')).toEqual(['effects[0].endArea']);
   });
 });
 
@@ -697,7 +707,7 @@ describe('the on-hit counter of the roster', () => {
   it('is spent by Heartseeker and Fade Step only, as the marker at these paths', () => {
     const spends = (kit: KitDef) => visitKit(kit).filter(({ effect }) => effect.type === 'consumeCounter').map(({ path }) => path);
     expect(spends(wrenna)).toEqual(['wrenna.slots.E.effects[1]', 'wrenna.slots.R.effects[0]']);
-    for (const kit of [hargrim, quillon, skerrow, lumeth, ondrel, brimwick, durnhal]) expect(spends(kit), kit.id).toEqual([]);
+    for (const kit of [hargrim, quillon, skerrow, lumeth, ondrel, brimwick, durnhal, ysmeer]) expect(spends(kit), kit.id).toEqual([]);
   });
 });
 
@@ -947,8 +957,9 @@ describe('the lingering area rules', () => {
 });
 
 describe('the fuse rules', () => {
-  // Rules 2.7 and roster-v2 section 0: no shipped kit has a fuse, so each row fuses an area of a
-  // copy of Hargrim, whose M2 is a one-hit area with a slow and whose cooldown is 360 ticks.
+  // Rules 2.7 and roster-v2 section 0: each row fuses an area of a copy of Hargrim, whose M2 is a
+  // one-hit area with a slow and whose cooldown is 360 ticks. Ysmeer's real fuses are pinned in her
+  // own describe below.
   const M2 = 'hargrim.slots.M2.effects[0]';
   const fused = (fuseTicks: number, durationTicks = 1, intervalTicks = 1): KitDef => {
     const copy = copyOf(hargrim);
@@ -1101,9 +1112,9 @@ describe('the fuse rules', () => {
 });
 
 describe('the endArea rules', () => {
-  // Spec 4.3: no shipped kit has an endArea yet, so each row puts one on a projectile of a copy of
-  // Quillon, whose M2 projectile slot is a 360-tick cooldown. The endArea counts as an area of that
-  // slot, so its duration (plus a fuse) stays under the cooldown.
+  // Spec 4.3: each row puts an endArea on a projectile of a copy of Quillon, whose M2 projectile
+  // slot is a 360-tick cooldown. The endArea counts as an area of that slot, so its duration (plus a
+  // fuse) stays under the cooldown. Ysmeer's real end areas are pinned in her own describe below.
   const M2 = 'quillon.slots.M2.effects[0]';
   const shot = (copy: KitDef): Extract<AbilityEffect, { type: 'projectile' }> => {
     const effect = copy.slots.M2.effects[0];
@@ -1758,6 +1769,15 @@ describe('every slot of the shipped kits', () => {
     { kit: wrenna, slot: 'E', ex: true, cooldown: 480, windup: 30, walk: 2.75, cost: 25 },
     { kit: wrenna, slot: 'R', ex: false, cooldown: 780, windup: 0, cost: 0 },
     { kit: wrenna, slot: 'F', ex: false, cooldown: 600, windup: 36, walk: 0, cost: 100 },
+    { kit: ysmeer, slot: 'M1', ex: false, cooldown: 42, windup: 6, walk: 5.5, cost: 0 },
+    { kit: ysmeer, slot: 'M2', ex: false, cooldown: 300, windup: 24, walk: 2.75, cost: 0 },
+    { kit: ysmeer, slot: 'M2', ex: true, cooldown: 300, windup: 24, walk: 2.75, cost: 25 },
+    { kit: ysmeer, slot: 'SPACE', ex: false, cooldown: 540, windup: 0, cost: 0 },
+    { kit: ysmeer, slot: 'Q', ex: false, cooldown: 600, windup: 24, walk: 2.75, cost: 0 },
+    { kit: ysmeer, slot: 'E', ex: false, cooldown: 420, windup: 18, walk: 2.75, cost: 0 },
+    { kit: ysmeer, slot: 'E', ex: true, cooldown: 420, windup: 18, walk: 2.75, cost: 25 },
+    { kit: ysmeer, slot: 'R', ex: false, cooldown: 780, windup: 0, cost: 0 },
+    { kit: ysmeer, slot: 'F', ex: false, cooldown: 600, windup: 24, walk: 2.75, cost: 100 },
   ];
 
   it.each(rows)('$kit.id $slot ex=$ex casts with its cooldown, windup, cost and walk rule', (row) => {
@@ -3459,5 +3479,309 @@ describe('Wrenna', () => {
   it('keeps one lingering area, Arrow Storm, and no wound', () => {
     expect(lingeringPaths(wrenna)).toEqual(['wrenna.slots.F.effects[0]']);
     expect(woundPaths(wrenna)).toEqual([]);
+  });
+});
+
+describe('Ysmeer', () => {
+  const damages = (rig: Rig) => rig.events('damage').map(({ e }) => [e.targetId, e.amount, e.health]);
+  const gains = (rig: Rig) => rig.events('energyGained').map(({ e }) => [e.championId, e.targetId, e.amount]);
+  const steps = (rig: Rig, type: 'areaTick' | 'areaSpawned' | 'areaExpired' | 'projectileExpired') =>
+    rig.events(type).map(({ step }) => step);
+
+  it('M1 Starbolt flies 11 m in 33 sweeps', () => {
+    const rig = new Rig(ysmeer);
+    rig.run(6 + 33, press('M1'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(6);
+    expect(spawned?.e.radius).toBe(0.25);
+    expect(spawned?.e.vx).toBe(20);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 6 + 1).toBe(33);
+    expect(expired?.e.x).toBeCloseTo(X0 + 11, 9);
+    rig.clean();
+  });
+
+  it('M1 Starbolt does 10 damage at 8 m and earns 5', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 8, 0] });
+    rig.run(6 + 25, press('M1'));
+    expect(damages(rig)).toEqual([[2, 10, 110]]);
+    expect(rig.applied()).toEqual([]);
+    expect(gains(rig)).toEqual([[0, 2, 5]]);
+    expectStopsOnHit(rig);
+    rig.clean();
+  });
+
+  // The fused area. Cast on step 0, windup 24, so the area is placed on step 24, and the first pulse
+  // is the fuse later: 24 + 45 = 69 (rules 2.7).
+  it('M2 Falling Star stays armed and inert for 45 ticks at the aim, then hits once on step 69', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 8, 0], 3: [X0 + 8, 2.6] });
+    rig.run(24 + 1, press('M2', { aim: [X0 + 8, 0] }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 8, 9);
+    expect(spawned?.e.y).toBe(0);
+    expect(spawned?.e.radius).toBe(2);
+    // Armed: one area with its fuse, no pulse, and the enemy untouched.
+    expect(rig.state.areas.map((a) => a.fuseTicks)).toEqual([45]);
+    rig.run(68 - 24);
+    expect(rig.state.areas.map((a) => a.fuseTicks)).toEqual([45]);
+    expect(rig.events('areaTick')).toEqual([]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.health(2)).toBe(120);
+    expect(rig.events('energyGained')).toEqual([]);
+    // The fuse burns out on step 69: the pulse, the hit and the end of a one-hit area, all together.
+    rig.step();
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([[69, [2]]]);
+    expect(damages(rig)).toEqual([[2, 20, 100]]);
+    expect(rig.applied()).toEqual([]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(steps(rig, 'areaExpired')).toEqual([69]);
+    expect(rig.state.areas).toEqual([]);
+    expect(rig.health(3)).toBe(120);
+    rig.clean();
+  });
+
+  it('M2 Falling Star hits no one who has walked out of the circle during the fuse', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 8, 0] });
+    rig.run(24 + 1, press('M2', { aim: [X0 + 8, 0] }));
+    // The fuse follows no one: the area stays where the cast aimed it.
+    place(rig.state, 2, X0 + 8 + 2.6, 0);
+    rig.run(69 - 24);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([[69, []]]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.health(2)).toBe(120);
+    rig.clean();
+  });
+
+  it('M2 Falling Star lands 11 m away at most', () => {
+    const rig = new Rig(ysmeer);
+    rig.run(24 + 1, press('M2', { aim: [X0 + 14, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.x).toBeCloseTo(X0 + 11, 9);
+    rig.clean();
+  });
+
+  it('M2 EX Falling Star grows to radius 2.5, burns the same 45 ticks and stuns for 45 after the fuse', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 8 + 2.9, 0], 3: [X0 + 8 + 3.1, 0] }, 25);
+    rig.run(24 + 1, press('M2', { ex: true, aim: [X0 + 8, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.radius).toBe(2.5);
+    expect(rig.state.areas.map((a) => a.fuseTicks)).toEqual([45]);
+    rig.run(68 - 24);
+    expect(rig.events('areaTick')).toEqual([]);
+    expect(rig.applied()).toEqual([]);
+    rig.step();
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([[69, [2]]]);
+    expect(damages(rig)).toEqual([[2, 20, 100]]);
+    expect(rig.applied()).toEqual([[2, 'stun', 45]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'stun' }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expect(rig.health(3)).toBe(120);
+    expect(steps(rig, 'areaExpired')).toEqual([69]);
+    rig.clean();
+  });
+
+  it('SPACE Drift dashes 4 m in 12 ticks with a 30 percent haste for 90, and fires nothing at the end', () => {
+    const rig = new Rig(ysmeer);
+    rig.step(press('SPACE'));
+    expect(rig.applied()).toEqual([[0, 'haste', 90]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'haste', percent: 30 }]);
+    rig.run(11);
+    expect(rig.events('dashStarted').map(({ step, e }) => [step, e.distance, e.ticks])).toEqual([[0, 4, 12]]);
+    const ended = rig.events('dashEnded');
+    expect(ended.map(({ step, e }) => [step, e.reason])).toEqual([[11, 'complete']]);
+    expect(ended[0]?.e.x).toBeCloseTo(X0 + 4, 9);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    rig.clean();
+  });
+
+  // The end area. The shot flies 50 sweeps from step 24, so it ends on step 24 + 50 - 1 = 73 and
+  // leaves its area there; a lifetime-spawned area first pulses a tick later (rules 2.8), then every
+  // 30 ticks for 90: steps 74, 104 and 134.
+  it('Q Gravity Well leaves a 3-pulse slow field where it ends and not where it flew past an enemy 1.5 m off the line', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 10, 1.5] });
+    rig.run(24 + 50 + 90, press('Q'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.radius).toBe(0.5);
+    expect(spawned?.e.vx).toBe(12);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.step).toBe(73);
+    expect(expired?.e.reason).toBe('lifetime');
+    expect(expired?.e.x).toBeCloseTo(X0 + 10, 9);
+    // The enemy is 1.5 m off the line: outside the flight reach of 0.5 + 0.5, inside the area's 2.5.
+    expect(rig.events('projectileHit')).toEqual([]);
+    const [area] = rig.events('areaSpawned');
+    expect(area?.step).toBe(73);
+    expect(area?.e.x).toBe(expired?.e.x);
+    expect(area?.e.y).toBe(expired?.e.y);
+    expect(area?.e.radius).toBe(2);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([
+      [74, [2]],
+      [104, [2]],
+      [134, [2]],
+    ]);
+    expect(damages(rig)).toEqual([[2, 8, 112], [2, 8, 104], [2, 8, 96]]);
+    expect(rig.applied()).toEqual([[2, 'slow', 60], [2, 'slow', 60], [2, 'slow', 60]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'slow', percent: 30 }]);
+    // Three pulses, one credit: the energy is earned once per target per cast.
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    // A lifetime-end area spawns after the step's area pass, so its 90 ticks start the step after the spawn.
+    expect(steps(rig, 'areaExpired')).toEqual([73 + 90]);
+    rig.clean();
+  });
+
+  it('Q Gravity Well hit on the line does 9 damage, stops on the hit and leaves no area', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 6, 0] });
+    rig.run(24 + 50 + 90, press('Q'));
+    expect(damages(rig)).toEqual([[2, 9, 111]]);
+    expect(rig.applied()).toEqual([]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expectStopsOnHit(rig);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    expect(rig.state.areas).toEqual([]);
+    rig.clean();
+  });
+
+  it('E Comet flies 12 m in 40 sweeps', () => {
+    const rig = new Rig(ysmeer);
+    rig.run(18 + 40, press('E'));
+    const [spawned] = rig.events('projectileSpawned');
+    expect(spawned?.step).toBe(18);
+    expect(spawned?.e.radius).toBe(0.4);
+    expect(spawned?.e.vx).toBe(18);
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.e.reason).toBe('lifetime');
+    expect((expired?.step ?? 0) - 18 + 1).toBe(40);
+    expect(expired?.e.x).toBeCloseTo(X0 + 12, 9);
+    // The base Comet carries no end area.
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.clean();
+  });
+
+  it('E Comet does 18 damage and a 2 m knockback in 8 ticks, earns 10 and stops on the hit', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 6, 0] });
+    rig.run(18 + 20, press('E'));
+    expect(damages(rig)).toEqual([[2, 18, 102]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 8]]);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 2, totalTicks: 8, dirX: 1, dirY: 0 }]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    expectStopsOnHit(rig);
+    rig.run(8);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 8, 9);
+    rig.clean();
+  });
+
+  it('E EX Comet leaves a one-hit area of radius 2 and 14 damage where it ends, hit on the step after the spawn', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 12.5, 1.5] }, 25);
+    rig.run(18 + 40 + 1, press('E', { ex: true }));
+    const [expired] = rig.events('projectileExpired');
+    expect(expired?.step).toBe(57);
+    expect(expired?.e.reason).toBe('lifetime');
+    expect(expired?.e.x).toBeCloseTo(X0 + 12, 9);
+    // The enemy is 1.58 m from the end of the flight: outside 0.4 + 0.5, inside the area's 2.5.
+    expect(rig.events('projectileHit')).toEqual([]);
+    const [area] = rig.events('areaSpawned');
+    expect(area?.step).toBe(57);
+    expect(area?.e.x).toBe(expired?.e.x);
+    expect(area?.e.y).toBe(expired?.e.y);
+    expect(area?.e.radius).toBe(2);
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([[58, [2]]]);
+    // A one-hit area runs its single tick on the step after the lifetime spawn and expires with it.
+    expect(steps(rig, 'areaExpired')).toEqual([58]);
+    expect(damages(rig)).toEqual([[2, 14, 106]]);
+    expect(rig.applied()).toEqual([]);
+    expect(gains(rig)).toEqual([[0, 2, 10]]);
+    rig.clean();
+  });
+
+  it('E EX Comet still does the 18 damage and the knockback of its base on a hit, and leaves no area', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 6, 0] }, 25);
+    rig.run(18 + 20, press('E', { ex: true }));
+    expect(damages(rig)).toEqual([[2, 18, 102]]);
+    expect(rig.applied()).toEqual([[2, 'knockback', 8]]);
+    expectStopsOnHit(rig);
+    expect(rig.events('areaSpawned')).toEqual([]);
+    rig.clean();
+  });
+
+  it('R Eclipse shields the caster for 30 over 240 ticks and pushes the enemy at 3.4 m 2.5 m away, not the one at 3.6 m', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 3.4, 0], 3: [X0, -3.6] });
+    rig.step(press('R'));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.e.x).toBe(X0);
+    expect(spawned?.e.radius).toBe(3);
+    expect(rig.events('areaTick').map(({ e }) => e.targetIds)).toEqual([[2]]);
+    expect(rig.applied()).toEqual([[0, 'shield', 240], [2, 'knockback', 10]]);
+    expect(rig.statuses(0)).toEqual([{ type: 'shield', absorb: 30 }]);
+    expect(rig.statuses(2)).toEqual([{ type: 'knockback', distance: 2.5, totalTicks: 10, dirX: 1, dirY: 0 }]);
+    expect(rig.statuses(3)).toEqual([]);
+    expect(rig.events('damage')).toEqual([]);
+    expect(rig.events('energyGained')).toEqual([]);
+    expectOneHit(rig);
+    rig.run(10);
+    expect(champion(rig.state, 2).x).toBeCloseTo(X0 + 3.4 + 2.5, 9);
+    rig.clean();
+  });
+
+  // The ultimate. Windup 24, fuse 90: the placed area is on step 24 and the first pulse on 114.
+  it('F Supernova stays armed for 90 ticks at the aim, then hits once on step 114 for 55 and a 60 tick stun', () => {
+    const rig = new Rig(ysmeer, { 2: [X0 + 10 + 3.9, 0], 3: [X0 + 10, 4.1] }, 100);
+    rig.run(24 + 1, press('F', { aim: [X0 + 10, 0] }));
+    const [spawned] = rig.events('areaSpawned');
+    expect(spawned?.step).toBe(24);
+    expect(spawned?.e.x).toBeCloseTo(X0 + 10, 9);
+    expect(spawned?.e.radius).toBe(3.5);
+    expect(rig.state.areas.map((a) => a.fuseTicks)).toEqual([90]);
+    rig.run(113 - 24);
+    expect(rig.events('areaTick')).toEqual([]);
+    expect(rig.events('damage')).toEqual([]);
+    rig.step();
+    expect(rig.events('areaTick').map(({ step, e }) => [step, e.targetIds])).toEqual([[114, [2]]]);
+    expect(damages(rig)).toEqual([[2, 55, 65]]);
+    expect(rig.applied()).toEqual([[2, 'stun', 60]]);
+    expect(gains(rig)).toEqual([[0, 2, 15]]);
+    expect(rig.health(3)).toBe(120);
+    expect(steps(rig, 'areaExpired')).toEqual([114]);
+    rig.clean();
+  });
+
+  it('F Supernova lands 12 m away at most', () => {
+    const rig = new Rig(ysmeer, {}, 100);
+    rig.run(24 + 1, press('F', { aim: [X0 + 14, 0] }));
+    expect(rig.events('areaSpawned')[0]?.e.x).toBeCloseTo(X0 + 12, 9);
+    rig.clean();
+  });
+
+  it('holds its fuses and end areas where the fuse and end area rules bind: M2, M2 EX and F fuse, Q and E EX end', () => {
+    const fused: [string, number][] = [];
+    const ends: [string, number, number][] = [];
+    for (const slot of SLOTS) {
+      const base = ysmeer.slots[slot];
+      for (const [label, ability] of [[slot, base], [`${slot} EX`, base.ex]] as const) {
+        for (const effect of ability?.effects ?? []) {
+          if (effect.type === 'area' && effect.fuseTicks !== undefined) fused.push([label, effect.fuseTicks]);
+          if (effect.type === 'projectile' && effect.endArea !== undefined) {
+            ends.push([label, effect.lifetimeTicks, effect.endArea.durationTicks]);
+          }
+        }
+      }
+    }
+    expect(fused).toEqual([['M2', 45], ['M2 EX', 45], ['F', 90]]);
+    expect(ends).toEqual([['Q', 50, 90], ['E EX', 40, 1]]);
+  });
+
+  it('keeps the Gravity Well field a pulsing slow with no control, and Falling Star and Supernova one-hit', () => {
+    const q = ysmeer.slots.Q.effects[0];
+    if (q?.type !== 'projectile' || q.endArea === undefined) throw new Error('Ysmeer Q has no end area');
+    expect(q.pierce).toBe(false);
+    expect([q.endArea.durationTicks, q.endArea.intervalTicks]).toEqual([90, 30]);
+    expect(q.endArea.effects.map((e) => e.type)).toEqual(['damage', 'applyStatus']);
+    const status = q.endArea.effects[1];
+    expect(status?.type === 'applyStatus' ? status.status.type : undefined).toBe('slow');
+    for (const [slot, ex] of [['M2', false], ['M2', true], ['F', false]] as const) {
+      const area = areaOf(ysmeer, slot, { ex });
+      expect([area.durationTicks, area.intervalTicks]).toEqual([1, 1]);
+    }
   });
 });

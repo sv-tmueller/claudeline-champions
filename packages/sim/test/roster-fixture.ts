@@ -169,6 +169,15 @@ export const EXPECTED: Record<string, Expected> = {
     thens: [],
     statuses: ['dot', 'slow', 'haste', 'root', 'shield'],
   },
+  // Drift's `then` is empty, and Drift and Eclipse carry no damage, so neither gains energy. The fuses
+  // of Falling Star and Supernova and the end areas (Gravity Well, Comet EX) pulse a number of ticks
+  // after their cast, so the run has to leave an enemy in them.
+  ysmeer: {
+    fired: ['M1/false', 'M2/false', 'M2/true', 'SPACE/false', 'Q/false', 'E/false', 'E/true', 'R/false', 'F/false'],
+    gains: ['M1/false', 'M2/false', 'M2/true', 'Q/false', 'E/false', 'E/true', 'F/false'],
+    thens: [],
+    statuses: ['stun', 'slow', 'haste', 'knockback', 'shield'],
+  },
 };
 
 /** Collects what the coverage test needs from the events of every step. */
@@ -245,6 +254,7 @@ export const SEEDS: Record<string, number> = {
   brimwick: 5560,
   durnhal: 5561,
   wrenna: 5562,
+  ysmeer: 5563,
 };
 
 export interface Observer {
