@@ -1,8 +1,11 @@
 import { defineConfig } from 'vitest/config';
+import { SlowFirstSequencer } from './tests/vitest-sequencer.ts';
 
 // Includes are scoped per project so Vitest never picks up e2e/**/*.spec.ts.
 export default defineConfig({
   test: {
+    // Starts the slow files first (tests/vitest-sequencer.ts).
+    sequence: { sequencer: SlowFirstSequencer },
     projects: [
       {
         test: {
