@@ -61,8 +61,8 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
 - The result, on the same runner speed: 2.9 workers busy in every attempt
   (2.88), against 2.6, and the job 374 and 369 s on two fast runners (Vitest 302
   and 304 s, typecheck 15 s). On slow runners the job reads 469 s (job
-  132456632009, Vitest 391 s, typecheck 18 s) and 510 s (job 132458686040, Vitest
-  429 s, typecheck 20 s), against 527 s on the unordered run. The three workers
+  132456632009, Vitest 391 s, typecheck 18 s) and 510 and 509 s (jobs 132458686040 and
+  132461266927, Vitest 429 and 426 s, typecheck 20 s), against 527 s on the unordered run. The three workers
   cannot do better than the files' times divided by 3: 1237 s of file time is 412
   s, and the run took 429 s. The slow reading is above the trigger of 480 s, and
   the order and the worker count are used up, so what is left is the re-size.
@@ -85,6 +85,7 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
 | 2119bc3, attempt 2 | 4 | 132454443211 | 496 | 21 | 414.5 | 1594 | 3.85 |
 | f0dee39, attempt 1 | 3, slow files first | 132456632009 | 469 | 18 | 390.6 | 1125 | 2.88 |
 | f0dee39, attempt 2 | 3, slow files first | 132458686040 | 510 | 20 | 429.1 | 1237 | 2.88 |
+| 3c3bd7f, attempt 1 | 3, slow files first | 132461266927 | 509 | 20 | 426.4 | 1231 | 2.89 |
 
 Rescan with the log command above, then add the job id and the times to this
 table. The typecheck step's seconds (15 on a fast runner, 20 and over on a slow
