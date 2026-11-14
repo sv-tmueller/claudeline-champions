@@ -108,11 +108,12 @@ first.
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
   profiles since #165); Durnhal's kit as data (#204) with his bot profile
   (#211); Wrenna's kit as data (#270), the first with a counter, with her bot
-  profile and client entry (#281, roadmap step 3.4); models for the eight roster
+  profile and client entry (#281, roadmap step 3.4); Ysmeer's kit as data
+  (#271), the first with a fuse and an end area, and her model (#273), with no
+  bot profile, select entry or balance harness place yet (roadmap step 4.3), so
+  the client does not load her model until then; models for the eight roster
   ids and the placeholder, each rigged, with six clips (the client registers and
-  plays all eight); Ysmeer's model (#273), with no kit, bot profile or select
-  entry yet (her kit is #271), so the client does not load her model until
-  roadmap step 4.3.
+  plays all eight).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion

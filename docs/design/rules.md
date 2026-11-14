@@ -181,7 +181,7 @@ An `area` effect may carry `fuseTicks`, an integer number of ticks. It is a dela
 - **Control on a fused area.** A fused one-hit area may carry stun, root or silence: the ban on a pulsing area exists for repeated control, and a single delayed hit gives the target the fuse to walk out. A fused area that pulses more than once keeps the ban (roster-v2 section 0). The damage and heal totals of roster-v2 section 0 hold for a fused area as for any other.
 - **No remote trigger.** The fuse is fixed at the cast. Nothing detonates an area early, and no area waits for a trigger.
 - **The client** draws an armed area from the area entity, with no new event kind. The first `areaTick` of the area is the end of the fuse.
-- No shipped kit has a fuse yet. The Ysmeer kit of roster-v3 is the first that will.
+- Ysmeer's kit of roster-v3 (#271) is the first shipped kit with a fuse: Falling Star (45 ticks, base and EX) and Supernova (90 ticks).
 
 ### 2.8 A projectile that leaves an area where it ends `[tuned]`
 
@@ -195,7 +195,7 @@ A `projectile` effect may carry `endArea`: an `area` effect whose `placement` is
 - **Round end.** A projectile cleared when the round is decided leaves no area: the round end pause takes the projectile away without an end tick.
 - **The client** draws the spawned area from the existing `areaSpawned` event and the area entity, with no new event kind and no client source change.
 - **Pulse timing.** An area spawned where a projectile stops on an obstacle or the edge pulses on the tick it spawns; one spawned at a lifetime end runs one tick behind: it first pulses the next tick (or its fuse ends a tick later) and it ends a tick later, so a one-hit one pulses and ends on the tick after it spawns. Nothing else differs.
-- No shipped kit has an `endArea` yet. The Ysmeer kit of roster-v3 is the first that will.
+- Ysmeer's kit of roster-v3 (#271) is the first shipped kit with an `endArea`: Gravity Well (a pulsing slow field) and the Comet EX (a one-hit area), both spawned at a lifetime end.
 
 ## 3. Energy economy
 

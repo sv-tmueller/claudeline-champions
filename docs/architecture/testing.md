@@ -167,6 +167,21 @@ the file read 16.1 to 30.8 s on the runner in the five jobs of the branch
 (runs 41514425270 and 41516291837 read 17.9 and 16.1 s) against 17.0 to 32.6 s
 before.
 
+Ysmeer's file (#271) sorts last, so she is the last roster seat: the 3v3 guest of
+`loopback.test.ts` and the second player of the 2v2 rows of `room.test.ts` (the
+lines that pick `roster[roster.length - 1]`) now play her. No bot plays her, the
+bot seats stay the first five of the roster, and her fused areas and end areas
+cross the codec for the first time. Timed on one machine (Linux x64, Node 24.22.3)
+with the hook bodies timed by a line that was removed again, with her file and
+with it moved out of `data/kits`: the 2v2 hook 2.0 against 1.9 s and the 3v3 hook
+7.8 and 7.7 against 4.6 and 4.4 s, the loopback file 13.0 and 12.9 against 8.8 and
+8.7 s, and `room.test.ts` with the loopback file 13.0 against 9.0 s. The runner is
+about 1.7 times slower than this machine (the 4.5 s over 2.7 s of the header of
+`loopback.test.ts`), so the 3v3 hook is about 13 s there, under half of its 60 s,
+and the 3v3 row "matches a local sim of the same seed" read 2.1 s locally, about 3.6
+s there, under half of its 15 s. No timeout moves; read the runner log of this
+change for the hook, which the log does not time.
+
 `tools/balance/harness.test.ts` "plays 36 cells over the shipped data" (the four
 v1 kits) has a 200 s timeout (150 s before arena03 of #238, and 120 s before the
 dodge of #137), and it is the
@@ -360,7 +375,8 @@ and budget-hit lines only. It needs Node 22.15 or later, for
 match count on Apple silicon, not measured. It plays every kit of `HARNESS_KITS` in
 `tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
-step 1.3, #244, and Wrenna at her step 3.4, #281). Every
+step 1.3, #244, and Wrenna at her step 3.4, #281; Ysmeer's file, #271, waits
+for her step 4.3). Every
 cell plays the standard match, so it sets the arena's orb
 point from `data/orbs.json` (spec section 6).
 
@@ -416,8 +432,8 @@ What it does:
 
 `tools/fixtures/reproduce.test.ts` runs the search on the committed roster
 fixtures and compares the bytes: Hargrim's attempt 1, Quillon's attempt 23,
-Ondrel's attempt 2, Brimwick's attempt 10, Durnhal's attempt 2 and Wrenna's
-attempt 26 on the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
+Ondrel's attempt 2, Brimwick's attempt 10, Durnhal's attempt 2, Wrenna's
+attempt 26 and Ysmeer's attempt 7 on the current kits, and Skerrow's attempt 6 and Lumeth's attempt 2 on the kits they were
 searched on (the Rend damage 20 and the Binding Sigil radius 1.5 put back in
 memory, as #125 changed those numbers and regenerated only the checkpoints),
 with the checkpoints of the current kits. Each row of the test names the kit
@@ -449,7 +465,7 @@ failed pre-check (decision 13 of batch #134):
   rule moved only her checkpoints and checksum).
 
 A new kit, the recipe (batch 12 followed it for Ondrel and Brimwick, #148,
-batch 16 for Durnhal, #204, and #270 for Wrenna):
+batch 16 for Durnhal, #204, and #270 and #271 for Wrenna and Ysmeer):
 
 1. Add `data/kits/<id>.json`.
 2. Add its entries to `EXPECTED` (what its fixture must show: the casts, the
@@ -471,6 +487,8 @@ batch 16 for Durnhal, #204, and #270 for Wrenna):
    0.32 and 0.28 s locally), so they have no timeout of their own. Wrenna's row
    (attempt 26) takes about 1.5 s locally and 2.14 s on the runner (job
    132029295648 of #274, ubuntu-latest, Node 22.23.4), also under the mark.
+   Ysmeer's row (attempt 7) takes 0.7 s locally; read its runner time in the
+   unit job of the pull request.
 
 ## Playwright e2e
 
@@ -590,7 +608,8 @@ other spec.
   timeout is more than twice that. It does not use `__runProbeFrames`.
 - `fuse.spec.ts`: the armed look of a fused area (`fuse.png`, at 1280x720), on
   the dev-only sandbox with a paused clock and tick budgets, like
-  `lingering.spec.ts`. No shipped kit has a fuse, so Shift+F4 spawns one at the
+  `lingering.spec.ts`. No champion the client plays has a fuse (Ysmeer's kit is data
+  since #271; her select entry is roadmap step 4.3), so Shift+F4 spawns one at the
   aim through `debug.spawnArea` (fuse 90 ticks, radius 2.5 m, one hit of 30
   damage to the enemy team; client.md, Input). After the warmup the cursor goes
   to the pixel of champion 2 (12, 2) at the probe viewport, one frame samples

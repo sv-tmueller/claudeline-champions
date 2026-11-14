@@ -16,6 +16,8 @@ import { buildFixture, searchFixture } from './search.ts';
 // attempt 23 there) and took 2.14 s on the runner (job 132029295648 of #274, ubuntu-latest, Node
 // 22.23.4), under the 2.5 s mark, so it carries no timeout either; the rule applies to it when the
 // runner passes 2.5 s.
+// The Ysmeer row (attempt 7) searches in about 0.7 s locally, so it carries no timeout either; the
+// rule applies to it when the runner passes 2.5 s.
 //
 // What a kit change does to a row (decisions 12 and 13 of batch #134, balance.md section 6.3):
 // - A change that turns the fixture coverage red rebuilds the fixture with the tool in the same

@@ -4,10 +4,10 @@ Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written, her kit is data (#270) and her
 model is built, her bot profile and client entry are built and she is in the
 balance harness roster (#281, step 3.4; the committed block is still the
-seven-kit report); Ysmeer's section is written and her model is built (#273,
-roadmap step 4.2), but she has no kit, no bot profile and no select entry yet
-(roadmap step 4.3); her kit, her fuse and end area come in her own series
-(#271)
+seven-kit report); Ysmeer's section is written, her kit is data (#271, roadmap
+step 4.2, the first kit with a fuse and an end area) and her model is built
+(#273), but she has no bot profile, no select entry and no place in the balance
+harness yet (roadmap step 4.3)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -47,9 +47,9 @@ unchanged.
   rules entry before the kit that uses it.
 - The `endArea` of a projectile (v3 spec section 4.3, [rules](rules.md)
   section 2.8) is in the toolkit since #160, so the roster-v2 section 0 list of
-  what is not in the toolkit no longer holds for it. No kit of this document
-  uses it yet; Wrenna's section 2 names where hers would and why her
-  Heartseeker EX carries none.
+  what is not in the toolkit no longer holds for it. Ysmeer's kit (section 3,
+  #271) is the first to use it, on her Gravity Well and Comet EX; Wrenna's
+  section 2 names where hers would and why her Heartseeker EX carries none.
 
 ## 1. Durnhal, the guardian tank
 
@@ -654,9 +654,9 @@ kit gives them. Every effect of her table is in the toolkit plus those two.
   each a one-hit area of the projectile's slot, spawned where the projectile
   ends. No `pierce`, per v3 spec section 4.3.
 
-**Kit data (not built yet).** `data/kits/ysmeer.json` is step 4.2 of the
-build order, after the fuse (#159) and `endArea` (#160) land in the sim. This
-section fixes the numbers it will use. The conversions are ticks = seconds x
+**Kit data.** `data/kits/ysmeer.json` is step 4.2 of the build order (#271),
+after the fuse (#159) and `endArea` (#160) landed in the sim. This section
+fixes the numbers it uses. The conversions are ticks = seconds x
 60, one hit = `durationTicks` 1 and `intervalTicks` 1, and "N pulses of I s"
 is an `area` with `intervalTicks` I times 60 and `durationTicks` N times
 that. The table leaves these numbers open, each `[tuned]` and chosen by the
@@ -677,7 +677,9 @@ precedent of a kit that has the same shape:
   the same slow projectile). Speed 12 m/s, lifetime 50 ticks, reach 10.00 m.
   The `endArea` is a radius 2 m circle, `durationTicks` 90 and
   `intervalTicks` 30: 3 pulses at 0, 30 and 60 ticks, each 8 damage and a
-  slow of 30 percent for 60 ticks, so the next pulse refreshes it. Total 24,
+  slow of 30 percent for 60 ticks, so the next pulse refreshes it (an area that
+  spawns at a lifetime end runs a tick behind, rules 2.8, so the pulses fall a
+  tick after those offsets). Total 24,
   inside 8 to 30 (roster-v2 section 0). The area lands where the projectile
   ends, so the field reaches as far as the 10.00 m of the shot.
 - E windup 18 ticks, slowed, and projectile radius 0.4 m (Durnhal's Breaker

@@ -957,8 +957,105 @@ describe('the lingering area rules', () => {
 });
 
 describe('the fuse rules', () => {
-  // Rules 2.7 and roster-v2 section 0: no shipped kit has a fuse, so each row fuses an area of a
-  // copy of Hargrim, whose M2 is a one-hit area with a slow and whose cooldown is 360 ticks.
+  // Rules 2.7 and roster-v2 section 0: each row fuses an area of a copy of Hargrim, whose M2 is a
+  // one-hit area with a slow and whose cooldown is 360 ticks. Ysmeer's real fuses are pinned in her
+  // own describe below.
+  const M2 = 'hargrim.slots.M2.effects[0]';
+
+  it('T1 sums the damage over every pulse: 18 over 180 ticks every 60 is 54 and out of range', () => {
+    expect(catalogProblems(lingering(18, 180, 60))).toEqual([`${M2}: damage total 54 over 3 pulses is not 8 to 30`]);
+  });
+
+  it('T2 counts ceil(duration / interval) pulses, as area.ts does: 11 over 121 ticks every 60 is 33', () => {
+    const copy = lingering(11, 121, 60);
+    expect(catalogProblems(copy)).toEqual([`${M2}: damage total 33 over 3 pulses is not 8 to 30`]);
+    // The same copy in the sim: three areaTick events, so the formula is the engine's and not a guess.
+    const rig = new Rig(copy, { 2: [X0 + 4.5, 0] });
+    rig.run(24 + 130, press('M2'));
+    expect(rig.events('areaTick').map(({ step }) => step)).toEqual([24, 84, 144]);
+    expect(rig.events('damage').map(({ e }) => e.amount)).toEqual([11, 11, 11]);
+    rig.clean();
+  });
+
+  it('T3 passes a total of exactly 30, and on F exactly 60 but not 65', () => {
+    expect(catalogProblems(lingering(10, 180, 60))).toEqual([]);
+    // Hargrim F fires its area in a `then`: no stun here, since a pulsing area carries none.
+    const finale = (damage: number): KitDef => {
+      const copy = copyOf(hargrim);
+      const area = areaOf(copy, 'F', { then: true });
+      area.durationTicks = 300;
+      area.intervalTicks = 60;
+      area.effects.splice(1, 1);
+      const hit = area.effects[0];
+      if (hit?.type !== 'damage') throw new Error('Hargrim F does not start with a damage');
+      hit.amount = damage;
+      return copy;
+    };
+    expect(catalogProblems(finale(12))).toEqual([]);
+    expect(catalogProblems(finale(13))).toEqual([
+      'hargrim.slots.F.effects[0].then[0]: damage total 65 over 5 pulses is not 8 to 60',
+    ]);
+  });
+
+  it('T3 sums a heal on its own, apart from the damage', () => {
+    const copy = lingering(10, 180, 60);
+    areaOf(copy, 'M2').effects.push({ type: 'heal', amount: 11 });
+    expect(catalogProblems(copy)).toEqual([`${M2}: heal total 33 over 3 pulses is not 8 to 30`]);
+  });
+
+  it.each(['stun', 'root', 'silence'] as const)('T4 refuses %s on a pulsing area, and allows it on a one-hit area', (type) => {
+    const copy = lingering(8, 180, 60);
+    areaOf(copy, 'M2').effects.push({ type: 'applyStatus', status: { type, ticks: 60 } });
+    expect(catalogProblems(copy)).toEqual([`${M2}.effects[2].status: a pulsing area carries ${type}`]);
+    const oneHit = copyOf(hargrim);
+    areaOf(oneHit, 'M2').effects.push({ type: 'applyStatus', status: { type, ticks: 60 } });
+    expect(catalogProblems(oneHit)).toEqual([]);
+  });
+
+  it('T4 allows a slow and a knockback on a pulse, and one pulse of an area that lasts as long as it ticks', () => {
+    const copy = lingering(8, 180, 60);
+    areaOf(copy, 'M2').effects.push({ type: 'knockback', distance: 1, ticks: 6, direction: 'away' });
+    expect(catalogProblems(copy)).toEqual([]);
+    // One pulse (60 ticks every 60): a stun is a single application, not a chain.
+    const single = lingering(8, 60, 60);
+    areaOf(single, 'M2').effects.push({ type: 'applyStatus', status: { type: 'stun', ticks: 60 } });
+    expect(catalogProblems(single)).toEqual([]);
+  });
+
+  it('T5 wants the duration under the cooldown: Rally Cry at 840 ticks against 840 is red and 839 is not', () => {
+    const rally = (durationTicks: number): KitDef => {
+      const copy = copyOf(hargrim);
+      const area = areaOf(copy, 'Q');
+      area.durationTicks = durationTicks;
+      area.intervalTicks = 60;
+      return copy;
+    };
+    expect(catalogProblems(rally(839))).toEqual([]);
+    expect(catalogProblems(rally(840))).toEqual([
+      'hargrim.slots.Q.effects[0].durationTicks: 840 ticks is not under the Q cooldown of 840',
+    ]);
+  });
+
+  it('T5 holds the EX variant to the cooldown it shares: Ground Slam EX at 360 against 360 names M2', () => {
+    const copy = copyOf(hargrim);
+    const area = areaOf(copy, 'M2', { ex: true });
+    area.durationTicks = 360;
+    area.intervalTicks = 360;
+    expect(catalogProblems(copy)).toEqual([
+      'hargrim.slots.M2.ex.effects[0].durationTicks: 360 ticks is not under the M2 cooldown of 360',
+    ]);
+    area.durationTicks = 359;
+    expect(catalogProblems(copy)).toEqual([]);
+  });
+
+  it('keeps the four v1 kits free of lingering areas', () => {
+    for (const kit of [hargrim, quillon, skerrow, lumeth]) expect(lingeringPaths(kit)).toEqual([]);
+  });
+});
+
+describe('the fuse rules', () => {
+  // Rules 2.7 and roster-v2 section 0: each row fuses an area of a copy of Hargrim, as before a
+  // shipped kit had a fuse (Ysmeer's, which the Ysmeer rows below pin), whose M2 is a one-hit area with a slow and whose cooldown is 360 ticks.
   const M2 = 'hargrim.slots.M2.effects[0]';
   const fused = (fuseTicks: number, durationTicks = 1, intervalTicks = 1): KitDef => {
     const copy = copyOf(hargrim);
@@ -1111,9 +1208,9 @@ describe('the fuse rules', () => {
 });
 
 describe('the endArea rules', () => {
-  // Spec 4.3: no shipped kit has an endArea yet, so each row puts one on a projectile of a copy of
-  // Quillon, whose M2 projectile slot is a 360-tick cooldown. The endArea counts as an area of that
-  // slot, so its duration (plus a fuse) stays under the cooldown.
+  // Spec 4.3: each row puts an endArea on a projectile of a copy of Quillon, whose M2 projectile
+  // slot is a 360-tick cooldown. The endArea counts as an area of that slot, so its duration (plus a
+  // fuse) stays under the cooldown. Ysmeer's real end areas are pinned in her own describe below.
   const M2 = 'quillon.slots.M2.effects[0]';
   const shot = (copy: KitDef): Extract<AbilityEffect, { type: 'projectile' }> => {
     const effect = copy.slots.M2.effects[0];

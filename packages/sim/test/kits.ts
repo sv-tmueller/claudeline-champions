@@ -15,9 +15,10 @@ export const MENDER_ID = 'test-mender';
 export const ENDER_ID = 'test-ender';
 
 /**
- * The ender (spec 4.3, #160): no shipped kit carries an `endArea` yet, so this one does, on every
- * projectile it fires. It mirrors the striker's stats and is used only by the scripted `endArea`
- * fixture; the ability and roster fixtures stay on the striker and the mender, so they do not move.
+ * The ender (spec 4.3, #160): a test kit with an `endArea` on every projectile it fires (Ysmeer's
+ * shipped kit, #271, carries two of its own). It mirrors the striker's stats and is used only by the
+ * scripted `endArea` fixture; the ability and roster fixtures stay on the striker and the mender, so
+ * they do not move.
  */
 export function testEnder(): KitDef {
   const area = {
