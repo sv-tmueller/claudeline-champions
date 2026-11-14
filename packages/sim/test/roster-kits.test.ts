@@ -273,7 +273,7 @@ function catalogProblems(kit: KitDef): string[] {
   // the first windup is over, and no earlier than the first dash is over when the second ability
   // dashes too (a second dash cancels the first). There is no lower conjunct: the player picks the
   // tick of the second cast, so a first area that appears after the earliest second area is gone is
-  // still met by a later cast. E8 to E15 pin each rule against the sim in both cast orders.
+  // still met by a later cast. E8 to E17 pin each rule against the sim in both cast orders.
   const flightTicks = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return 0;
     // The projectile ends `lifetimeTicks` after it spawns, so the area appears on the last of them.
@@ -1676,6 +1676,25 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     // would never be seen.
     pinPair(shot(340, 20, 1), plain(0, 2), null, null);
     pinPair(shot(341, 20, 1), plain(0, 2), 360, null);
+  });
+
+  /** A fused `area` at the fire step: its pulse, and the end of its live span, come `fuseTicks` later. */
+  const fusedPlain = (windupTicks: number, durationTicks: number, fuseTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ ...area(durationTicks), fuseTicks }],
+  });
+
+  it('E17 prices the fuse of a plain area, which is placed on the fire step, so the walker is exact', () => {
+    // A plain fused area spawns on the fire step with `fuse + duration` ticks to live, and the spawn
+    // step takes one off, so it is live on [fire, fire + fuse + duration - 1): here the walker's
+    // figure is exact, not an upper bound. From windup 10 with a 60-tick fuse a 291-tick area is last
+    // live on tick 359 and a 292-tick one on tick 360, the tick the recharge places the second area.
+    pin(fusedPlain(10, 291, 60), plain(0, 2), { base: null, EX: null });
+    pin(fusedPlain(10, 292, 60), plain(0, 2), { base: 360, EX: null });
+    // The same for a one-hit area: from windup 340 a 20-tick fuse leaves it last live on tick 359,
+    // a 30-tick fuse keeps it live to tick 369, across the recharge.
+    pin(fusedPlain(340, 1, 20), plain(0, 2), { base: null, EX: null });
+    pin(fusedPlain(340, 1, 30), plain(0, 2), { base: 360, EX: null });
   });
 });
 
