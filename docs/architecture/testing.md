@@ -64,8 +64,9 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
   132456632009, Vitest 391 s, typecheck 18 s) and 510 and 509 s (jobs 132458686040 and
   132461266927, Vitest 429 and 426 s, typecheck 20 s), against 527 s on the unordered run. The three workers
   cannot do better than the files' times divided by 3: 1237 s of file time is 412
-  s, and the run took 429 s. The slow reading is above the trigger of 480 s, and
-  the order and the worker count are used up, so what is left is the re-size.
+  s, and the run took 429 s. The slow reading was above the old trigger of 480
+  s, and the order and the worker count were used up, so the limit and the
+  trigger were re-sized (see the decision below).
 - One worker per CPU (`--maxWorkers=100%`, four workers) was tried in CI only and
   dropped. The work is CPU-bound, so each file took 38 percent longer with four
   workers than with three (the files' times add up to 1210 s against 870 s on
@@ -87,6 +88,33 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
 | f0dee39, attempt 2 | 3, slow files first | 132458686040 | 510 | 20 | 429.1 | 1237 | 2.88 |
 | 3c3bd7f, attempt 1 | 3, slow files first | 132461266927 | 509 | 20 | 426.4 | 1231 | 2.89 |
 
+The decision (#285): the unit job's `timeout-minutes` is 15 minutes and the
+trigger is 12 minutes (720 s), both since #285; they were 10 minutes and 8
+minutes (480 s). They change together, because the trigger is a margin below the
+limit, and 12 of 15 minutes leaves the job 25 percent of slowdown before the
+limit stops it. The reason:
+
+- The order is used up. Three workers cannot run faster than the summed file time
+  over three: 1237 s of file time gives 412 s, and the run took 429 s.
+- The fourth worker was tried and dropped (figures above): the work is CPU-bound,
+  each file took 38 percent longer, and the job read 496 s on a slow runner,
+  inside the spread between runners.
+- The runners differ by a factor of about 1.4 on the same code (Vitest 302 and
+  304 s on a fast runner, 426 to 429 s on a slow one), and the slow ones are
+  common (10 of 27 recent runs), so the slow reading is the one to compare with
+  the trigger. Ordering saves 20 to 60 s on every runner, but the slow reading
+  still sits at 509 and 510 s.
+- Each new champion adds about 65 s to the job (#281), so the 480 s trigger would
+  have fired again with the next kit.
+
+The check name and the branch protection do not change, and no test is cut. When
+a slow-runner unit job on main passes 12 minutes again, the trigger calls for
+this, in order: the list rule above first (every file at 10 s or more is on the
+list at its place); then a second unit job or a larger runner. Both need the
+owner, a second job because it is not a required check until the owner adds it
+to the branch protection, a larger runner because of its cost. A test is never
+cut to get under the trigger.
+
 Rescan with the log command above, then add the job id and the times to this
 table. The typecheck step's seconds (15 on a fast runner, 20 and over on a slow
 one) tell the runner's speed, because every step slows by the same factor.
@@ -103,7 +131,7 @@ slowest runner time seen in the logs. When a test passes half of its timeout,
 apply the rule again.
 
 A synchronous test's timeout is checked when its body returns, so no value
-stops a hang. The unit job's `timeout-minutes: 10` does that. What the value
+stops a hang. The unit job's `timeout-minutes: 15` does that. What the value
 bounds is a slowdown.
 
 To rescan, read the unit job's times from a CI run. Vitest prints a time
@@ -248,15 +276,16 @@ take 161 s and 120 s of job 121726022078, beside `lumeth.test.ts` (117 s) and
 (4cfe695) to 5 min 49 s (305 s of Vitest). On main it reads 6 min 4 s at bce9662
 (job 122194680307, 320 s of Vitest: `ondrel.test.ts` 154 s, `lumeth.test.ts` 125
 s, `brimwick.test.ts` 120 s, `tools/balance/harness.test.ts` 90 s,
-`headless-kits.test.ts` 90 s), 61 percent of `timeout-minutes: 10`. One test's
-runner time has spread 2x in a day (2.9 to 5.9 s, see Check suite), and a day
-that slow for the whole job would pass the 10 minutes from 5 minutes on, so the
-job keeps less than that margin. The trigger: once a unit job on main passes
-about 8 minutes (480 s), no test is cut. The remedies, in order, are the run
-order (the slow files start first, see Check suite), one Vitest worker more than
-the default (tried on #285 and dropped, with the figures there), and last
-re-sizing `timeout-minutes` and this trigger together, with the reason written
-here. The cost of the cells is the price of the coverage, and #285 decided to keep it.
+`headless-kits.test.ts` 90 s), 61 percent of the then `timeout-minutes: 10`. One
+test's runner time has spread 2x in a day (2.9 to 5.9 s, see Check suite), and a
+day that slow for the whole job would have passed those 10 minutes from 5
+minutes on, so the job kept less than that margin. The trigger: once a unit job
+on main passes 12 minutes (720 s, 8 minutes until #285), no test is cut. It
+calls for the list rule of the Check suite section first, then a second job or a
+larger runner, which need the owner; the run order and the fourth worker were
+used up on #285, with the figures there, and the limit and the trigger were
+re-sized together there, with the reason. The cost of the cells is the price of
+the coverage, and #285 decided to keep it.
 
 `durnhal.test.ts` (#211) has the same timeouts, set by the same rule. A cell
 takes 4.3 to 10.3 s locally (Linux x64, Node 22.23.4, load about 4, the file alone
@@ -267,8 +296,8 @@ so 60 s. The Last Bastion run read 10.9, 6.1 and 8.5 s (twice the slowest is
 s, with no timeout. The file took 155, 107 and 113 s of those attempts. The unit
 job of that commit took 449, 342 and 336 s (Vitest 370, 272 and 271 s), against
 373 s (Vitest 295 s) on main at 88b5603 (job 124649346673); the first attempt ran
-on a slow runner (`ondrel.test.ts` 147 s against 99 and 104 s) and stays under
-the trigger of about 8 minutes (480 s), at 94 percent of it. The two pushes before
+on a slow runner (`ondrel.test.ts` 147 s against 99 and 104 s) and stayed under
+the trigger of the time, 8 minutes (480 s), at 94 percent of it. The two pushes before
 it, without and with the file, took 230 and 254 s (the second one red on a
 melee-key list that this package then extended).
 
@@ -285,8 +314,8 @@ enough for the orb rounds; the Quillon v Lumeth pair of #225 then read exactly h
 arena01): 8.0 and 6.2 s locally, the arena01 cell's rounds longer than the old pair's, so
 the 60 s timeout still covers twice the slowest. They
 are the only matches the package commits (the optional orb-on determinism row was left out
-for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
-unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.
+for the unit job's time), and the job was to pass the 8 minutes the trigger was then, once the
+unit job of #230, which read up to 449 s, merged with them (#285 re-sized it to 12 minutes).
 
 The Wrenna cell (`wrenna.test.ts`, one seeded 2v2 match) read 11.0 s on the runner
 (unit job of run 43544274291, 9fe3ec7). Twice that is 22 s, above the 20 s top of
