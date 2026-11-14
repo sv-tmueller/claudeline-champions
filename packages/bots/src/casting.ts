@@ -588,7 +588,8 @@ const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
  * module and not `SIGHT_CLEARANCE` itself in the select of `computeCues`: Maglev loads an imported
  * const from its module cell as a tagged number, and a select between that and the double read from
  * the kit cache then boxes the double, 16 B a think while a wide ultimate stands in reach at full
- * energy (the pin of allocation.test.ts, #290). This one is folded.
+ * energy (the pin of allocation.test.ts, #290). This one is folded. It is local on purpose and a
+ * copy of the import, not a second value: reserve.test.ts pins it equal to `SIGHT_CLEARANCE`.
  */
 const STAND_CLEARANCE = SIGHT_CLEARANCE;
 

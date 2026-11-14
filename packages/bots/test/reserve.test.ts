@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { Button, step } from '@claudeline/sim';
 import type { ChampionState, PlayerInput, SlotSpec } from '@claudeline/sim';
 import { createBot } from '../src/bot';
+import { computeCues, createCastCues, createKitCache, refreshKitCache } from '../src/casting';
 import { TIERS } from '../src/difficulty';
+import { buildNavGrid } from '../src/grid';
+import { createMeasure } from '../src/hypot';
+import { createKiteScratch } from '../src/kite';
+import { SIGHT_CLEARANCE, createSightScratch } from '../src/sight';
 import { arena01, clearShotOracle, copyInput } from './helpers';
 import { boltAbility, boltSlot, quietKit } from './kits';
 import { THINKS, pressOf, sceneOf } from './scenes';
@@ -95,5 +100,46 @@ describe('the stand of a bot whose ultimate is wider than a champion', () => {
       }
     }
     expect(bot.inspect().intent).toBe('engage');
+  });
+});
+
+describe('the stand clearance that computeCues sets', () => {
+  // `computeCues` selects between F's width and `STAND_CLEARANCE`, a const of casting.ts that is a
+  // copy of `SIGHT_CLEARANCE` (the import itself in the select boxes a double in Maglev, #290). The
+  // copy must stay equal to it, and to the champion radius it stands for: this reads it through the
+  // output of `computeCues`.
+  function standClearance(championId: string, energy: number, distance: number): number {
+    const state = sceneOf(championId, distance, { energy, ready: ['F'] });
+    const cache = createKitCache();
+    refreshKitCache(
+      cache,
+      state.kits.find((kit) => kit.id === championId),
+      championId,
+    );
+    const sight = createSightScratch();
+    computeCues(
+      createCastCues(createKiteScratch()),
+      cache,
+      cache.profile,
+      'engage',
+      state,
+      state.champions[0] as ChampionState,
+      state.champions[2] as ChampionState,
+      sight,
+      createMeasure(),
+      buildNavGrid(state.arena),
+    );
+    return sight.standClearance;
+  }
+
+  it('is SIGHT_CLEARANCE, a champion radius of 0.5 m, when F cannot be pressed now', () => {
+    expect(SIGHT_CLEARANCE).toBe(0.5);
+    expect(standClearance('quillon', 99, 8), 'one point below the cost of F').toBe(SIGHT_CLEARANCE);
+    expect(standClearance('quillon', 100, 30), 'the target beyond the reach of F').toBe(SIGHT_CLEARANCE);
+    expect(standClearance('hargrim', 100, 8), 'F is no wider than a champion').toBe(SIGHT_CLEARANCE);
+  });
+
+  it('is the width of F, 0.6 m for Quillon, at full energy with the target in its reach', () => {
+    expect(standClearance('quillon', 100, 8)).toBe(0.6);
   });
 });
