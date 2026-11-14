@@ -250,9 +250,9 @@ function catalogProblems(kit: KitDef): string[] {
   // still hold two live areas of the slot at once.
   //
   // The fix is per slot: at most one area-producing effect of an ability may leave a *lingering*
-  // area, and the base and its EX must not overlap either. Two non-lingering (one-hit, unfused)
-  // areas are gone by the step's end and never counted twice, which is why the shipped Lumeth F may
-  // carry two of them. A lone lingering effect stays under the cooldown (the per-effect bound
+  // area, and the base and its EX must not overlap either. Two non-lingering (plain, one-hit,
+  // unfused) areas are gone by the step's end and never counted twice, which is why the shipped
+  // Lumeth F may carry two of them. A one-hit `endArea` is not one of them: the walker counts it as lingering, at its lifetime-end case (issue #276). A lone lingering effect stays under the cooldown (the per-effect bound
   // below), so one lingering effect per ability is the one-live-area rule within that ability
   // (roster-v2 section 0, rules 2.8). A sum of the lifetimes under the cooldown is not enough: two
   // bolts that each fly 100 ticks and leave a 79-tick area sum to 358 against the 360 cooldown yet
@@ -286,20 +286,28 @@ function catalogProblems(kit: KitDef): string[] {
     }
     return 0;
   };
-  /** The ticks from an area's first live step to its last: `expireAreas` takes one off on the spawn step. */
+  /**
+   * The ticks an area is live (in the arena at the end of a step), from its first live step: `expireAreas`
+   * takes one off on the spawn step. An `endArea` is counted at its latest case, a lifetime end, which
+   * is spawned after the pulse phase and so runs one tick behind an obstacle or edge spawn and lives
+   * one more (issue #276, projectile.ts `spawnEndArea`): the walker prices every `endArea` that way,
+   * since the projectile may fly its whole lifetime.
+   */
   const liveSpan = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return (effect.fuseTicks ?? 0) + effect.durationTicks - 1;
     if (effect.type === 'projectile' && effect.endArea !== undefined) {
-      return (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks - 1;
+      return (effect.endArea.fuseTicks ?? 0) + effect.endArea.durationTicks;
     }
     return 0;
   };
+  /**
+   * Whether an area is still in the arena at the end of the step that spawns it. A plain one-hit area
+   * is gone by then; a one-hit `endArea` that spawns at a lifetime end is not, because that end gives it a tick
+   * (issue #276), so the walker counts every `endArea` as lingering.
+   */
   const lingers = (effect: AbilityEffect): boolean => {
     if (effect.type === 'area') return effect.fuseTicks !== undefined || effect.durationTicks > 1;
-    if (effect.type === 'projectile' && effect.endArea !== undefined) {
-      return effect.endArea.fuseTicks !== undefined || effect.endArea.durationTicks > 1;
-    }
-    return false;
+    return effect.type === 'projectile' && effect.endArea !== undefined;
   };
   /**
    * One lingering area of an ability, counted from the tick the ability's cast starts: `appear` is the
@@ -1215,21 +1223,42 @@ describe('the endArea rules', () => {
     const twoBolts = shape([shot(100, endArea(79)), shot(100, endArea(79))]);
     expect(catalogProblems(twoBolts)).toEqual([message([179, 179])]);
 
-    // A lingering area beside a one-hit area is fine: the one-hit area is gone in the step it
+    // A lingering area beside a plain one-hit area is fine: the one-hit area is gone in the step it
     // spawns (shipped Lumeth F carries two one-hit areas), so only one area of the slot lingers.
     const oneHit = { type: 'area', radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 20 }] };
     expect(catalogProblems(shape([plain, oneHit]))).toEqual([]);
     // Two one-hit areas, the shipped Lumeth F shape, linger neither.
     expect(catalogProblems(shape([oneHit, oneHit]))).toEqual([]);
-    // A lingering area beside a bolt whose endArea is a one-hit area: only the plain area lingers.
-    expect(catalogProblems(shape([plain, shot(300, endArea(1))]))).toEqual([]);
+    // A lingering area beside a bolt whose endArea is a one-hit area is not fine since issue #276: the
+    // endArea of a lifetime end is still in the arena after its spawn step, so it lingers, and the
+    // walker prices every endArea that way (this long flight would reach the edge first, where a
+    // one-hit area is gone at once, but the walker does not model the stop).
+    expect(catalogProblems(shape([plain, shot(300, endArea(1))]))).toEqual([message([340, 301])]);
+
+    // A one-hit endArea lingers too: spawned where the projectile runs out of lifetime, it runs a tick
+    // behind and is still in the arena at the end of that step (issue #276). Beside a 340-tick area
+    // the slot holds two live areas, the projectile ended by `lifetime`, not a wall.
+    const lifetimeEnd = shape([plain, shot(20, endArea(1))]);
+    {
+      const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(lifetimeEnd)]);
+      let live = 0;
+      const reasons: string[] = [];
+      for (let i = 0; i < 330; i++) {
+        step(state, [input(0, 0, 0, 0, Button.M2)]);
+        live = Math.max(live, state.areas.filter((a) => a.ownerId === 0).length);
+        for (const e of state.events) if (e.type === 'projectileExpired') reasons.push(e.reason);
+      }
+      expect(reasons).toEqual(['lifetime']);
+      expect(live).toBe(2);
+    }
+    expect(catalogProblems(lifetimeEnd)).toEqual([message([340, 21])]);
 
     // The admitted shape keeps max live = 1 in the sim, over three cooldowns: one lingering area
-    // (100 ticks) whose effect is a plain area, and a bolt whose 300-tick flight ends in a one-hit
-    // area long after the slot's own area has gone.
+    // (100 ticks) whose effect is a plain area, beside a plain one-hit area that is gone in the step
+    // it spawns. (A one-hit endArea no longer fits here: it lingers, see above.)
     const fits = shape([
       { type: 'area', radius: 2, durationTicks: 100, intervalTicks: 100, targets: 'enemies', placement: { type: 'self' }, effects: [{ type: 'damage', amount: 10 }] },
-      shot(300, endArea(1)),
+      oneHit,
     ]);
     expect(catalogProblems(fits)).toEqual([]);
     const state = createMatch(mirror('quillon'), openArena(), 7, [validateKit(fits)]);
@@ -1374,6 +1403,16 @@ describe('the endArea rules', () => {
     expect(catalogProblems(tie)).toEqual([]);
     expect(maxLive(tie)).toBe(1);
     expect(catalogProblems(swapped(plain(10, 352), plain(0, 352)))).toEqual([message('base', 'EX')]);
+
+    // The same tie on an endArea shot (flight 1): an area spawned at a lifetime end runs one tick
+    // behind a plain one and lives a tick longer (issue #276), so its last present tick is 359 for
+    // `endArea(350)` and 360 for `endArea(351)`, the tick the recharge appears the EX area.
+    const endTie = swapped(shotAbility(10, endArea(350)), plain(0, 350));
+    expect(maxLive(endTie)).toBe(1);
+    expect(catalogProblems(endTie)).toEqual([]);
+    const endOver = swapped(shotAbility(10, endArea(351)), plain(0, 351));
+    expect(maxLive(endOver)).toBe(2);
+    expect(catalogProblems(endOver)).toEqual([message('base', 'EX')]);
   });
 });
 
@@ -1542,16 +1581,17 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     pinPair(plain(10, 353), plain(0, 353), 360, null);
   });
 
-  it('E10 keeps an endArea shot exact at the 42 / 43 / 44 boundary', () => {
-    // A 20-tick flight puts the area on `windup + 19` for 300 ticks, so windup 42 is last live on
-    // tick 360 - 1 and 43 is not.
-    pinPair(shot(42, 20, 300), plain(0, 300), null, null);
+  it('E10 keeps an endArea shot exact at the 41 / 42 / 43 boundary', () => {
+    // A 20-tick flight puts the area on `windup + 19`, and a 300-tick endArea spawned at a lifetime end
+    // lives a tick longer than a plain one (issue #276): windup 41 is last live on tick 360 - 1 and 42
+    // is not.
+    pinPair(shot(41, 20, 300), plain(0, 300), null, null);
+    pinPair(shot(42, 20, 300), plain(0, 300), 360, null);
     pinPair(shot(43, 20, 300), plain(0, 300), 360, null);
-    pinPair(shot(44, 20, 300), plain(0, 300), 360, null);
     // A dash then a shot pays both delays: the area appears on `(dash - 1) + (flight - 1)`, so with
-    // a 3-tick flight and a 356-tick area a 4-tick dash is last live on tick 359 and a 5-tick one is not.
-    pinPair(dashThenShot(0, 4, 3, 356), plain(0, 356), null, null);
-    pinPair(dashThenShot(0, 5, 3, 356), plain(0, 356), 360, null);
+    // a 3-tick flight and a 356-tick area a 3-tick dash is last live on tick 359 and a 4-tick one is not.
+    pinPair(dashThenShot(0, 3, 3, 356), plain(0, 356), null, null);
+    pinPair(dashThenShot(0, 4, 3, 356), plain(0, 356), 360, null);
   });
 
   it('E11 starts the second cast when the cooldown is out and the first windup is over', () => {
@@ -1604,6 +1644,27 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
       { windupTicks: 5, effects: [{ ...area(100), fuseTicks: 30, intervalTicks: 100 }] },
       { base: 758, EX: null },
     );
+  });
+
+  /** A shot whose endArea has a fuse: the first pulse, and the live span, start `fuseTicks` later. */
+  const fusedShot = (windupTicks: number, lifetimeTicks: number, durationTicks: number, fuseTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ ...bolt(lifetimeTicks, durationTicks), endArea: { ...area(durationTicks), fuseTicks } }],
+  });
+
+  it('E16 prices the fuse and the last tick of an endArea, which the walker gives every endArea since #276', () => {
+    // A lifetime-end endArea is live for `fuse + duration` ticks from `windup + flight - 1` (issue
+    // #276), so the pair with a plain area cast at the 360 recharge is exact at the boundary. Windup 6
+    // and a 5-tick flight put the area on tick 10, so with a 60-tick fuse a 291-tick duration is
+    // last live on tick 360 and 290 on tick 359. Without the fuse in the span both would be accepted.
+    pin(fusedShot(6, 5, 290, 60), plain(0, 2), { base: null, EX: null });
+    pin(fusedShot(6, 5, 291, 60), plain(0, 2), { base: 360, EX: null });
+    pin(fusedShot(6, 5, 292, 60), plain(0, 2), { base: 360, EX: null });
+    // A one-hit unfused endArea lingers in the walker's model: the area of a lifetime end is live on the step it spawns, so a
+    // 20-tick flight from windup 340 puts it on tick 359 and one more tick of windup on 360, the tick
+    // the recharge appears the second area. A plain one-hit area would never be seen.
+    pinPair(shot(340, 20, 1), plain(0, 2), null, null);
+    pinPair(shot(341, 20, 1), plain(0, 2), 360, null);
   });
 
   it('E15 leaves the shipped Ondrel M2 accepted, and the sim holds one live area of it at every start', () => {
