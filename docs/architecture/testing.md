@@ -895,8 +895,8 @@ other spec.
 ### The heap probe
 
 The probe's sampler is not free of side effects (#290): started and stopped with garbage
-included, the CDP sampling profiler forces a Mark-Compact each time (43 against 2 over a 3v3 match
-with a Wrenna champion). A major GC clears the weak objects embedded in optimized code and throws
+included, the CDP sampling profiler forces a Mark-Compact in every sampled window, one per window
+(43 against 2 over a 3v3 match with a Wrenna champion). A major GC clears the weak objects embedded in optimized code and throws
 it back to baseline, so a per-function figure of a window can be inflated, and has to be read with
 the tier of the function (bots.md, "What the rule guarantees in a match"). Tracked in #304.
 

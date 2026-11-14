@@ -834,8 +834,8 @@ guards that (see Testing: the default tiers read TurboFan, the Maglev project Ma
 It is a statement about optimized code, not about every tick of a match: baseline and
 interpreter code box every double load and every double result, so no change of source
 reaches 0 B there, and a function that first reaches a cold branch drops to baseline code
-for some hundred ticks (the browser measurements, below, are in "In the browser"; the
-configurations measured are listed there). What makes the optimized figure true, and what
+for some hundred ticks (the browser measurements, below, are in "What the rule guarantees in a
+match (#290)", which lists the configurations measured). What makes the optimized figure true, and what
 stays outside it:
 
 - Every record a think reads or writes is made once, in `createBot`, and rewritten
@@ -1160,18 +1160,19 @@ no time outside Maglev or TurboFan, not no boxes there.
 The measured example, `computeCues` in the default match (hargrim 2v2 on arena01, normal
 tier). On main (5a95dfa) a statement behind `cues.reserve && me.energy >= ULTIMATE_ENERGY_COST`
 (the load of `cache.baseClearance[F_INDEX]` and the compare with the stand clearance) was
-compiled without type feedback, and its first think, at tick 3539 to 3569, deoptimized the
+compiled without type feedback, and its first think, at about tick 3535, deoptimized the
 function (offset 388, `Insufficient type feedback for generic named access`). It then ran in
-Sparkplug for 17 steady windows, ticks 3509 to 4019, about 540 ticks: 1015 and 1016 of the 1080
-thinks of those windows (two runs) read 156 or 168 B, 13 or 14 boxes. After the hoist (the three
-reads on every call and one store, commit 74e1f40) `computeCues` was in Maglev in 30 of 30
+Sparkplug for 17 steady windows, ticks 3509 to 4019, about 540 ticks: 960 of the 1080 thinks of
+those windows in both runs (1015 and 1016 over all 30 steady windows) read 156 or 168 B, 13 or 14
+boxes. After the hoist (the three reads on every call and one store, #302) `computeCues` was in Maglev in 30 of 30
 steady windows in 3 runs, no think read 156 or 168 B, and the median of a window was 0 B in 29 of
 30 windows; the 30th, at tick 3209, reads a median of 24 B on main too (a class of 24 to 48 B
 thinks that is not attributed to a function and is tracked in #303). The hoist's else value is a
-const of `casting.ts` and not the imported `SIGHT_CLEARANCE`: Maglev loads an imported const as
-a tagged number, and a select between it and the double from the kit cache boxed that double,
-16 B a think in Node while a wide ultimate stands in reach at full energy. The const is a copy,
-pinned equal to the import by `reserve.test.ts`. A Maglev pin in the heap check guards the
+const of `casting.ts` and not the imported `SIGHT_CLEARANCE`. What was measured: with the import
+in the select the Node pin (Maglev alone, under Vitest) read 16 B a think while a wide ultimate
+stands in reach at full energy, and with a const of the module it reads 0 B. The mechanism is not
+established, and the browser was not measured with the import. The const is a copy, pinned equal
+to the import by `reserve.test.ts`. A Maglev pin in the heap check guards the
 hoist (see Testing).
 
 The default match is free of such a drop after its warm-up: a traced run of the head
@@ -1204,7 +1205,7 @@ here beyond the second measurement's trace of main: rounds 1 and 2 of the defaul
 `chooseTarget`, `lineOfSight` and `computeCues @109`). All of these are tracked in #303.
 
 The profiler caveat. The CDP sampling profiler of the live probe, with garbage included, forces a
-Mark-Compact on every start and stop of a window: 43 against 2 over the same 3v3 match with a
+Mark-Compact in every sampled window (one per window): 43 against 2 over the same 3v3 match with a
 Wrenna champion, per `--trace-gc`. Each one clears the weak objects embedded in optimized code
 (`embedded weak objects cleared`) and throws the code back to baseline. So a per-function figure
 of the sampler can be inflated, the live probe's included, and has to be read with the tier of
@@ -2862,8 +2863,12 @@ cleared`) and the window reads 32 B a think, two boxes, from baseline code (480 
 ignored scene: in every red run an incremental Mark-Compact fell inside window 0 of the first pin,
 and `%GetOptimizationStatus` read `move` 16385 (Sparkplug) and `seekShot` 131073 after both
 windows; in green runs the GC fell after the pins and every status read 25 (Maglev). The test
-keeps every bot of the file reachable (`madeScenes`), so nothing a think path embeds ever dies:
-main plus the copy read 6 of 16 runs red before and 0 of 48 after (the copy first, in the middle
+keeps every bot of the file reachable (`madeScenes`), so no bot the scene list made ever dies. That
+stops the collection of dead bots and nothing more: bots that think in the same test before the
+scene list was built still leave the first scenes and the press pin at 32 B, on main alike (the
+tester: 32 B in 16 of 16 runs on this head, 10 of 10 with the bots dropped, 4 of 4 on main), so
+bots made through `scene()` are not safe from it either; tracked in #303. Main plus the copy read
+6 of 16 runs red before and 0 of 48 after (the copy first, in the middle
 and last); with Wrenna's scene as a list entry 10 of 12 runs were red before and 0 of 36 after.
 The final head read 0 of 108 runs red over the file, copies of `orb ignored` and of `wrenna
 spend` first, in the middle and last, and copies of the landing pin and of the computeCues pin,

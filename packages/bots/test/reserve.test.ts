@@ -105,9 +105,9 @@ describe('the stand of a bot whose ultimate is wider than a champion', () => {
 
 describe('the stand clearance that computeCues sets', () => {
   // `computeCues` selects between F's width and `STAND_CLEARANCE`, a const of casting.ts that is a
-  // copy of `SIGHT_CLEARANCE` (the import itself in the select boxes a double in Maglev, #290). The
-  // copy must stay equal to it, and to the champion radius it stands for: this reads it through the
-  // output of `computeCues`.
+  // copy of `SIGHT_CLEARANCE` (the import itself in the select read 16 B a think in the Node pin,
+  // #290). The copy must stay equal to it, and to the champion radius it stands for: this reads it
+  // through the output of `computeCues`.
   function standClearance(championId: string, energy: number, distance: number): number {
     const state = sceneOf(championId, distance, { energy, ready: ['F'] });
     const cache = createKitCache();

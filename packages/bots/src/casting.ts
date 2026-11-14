@@ -585,11 +585,12 @@ const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
 
 /**
  * The stand clearance of a think that could not press F now: a champion's 0.5 m. A const of this
- * module and not `SIGHT_CLEARANCE` itself in the select of `computeCues`: Maglev loads an imported
- * const from its module cell as a tagged number, and a select between that and the double read from
- * the kit cache then boxes the double, 16 B a think while a wide ultimate stands in reach at full
- * energy (the pin of allocation.test.ts, #290). This one is folded. It is local on purpose and a
- * copy of the import, not a second value: reserve.test.ts pins it equal to `SIGHT_CLEARANCE`.
+ * module and not `SIGHT_CLEARANCE` itself in the select of `computeCues`. What was measured: with
+ * the import in the select the Node pin of allocation.test.ts (Maglev alone, under Vitest, #290)
+ * read 16 B a think while a wide ultimate stands in reach at full energy, and with this const it
+ * reads 0 B. The mechanism is not established, and the browser was not measured with the import.
+ * It is local on purpose and a copy of the import, not a second value: reserve.test.ts pins it
+ * equal to `SIGHT_CLEARANCE`.
  */
 const STAND_CLEARANCE = SIGHT_CLEARANCE;
 
@@ -663,7 +664,7 @@ export function computeCues(
   // The three reads run on every think, and the store is one. A statement that only some thinks
   // reach is compiled without type feedback, and the first think that reaches it deoptimizes the
   // function: this load and compare sat behind `cues.reserve` and a full bar, and a deopt there left
-  // `computeCues` in baseline code, boxing about 156 B a think, for about 540 ticks (docs/architecture/
+  // `computeCues` in baseline code, boxing about 156 B a think in Chromium, for about 540 ticks (docs/architecture/
   // bots.md, Allocation). The reads are pure and F_INDEX is in range, so the value is the same.
   // The else of the select is `STAND_CLEARANCE`, not the import: see there.
   const wide = cache.baseClearance[F_INDEX] as number;
