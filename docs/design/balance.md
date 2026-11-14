@@ -92,7 +92,8 @@ Sources:
   roster, so 28 pairings with eight kits (21 with seven). The roster is the fixed list
   `HARNESS_KITS` in `tools/balance/inputs.ts`, the listed kits of `data/kits`
   in file order, and a listed kit with no file is an error. A kit file the list
-  leaves out is not played. Wrenna (#270, her kit as data) joined it at step 3.4
+  leaves out is not played: Ysmeer's file (#271) is the one it leaves out until her
+  step 4.3. Wrenna (#270, her kit as data) joined it at step 3.4
   of roadmap #176 (#281), and the block of section 4 is not regenerated for her:
   it is still the seven-kit report, and `npm run balance -- --check` and the manual
   `balance.yml` fail on purpose (168 cells against the committed 126) until the

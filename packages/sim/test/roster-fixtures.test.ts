@@ -1,8 +1,8 @@
 // Scripted roster fixtures: one per kit, `scripted-roster-hargrim-arena01-2v2.json`,
 // `scripted-roster-quillon-arena01-2v2.json`, `scripted-roster-skerrow-arena01-2v2.json`,
 // `scripted-roster-lumeth-arena01-2v2.json`, `scripted-roster-ondrel-arena01-2v2.json`,
-// `scripted-roster-brimwick-arena01-2v2.json`, `scripted-roster-durnhal-arena01-2v2.json` and
-// `scripted-roster-wrenna-arena01-2v2.json`.
+// `scripted-roster-brimwick-arena01-2v2.json`, `scripted-roster-durnhal-arena01-2v2.json`,
+// `scripted-roster-wrenna-arena01-2v2.json` and `scripted-roster-ysmeer-arena01-2v2.json`.
 //
 // Each fixture runs 2400 ticks on arena01 with the kit of `data/kits/<id>.json` for all four
 // champions (a mirror: two on team A, two on team B), so one kit meets itself in every exchange.
@@ -22,7 +22,7 @@
 // The search script is not committed; the script it produced is the data. It used mulberry32 seeded
 // with the attempt number (1, 2, 3 and so on) and ran the mirror config of the fixture for 2400
 // ticks. Match seed 5555 for Hargrim, 5556 for Quillon, 5557 for Lumeth, 5558 for Skerrow, 5559 for
-// Ondrel, 5560 for Brimwick, 5561 for Durnhal and 5562 for Wrenna.
+// Ondrel, 5560 for Brimwick, 5561 for Durnhal, 5562 for Wrenna and 5563 for Ysmeer.
 // Attempt 1 was the first to cover everything for Hargrim, attempt 23 the first for Quillon,
 // attempt 6 the first for Skerrow and attempt 2 the first for Lumeth (attempts 1 to 22, 1 to 5 and
 // 1 each missed an item of the coverage test, and none had an oracle problem); each one's output is
@@ -41,6 +41,13 @@
 // She is the first fixture of a kit with a counter, so her checksums include the counter of every
 // champion: the run holds Heartseeker and Fade Step casts that spend Focus, and a Fade Step that
 // starts on the step another cast ends its windup (which finds the Focus already spent).
+//
+// Ysmeer (#271) came from the tool as well: on her committed kit, with no pins, `npm run
+// fixtures:search -- ysmeer` settled on attempt 7 (the attempts before it missed an item of the
+// coverage test, and the settling attempt had no oracle problem), and the file is byte for byte the
+// same on Node 22.23.5 and 24.22.3. She is the first fixture of a kit with a fused area (Falling Star
+// and Supernova pulse 45 and 90 ticks after the cast) and with an end area (Gravity Well and Comet
+// EX), so the oracle runs both for the first time on a kit of the roster.
 //
 // The search is now in the repository: `npm run fixtures:search -- <kit>` (tools/fixtures, which
 // shares this file's format, replay, coverage and oracle through `roster-fixture.ts`). It stops at
@@ -140,6 +147,7 @@ import ondrelFixtureJson from './fixtures/scripted-roster-ondrel-arena01-2v2.jso
 import brimwickFixtureJson from './fixtures/scripted-roster-brimwick-arena01-2v2.json';
 import durnhalFixtureJson from './fixtures/scripted-roster-durnhal-arena01-2v2.json';
 import wrennaFixtureJson from './fixtures/scripted-roster-wrenna-arena01-2v2.json';
+import ysmeerFixtureJson from './fixtures/scripted-roster-ysmeer-arena01-2v2.json';
 import hargrimJson from '../../../data/kits/hargrim.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
@@ -148,6 +156,7 @@ import ondrelJson from '../../../data/kits/ondrel.json';
 import brimwickJson from '../../../data/kits/brimwick.json';
 import durnhalJson from '../../../data/kits/durnhal.json';
 import wrennaJson from '../../../data/kits/wrenna.json';
+import ysmeerJson from '../../../data/kits/ysmeer.json';
 import { checksum, cloneState } from '../src/index';
 import type { GameState } from '../src/index';
 import { validateKit } from '../src/kit';
@@ -177,6 +186,7 @@ const SUBJECTS: Subject[] = [
   { name: 'brimwick', kit: validateKit(brimwickJson), fixture: decodeFixture(brimwickFixtureJson, 'brimwick') },
   { name: 'durnhal', kit: validateKit(durnhalJson), fixture: decodeFixture(durnhalFixtureJson, 'durnhal') },
   { name: 'wrenna', kit: validateKit(wrennaJson), fixture: decodeFixture(wrennaFixtureJson, 'wrenna') },
+  { name: 'ysmeer', kit: validateKit(ysmeerJson), fixture: decodeFixture(ysmeerFixtureJson, 'ysmeer') },
 ];
 
 describe.each(SUBJECTS)('scripted $name fixture', ({ name, kit, fixture }) => {
