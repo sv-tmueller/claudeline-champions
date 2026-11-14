@@ -45,14 +45,14 @@ first.
   `energyOrb` (the point from `data/orbs.json`, #218); the on-hit counter a kit
   may declare, built by the hits of one slot, decayed by a window and reset each
   round, and its two spend verbs (#227, #245; Wrenna's kit of #270 is the first to
-  declare one); angles through `dmath.ts`; the sweep's
+  declare one, and she plays since #281); angles through `dmath.ts`; the sweep's
   heap check in `packages/sim/test/allocation.test.ts`.
 - `bots`: the navigation grid, A-star and the path follower; engage, kite and
   retreat by utility with the finisher and deadlock rules, the deadlock's entry
   test and latched stand reading a `latchReach` profile double (#222); the
   clear-shot test
   (none for a melee arc, whose press lands as the sim's arc does, #186); casting
-  from kit data with range profiles for all seven roster ids; the energy reserve;
+  from kit data with range profiles for all eight roster ids; the energy reserve;
   openers and escapes for Hargrim, Quillon and Skerrow (#81), Skerrow's wait at
   6 to 8 m and her Quiet Dart opener, and no dash pressed on an escape think for
   any kit (#98); aim leading and three tiers; the contest of the energy orb (a
@@ -73,7 +73,10 @@ first.
   lingering ones staying nominal (measured, see [bots](bots.md), Aim; #187).
   Durnhal (#211) stands at 2.4 m, throws Breaker Throw at a target walking away,
   and has Bulwark Charge then Aegis Line as escapes, the dash an escape only (the
-  `escapeOnly` field of his rule).
+  `escapeOnly` field of his rule). Wrenna (#281) keeps 10 to 13 m, throws Pinning
+  Shot at a target walking toward her, escapes by Tumble then Fade Step, and
+  presses the base Heartseeker while her counter stands (the `spendBase` field of
+  her rule), so the stacks are spent, not left on the EX variant.
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
   champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
@@ -104,11 +107,10 @@ first.
 - Content: arena01, arena02 and arena03 (JSON and committed models); the Hargrim,
   Quillon, Skerrow and Lumeth kits, and the Ondrel and Brimwick kits (bot
   profiles since #165); Durnhal's kit as data (#204) with his bot profile
-  (#211); Wrenna's kit as data (#270), the first with a counter, which waits
-  for her bot profile and client entry at roadmap step 3.4; models for the
-  eight roster ids and the placeholder, each rigged, with six clips (the client
-  registers and plays seven of the eight, and Wrenna's model waits for roadmap
-  step 3.4).
+  (#211); Wrenna's kit as data (#270), the first with a counter, with her bot
+  profile and client entry (#281, roadmap step 3.4); models for the eight roster
+  ids and the placeholder, each rigged, with six clips (the client registers and
+  plays all eight).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion
@@ -120,10 +122,12 @@ first.
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
   22.15 or later. It plays the `HARNESS_KITS` of `tools/balance/inputs.ts`
-  (Wrenna's file is not listed until step 3.4), with the standard match (the
-  arena's orb point of `data/orbs.json`): 126 cells and 25 200 matches over three arenas, about 31
-  minutes on Apple silicon (the report of #244, seven kits with the orb, after
-  the six-kit report of batch 15, #189, and arena03 of #238).
+  (eight since #281, every kit file), with the standard match (the arena's orb
+  point of `data/orbs.json`): 168 cells and 31 248 matches over three arenas, at 32
+  seeds a 2v2 config and 6 a 3v3 config. The committed block is still the
+  seven-kit report of #244 (126 cells, 25 200 matches, about 31 minutes on Apple
+  silicon), so `--check` and the manual workflow fail on purpose until the
+  nine-kit report of batch 21 rewrites it.
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test

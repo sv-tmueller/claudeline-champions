@@ -148,8 +148,8 @@ The commands and file list are in `tools/blender/README.md`.
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
   in body colour, one cue and one head piece that stay below 1.9 m, Durnhal's,
   Wrenna's and the head pieces in parts on more than one bone. The client
-  registers and loads seven of the eight (batch #177, package C, then #212 for
-  Durnhal); Wrenna's model waits for roadmap step 3.4.
+  registers and loads all eight (batch #177, package C, then #212 for Durnhal
+  and #281 for Wrenna).
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours, cues and head pieces are in
   [`tools/blender/README.md`](../../tools/blender/README.md).

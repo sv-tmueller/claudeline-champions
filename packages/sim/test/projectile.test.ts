@@ -927,6 +927,65 @@ describe('a projectile that spawns an endArea where it ends (spec 4.3)', () => {
     expect(ofType(lifetime.events, 'areaTick')).toHaveLength(1);
   });
 
+  /**
+   * Plays a projectile that ends at `reason`'s place with an enemy (id 2) inside the endArea and
+   * returns the steps, counted from the area's spawn step, of its pulses (with the target ids),
+   * the damage the enemy takes and its expiry.
+   */
+  function timeline(path: 'lifetime' | 'obstacle', over: Partial<typeof endArea> & { fuseTicks?: number }) {
+    const wall: Obstacle = { type: 'rect', x: 0, y: 0, w: 0.5, h: 4, height: 1, blocksProjectiles: true };
+    const state = path === 'obstacle' ? open([wall]) : open();
+    const shape = { ...endArea, ...over };
+    if (path === 'obstacle') {
+      place(state, 2, -1.2, 1.2);
+      spawnProjectile(state, spec({ x: -5, y: 0, speed: 120, endArea: shape }));
+    } else {
+      place(state, 2, -4.1667, 9.2);
+      spawnProjectile(state, spec({ x: -5, y: 8, speed: 10, lifetimeTicks: 5, endArea: shape }));
+    }
+    let spawnedAt = -1;
+    let ended = '';
+    const pulses: { at: number; targetIds: number[] }[] = [];
+    const damage: number[] = [];
+    const expired: number[] = [];
+    for (let n = 0; n < 200 && (spawnedAt < 0 || state.areas.length > 0); n++) {
+      step(state, []);
+      for (const e of state.events) {
+        if (e.type === 'projectileExpired') ended = e.reason;
+        if (e.type === 'areaSpawned') spawnedAt = n;
+        if (e.type === 'areaTick') pulses.push({ at: n - spawnedAt, targetIds: e.targetIds });
+        if (e.type === 'damage' && e.targetId === 2) damage.push(n - spawnedAt);
+        if (e.type === 'areaExpired') expired.push(n - spawnedAt);
+      }
+    }
+    return { ended, pulses, damage, expired, live: state.areas.length };
+  }
+
+  // The obstacle (and edge) spawn is phase 4, so its area pulses the same step. A lifetime-end area
+  // is spawned in phase 6, after the pulses, and runs one tick behind it on every tick it has,
+  // including the last: its `expireAreas` the same step counts the spawn step (issue 276).
+  it.each([
+    ['unfused, one hit', { durationTicks: 1, intervalTicks: 1 }, [0], 0],
+    ['fused 15, one hit', { durationTicks: 1, intervalTicks: 1, fuseTicks: 15 }, [15], 15],
+    ['unfused, 31 over 30', { durationTicks: 31, intervalTicks: 30 }, [0, 30], 30],
+    ['fused 15, 31 over 30', { durationTicks: 31, intervalTicks: 30, fuseTicks: 15 }, [15, 45], 45],
+    ['unfused, 30 over 30 (control)', { durationTicks: 30, intervalTicks: 30 }, [0], 29],
+  ])('times a %s area from its spawn step, a tick later on the lifetime end', (_name, over, pulses, gone) => {
+    const contact = timeline('obstacle', over);
+    expect(contact.ended).toBe('obstacle');
+    expect(contact.pulses).toEqual(pulses.map((at) => ({ at, targetIds: [2] })));
+    expect(contact.damage).toEqual(pulses);
+    expect(contact.expired).toEqual([gone]);
+    expect(contact.live).toBe(0);
+
+    const lifetime = timeline('lifetime', over);
+    expect(lifetime.ended).toBe('lifetime');
+    expect(lifetime.pulses).toEqual(pulses.map((at) => ({ at: at + 1, targetIds: [2] })));
+    expect(lifetime.damage).toEqual(pulses.map((at) => at + 1));
+    expect(lifetime.expired).toEqual([gone + 1]);
+    expect(lifetime.live).toBe(0);
+  });
+
   it('rejects a malformed endArea with its path', () => {
     expect(() => spawnProjectile(open(), spec({ endArea: { ...endArea, radius: 0 } as never }))).toThrow(
       'Invalid projectile: endArea radius must be above 0',

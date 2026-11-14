@@ -68,16 +68,18 @@ Sources:
 
 ## 2. The bands
 
-- A cell is one mode (2v2 or 3v3), one arena and one pairing, so there are
-  126 cells with the seven kits of the harness roster and three arenas, 21
-  pairings a mode and arena (the 24 of the four v1 kits on the first two arenas
-  and the 90 of the six-kit report are among them).
+- A cell is one mode (2v2 or 3v3), one arena and one pairing. The harness
+  roster has eight kits since #281, so a full run plays 168 cells (28 pairings a
+  mode and arena, three arenas); the block of section 4 is still the seven-kit
+  one, 126 cells and 21 pairings (the 24 of the four v1 kits on the first two
+  arenas and the 90 of the six-kit report are among them).
 - The band is 40 to 60 percent inclusive on X's win rate in the cell. The test
   is on the exact rate (wins times 100 against 40 and 60 times the decided
   matches), not on the rounded figure in the table.
 - X is the first kit of the pairing in the order of the kit files of the
   harness roster (`brimwick`, `durnhal`, `hargrim`, `lumeth`, `ondrel`,
-  `quillon`, `skerrow`). A rate under 50 means Y is ahead.
+  `quillon`, `skerrow`, and `wrenna` after them, which the block of section 4
+  does not have yet). A rate under 50 means Y is ahead.
 - A roster counter (an intended counter in roster-v1.md, or in the web of
   roster-v2.md section 1) is read as the favoured side inside the band: the
   favourite at 50 to 60 percent and the other side at 40 to 50. A favourite
@@ -87,27 +89,31 @@ Sources:
 ## 3. The method
 
 - **Pairing.** An unordered pair X v Y of different kits of the harness
-  roster, so 21 pairings with seven kits. The roster is the fixed list
+  roster, so 28 pairings with eight kits (21 with seven). The roster is the fixed list
   `HARNESS_KITS` in `tools/balance/inputs.ts`, the listed kits of `data/kits`
   in file order, and a listed kit with no file is an error. A kit file the list
-  leaves out is not played: Wrenna's (#270) joins at step 3.4 of roadmap #176,
-  and the block of section 4 is not regenerated before it. Ondrel and Brimwick
+  leaves out is not played. Wrenna (#270, her kit as data) joined it at step 3.4
+  of roadmap #176 (#281), and the block of section 4 is not regenerated for her:
+  it is still the seven-kit report, and `npm run balance -- --check` and the manual
+  `balance.yml` fail on purpose (168 cells against the committed 126) until the
+  nine-kit report of batch 21 rewrites it. Ondrel and Brimwick
   (#148) joined the four v1 kits in the six-kit report (#189; [decision 3 of batch
   #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667))
   and Durnhal (#204, his kit as data) joined them at step 1.3 of roadmap #176
   (#244), so the 126 cells, the 25 200 matches and the block of section 4 are
-  those of seven kits on three arenas (arena03 of #238). The harness plays the
+  those of seven kits on three arenas (arena03 of #238); with Wrenna the full
+  run is 168 cells and 31 248 matches. The harness plays the
   standard match, so every cell sets the arena's orb point (`data/orbs.json`,
   spec section 6): the block of section 4 is the seven-kit one with the orb on
   and section 5.12 reads what the orb moved.
   "Pairing" is read as the matchup of two champions, as decision 6
   words it, and not as the duo of roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
-  In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: five fills
-  with seven kits (four with six, two with four), pooled in the cell and each
+  In 2v2 the teams are [X, Z] v [Y, Z] for each Z outside the pair: six fills
+  with eight kits (five with seven, four with six, two with four), pooled in the cell and each
   shown in the Fills column. In 3v3 they are [X, Z, W] v [Y, Z, W] for each
-  ordered pair of two kits outside the pair: twenty fills with seven kits
-  (twelve with six, two with four), both orders of each two, pooled and each
+  ordered pair of two kits outside the pair: thirty fills with eight kits
+  (twenty with seven, twelve with six, two with four), both orders of each two, pooled and each
   shown, because the order sets the spawn slots (see Noise). X takes the first
   spawn slot of its team.
 - **Sides.** Odd seeds put X on team A and even seeds on team B, so each side
@@ -122,6 +128,10 @@ Sources:
   matches). With seven kits it is 40 seeds for each of the 5 fills of a 2v2
   cell and 10 for each of the 20 fills of a 3v3 cell, 200 matches in every cell:
   with three arenas, 126 cells and 25 200 matches in all (12 600 in each mode).
+  With eight kits it is 32 seeds for each of the 6 fills of a 2v2 cell (192
+  matches) and 6 for each of the 30 fills of a 3v3 cell (180): 168 cells and
+  31 248 matches (16 128 in 2v2 and 15 120 in 3v3), about 38 minutes by match
+  count on Apple silicon, not measured.
   The count is even so that X plays each side equally often. When the
   two modes get the same count the head of the block says "Seeds 1 to N for each
   config"; when they differ it names each mode's count, and the Seeds / matches
@@ -1378,7 +1388,7 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 
 ## 7. How to regenerate
 
-- `npm run balance` plays all 25 200 matches and writes the block of section 4.
+- `npm run balance` plays all 31 248 matches of the eight listed kits (about 38 minutes by match count, not measured) and writes the block of section 4.
   It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
   stops with a message below that. A full run takes about 31 minutes on one
   core of an Apple silicon laptop (the seven-kit block of #244 with the orb; the

@@ -3,8 +3,8 @@ import type { ChampionState, MatchConfig, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import { SLOTS } from '@claudeline/sim';
 import { RANGE_MIN, WITHIN } from './escape-oracle';
-import { configMirror, configLumeth, configSkerrow, createRun, rosterKits, sevenKits, sixKits } from './helpers';
-import { ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SEVEN_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
+import { configMirror, configLumeth, configSkerrow, createRun, eightKits, rosterKits, sevenKits, sixKits } from './helpers';
+import { EIGHT_SET, ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SEVEN_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
 import type { AllyRow, KitSet } from './press-oracle';
 
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
@@ -211,7 +211,7 @@ describe('the band and clearance tables of the shipped kits', () => {
   // Dance start with a dash and a teleport, so they are not among them.
   it('has the melee keys of the shipped kits: the abilities whose first effect is a melee arc', () => {
     const found = new Set<string>();
-    for (const kit of sevenKits()) {
+    for (const kit of eightKits()) {
       for (const slot of SLOTS) {
         const spec = kit.slots[slot];
         if (spec.effects[0]?.type === 'meleeArc') found.add(`${kit.id}:${slot}`);
@@ -574,5 +574,64 @@ describe('the band and clearance tables of Durnhal', () => {
   it('has the trigger of the common kind: rangeMin 0 (he never kites), and no trigger of his own', () => {
     expect(RANGE_MIN['durnhal']).toBe(0);
     expect(WITHIN['durnhal']).toBeUndefined();
+  });
+});
+
+// Wrenna's kit (#281), worked out again from wrenna.json by the same rules: a bolt reaches speed
+// times lifetime over 60 (multiplied first), the Rain of Arrows (an area at the aim) its range plus
+// its radius plus 0.5. Tumble is a dash and Fade Step a counter spend and a shield: neither reaches
+// an enemy, so neither has a band, only an escape row.
+describe('the band and clearance tables of Wrenna', () => {
+  const kits = eightKits();
+  const kit = kits.find((k) => k.id === 'wrenna') as KitDef;
+  const slotOf = (key: string): AbilitySpec => {
+    const [slot, variant] = key.split(':') as [Slot, string | undefined];
+    const base = kit.slots[slot];
+    return variant === 'ex' ? (base.ex as AbilitySpec) : base;
+  };
+  const bolt = (key: string) => {
+    const effect = slotOf(key).effects[0];
+    if (effect === undefined || effect.type !== 'projectile') throw new Error(`${key} is no bolt`);
+    return effect;
+  };
+
+  it('has the reach and the shot width of every Wrenna bolt, and the opener condition of Pinning Shot', () => {
+    const shipped = EIGHT_SET;
+    for (const key of ['M1', 'M2', 'M2:ex', 'Q', 'E', 'E:ex']) {
+      const reach = { min: 0, max: (bolt(key).speed * bolt(key).lifetimeTicks) / 60 };
+      expect(shipped.bands[`wrenna:${key}`], key).toEqual(key === 'Q' ? { ...reach, motion: 'closing' } : reach);
+      expect(shipped.clearances[`wrenna:${key}`], key).toBe(bolt(key).radius);
+    }
+  });
+
+  it('has the reach of the Rain of Arrows: the area at the aim, range 13 plus radius 3 plus 0.5', () => {
+    const rain = slotOf('F').effects[0];
+    if (rain === undefined || rain.type !== 'area' || rain.placement.type !== 'aim') throw new Error('F is no aim area');
+    expect(EIGHT_SET.bands['wrenna:F']).toEqual({ min: 0, max: rain.placement.range + rain.radius + 0.5 });
+    expect(EIGHT_SET.clearances['wrenna:F']).toBe(0.5);
+    // Held for nobody: its damage is an area of 12 a pulse, pressed at 100 energy.
+    expect(HELD['wrenna:F']).toBeUndefined();
+  });
+
+  it('has no band for Tumble and Fade Step, and the escape rows from the kit literals', () => {
+    expect(EIGHT_SET.bands['wrenna:SPACE']).toBeUndefined();
+    expect(EIGHT_SET.bands['wrenna:R']).toBeUndefined();
+    const tumble = slotOf('SPACE').effects[0];
+    if (tumble === undefined || tumble.type !== 'dash') throw new Error('no dash');
+    expect(ESCAPES['wrenna:SPACE']).toEqual({ slot: 'SPACE', teleport: null, dash: tumble.distance, after: null });
+    expect(ESCAPES['wrenna:R']).toEqual({
+      slot: 'R',
+      teleport: null,
+      after: { slot: 'SPACE', teleport: null, dash: tumble.distance },
+    });
+  });
+
+  it('has the trigger of the common kind: rangeMin 10, and no trigger of her own', () => {
+    expect(RANGE_MIN['wrenna']).toBe(10);
+    expect(WITHIN['wrenna']).toBeUndefined();
+  });
+
+  it('is not a melee kit: no key of hers is in MELEE', () => {
+    expect([...MELEE].filter((key) => key.startsWith('wrenna:'))).toEqual([]);
   });
 });

@@ -212,15 +212,20 @@ must not reach a production file (the dist grep).
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`. A later kit file joins the match without a client change, reached
 by `?champion=<id>` on the placeholder model, if it has no roster entry. The
-client registers seven champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
+client registers eight champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
 Lumeth and Skerrow in the order of roster-v1.md, then Ondrel and Brimwick of
-roster-v2.md, then Durnhal of roster-v3.md, each with a name and a model, so
-`?champion=ondrel`, `?champion=brimwick` and `?champion=durnhal` play their own
-model, health and name (batch #177, package C; Durnhal in #212). The select
-shows those seven, each available once its kit file exists, so a kit without a
+roster-v2.md, then Durnhal and Wrenna of roster-v3.md, each with a name and a model, so
+`?champion=ondrel`, `?champion=brimwick`, `?champion=durnhal` and `?champion=wrenna` play
+their own model, health and name (batch #177, package C; Durnhal in #212; Wrenna in #281,
+the first pick whose HUD shows counter pips, three of them). The select
+shows those eight, each available once its kit file exists, so a kit without a
 roster entry is not on it until the client registers it (batch #147 decision 3,
-part 3). `ENEMY_ROSTER` and the sandbox roster hold none of the three, so no
-bot team and no probe scene plays an Ondrel, a Brimwick or a Durnhal. `createMatch`
+part 3). The row of eight lies inside the 1280 px viewport on one line (`select.spec`
+pins it), and a ninth entry will not fit (about 1380 px by estimate), so the one that adds
+it also wraps the row in `select.css`, `result.css` and `menu.css`. `ENEMY_ROSTER` and the
+sandbox roster hold none of the four, so no bot team and no probe scene plays an Ondrel, a
+Brimwick, a Durnhal or a Wrenna (a pick of any of them gets bot allies and enemies of the
+usual rows). `createMatch`
 validates the kits, and a bad kit file shows up as a page error. The arenas work
 the same way: every file under `data/arenas/` goes through `parseArenaDef` (a
 bad file is a page error too), sorted by id, and `arenaById` in `arenas.ts`
@@ -441,7 +446,7 @@ averages the clips that play where an upper-body strike must replace the arms
 and leave the legs alone
 ([batch #105 decision 11](https://github.com/sv-tmueller/claudeline-champions/issues/105#issuecomment-6221276811)).
 The mixer is the test oracle: `clip-sampler.test.ts` compares the sampler to it
-with `Object.is` per component, for every clip of all eight models at 60 times
+with `Object.is` per component, for every clip of all nine models at 60 times
 per clip, with `action.time` and `update(0)`. Two counted modules, both on the
 frame path rules above:
 
@@ -521,7 +526,7 @@ to its next passing key, holds there while the weight fades, and the feet stay
 at or above the floor. `clip-sampler.test.ts` samples every transition (every
 stop phase of Run at four speeds and both directions, every overlay at every
 offset over Idle and Run, interrupts, Death from every state, a dash, the snap)
-for all eight models, and the lowest skinned vertex stays at or above -1e-4 m
+for all nine models (Wrenna's passes the same pins, under 1.91 m), and the lowest skinned vertex stays at or above -1e-4 m
 (the lowest figure is -9e-15 m). The highest stays under 1.91 m: every
 transition reaches 1.735 m on the three plain models, 1.8695 m on Lumeth,
 1.8758 m on Ondrel, 1.8641 m on Brimwick and
