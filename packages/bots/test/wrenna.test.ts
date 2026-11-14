@@ -140,6 +140,8 @@ describe('Pinning Shot, the opener on a target that closes in', () => {
 // kits on the runner 17.1 s (durnhal.test.ts): the timeout of 60 s is at least twice that
 // (testing.md, Check suite, with the long-match precedent of durnhal.test.ts). A stall here is a
 // reason to report, not to move `rangeMin`.
+// On the runner it read 11.0 s (unit job of run 43544274291, 9fe3ec7): twice that is 22 s, above the
+// 20 s top of the rule, so it keeps the 60 s of the long-match precedent.
 const CELL = cellOf('wrenna', 'ondrel', 'arena02', 4206, 913);
 
 /** Wrenna's tallies in the cell: what her counter did and which slots spent it. */

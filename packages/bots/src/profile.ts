@@ -191,7 +191,8 @@ export interface ChampionRules {
    * The EX slots that spend a built counter on the base ability: while `me.counter.count` is above
    * 0, the EX variant of a listed slot is not cast (see `exFor` in casting.ts), so the base ability
    * is pressed and spends the stacks. Wrenna's Heartseeker: the base shot adds 4 damage a stack and
-   * saves 25 energy, and ties the EX at 1 stack and beats it from 2. Empty for the other seven.
+   * saves 25 energy, and ties the EX at 1 stack and beats it from 2. The test is `count > 0`, so a kit
+   * whose base shot beats its EX only from a higher count needs a threshold. Empty for the other seven.
    */
   readonly spendBase: readonly Slot[];
 }

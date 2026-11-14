@@ -1388,7 +1388,7 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 
 ## 7. How to regenerate
 
-- `npm run balance` plays all 25 200 matches and writes the block of section 4.
+- `npm run balance` plays all 31 248 matches of the eight listed kits (about 38 minutes by match count, not measured) and writes the block of section 4.
   It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
   stops with a message below that. A full run takes about 31 minutes on one
   core of an Apple silicon laptop (the seven-kit block of #244 with the orb; the

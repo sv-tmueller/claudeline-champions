@@ -19,8 +19,11 @@ CI is split by cost:
   --no-turbofan --no-concurrent-recompilation --no-use-osr`; the last two
   switch off background compilation and OSR, which the browser keeps on, so
   that the figures do not depend on compile timing), and Node 24 in the
-  default tiers. The unit job runs it on Node 22. The job has no `needs:`,
-  runs on drafts in parallel with the unit job and takes about half a minute.
+  default tiers. Wrenna's spend scene (#281) runs in the default tiers only and
+  is left out of the Maglev run until #290 is fixed, so her `spendBase` branch
+  has no Maglev coverage yet. The unit job runs it on Node 22. The job has no
+  `needs:`, runs on drafts in parallel with the unit job and takes about half a
+  minute.
   See [bots](bots.md), Testing.
 - Build and the Playwright e2e specs (`e2e/*.spec.ts`) run on pull requests
   that are ready for review and on pushes to main. They skip draft pull
@@ -223,6 +226,10 @@ are the only matches the package commits (the optional orb-on determinism row wa
 for the unit job's time), and the job may pass the 8 minutes of the trigger above once the
 unit job of #230, which read up to 449 s, merges with them, so read the trigger again then.
 
+The Wrenna cell (`wrenna.test.ts`, one seeded 2v2 match) read 11.0 s on the runner
+(unit job of run 43544274291, 9fe3ec7). Twice that is 22 s, above the 20 s top of
+the rule, so it keeps the 60 s timeout of the long-match precedent.
+
 ## Test types
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
@@ -333,7 +340,7 @@ unit job of #230, which read up to 449 s, merges with them, so read the trigger 
 
 ## Balance reproduction
 
-`npm run balance` plays all 25 200 matches of the report in
+`npm run balance` plays all 31 248 matches of the eight listed kits for the report in
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a

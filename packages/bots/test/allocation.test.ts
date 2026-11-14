@@ -696,7 +696,8 @@ function buildScenes(): Scene[] {
     // run of every slot and in the choice, and E is pressed on every one. She stands (12 m is
     // inside her stand reach). Default tiers only: in Maglev alone any scene added to this list
     // (this one, or a copy of an existing one on main without Wrenna) leaves the two -0 pins at
-    // 32 B a think in about half the runs, a defect of this test that is not Wrenna's (PR #286).
+    // 32 B a think in about half the runs, a defect of this test that is not Wrenna's (#290), so
+    // the Maglev run does not cover the spendBase branch until #290 is fixed.
     ...(MAGLEV
       ? []
       : [

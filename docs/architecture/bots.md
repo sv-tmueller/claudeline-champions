@@ -1127,7 +1127,7 @@ What the Node check misses, by construction: it reaches Turbofan only (20000
 warm-up thinks and the settle), it runs frozen states (one kit, one cast state,
 so no polymorphic feedback), the median of single thinks hides the plans and
 the aim draw, and Node 22's V8 is not the browser's. The Maglev-only run is in
-the CI now (see Testing), on Node 26.7 and not in the browser: Node builds have
+the CI now (see Testing; it leaves out Wrenna's spend scene, so her `spendBase` branch, until #290 is fixed), on Node 26.7 and not in the browser: Node builds have
 no pointer compression, so a Smi is 32 bits there and 31 in Chromium, and an
 int32 above 2^30 boxes only in the browser. The live probe stays the authority.
 
@@ -2650,17 +2650,17 @@ counter on the state the bot thought on) and a table test that works every liter
 from `wrenna.json`.
 
 The heap check got one Wrenna scene (Heartseeker with 3 stacks and 60 energy at 12 m, E pressed on
-every think, so the `spendBase` test of `exFor` runs), a twenty-second scene of the scene test in
+every think, so the `spendBase` test of `exFor` runs), a twenty-third scene of the scene test in
 the default tiers, under the same 128 B as every other scene (0 B in 3 of 3 runs). It is not in
 the Maglev run (the 8 B limit stays what it was for every scene): in Maglev alone any scene added
 to that list leaves the two -0 pins at 32 B a think in about half the runs, and this is so on main
 without Wrenna or the eight kits too (main's test with a copy of the orb ignored scene appended:
 5 of 8 runs on Node 26.7.0), so the cause is the test's and not hers. Her scene, as a test of its
 own, reads 32 B in every Maglev run. Neither reading is understood yet, and no limit is relaxed
-for them: the Maglev run does not cover her `spendBase` branch until the heap test is fixed.
+for them: the Maglev run does not cover her `spendBase` branch until the heap test is fixed (#290, which also puts her scene back in that run).
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-one frozen scenes (twenty-two in the default tiers: see above) on arena 1 with the eight shipped kits (a
+section. It builds twenty-two frozen scenes (twenty-three in the default tiers: see above) on arena 1 with the eight shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
