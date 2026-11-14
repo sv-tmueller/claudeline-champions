@@ -4,8 +4,10 @@ Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written, her kit is data (#270) and her
 model is built, her bot profile and client entry are built and she is in the
 balance harness roster (#281, step 3.4; the committed block is still the
-seven-kit report); Ysmeer's section is
-written and her kit, her fuse and end area and her model come in her own series
+seven-kit report); Ysmeer's section is written and her model is built (#273,
+roadmap step 4.2) with her hud palette colour, but she has no kit, no bot
+profile and no select entry yet: her kit, her fuse and end area come in her own
+series (#271)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -802,8 +804,7 @@ clip tops are 1.8096 m (Idle), 1.8222 m (Run), 1.8000 m (Attack), 1.8093 m
 low at 0.0000 m. The lowest new vertex is the crown's back point at key 30 of
 `Death` (on the back, `Hips` at -85 degrees and -0.64 m), 16.7 mm above the
 floor, and the motes stay at least 62 mm up in every clip. The model is 648
-vertices and 312 triangles. [C3: the byte count and the four byte-identical
-builds, once `ysmeer.glb` is committed; about 42.0 KB by estimate.]
+vertices, 312 triangles and 42 036 bytes, and four builds are byte-identical.
 
 Body colour: night blue, linear (0.000, 0.060, 0.165), about `#004571`. In 8-bit
 sRGB b minus g is 44, one under the overlay cap of 45, so the overlay rule

@@ -149,7 +149,10 @@ The commands and file list are in `tools/blender/README.md`.
   in body colour, one cue and one head piece that stay below 1.9 m, Durnhal's,
   Wrenna's and the head pieces in parts on more than one bone. The client
   registers and loads all eight (batch #177, package C, then #212 for Durnhal
-  and #281 for Wrenna).
+  and #281 for Wrenna). Ysmeer's `champions/ysmeer.glb` (#273) has the same
+  parts, with a night blue body, a star crown and two star motes, and it is
+  built and committed but not loaded: she has no kit, bot profile or select
+  entry yet (her kit is #271), so her model waits for roadmap step 4.3.
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours, cues and head pieces are in
   [`tools/blender/README.md`](../../tools/blender/README.md).

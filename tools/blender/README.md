@@ -325,8 +325,8 @@ floor, and a 0.48 m bar would sink 3.3 mm. The motes stay at least 62 mm up in
 every shared clip. Over the six clips the posed tops are 1.8096 (Idle), 1.8222
 (Run), 1.8000 (Attack), 1.8093 (Cast), 1.8150 (Hit) and 1.8281 m (Death), and
 the rest top is 1.8000 m. The model has 648 vertices and 312 triangles, a ground
-radius of 0.4323 m and [C3: the glb's byte count, once `ysmeer.glb` is
-committed] bytes, about 42.0 KB by estimate.
+radius of 0.4323 m and the committed `ysmeer.glb` is 42 036 bytes, the size of
+Durnhal's model, which has the same five boxes.
 
 That client test keeps its own `BODY_COLOURS` table with the bodies above, so
 change both in the same commit.

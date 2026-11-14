@@ -110,7 +110,9 @@ first.
   (#211); Wrenna's kit as data (#270), the first with a counter, with her bot
   profile and client entry (#281, roadmap step 3.4); models for the eight roster
   ids and the placeholder, each rigged, with six clips (the client registers and
-  plays all eight).
+  plays all eight); Ysmeer's model (#273) and her hud palette colour, with no
+  kit, bot profile or select entry yet (her kit is #271), so the client does not
+  load her model until roadmap step 4.3.
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion
