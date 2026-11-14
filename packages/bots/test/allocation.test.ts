@@ -162,7 +162,7 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * between the two.
  *
  * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
- * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 20 scenes, the plan
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 21 scenes, the plan
  * step 2784 B clear and 2400 to 2416 B fallback, the draw block and the dodge block 0 B, both -0
  * pins 0 B.
  *
@@ -192,6 +192,8 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  *   a double argument to a function of orb.ts      the orb contest scene 64 B, the orb ignored
  *     that is too large to inline (#225)           scene 80 B (the default tiers read the same and
  *                                                  stay under 128)
+ *   a double stored in a module variable in the    the wrenna spend scene, 32 B (two boxes a
+ *     `spendBase` branch of exFor (#281)           think)
  *
  * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
  * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
@@ -713,31 +715,24 @@ function buildScenes(): Scene[] {
     // (the EX variant is affordable), Heartseeker ready and every other slot cooling down: the
     // spend-base test of `exFor` (stacks above 0, so the base shot) runs on every think, in the
     // run of every slot and in the choice, and E is pressed on every one. She stands (12 m is
-    // inside her stand reach). Default tiers only: in Maglev alone any scene added to this list
-    // (this one, or a copy of an existing one on main without Wrenna) leaves the two -0 pins at
-    // 32 B a think in about half the runs, a defect of this test that is not Wrenna's (#290), so
-    // the Maglev run does not cover the spendBase branch until #290 is fixed.
-    ...(MAGLEV
-      ? []
-      : [
-          scene(
-            'wrenna spend',
-            1,
-            'engage',
-            true,
-            false,
-            (state) => {
-              put(state, 1, -6, -3);
-              put(state, 2, 6, -3);
-              const me = ch(state, 1);
-              me.energy = 60;
-              me.cooldowns.fill(100);
-              me.cooldowns[SLOTS.indexOf('E')] = 0;
-              (me.counter as NonNullable<ChampionState['counter']>).count = 3;
-            },
-            configWrenna(),
-          ),
-        ]),
+    // inside her stand reach).
+    scene(
+      'wrenna spend',
+      1,
+      'engage',
+      true,
+      false,
+      (state) => {
+        put(state, 1, -6, -3);
+        put(state, 2, 6, -3);
+        const me = ch(state, 1);
+        me.energy = 60;
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('E')] = 0;
+        (me.counter as NonNullable<ChampionState['counter']>).count = 3;
+      },
+      configWrenna(),
+    ),
   ];
 }
 
