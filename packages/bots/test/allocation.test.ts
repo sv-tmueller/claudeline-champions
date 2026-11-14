@@ -162,7 +162,7 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * between the two.
  *
  * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
- * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 17 scenes, the plan
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 20 scenes, the plan
  * step 2784 B clear and 2400 to 2416 B fallback, the draw block and the dodge block 0 B, both -0
  * pins 0 B.
  *
@@ -372,6 +372,23 @@ function put(state: GameState, id: number, x: number, y: number): void {
 }
 
 /**
+ * Every scene `scene()` has made, kept for as long as the file runs, so that no bot and no state of
+ * it is ever garbage (#290). The bots' functions are shared by every bot of the process: V8 compiles
+ * `move`, `seekShot` and the rest once, and the Maglev code embeds, as weak references, objects of
+ * the bots that ran while it was made. When a major GC finds such a bot dead (a scene or a pin of
+ * an earlier test, which nothing refers to any more), it clears the reference, marks the shared code
+ * for deoptimization (`embedded weak objects cleared`) and the bot that is measured then runs `move`
+ * and `seekShot` in baseline code, which boxes two doubles a think (32 B), until V8 tiers them up
+ * again: longer than the two windows of a pin. Where that GC fell depended on how much the tests
+ * before had allocated, so one more scene moved it onto the pins in about half the runs. Left
+ * reachable, the bots of the file never die, so no GC clears anything the think path embeds.
+ * Node 26.7 in Maglev alone, 16 runs each: main with a copy of the scene `orb ignored` at its end
+ * read both -0 pins at 32 B in 6 runs; with the scenes kept, that copy at the start, in the middle
+ * and at the end read them at 0 B in all 48 (see bots.md, Allocation).
+ */
+const madeScenes: Scene[] = [];
+
+/**
  * A frozen mirror match on arena01 with the eight shipped kits (`createMatch` keeps only the kits in
  * use, so a scene of the first four is the match it always was): nothing steps inside a scene, and
  * `think` never mutates the state, so the same think repeats. Champions 0 and 3 are dead unless
@@ -392,7 +409,9 @@ function scene(
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', seed);
   arrange(state, bot);
-  return { name, state, bot, intent, presses, moves };
+  const made = { name, state, bot, intent, presses, moves };
+  madeScenes.push(made);
+  return made;
 }
 
 /** Thinks until the reaction delay has passed, so the bot acts on what it decided. */
