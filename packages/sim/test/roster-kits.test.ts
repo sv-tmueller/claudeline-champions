@@ -256,7 +256,9 @@ function catalogProblems(kit: KitDef): string[] {
   // The fix is per slot: at most one area-producing effect of an ability may leave a *lingering*
   // area, and the base and its EX must not overlap either. Two non-lingering (plain, one-hit,
   // unfused) areas are gone by the step's end and never counted twice, which is why the shipped
-  // Lumeth F may carry two of them. A one-hit `endArea` is not one of them: the walker counts it as lingering, at its lifetime-end case (issue #276). A lone lingering effect stays under the cooldown (the per-effect bound
+  // Lumeth F may carry two of them. A one-hit `endArea` is not one of them: the walker counts it
+  // as lingering, at its lifetime-end case (issue #276). A lone lingering effect stays under the
+  // cooldown (the per-effect bound
   // below), so one lingering effect per ability is the one-live-area rule within that ability
   // (roster-v2 section 0, rules 2.8). A sum of the lifetimes under the cooldown is not enough: two
   // bolts that each fly 100 ticks and leave a 79-tick area sum to 358 against the 360 cooldown yet
@@ -275,7 +277,7 @@ function catalogProblems(kit: KitDef): string[] {
   // the first windup is over, and no earlier than the first dash is over when the second ability
   // dashes too (a second dash cancels the first). There is no lower conjunct: the player picks the
   // tick of the second cast, so a first area that appears after the earliest second area is gone is
-  // still met by a later cast. E8 to E15 pin each rule against the sim in both cast orders.
+  // still met by a later cast. E8 to E17 pin each rule against the sim in both cast orders.
   const flightTicks = (effect: AbilityEffect): number => {
     if (effect.type === 'area') return 0;
     // The projectile ends `lifetimeTicks` after it spawns, so the area appears on the last of them.
@@ -1624,9 +1626,11 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     // (tick 361, or 362), when the 2-tick area is gone: the pair is accepted, and the sim agrees.
     pin(dashAndArea(0, 4, 2), dashThen(346, 15, 2), { base: null, EX: null });
     pin(dashAndArea(0, 4, 2), dashThen(346, 16, 2), { base: null, EX: null });
-    // The threshold is exact: a 3-tick EX area is still live on tick 361, where a base cast on the first tick that does not cancel meets it.
+    // The threshold is exact: a 3-tick EX area is still live on tick 361, where a base cast on the
+    // first tick that does not cancel meets it.
     pin(dashAndArea(0, 4, 2), dashThen(346, 15, 3), { base: null, EX: 361 });
-    // A base windup of 1 moves the first start that does not cancel one tick earlier, to 361, and its area meets the EX area on 362.
+    // A base windup of 1 moves the first start that does not cancel one tick earlier, to 361, and
+    // its area meets the EX area on 362.
     pin(dashAndArea(1, 4, 2), dashThen(346, 16, 3), { base: null, EX: 362 });
     // With a plain area on the base there is no dash to cancel with: the EX area is live on tick 360
     // (15 ticks) or appears on tick 361 (16 ticks), where a base cast then holds two.
@@ -1657,6 +1661,12 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     );
   });
 
+  it('E15 leaves the shipped Ondrel M2 accepted, and the sim holds one live area of it at every start', () => {
+    expect(catalogProblems(ondrel)).toEqual([]);
+    expect(simulate(ondrel, false)).toEqual({ peak: 1, both: undefined });
+    expect(simulate(ondrel, true)).toEqual({ peak: 1, both: undefined });
+  });
+
   /** A shot whose endArea has a fuse: the first pulse, and the live span, start `fuseTicks` later. */
   const fusedShot = (windupTicks: number, lifetimeTicks: number, durationTicks: number, fuseTicks: number): Shape => ({
     windupTicks,
@@ -1671,17 +1681,31 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     pin(fusedShot(6, 5, 290, 60), plain(0, 2), { base: null, EX: null });
     pin(fusedShot(6, 5, 291, 60), plain(0, 2), { base: 360, EX: null });
     pin(fusedShot(6, 5, 292, 60), plain(0, 2), { base: 360, EX: null });
-    // A one-hit unfused endArea lingers in the walker's model: the area of a lifetime end is live on the step it spawns, so a
-    // 20-tick flight from windup 340 puts it on tick 359 and one more tick of windup on 360, the tick
-    // the recharge appears the second area. A plain one-hit area would never be seen.
+    // A one-hit unfused endArea lingers in the walker's model: the area of a lifetime end is live
+    // on the step it spawns, so a 20-tick flight from windup 340 puts it on tick 359 and one more
+    // tick of windup on 360, the tick the recharge appears the second area. A plain one-hit area
+    // would never be seen.
     pinPair(shot(340, 20, 1), plain(0, 2), null, null);
     pinPair(shot(341, 20, 1), plain(0, 2), 360, null);
   });
 
-  it('E15 leaves the shipped Ondrel M2 accepted, and the sim holds one live area of it at every start', () => {
-    expect(catalogProblems(ondrel)).toEqual([]);
-    expect(simulate(ondrel, false)).toEqual({ peak: 1, both: undefined });
-    expect(simulate(ondrel, true)).toEqual({ peak: 1, both: undefined });
+  /** A fused `area` at the fire step: its pulse, and the end of its live span, come `fuseTicks` later. */
+  const fusedPlain = (windupTicks: number, durationTicks: number, fuseTicks: number): Shape => ({
+    windupTicks,
+    effects: [{ ...area(durationTicks), fuseTicks }],
+  });
+
+  it('E17 prices the fuse of a plain area, which is placed on the fire step, so the walker is exact', () => {
+    // A plain fused area spawns on the fire step with `fuse + duration` ticks to live, and the spawn
+    // step takes one off, so it is live on [fire, fire + fuse + duration - 1): here the walker's
+    // figure is exact, not an upper bound. From windup 10 with a 60-tick fuse a 291-tick area is last
+    // live on tick 359 and a 292-tick one on tick 360, the tick the recharge places the second area.
+    pin(fusedPlain(10, 291, 60), plain(0, 2), { base: null, EX: null });
+    pin(fusedPlain(10, 292, 60), plain(0, 2), { base: 360, EX: null });
+    // The same for a one-hit area: from windup 340 a 20-tick fuse leaves it last live on tick 359,
+    // a 30-tick fuse keeps it live to tick 369, across the recharge.
+    pin(fusedPlain(340, 1, 20), plain(0, 2), { base: null, EX: null });
+    pin(fusedPlain(340, 1, 30), plain(0, 2), { base: 360, EX: null });
   });
 });
 

@@ -277,8 +277,8 @@ hangs from `Arm_R`: a haft 0.05 by 0.05 by 0.40 m and a head 0.22 by 0.14 by
 and the hammer sits at y = -0.41 for two reasons: at 0.28 m the head sinks
 3.3 mm under the floor at Death key 30, and at y = -0.34 the head's y span
 equals the arm's, so from above it adds only 4 cm strips in front of and
-behind the arm. The model has 600 vertices and 288 triangles, a ground radius of
-0.4924 m and 39 780 bytes.
+behind the arm. The model has 648 vertices and 312 triangles, a ground radius of
+0.4924 m and 42 036 bytes.
 
 Wrenna's plum, (0.445, 0.093, 0.175), about `#b25674`, is the lead's decision
 for her model (issue #235). Three decimal places are needed: two give `#b35573`,
@@ -298,8 +298,8 @@ at y = 0.45: a grip 0.05 by 0.05 by 0.34 m and two limbs 0.30 and 0.24 m long,
 angled 30 degrees off it, plus one quiver 0.08 by 0.10 by 0.44 m on `Spine` at
 (-0.10, 0, 1.30). The quiver's x offset must stay small: at -0.16 m, on the back
 of the body as it lies at Death key 30, it sinks 7.3 mm under the floor (near
--0.17 m it sinks 17.2 mm). The model has 624 vertices and 300 triangles, a
-ground radius of 0.4847 m and 40 924 bytes.
+-0.17 m it sinks 17.2 mm). The model has 672 vertices and 324 triangles, a
+ground radius of 0.4847 m and 43 180 bytes.
 
 Ysmeer's night blue, (0.000, 0.060, 0.165), about `#004571`, is the lead's
 decision for her model (issue #273, accepted in batch #279). In 8-bit sRGB b

@@ -802,13 +802,14 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 - The deadlock rule's latched advance is a retreat, so a latched Quillon that a target closes on
   within 6 m blinks away. The #58 scene of the Deadlock section passes with both kit sets; the
   fallback if that ever fails is to leave the latched advance out of the trigger, but that is not a
-  narrow one: while the team is behind it would also mute every retreat escape outside `latchReach`
-  (Hargrim at 4 m with a `latchReach` of 2.5, Iron Hide, Lumeth's and others), as the mutation of
-  PR #266 showed by turning 13 rows red; a narrower fallback would have to leave out only the
-  latched case. `escapes.test.ts` pins the blink (`the escape of a latched advance`): a Quillon latched on a target 16 m off presses
-  Skip, aimed 4 m straight away, from the latched stand once the target closes to 4 m, and the row
-  goes red with the latched advance left out of the trigger, and with the latch dropped it alone
-  goes red: she flees instead of standing.
+  narrow one: while the team is not ahead it would also mute every retreat escape outside
+  `latchReach` (Hargrim at 4 m with a `latchReach` of 2.5, Iron Hide, Lumeth's and others), as the
+  mutation of PR #266 showed by turning 13 rows red; a narrower fallback would have to leave out
+  only the latched stand (a latched advance whose target is within `latchReach` with a clear shot,
+  see Deadlock). `escapes.test.ts` pins the blink (`the escape of a latched advance`): a Quillon
+  latched on a target 16 m off presses Skip, aimed 4 m straight away, from the latched stand once
+  the target closes to 4 m, and the row goes red with the latched advance left out of the trigger,
+  and with the latch dropped it alone goes red: she flees instead of standing.
 
 The held ultimate: Skerrow's Reaper's Dance and Brimwick's Grand Finale are held for a target she
 can finish or one that cannot get away (`holdF` of the row). The run of F counts only while the
