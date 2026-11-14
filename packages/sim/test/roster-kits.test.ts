@@ -1650,6 +1650,12 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     );
   });
 
+  it('E15 leaves the shipped Ondrel M2 accepted, and the sim holds one live area of it at every start', () => {
+    expect(catalogProblems(ondrel)).toEqual([]);
+    expect(simulate(ondrel, false)).toEqual({ peak: 1, both: undefined });
+    expect(simulate(ondrel, true)).toEqual({ peak: 1, both: undefined });
+  });
+
   /** A shot whose endArea has a fuse: the first pulse, and the live span, start `fuseTicks` later. */
   const fusedShot = (windupTicks: number, lifetimeTicks: number, durationTicks: number, fuseTicks: number): Shape => ({
     windupTicks,
@@ -1670,12 +1676,6 @@ describe('the roster walker’s one-live-area bound against the sim', () => {
     // would never be seen.
     pinPair(shot(340, 20, 1), plain(0, 2), null, null);
     pinPair(shot(341, 20, 1), plain(0, 2), 360, null);
-  });
-
-  it('E15 leaves the shipped Ondrel M2 accepted, and the sim holds one live area of it at every start', () => {
-    expect(catalogProblems(ondrel)).toEqual([]);
-    expect(simulate(ondrel, false)).toEqual({ peak: 1, both: undefined });
-    expect(simulate(ondrel, true)).toEqual({ peak: 1, both: undefined });
   });
 });
 
