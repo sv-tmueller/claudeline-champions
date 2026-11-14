@@ -105,12 +105,12 @@ describe('the pairings, the fills and the configs', () => {
 });
 
 describe('the shipped data', () => {
-  it('has the seven kits, sorted, and every arena', () => {
-    expect(KIT_IDS).toEqual(['brimwick', 'durnhal', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow']);
+  it('has the eight kits, sorted, and every arena', () => {
+    expect(KIT_IDS).toEqual(['brimwick', 'durnhal', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow', 'wrenna']);
     expect(DATA.arenas.map((a) => a.id)).toEqual(['arena01', 'arena02', 'arena03']);
-    expect(pairings(KIT_IDS)).toHaveLength(21);
-    // 5 fills in each 2v2 pairing and 20 in each 3v3 pairing.
-    expect(configs(KIT_IDS)).toHaveLength(21 * (5 + 20));
+    expect(pairings(KIT_IDS)).toHaveLength(28);
+    // 6 fills in each 2v2 pairing and 30 in each 3v3 pairing.
+    expect(configs(KIT_IDS)).toHaveLength(28 * (6 + 30));
   });
 
   it('loads the orb point of every arena, so each cell plays the standard match', () => {
@@ -162,6 +162,10 @@ describe('the seed schedule', () => {
 
   it('is 40 and 10 at seven kits', () => {
     expect(seedSchedule(7)).toEqual({ '2v2': 40, '3v3': 10 });
+  });
+
+  it('is 32 and 6 at eight kits', () => {
+    expect(seedSchedule(8)).toEqual({ '2v2': 32, '3v3': 6 });
   });
 });
 
