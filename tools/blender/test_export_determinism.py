@@ -3,8 +3,8 @@
 These tests run the generators in Blender, so they skip when Blender is not
 installed. They exist because `bmesh.ops.create_uvsphere` once gave a
 different vertex order inside its faces on some runs, so one matching run
-proved nothing. Each model is built several times: the placeholder, the seven
-roster champions and every arena, four runs each. The champion files are
+proved nothing. Each model is built several times: the placeholder, every
+roster champion and every arena, four runs each. The champion files are
 rigged and carry clips, so these runs also prove the animation export is
 stable; the arena runs prove the rigged export flags left the arenas alone.
 The last two test classes need no Blender. They fail when a committed champion
@@ -31,6 +31,7 @@ CHAMPION_IDS = (
     "brimwick",
     "durnhal",
     "wrenna",
+    "ysmeer",
 )
 CHAMPIONS_DIR = REPO / "assets" / "models" / "champions"
 

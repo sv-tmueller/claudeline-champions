@@ -4,8 +4,10 @@ Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written, her kit is data (#270) and her
 model is built, her bot profile and client entry are built and she is in the
 balance harness roster (#281, step 3.4; the committed block is still the
-seven-kit report); Ysmeer's section is
-written and her kit, her fuse and end area and her model come in her own series
+seven-kit report); Ysmeer's section is written and her model is built (#273,
+roadmap step 4.2), but she has no kit, no bot profile and no select entry yet
+(roadmap step 4.3); her kit, her fuse and end area come in her own series
+(#271)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -789,7 +791,49 @@ cooldowns, the windups, the lifetime of a projectile, the radius and the
 duration of an area, the length of a fuse chosen inside the catalog, and the
 distance of a dash.
 
-**Model.** Not part of this section. Her model, colour and cue are built in
-step 4.2 of the build order, under the colour rule of v3 spec section 3:
-distinct from the six shipped champions, Durnhal, Wrenna and the HUD's
-reserved team colours.
+**Model.** Cue: two star motes, two boxes in the body material, so the accent
+still marks only the front. Each is a cube of 0.12 m turned 45 degrees about Z,
+so from the 55 degree camera it shows as a diamond, and both ride `Spine`, so
+the `Attack` yaw and the `Hit` lean carry them. One is front-left at (0.08,
+0.34, 1.74) and one back-right at (-0.08, -0.34, 1.62): a mote on each side of
+the head, one high and one low. Both stay inside the 0.5 m ground radius, at
+0.4323 m. The pose tables stay shared, with no per-champion pose. With the head
+piece below, the model's top is the front-left mote's 1.8000 m at rest, and the
+clip tops are 1.8096 m (Idle), 1.8222 m (Run), 1.8000 m (Attack), 1.8093 m
+(Cast), 1.8150 m (Hit) and 1.8281 m (Death), all under 1.90 m, with every clip's
+low at 0.0000 m. The lowest new vertex is the crown's back point at key 30 of
+`Death` (on the back, `Hips` at -85 degrees and -0.64 m), 16.7 mm above the
+floor, and the motes stay at least 62 mm up in every clip. The model is 648
+vertices, 312 triangles and 42 036 bytes, and four builds are byte-identical.
+
+Body colour: night blue, linear (0.000, 0.060, 0.165), about `#004571`. In 8-bit
+sRGB b minus g is 44, one under the overlay cap of 45, so the overlay rule
+holds (`overlay None`). The distances to the bodies are Skerrow 83.5, Quillon
+83.5, Ondrel 113.7, Durnhal 172.7, the placeholder 178.2, Wrenna 178.8, Hargrim
+183.0, Lumeth 211.7 and Brimwick 251.6; to the client colours the dead grey
+94.0, the energy orb 149.7, the ally bar 164.0, the ally projectile 222.8, the
+enemy bar 257.4, the enemy projectile 265.0, the debug overlay 299.9, the
+impact ring 295.6 and the hit flash 346.1; to the arena floor 177.9, the trim
+220.8 and the accent 287.6. The HUD, result, menu and select colours are at
+least 132.4 away (the four panels). Every pair is at least 83.5, so no
+existing margin moves, and the pair with Skerrow and Quillon is the
+second-tightest of the roster after Skerrow against the black panels at 83.1.
+Violet and indigo break the b - g rule. Gold, silver and white sit within 80 of
+the accent, the impact ring, the HUD energy colour, the hit flash or the trim,
+so night blue is the only on-theme family that passes. Two on-theme colours
+were measured and set aside: aqua `#00fed6`, nearest the ally bar and the ally
+projectile, so an enemy Ysmeer would read as ally-coloured, and pale star
+yellow `#ffffa0`, nearest the accent, so the visor would stop marking the
+front.
+
+The head piece is a star crown: three flat bars of 0.44 m by 0.08 m by 0.04 m on
+`Spine` in the body material, all centred at (0, 0, 1.69) and turned 0, +60 and
+-60 degrees about Z, which makes a six-point star with one point straight over
+the visor. The top is 1.71 m and the bottom 1.67 m, so the crown sits above the
+accent visor (which ends at 1.61 m) and the visor stays the front mark, and the
+top is far under the 1.85 m rest bound. Treated alone, the crown's ground radius
+is 0.2236 m, inside 0.5 m, so the model's 0.4323 m footprint is the motes'. The
+bar length is the number the shared `Death` clip fixes: at key 30 the crown's
+back point is 16.7 mm above the floor, and a 0.48 m bar would sink 3.3 mm. No
+box corner coincides with another box or with the body, and only Z turns are
+used.
