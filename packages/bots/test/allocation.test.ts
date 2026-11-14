@@ -690,6 +690,34 @@ function buildScenes(): Scene[] {
       },
       configOrb(),
     ),
+    // A Wrenna spend: Wrenna 12 m from a Hargrim on a clear lane, 3 counter stacks and 60 energy
+    // (the EX variant is affordable), Heartseeker ready and every other slot cooling down: the
+    // spend-base test of `exFor` (stacks above 0, so the base shot) runs on every think, in the
+    // run of every slot and in the choice, and E is pressed on every one. She stands (12 m is
+    // inside her stand reach). Default tiers only: in Maglev alone any scene added to this list
+    // (this one, or a copy of an existing one on main without Wrenna) leaves the two -0 pins at
+    // 32 B a think in about half the runs, a defect of this test that is not Wrenna's (PR #286).
+    ...(MAGLEV
+      ? []
+      : [
+          scene(
+            'wrenna spend',
+            1,
+            'engage',
+            true,
+            false,
+            (state) => {
+              put(state, 1, -6, -3);
+              put(state, 2, 6, -3);
+              const me = ch(state, 1);
+              me.energy = 60;
+              me.cooldowns.fill(100);
+              me.cooldowns[SLOTS.indexOf('E')] = 0;
+              (me.counter as NonNullable<ChampionState['counter']>).count = 3;
+            },
+            configWrenna(),
+          ),
+        ]),
   ];
 }
 
@@ -1084,59 +1112,6 @@ describe('think allocation', () => {
       put(state, 1, 3.997, -3);
       put(state, 2, 6.997, -3);
     });
-  });
-
-  // Wrenna's spend (#281): she is 12 m from a Hargrim on a clear lane with 3 counter stacks and 60
-  // energy (the EX variant is affordable), Heartseeker ready and every other slot cooling down, so
-  // the `spendBase` test of `exFor` runs on every think and E is pressed on each. She stands (12 m is
-  // inside her stand reach). It is not one of the scenes of the test above, and it runs after the two
-  // -0 pins, for a reason found on the runner: as one of those scenes it left the pins at 32 B a think
-  // in 3 of 4 runs of the Node 26.7 job (0 B in both runs without it, and 0 B on every run here).
-  // Whatever of Wrenna's think does it is Maglev's and is not isolated: this scene reads 32 B a think
-  // in Maglev alone, here and on the runner, and it reads the same with 0 stacks (the EX press), with
-  // M1 pressed instead of E, with `spendBase` empty, with Wrenna's range as Quillon's, in a mirror of
-  // four Wrenna and with the `counter` key off the champions; Quillon in the same place reads 0 B.
-  // So the bound is the 128 B of the default tiers, not the 8 B of Maglev, and the finding is in
-  // bots.md (Allocation). Maglev alone: the default tiers are settled by the windows of the test
-  // above, which this does not repeat.
-  it.runIf(MAGLEV)('allocates under the limit of the default tiers per think while Wrenna spends her counter', () => {
-    const s = scene(
-      'wrenna spend',
-      1,
-      'engage',
-      true,
-      false,
-      (state) => {
-        put(state, 1, -6, -3);
-        put(state, 2, 6, -3);
-        const me = ch(state, 1);
-        me.energy = 60;
-        me.cooldowns.fill(100);
-        me.cooldowns[SLOTS.indexOf('E')] = 0;
-        (me.counter as NonNullable<ChampionState['counter']>).count = 3;
-      },
-      configWrenna(),
-    );
-    const before = checksum(s.state);
-    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
-    const figures: number[] = [];
-    let presses = 0;
-    for (let round = 0; round < ROUNDS; round++) {
-      for (let i = 0; i < WINDOW; i++) {
-        const start = heap();
-        const input = s.bot.think(s.state);
-        deltas[i] = heap() - start;
-        if (input.buttons !== 0) presses++;
-      }
-      figures.push(median(deltas, WINDOW) - emptyPairMedian());
-    }
-    console.log(`think allocation, wrenna spend: ${figures.map((f) => Math.round(f)).join(', ')} B per think`);
-    expect(s.bot.inspect().intent).toBe('engage');
-    expect(presses, 'presses').toBe(ROUNDS * WINDOW);
-    expect(Math.min(...figures), `lowest round of the median bytes per think: ${figures.map(Math.round).join(', ')}`).toBeLessThan(
-      THINK_ALLOCATION_LIMIT_BYTES,
-    );
-    expect(checksum(s.state)).toBe(before);
   });
 
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {

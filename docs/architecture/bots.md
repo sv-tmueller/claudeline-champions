@@ -2650,17 +2650,17 @@ counter on the state the bot thought on) and a table test that works every liter
 from `wrenna.json`.
 
 The heap check got one Wrenna scene (Heartseeker with 3 stacks and 60 energy at 12 m, E pressed on
-every think, so the `spendBase` test of `exFor` runs), as its own Maglev-only test after the two
--0 pins and not among the twenty-one scenes: as a scene it left the two pins at 32 B a think in 3
-of 4 runs of the Node 26.7 job on the runner (0 B in the runs without it). A Wrenna think reads
-32 B a think in Maglev alone, here and on the runner, whichever slot she presses (E on 3 stacks, the
-EX at 0, M1), with `spendBase` empty, with Quillon's range or without the `counter` key on the
-champions, where Quillon in the same place reads 0 B: the cause is Maglev's and is not isolated.
-The default tiers read the same loads through Turbofan, and the browser runs those; the Maglev
-scene is bounded by the 128 B of the default tiers (not the 8 B of Maglev) until the cause is found.
+every think, so the `spendBase` test of `exFor` runs), a twenty-second scene of the scene test in
+the default tiers, under the same 128 B as every other scene (0 B in 3 of 3 runs). It is not in
+the Maglev run (the 8 B limit stays what it was for every scene): in Maglev alone any scene added
+to that list leaves the two -0 pins at 32 B a think in about half the runs, and this is so on main
+without Wrenna or the eight kits too (main's test with a copy of the orb ignored scene appended:
+5 of 8 runs on Node 26.7.0), so the cause is the test's and not hers. Her scene, as a test of its
+own, reads 32 B in every Maglev run. Neither reading is understood yet, and no limit is relaxed
+for them: the Maglev run does not cover her `spendBase` branch until the heap test is fixed.
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-one frozen scenes on arena 1 with the eight shipped kits (a
+section. It builds twenty-one frozen scenes (twenty-two in the default tiers: see above) on arena 1 with the eight shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
