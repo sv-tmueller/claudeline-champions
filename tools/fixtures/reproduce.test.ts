@@ -75,6 +75,7 @@ const ROWS: Row[] = [
   { kit: 'brimwick', attempt: 10, pins: [] },
   { kit: 'durnhal', attempt: 2, pins: [] },
   { kit: 'wrenna', attempt: 26, pins: [] },
+  { kit: 'ysmeer', attempt: 7, pins: [] },
 ];
 
 function committed(kit: string): string {
