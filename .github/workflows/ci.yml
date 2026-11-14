@@ -32,7 +32,10 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm run test
+      # One Vitest worker per CPU (4 on ubuntu-latest) instead of the default of CPUs minus one, so
+      # the long bots and tools files run four at a time (#285). CI only: `npm run test` keeps the
+      # default on a development machine, which has other work running.
+      - run: npm run test -- --maxWorkers=100%
       # ubuntu-latest ships python3. The Blender tests skip without Blender.
       - run: npm run assets:validate
       - run: npm run assets:test
