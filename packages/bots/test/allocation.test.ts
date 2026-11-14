@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { SLOTS, checksum, createMatch, step } from '@claudeline/sim';
-import type { ChampionState, GameState, MatchConfig } from '@claudeline/sim';
+import { SLOTS, ULTIMATE_ENERGY_COST, checksum, createMatch, step } from '@claudeline/sim';
+import type { ChampionState, GameState, MatchConfig, PlayerInput } from '@claudeline/sim';
 import { AIM_ERROR_HOLD, createBot } from '../src/bot';
 import type { Bot } from '../src/bot';
+import { computeCues, createCastCues, createKitCache, refreshKitCache } from '../src/casting';
 import { TIERS } from '../src/difficulty';
 import { createFollower, followPathInto } from '../src/follow';
 import type { PathFollower } from '../src/follow';
 import { pointBlocked } from '../src/geometry';
 import { buildNavGrid, cellCenter, cellIndexAt } from '../src/grid';
 import type { NavGrid, Vec2 } from '../src/grid';
-import { hypot2 } from '../src/hypot';
+import { createMeasure, hypot2 } from '../src/hypot';
 import type { Intent } from '../src/intent';
+import { createKiteScratch } from '../src/kite';
+import { createSightScratch } from '../src/sight';
 import type { MoveCommand } from '../src/steer';
 import {
   arena01,
@@ -164,7 +167,7 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
  * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 21 scenes, the plan
  * step 2784 B clear and 2400 to 2416 B fallback, the draw block and the dodge block 0 B, both -0
- * pins 0 B.
+ * pins and the computeCues pin 0 B.
  *
  *   mutation                                       red in, and what it reads
  *   Number.isFinite for `t - t === 0` in aim       all 16 scenes 16 B; block 240 B; both pins 16 B
@@ -194,6 +197,10 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  *                                                  stay under 128)
  *   a double stored in a module variable in the    the wrenna spend scene, 32 B (two boxes a
  *     `spendBase` branch of exFor (#281)           think)
+ *   main's computeCues, the wide-ultimate reads    the computeCues pin, 224 B in both windows
+ *     behind `cues.reserve` and a full bar (#290)
+ *   SIGHT_CLEARANCE, the import, as the else of    the computeCues pin, 16 B in both windows
+ *     the select that stores the stand clearance
  *
  * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
  * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
@@ -1070,6 +1077,34 @@ describe('think allocation', () => {
     ).toBeLessThan(DODGE_BLOCK_MAGLEV_LIMIT_BYTES);
   });
 
+  // The two windows after a change, the shape of every pin below. The scene is warmed up in the state
+  // it is built in; `change` then moves it to the case the pin is for, with nothing in between, and
+  // the two windows after it are read at once. A function that deoptimizes at the change runs in a
+  // lower tier for about 1200 thinks, which is both windows, so the lower of the two must be clean.
+  // The figure of a window is the median `heapUsed` delta of a think less the empty pair. Returns the
+  // figures and the number of thinks for which `counted` held, which a pin reads to show that its scene
+  // reaches the case it is for.
+  function windowsAfter(
+    s: Scene,
+    change: (state: GameState) => void,
+    counted: (input: PlayerInput) => boolean,
+  ): { figures: number[]; hits: number } {
+    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
+    change(s.state);
+    const figures: number[] = [];
+    let hits = 0;
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < WINDOW; i++) {
+        const before = heap();
+        const input = s.bot.think(s.state);
+        deltas[i] = heap() - before;
+        if (counted(input)) hits++;
+      }
+      figures.push(median(deltas, WINDOW) - emptyPairMedian());
+    }
+    return { figures, hits };
+  }
+
   // The first aim of -0: after a warm-up on whole-centimetre aims, a point in [-0.5, 0) cm rounds
   // to -0, and `Math.round(..) + 0` then saw its first value that is not an int32: V8 deoptimised
   // the function, and in Maglev alone the bot ran about 1200 thinks in a lower tier at 290 to
@@ -1079,19 +1114,11 @@ describe('think allocation', () => {
   // the limit (the first window alone reads 16 B in a run of this test by itself).
   // Red under `+ 0` in aim (768 B) and in landingInto (288 B), Node 26.7, Maglev alone.
   function expectNoDeoptAtMinusZero(s: Scene, move: (state: GameState) => void): void {
-    for (let i = 0; i < WARM_UP; i++) s.bot.think(s.state);
-    move(s.state);
-    const figures: number[] = [];
-    let zeros = 0;
-    for (let round = 0; round < 2; round++) {
-      for (let i = 0; i < WINDOW; i++) {
-        const before = heap();
-        const input = s.bot.think(s.state);
-        deltas[i] = heap() - before;
-        if (Object.is(input.aimX, 0) || Object.is(input.aimY, 0)) zeros++;
-      }
-      figures.push(median(deltas, WINDOW) - emptyPairMedian());
-    }
+    const { figures, hits: zeros } = windowsAfter(
+      s,
+      move,
+      (input) => Object.is(input.aimX, 0) || Object.is(input.aimY, 0),
+    );
     console.log(
       `think allocation after the move to -0, ${s.name}: ${figures.map((f) => Math.round(f)).join(', ')} B per think, ${zeros} aims of +0`,
     );
@@ -1127,6 +1154,77 @@ describe('think allocation', () => {
       put(state, 1, 3.997, -3);
       put(state, 2, 6.997, -3);
     });
+  });
+
+  // The `standClearance` that `computeCues` sets for Quillon and her acted target, read on scratch
+  // objects made here, so that reading it adds no feedback to the code the pin measures.
+  function standClearanceOf(state: GameState): number {
+    const cache = createKitCache();
+    refreshKitCache(
+      cache,
+      state.kits.find((kit) => kit.id === 'quillon'),
+      'quillon',
+    );
+    const sight = createSightScratch();
+    computeCues(
+      createCastCues(createKiteScratch()),
+      cache,
+      cache.profile,
+      'engage',
+      state,
+      ch(state, 1),
+      ch(state, 2),
+      sight,
+      createMeasure(),
+      buildNavGrid(state.arena),
+    );
+    return sight.standClearance;
+  }
+
+  // The first think at full energy with F ready (#290): a stand needs the width of F's shot when the
+  // bot could press F now (`cues.reserve` and `me.energy >= ULTIMATE_ENERGY_COST` in `computeCues`),
+  // and the load and compare behind that test were compiled without feedback, so the first think
+  // that reached them deoptimized `computeCues` and left it in baseline code, 156 B a think for about
+  // 540 ticks of the default match in Chromium. No other scene gets there: their energy is 0, 60 or
+  // 100 with F held (the Skerrow engage scene), so the branch is still cold when this pin flips it.
+  // Quillon stands 8 m from Hargrim on an open lane, inside the reach of her F (a 0.6 m shot, wider
+  // than a champion), with F ready, every other slot cooling down and herself silenced: `chooseCast`
+  // returns at once, so the energy is all that differs between the warm-up and the windows. It is
+  // warmed up at 99 and set to 100. Red with main's `computeCues` (the three reads behind the
+  // branch): 224 B a think in both windows, 3 of 3 runs, and 16 B a think with `SIGHT_CLEARANCE`
+  // itself in the select of the hoisted store (Node 26.7, Maglev alone).
+  // A scene added to the list above that reaches the branch would warm it first, and this pin
+  // could no longer fail without saying so: the check after the windows would still pass.
+  it.runIf(MAGLEV)('keeps computeCues optimised when the energy first reaches the cost of a wide ultimate', () => {
+    const s = scene('wide ultimate at full energy', 1, 'engage', false, false, (state) => {
+      put(state, 1, -4, -3);
+      put(state, 2, 4, -3);
+      const me = ch(state, 1);
+      me.energy = ULTIMATE_ENERGY_COST - 1;
+      me.cooldowns.fill(100);
+      me.cooldowns[SLOTS.indexOf('F')] = 0;
+      me.statuses.push({ type: 'silence', sourceId: 2, slot: null, remainingTicks: 600 });
+    });
+    const { figures, hits: presses } = windowsAfter(
+      s,
+      (state) => {
+        ch(state, 1).energy = ULTIMATE_ENERGY_COST;
+      },
+      (input) => input.buttons !== 0,
+    );
+    console.log(
+      `think allocation after the energy reaches the cost of F, ${s.name}: ${figures.map((f) => Math.round(f)).join(', ')} B per think, ${presses} presses`,
+    );
+    // The scene reaches the case it is for: silenced, nothing is pressed, and the clearance computeCues
+    // sets is F's 0.6 m at full energy and a champion's 0.5 m one point below it.
+    expect(presses, `${s.name}: thinks that pressed a button`).toBe(0);
+    expect(standClearanceOf(s.state), `${s.name}: stand clearance at full energy`).toBe(0.6);
+    ch(s.state, 1).energy = ULTIMATE_ENERGY_COST - 1;
+    expect(standClearanceOf(s.state), `${s.name}: stand clearance one point below`).toBe(0.5);
+    expect(
+      Math.min(...figures),
+      `${s.name}: lowest of the two windows after the change, median bytes per think: ${figures.map(Math.round).join(', ')}`,
+    ).toBeLessThan(THINK_MAGLEV_LIMIT_BYTES);
   });
 
   it('measures a counter that moves: the baseline sim step reads above the floor', () => {
