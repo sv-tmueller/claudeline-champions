@@ -584,6 +584,15 @@ const F_INDEX = SLOTS.indexOf('F');
 const EX_RESERVE_ENERGY = ULTIMATE_ENERGY_COST - EX_ENERGY_COST;
 
 /**
+ * The stand clearance of a think that could not press F now: a champion's 0.5 m. A const of this
+ * module and not `SIGHT_CLEARANCE` itself in the select of `computeCues`: Maglev loads an imported
+ * const from its module cell as a tagged number, and a select between that and the double read from
+ * the kit cache then boxes the double, 16 B a think while a wide ultimate stands in reach at full
+ * energy (the pin of allocation.test.ts, #290). This one is folded.
+ */
+const STAND_CLEARANCE = SIGHT_CLEARANCE;
+
+/**
  * Whether the slot at `index` would cast its EX variant on this think: the slot is listed in
  * `kit.ex`, has a variant with a reach band (the cache holds one only then), the champion has
  * the energy, F is not holding the energy back (`cues.reserve`, see `computeCues`), and the slot is
@@ -650,11 +659,16 @@ export function computeCues(
     (cache.baseMin[F_INDEX] as number) <= d &&
     d <= (cache.baseMax[F_INDEX] as number) - RANGE_MARGIN &&
     cues.fOk;
-  sight.standClearance = SIGHT_CLEARANCE;
-  if (cues.reserve && me.energy >= ULTIMATE_ENERGY_COST) {
-    const wide = cache.baseClearance[F_INDEX] as number;
-    if (wide > SIGHT_CLEARANCE) sight.standClearance = wide;
-  }
+  // The three reads run on every think, and the store is one. A statement that only some thinks
+  // reach is compiled without type feedback, and the first think that reaches it deoptimizes the
+  // function: this load and compare sat behind `cues.reserve` and a full bar, and a deopt there left
+  // `computeCues` in baseline code, boxing about 156 B a think, for about 540 ticks (docs/architecture/
+  // bots.md, Allocation). The reads are pure and F_INDEX is in range, so the value is the same.
+  // The else of the select is `STAND_CLEARANCE`, not the import: see there.
+  const wide = cache.baseClearance[F_INDEX] as number;
+  const full = me.energy >= ULTIMATE_ENERGY_COST;
+  const wider = wide > SIGHT_CLEARANCE;
+  sight.standClearance = cues.reserve && full && wider ? wide : STAND_CLEARANCE;
 }
 
 /**
