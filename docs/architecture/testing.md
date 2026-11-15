@@ -919,9 +919,10 @@ outside every window. A profile with other than two markers per window throws.
 
 The control, one function measured both ways (Chromium 153.0.8010.12, a scratch script, not
 committed; the same Wrenna 3v3 match on arena01 with an idle human, 150 plain windows of 30 frames
-and then 32 measured, `dodgeInto` bytes in the 32 windows): with a session per window, 32
-collections, `dodgeInto` read 41 268, 48 384 and 67 584 B in windows 3, 4 and 5 and 24 B in three
-others, 0 B in the other 26; with one session, 1 collection (the stop), 0 B in all 32 windows.
+and then 32 measured, `dodgeInto` bytes in the 32 windows, 3 runs of each): with a session per
+window, 32 collections, `dodgeInto` read 40 332 to 41 316, 46 428 to 48 384 and 67 584 to 69 600 B
+in windows 3, 4 and 5, and 24 B in three or four others, 0 B in the rest; with one session, 1
+collection (the stop, traced once), 0 B in all 32 windows of all 3 runs.
 The totals of the windows agree to a few percent (330 to 880 KB: the sweep files and
 three's render). The two scenes read the same functions in the same ranges before and after (live:
 counted code 336 to 708 B and bots 2.9 to 8.3 KB a window, `splitPath`, `plan`, `cellCenter`,
