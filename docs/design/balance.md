@@ -103,7 +103,12 @@ Sources:
   and Durnhal (#204, his kit as data) joined them at step 1.3 of roadmap #176
   (#244), so the 126 cells, the 25 200 matches and the block of section 4 are
   those of seven kits on three arenas (arena03 of #238); with Wrenna and Ysmeer the full
-  run is 216 cells and 39 312 matches. The harness plays the
+  run is 216 cells and 39 312 matches. For the nine-kit report: Ysmeer's bot did not reach 100
+  energy in any match with flow measured for #307 (the 16 cells of her bot test, played without the
+  orb, and 44 matches of the tester at normal and hard, energy at most 80), so her Supernova is not
+  played in those matches, and her EX casts spend the bar first. How it is in the harness's matches,
+  which have the orb, is not measured. It is a bot-tuning question for that report, not a kit number.
+  The harness plays the
   standard match, so every cell sets the arena's orb point (`data/orbs.json`,
   spec section 6): the block of section 4 is the seven-kit one with the orb on
   and section 5.12 reads what the orb moved.

@@ -227,11 +227,13 @@ part 3). The roster is frozen at nine (roadmap, 2026-11-13), so the champion row
 panel and the menu is one line of nine, the final case: the entries take 0.8u of horizontal
 padding (1.2u for the arena, team and difficulty entries) and the row a gap of 1.0u (1.5u), in
 `select.css`, `result.css` and `menu.css`. At 1280 x 720 the select panel is 1216 x 665 px with a
-row of 1114 px, the result panel 1208 x 679 and the menu's select 1260 x 666, so the panels keep their
+row of 1114 px, the result panel 1208 x 679 (a row of 1106 px) and the menu's select 1208 x 666 (the same row), so the panels keep their
 heights (a 3x3 grid would have added at least 104 px to panels with 56 and 40 px to spare). `e2e`
 (`expectChampionRowFits` in `support.ts`, called by `select.spec`, `match-end.spec` and `menu.spec`)
 measures that the nine entries are on one line, inside the panel's padding, and the panel inside
-the viewport; a tenth entry would need the grid or a two-column panel. `ENEMY_ROSTER` and the
+the viewport, and that the row's gap and the entries' padding are the tight ones, not a shared
+rule's (the rules of the champion row come after the shared ones in all three files, since a later
+rule of the same specificity wins); a tenth entry would need the grid or a two-column panel. `ENEMY_ROSTER` and the
 sandbox roster hold none of the five, so no bot team and no probe scene plays an Ondrel, a
 Brimwick, a Durnhal, a Wrenna or a Ysmeer (a pick of any of them gets bot allies and enemies of the
 usual rows). `createMatch`

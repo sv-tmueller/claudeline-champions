@@ -1570,7 +1570,10 @@ match replays exactly from its input stream.
 - A fuse-aware lead (#307): the aim ignores `fuseTicks`, so the Falling Star and Supernova land where
   the target is (plus the capped offset) and not where it will be 0.75 or 1.5 s later; a lead over
   the fuse would predict the target's path for 45 to 90 ticks and is not measured. How her stars
-  land on a moving target is for the package that plays the nine-kit balance report.
+  land on a moving target is for the package that plays the nine-kit balance report. That package
+  also inherits a bigger gap: in every match with flow measured for #307 her bot never reached 100
+  energy (the most was 80), so Supernova, the one fused area with a stun of 1 s, was not played at all
+  (the 16 cells ran without the orb; a harness match has it). See Testing, the rules of #307.
 - A kit-derived speed for the areas: the lead uses the nominal 20 m/s for every
   area (the one-hit aimed ones cap the offset, #187; see Aim). The lingering
   areas stay nominal because their pulses walk the circle over the whole
@@ -2813,11 +2816,16 @@ the oracle, no escape is blocked, no bot stalls for more than 120 ticks, it ends
 as the longest ordinary round, and her casts fired (counted on `castFired`, not `castStarted`) are
 M1 47, M2 5, M2 EX 4, SPACE 4, Q 5, E 5, E EX 2 and R 4. It is the first of 16 candidates (the eight
 other kits on arenas 01 and 02, in roster order): all 16 end with a winner and block no escape, and 15
-fire the eight (against Hargrim on arena02 she fires no Comet EX). The ultimate never fires in a match
-with flow: energy resets to 0 at each round start and her EX casts keep the bar low (the highest of
-the four longest candidates was 80), so the cell cannot carry a start edit and a second run does, as
-Durnhal's Last Bastion does: free play with no round start, Ysmeer at 100 energy, and Supernova fires
-once, at tick 99. No pinned hash and no end tick of another kit moved.
+fire the eight (against Hargrim on arena02 she fires no Comet EX). Her ultimate did not fire in any
+match with flow that was measured, and her energy never reached 100 in one: the 16 candidate cells
+(no energy orb) and the tester's 44 matches of #307 (normal and hard tiers, 2v2 and 3v3, three arenas,
+several seeds; energy topped out at 80) read the same. Energy resets to 0 at each round start and her EX
+casts spend the bar, so in a match as the bots play it Supernova is not played. That is a question of
+bot tuning (when an EX is worth more than the road to F) for the package that plays the nine-kit
+balance report, not a property of the kit; matches with the energy orb, which the harness plays, were
+not measured for her. The cell cannot carry a start edit (the round start resets it), so a second
+run does, as Durnhal's Last Bastion does: free play with no round start, Ysmeer at 100 energy, and
+Supernova fires once, at tick 99. No pinned hash and no end tick of another kit moved.
 
 The heap check got three Ysmeer scenes as list entries after Wrenna's (the 24th to 26th of the scene
 test, which has 26 scenes after #307), each made through `scene()` with `configYsmeer()` and no think in its arrange: a star windup

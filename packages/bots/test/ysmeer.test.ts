@@ -46,11 +46,13 @@ describe('Falling Star, the fused area', () => {
     const state = scene();
     const target = state.champions[2] as ChampionState;
     expect(target.health).toBe(target.maxHealth);
+    let started = -1;
     let fired = -1;
     let hit = -1;
     let amount = 0;
     drive(state, THINKS + 200, (events) => {
       for (const e of events) {
+        if (e.type === 'castStarted' && e.championId === 0 && started < 0) started = state.tick;
         if (e.type === 'castFired' && e.championId === 0 && fired < 0) fired = state.tick;
         if (e.type === 'damage' && e.sourceId === 0 && hit < 0) {
           hit = state.tick;
@@ -59,7 +61,9 @@ describe('Falling Star, the fused area', () => {
       }
       return hit >= 0;
     });
-    expect(fired, 'the cast fires').toBeGreaterThan(0);
+    expect(started, 'the cast starts').toBeGreaterThan(0);
+    // The windup: the press starts the cast and it fires 24 ticks later.
+    expect(fired - started).toBe(24);
     // Armed on the tick the cast fires, inert for the fuse, one pulse at its end.
     expect(hit - fired).toBe(45);
     expect(amount).toBe(20);
@@ -77,8 +81,8 @@ describe('Falling Star, the fused area', () => {
 // here is a reason to report, not to move `rangeMin`.
 // The cell takes 5.1 s locally (Linux x64, Node 24.22, load average 6 to 10) and 8.8 and 8.0 s on the
 // runner (unit jobs of runs 43691427587 and 43692315600, fast runners: typecheck 15 and 16 s, Node
-// 22); the free-play run below takes 4.4 s locally and 7.3 and 8.0 s there. Twice the cell is 17.7 s,
-// but runners differ by about 1.4 (testing.md, Check suite), so on a slow one it is 25 s, above the
+// 22); the free-play run below takes 4.4 s locally and 7.3 and 8.0 s there. The slowest cell read 8.845 s, so twice it is 17.7 s,
+// but runners differ by about 1.4 (testing.md, Check suite), so on a slow one it is 24.8 s, above the
 // 20 s top of the rule: both keep the 60 s and 30 s of the long-match and start-edit precedents
 // (wrenna.test.ts, durnhal.test.ts).
 const CELL = cellOf('ysmeer', 'hargrim', 'arena01', 3629, 1072);

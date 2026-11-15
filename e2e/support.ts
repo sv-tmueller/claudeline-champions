@@ -136,6 +136,13 @@ interface ChampionRow {
   panel: Box;
   /** The panel's horizontal padding in px: a row wider than the panel's content box squeezes it. */
   padding: { left: number; right: number };
+  /**
+   * The computed column gap and horizontal entry padding of the champion row and of the arena row of the
+   * same panel, in px. The champion row is tighter than the arena row (a gap of 1.0u against 1.5u, a
+   * padding of 0.8u against 1.2u): a rule of the champion row that a later shared rule overrides leaves
+   * its own measure at the arena row's, and the row is still one line, only wider.
+   */
+  tight: { gap: number; padding: number; arenaGap: number; arenaPadding: number };
   entries: { id: string | null; box: Box }[];
 }
 
@@ -149,7 +156,21 @@ export async function readChampionRow(page: Page, panel: string): Promise<Champi
     const root = document.querySelector(selector);
     if (root === null) throw new Error(`no panel at ${selector}`);
     const style = getComputedStyle(root);
+    const px = (value: string): number => Number.parseFloat(value);
+    const row = root.querySelector('[data-part="select"]');
+    const arenaRow = root.querySelector('[data-part="arena-select"]');
+    const entry = root.querySelector('[data-champion]');
+    const arenaEntry = root.querySelector('[data-arena-id]');
+    if (row === null || arenaRow === null || entry === null || arenaEntry === null) {
+      throw new Error(`no champion row or arena row in ${selector}`);
+    }
     return {
+      tight: {
+        gap: px(getComputedStyle(row).columnGap),
+        padding: px(getComputedStyle(entry).paddingLeft),
+        arenaGap: px(getComputedStyle(arenaRow).columnGap),
+        arenaPadding: px(getComputedStyle(arenaEntry).paddingLeft),
+      },
       panel: read(root),
       padding: { left: Number.parseFloat(style.paddingLeft), right: Number.parseFloat(style.paddingRight) },
       entries: [...root.querySelectorAll('[data-part="select"] > *')].map((entry) => ({
@@ -176,6 +197,9 @@ export async function expectChampionRowFits(page: Page, panel: string, ids: read
   expect(row.panel.top, `${panel} starts inside the viewport`).toBeGreaterThanOrEqual(0);
   expect(row.panel.bottom, `${panel} ends inside the viewport`).toBeLessThanOrEqual(720);
   const first = row.entries[0];
+  // The champion row's own measures are in force: 1.0u of 1.5u for the gap, 0.8u of 1.2u for the padding.
+  expect(row.tight.gap / row.tight.arenaGap, `${panel} champion row gap against the arena row's`).toBeCloseTo(1 / 1.5, 2);
+  expect(row.tight.padding / row.tight.arenaPadding, `${panel} champion entry padding against the arena entry's`).toBeCloseTo(0.8 / 1.2, 2);
   // The panel keeps its padding: the panel is a flex item that shrinks to the viewport, so a row too
   // wide for the content box would leave the entries inside the panel but across its padding.
   const inner = { left: row.panel.left + row.padding.left, right: row.panel.right - row.padding.right };

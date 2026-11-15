@@ -392,11 +392,11 @@ above, 60 s and 30 s (the long-match precedent and the start-edit precedent of
 `durnhal.test.ts`). Locally (Linux x64, Node 24.22.3, load average 6 to 10) the cell takes 5.1 s and
 the run 4.4 s, the whole file about 10 s. On the runner (unit jobs of runs 43691427587 and 43692315600, fast
 runners: typecheck 15 and 16 s, Node 22) the cell read 8.8 and 8.0 s and the run 7.3 and 8.0 s, the file
-16.2 and 16.1 s. Twice
-the cell is 17.7 s, but runners differ by about 1.4, which makes 25 s on a slow one, above the 20 s
+16.2 and 16.1 s. The
+slowest cell read 8.845 s, so twice it is 17.7 s, but runners differ by about 1.4, which makes 24.8 s on a slow one, above the 20 s
 top of the rule, so the cell keeps its 60 s and the run its 30 s (as `wrenna.test.ts` and
 `durnhal.test.ts` do). The three sampler cases for her read 5.2, 1.6 and 1.6 s there, against
-Wrenna's 4.0, 1.7 and 1.9 s: twice 5.2 s is 10.3 s, under the 20 s of the first and the
+Wrenna's 4.0, 1.7 and 1.9 s: twice her slowest, 5.160 s, is 10.3 s, under the 20 s of the first and the
 timeouts stand.
 
 ## Test types
@@ -660,7 +660,10 @@ other spec.
   order, all available, on one line inside the panel's padding, the panel inside the 1280 x
   720 viewport (`expectChampionRowFits` of `support.ts`: the select panel measures
   1216 x 665 px with a row of 1114 px; `match-end.spec.ts` and `menu.spec.ts` call it for the
-  result panel, 1208 x 679 px, and the menu's select, 1260 x 666 px), with Hargrim, arena01, 2v2 and normal current and the
+  result panel, 1208 x 679 px with a row of 1106 px, and the menu's select, 1208 x 666 px with the same row;
+  the helper also reads the computed gap and entry padding of the champion row against the arena row's, 1.0u
+  of 1.5u and 0.8u of 1.2u, which fails when a later shared rule of the same specificity overrides them: it
+  did in `menu.css` until fix round 2 of #307, where the row measured 1157 px and the panel 1260 px), with Hargrim, arena01, 2v2 and normal current and the
   Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
   each `data-current`, leaves the address search empty and makes the Start href
   `?champion=quillon&difficulty=hard&arena=arena02&teamsize=3`. Start plays it:
