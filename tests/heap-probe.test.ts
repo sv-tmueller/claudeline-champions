@@ -258,13 +258,14 @@ describe('splitWindows', () => {
 
   it('cuts by ordinal, not by array position, when the samples arrive in another order', () => {
     const ordered = splitWindows(session(), 3);
-    // The CDP orders the ordinals, not the array: the same samples reversed, and shuffled by a fixed
-    // permutation, must give the same windows.
+    // The ordinals follow time; the array is in no set order. The same samples reversed, and shuffled
+    // by a fixed permutation, must give the same windows.
+    const base = session().samples;
     const reversed = session();
-    reversed.samples.reverse();
+    reversed.samples = [...base].reverse();
     const shuffled = session();
-    shuffled.samples = [7, 2, 12, 0, 9, 4, 11, 1, 6, 10, 3, 8, 5].map((at) => session().samples[at]!);
-    expect(shuffled.samples.map((s) => s.ordinal)).not.toEqual(session().samples.map((s) => s.ordinal));
+    shuffled.samples = [7, 2, 12, 0, 9, 4, 11, 1, 6, 10, 3, 8, 5].map((at) => base[at]!);
+    expect(shuffled.samples.map((s) => s.ordinal)).not.toEqual(base.map((s) => s.ordinal));
     expect(splitWindows(reversed, 3)).toEqual(ordered);
     expect(splitWindows(shuffled, 3)).toEqual(ordered);
   });

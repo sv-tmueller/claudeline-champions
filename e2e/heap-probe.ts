@@ -285,9 +285,8 @@ const MARKER_ELEMENTS = 1024;
 export async function openProbe(page: Page): Promise<CDPSession> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
-  // The marker function lives in the page. Its allocation survives optimization because the loop stores
-  // at a variable index, so the array escapes and the allocation is not removed. It runs twice per
-  // measured window.
+  // The marker function lives in the page. The loop stores at a variable index, which escape analysis
+  // cannot track, so the optimizer keeps the allocation. It runs twice per measured window.
   await page.evaluate(
     ({ name, elements }) => {
       const body = `return function ${name}() { const a = new Array(${elements}); for (let i = 0; i < a.length; i++) a[i] = i; return a.length; }`;
