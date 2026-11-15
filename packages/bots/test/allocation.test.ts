@@ -906,7 +906,9 @@ describe('think allocation', () => {
   // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 14.2 to 14.7 s on a Linux host with Node 22.23.3
   // (the `{ slot, ex }` mutation of bots.md, all 23 scenes at the cap; main's file reads 14.3 to
   // 14.6 s there, so the time is not this change's), inside it. The heap jobs (Node 24 and 26, both tiers)
-  // read 3.6 to 5.3 s.
+  // read 3.6 to 5.3 s. With Ysmeer's three scenes (26 scenes, #307): 6.7 s in the unit job (run
+  // 43691427587, a fast runner, Node 22) and 2.9 to 3.3 s in the heap jobs; twice 6.7 s is 13.4 s, so
+  // the 20 s stays.
   it('allocates under the limit per think in every scene', { timeout: 20_000 }, () => {
     const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
     const scenes = buildScenes();

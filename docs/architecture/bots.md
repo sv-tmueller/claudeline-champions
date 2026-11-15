@@ -2808,7 +2808,8 @@ the speed of a projectile spec that has an `endArea` key) and a dodge over an en
 scene with the roles turned: the bot is the Quillon of team B and the second of two bolts carries an
 `endArea`, so the threat scan reads two shapes of projectile entity; `spawnBolt` has an `endArea`
 option). They read 0 B a think in the default tiers on Node 24 in 3 of 3 local runs and on Node 26.7.0 in both
-tiers in 3 of 3, under the unchanged 128 B and 8 B. A six-double object kept in a module variable in
+tiers in 3 of 3, and in CI (run 43691427587: the unit job on Node 22, the heap jobs on Node 24 and on
+Node 26.7.0 in both tiers) in each of the three rounds, under the unchanged 128 B and 8 B. A six-double object kept in a module variable in
 the capped branch of `aim`'s area loop reads 88 B in the star windup scene (and in Brimwick's windup
 scene, which takes the same branch): red in Maglev alone, under the 128 B of the default tiers.
 

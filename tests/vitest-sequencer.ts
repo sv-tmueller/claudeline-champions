@@ -9,19 +9,23 @@ import type { TestSpecification } from 'vitest/node';
 // the unit job of main's PR #288 (job 132439224766), except that the bots heap
 // check goes first: it has always run first, and its readings depend on the
 // load around it (#290). A file that passes 10 s on a slow runner is added at
-// its place. docs/architecture/testing.md, Check suite, has the rule.
+// its place. docs/architecture/testing.md, Check suite, has the rule. #307 added
+// `ysmeer.test.ts` (16.2 s in the unit job of run 43691427587) between the loopback and the Wrenna
+// file, and moved the balance CLI's file to second: with nine kits its CLI row reads 152 s, above
+// `durnhal.test.ts` (120 s), so it is the slowest file after the heap check.
 export const SLOW_FIRST: readonly string[] = [
   'packages/bots/test/allocation.test.ts',
+  'tools/balance/run.test.ts',
   'packages/bots/test/durnhal.test.ts',
   'packages/bots/test/ondrel.test.ts',
   'tools/balance/harness.test.ts',
-  'tools/balance/run.test.ts',
   'packages/client/src/clip-sampler.test.ts',
   'packages/bots/test/lumeth.test.ts',
   'packages/bots/test/brimwick.test.ts',
   'packages/bots/test/headless-kits.test.ts',
   'packages/bots/test/orb-match.test.ts',
   'packages/server/test/loopback.test.ts',
+  'packages/bots/test/ysmeer.test.ts',
   'packages/bots/test/wrenna.test.ts',
   'tools/fixtures/reproduce.test.ts',
   'packages/sim/test/roster-fixtures.test.ts',
