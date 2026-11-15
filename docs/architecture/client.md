@@ -132,9 +132,9 @@ in the menu. The listener is event code, not frame path.
 Two keys are not game input. F3 toggles the debug overlay. F4 fires a debug
 shot from the local champion towards the aim point, and Shift+F4 spawns a fused
 one-hit area at the aim point (fuse 90 ticks, radius 2.5 m, 30 damage to the
-enemy team, through `debug.spawnArea`): no champion in the client's select has a
-fuse (Ysmeer's kit is data since #271, but she has no select entry until
-roadmap step 4.3), so this is how `e2e/fuse.spec.ts` shows the armed look. Both
+enemy team, through `debug.spawnArea`): only Ysmeer's kit has fuses (45 ticks on her
+M2 and its EX, 90 on F; she is in the select since #307), and the sandbox plays the
+Hargrim and Quillon kits, so this is how `e2e/fuse.spec.ts` shows the armed look. Both
 are dev-only keys.
 `main.ts` imports `debug-shot.ts` behind `import.meta.env.DEV`, so a
 production build contains neither the key nor the module. No CI step checks
@@ -214,19 +214,26 @@ must not reach a production file (the dist grep).
 The kits are the files under `data/kits/`, read with an eager `import.meta.glob`
 in `main.ts`. A later kit file joins the match without a client change, reached
 by `?champion=<id>` on the placeholder model, if it has no roster entry. The
-client registers eight champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
+client registers nine champions in `ROSTER_IDS` (`roster.ts`): Hargrim, Quillon,
 Lumeth and Skerrow in the order of roster-v1.md, then Ondrel and Brimwick of
-roster-v2.md, then Durnhal and Wrenna of roster-v3.md, each with a name and a model, so
-`?champion=ondrel`, `?champion=brimwick`, `?champion=durnhal` and `?champion=wrenna` play
-their own model, health and name (batch #177, package C; Durnhal in #212; Wrenna in #281,
-the first pick whose HUD shows counter pips, three of them). The select
-shows those eight, each available once its kit file exists, so a kit without a
+roster-v2.md, then Durnhal, Wrenna and Ysmeer of roster-v3.md, each with a name and a model, so
+`?champion=ondrel`, `?champion=brimwick`, `?champion=durnhal`, `?champion=wrenna` and
+`?champion=ysmeer` play their own model, health and name (batch #177, package C; Durnhal in
+#212; Wrenna in #281, the first pick whose HUD shows counter pips, three of them; Ysmeer in
+#307, the first pick with a fused area and an end area, and the roster's last). The select
+shows those nine, each available once its kit file exists, so a kit without a
 roster entry is not on it until the client registers it (batch #147 decision 3,
-part 3). The row of eight lies inside the 1280 px viewport on one line (`select.spec`
-pins it), and a ninth entry will not fit (about 1380 px by estimate), so the one that adds
-it also wraps the row in `select.css`, `result.css` and `menu.css`. `ENEMY_ROSTER` and the
-sandbox roster hold none of the four, so no bot team and no probe scene plays an Ondrel, a
-Brimwick, a Durnhal or a Wrenna (a pick of any of them gets bot allies and enemies of the
+part 3). The roster is frozen at nine (roadmap, 2026-11-13), so the champion row of the select, the result
+panel and the menu is one line of nine, the final case: the entries take 0.8u of horizontal
+padding (1.2u for the arena, team and difficulty entries) and the row a gap of 1.0u (1.5u), in
+`select.css`, `result.css` and `menu.css`. At 1280 x 720 the select panel is 1216 x 665 px with a
+row of 1114 px, the result panel 1208 x 679 and the menu's select 1260 x 666, so the panels keep their
+heights (a 3x3 grid would have added at least 104 px to panels with 56 and 40 px to spare). `e2e`
+(`expectChampionRowFits` in `support.ts`, called by `select.spec`, `match-end.spec` and `menu.spec`)
+measures that the nine entries are on one line, inside the panel's padding, and the panel inside
+the viewport; a tenth entry would need the grid or a two-column panel. `ENEMY_ROSTER` and the
+sandbox roster hold none of the five, so no bot team and no probe scene plays an Ondrel, a
+Brimwick, a Durnhal, a Wrenna or a Ysmeer (a pick of any of them gets bot allies and enemies of the
 usual rows). `createMatch`
 validates the kits, and a bad kit file shows up as a page error. The arenas work
 the same way: every file under `data/arenas/` goes through `parseArenaDef` (a
@@ -331,8 +338,8 @@ sim steps first and the views read its state afterwards.
   heap-probe window plays a fused area, so that path is not measured. The
   armed look ends in the step of the first `areaTick`, and a fused one-hit area,
   which pulses and expires in that step, is released from the armed look to
-  nothing. No champion in the client's select has a fuse yet (Ysmeer's does, from
-  #271, and joins the select at roadmap step 4.3); `entity-views-fuse.test.ts`
+  nothing. Only Ysmeer's kit has fuses (#271; she is in the select since #307, and no e2e
+  plays her cast); `entity-views-fuse.test.ts`
   plays the armed look on the real sim and `e2e/fuse.spec.ts` (`fuse.png`) in
   the browser. The pool of 16 covers the most Ondrel has alive, five, since each
   lingering duration is shorter than its slot's cooldown (roster-v2.md section
@@ -531,7 +538,7 @@ to its next passing key, holds there while the weight fades, and the feet stay
 at or above the floor. `clip-sampler.test.ts` samples every transition (every
 stop phase of Run at four speeds and both directions, every overlay at every
 offset over Idle and Run, interrupts, Death from every state, a dash, the snap)
-for all nine models (Wrenna's passes the same pins, under 1.91 m), and the lowest skinned vertex stays at or above -1e-4 m
+for all ten models (Wrenna's and Ysmeer's pass the same pins, under 1.91 m), and the lowest skinned vertex stays at or above -1e-4 m
 (the lowest figure is -9e-15 m). The highest stays under 1.91 m: every
 transition reaches 1.735 m on the three plain models, 1.8695 m on Lumeth,
 1.8758 m on Ondrel, 1.8641 m on Brimwick and

@@ -70,10 +70,11 @@ describe('Falling Star, the fused area', () => {
 // One seeded 2v2 of the cell format of durnhal.test.ts: Ysmeer and Quillon (the filler of a cell
 // against a Hargrim) against Hargrim and Quillon on arena01, on the nine shipped kits. The cell is
 // the first of the 16 candidates, the eight other kits on the two arenas in roster order (Hargrim,
-// Quillon, Lumeth, Skerrow, Ondrel, Brimwick, Durnhal, Wrenna; arena01 then arena02), and all 16
-// end with a winner, with no stall and no blocked escape, and fire the eight abilities below.
-// It is the first, so it is the one the rule of the plan picks. Seeds: bots 101 to 104 on normal
-// tiers, match seed 7 (`six-cells.ts`). A stall here is a reason to report, not to move `rangeMin`.
+// Quillon, Lumeth, Skerrow, Ondrel, Brimwick, Durnhal, Wrenna; arena01 then arena02), and so the
+// one the rule of the plan picks: all 16 end with a winner (30 000 ticks allowed), pass the press
+// oracle and block no escape, and 15 fire the eight abilities below (against Hargrim on arena02 she
+// fires no Comet EX). Seeds: bots 101 to 104 on normal tiers, match seed 7 (`six-cells.ts`). A stall
+// here is a reason to report, not to move `rangeMin`.
 const CELL = cellOf('ysmeer', 'hargrim', 'arena01', 3629, 1072);
 
 /** Her tallies in the cell: the casts that fired, by slot, and the EX ones apart. */

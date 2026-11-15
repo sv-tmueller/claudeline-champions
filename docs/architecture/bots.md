@@ -203,7 +203,7 @@ Kite movement, from the acted intent, with `rangeMin` from the profile:
 
 Profiles live in `packages/bots/src/profile.ts`, keyed by champion id:
 `profileFor(championId, kit?)`. Without a kit the table applies. Hargrim, Quillon,
-Skerrow, Lumeth, Ondrel, Brimwick, Durnhal and Wrenna have a rule: with a kit whose id
+Skerrow, Lumeth, Ondrel, Brimwick, Durnhal, Wrenna and Ysmeer have a rule: with a kit whose id
 equals the champion id, `rangeMax` is the top of the base M1 reach band minus the 1 m range
 margin (see Casting), and `rangeMin` is the rule's literal, because no kit field
 holds it: roster-v1 words it as backing away from an enemy inside 6 m (Hargrim
@@ -215,7 +215,9 @@ so her `rangeMax` with her kit is 11; Ondrel's reaches 10 m (20 m/s for 30
 ticks), so hers is 9, and Brimwick's 11 m (33 ticks), so hers is 10, the
 roster's 9 and 10, and Wrenna's 14 m (24 m/s for 35 ticks), so hers is 13 (roster-v3 has no bot
 sketch for her, so her 10 to 13 m follows roster-v2's recipe: the low end of her intended 10 to
-14 m, and Longbow's reach less the margin). `KitDef` has no profile field and `createMatch` copies only
+14 m, and Longbow's reach less the margin), and Ysmeer's 11 m (20 m/s for 33 ticks), so hers is 10
+(roster-v3 has no bot sketch for her either: her 8 to 10 m is the low end of her intended 8 to 12 m and
+Starbolt's reach less the margin). `KitDef` has no profile field and `createMatch` copies only
 the kit contract, so profiles stay in bots; the kit JSON must carry no bot
 fields.
 
@@ -229,6 +231,7 @@ fields.
 | brimwick | 7        | 10       | M1 band top minus 1 m | burst caster, kites inside 7 m      |
 | durnhal  | 0        | 3.5      | M1 band top minus 1 m | guardian, closes in and never kites |
 | wrenna   | 10       | 13       | M1 band top minus 1 m | marksman, kites inside 10 m         |
+| ysmeer   | 8        | 10       | M1 band top minus 1 m | star caster, kites inside 8 m       |
 | default  | 4        | 8        | the table             | any other champion id               |
 
 Every `rangeMax` exceeds 1 m, so a bot never needs to stand inside another
@@ -265,7 +268,7 @@ condition as `KIT_RULES`: a kit of the champion's own id) adds what no kit field
 holds. Roster-v1's bot profile sketches are its source, and for Ondrel and
 Brimwick roster-v2's (sections 2 and 3); see Openers and escapes for what each
 row means. A row also has `escapeWithin`: null for Hargrim, Quillon, Skerrow,
-Ondrel, Brimwick, Durnhal and Wrenna, who keep the common escape trigger, and 3 for Lumeth, whose
+Ondrel, Brimwick, Durnhal, Wrenna and Ysmeer, who keep the common escape trigger, and 3 for Lumeth, whose
 trigger is her own; `allies`, the slots the champion presses at an ally
 (Lumeth's F, R, M2 and M1, the others none: see Ally slots under Casting); and
 `escapeOnly`, the escape slots the walk never presses on their own band (Durnhal's
@@ -284,6 +287,7 @@ of #281).
 | brimwick | Q (Flash Powder), kit band, target walking toward her                                                                                                 | SPACE (Flare Step), then R (Smoke Pot)                  | held for a low or cornered target |
 | durnhal  | E (Breaker Throw), kit band, target walking away                                                                                                      | SPACE (Bulwark Charge), then R (Aegis Line)             | pressed in reach                  |
 | wrenna   | Q (Pinning Shot), kit band, target walking toward her                                                                                                 | SPACE (Tumble), then R (Fade Step)                      | pressed in reach                  |
+| ysmeer   | none                                                                                                                                                  | SPACE (Drift), then R (Eclipse)                         | pressed in reach                  |
 | other    | none                                                                                                                                                  | none                                                    | pressed in reach                  |
 
 ### Dodge
@@ -512,6 +516,12 @@ one. A target is in reach when `band.min <= d <= band.max - RANGE_MARGIN`, both
 ends inclusive, with `d` the centre distance and `RANGE_MARGIN` 1 m: a target
 walking away at 5.5 m/s gains 0.825 m during a 9 tick windup.
 
+Two keys of the sim add nothing to a band (#307, Ysmeer's kit): the `fuseTicks` of an area, which
+delays the hit and does not move or resize it, and the `endArea` of a projectile, which spawns
+where the projectile ends, so it lies at the top of the band the flight already has. The Falling
+Star (M2, `aim` 11, radius 2, fuse 45) reads 13.5 m and Supernova (F, `aim` 12, radius 3.5, fuse 90)
+16 m, as unfused areas would, and Gravity Well and the Comet EX read their flights, 10 m and 12 m.
+
 Gates, copied from steps 3b to 3d of the sim's `step` and read on the state the
 bot thinks on. Step 3b counts cooldowns down, step 3c fires a windup at 1, then
 step 3d tries a new cast. For each slot, with the ability it would cast:
@@ -622,7 +632,7 @@ of a champion without a kit. The rules press three kinds of slot that have no
 band: the base dash opener (Hargrim SPACE, Skerrow SPACE: its band is derived
 from the dash), the escape slots (Hargrim R, Quillon SPACE and R, Skerrow R,
 Lumeth E and SPACE, Ondrel SPACE and R, Brimwick SPACE and R, Durnhal SPACE and R, Wrenna
-SPACE and R, on an escape think only), and the ally slots (Lumeth M2, R and F, at an ally that needs them). On
+SPACE and R, Ysmeer SPACE and R, on an escape think only), and the ally slots (Lumeth M2, R and F, at an ally that needs them). On
 an escape think the dash openers are not pressed either (see the dash hold under
 Openers and escapes). Not every escape slot is without a band: Lumeth's E,
 Ondrel's SPACE and R and Brimwick's R reach an enemy with an area around them
@@ -705,8 +715,8 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
 
 - An escape think is a think whose acted intent is retreat with the acted target within
   `ESCAPE_RANGE` = 6 m, inclusive, or kite with the acted target closer than `rangeMin`. One
-  trigger serves Hargrim, Quillon, Skerrow, Ondrel, Brimwick, Durnhal and Wrenna (their
-  `rangeMin` is 0, 6, 0, 5, 7, 0 and 10; roster-v2 words the trigger of Ondrel and Brimwick as the common
+  trigger serves Hargrim, Quillon, Skerrow, Ondrel, Brimwick, Durnhal, Wrenna and Ysmeer (their
+  `rangeMin` is 0, 6, 0, 5, 7, 0, 10 and 8; roster-v2 words the trigger of Ondrel and Brimwick as the common
   one). For Skerrow it is decision 6 of batch #80: the roster words her escape as
   "health below 50 percent", which would vanish her in the middle of an engage and walk her
   straight back in; a retreat starts below 30 percent health, unless a finisher qualifies (then
@@ -723,8 +733,9 @@ Escapes: a retreat, or a kite inside the minimum range, presses an escape slot.
   R; Quillon SPACE, then R; Skerrow R; Lumeth E, then SPACE; Ondrel SPACE, then R; Brimwick
   SPACE, then R; Durnhal SPACE, then R; Wrenna SPACE, then R (Tumble, then Fade Step: the order
   keeps Fade Step's cut of 120 ticks a stack for a Tumble that is on cooldown, and it spends all
-  her stacks). "SPACE, then R" is a priority order, not a sequence: the
-  first slot that passes the gates is pressed, and Hush Ward is pressed only when Skip is on
+  her stacks); Ysmeer SPACE, then R (Drift, then Eclipse: a dash with a landing, then a push and a
+  shield; Eclipse also has a 2.5 m band, so the walk presses it too). "SPACE, then R" is a priority
+  order, not a sequence: the first slot that passes the gates is pressed, and Hush Ward is pressed only when Skip is on
   cooldown, has no landing or is otherwise refused. The gates are the cast gates of Casting
   (windup, cooldown at most 1, stun or silence, root with a dash, the run over the cast delay). The
   slots it tried are skipped in the usual walk, so a teleport that found no landing is not pressed
@@ -1444,6 +1455,14 @@ error.
   reference-chain test of `bot.test.ts` adds the 16 and 24 m/s of Undertow and
   Flash Powder to the speeds the aim is compared at, and the areas of the six
   kits to the casts the cap is resolved from.
+- Fused areas (#307): `fuseTicks` is not read. Ysmeer's Falling Star and Supernova are one-hit
+  aim-placed areas (duration 1, interval 1), so the cap of #187 applies to them as to Firecracker: the
+  aim is the target's position plus an offset of at most half the radius, 1 m for the star and
+  1.75 m for Supernova, and the lead stays the nominal 20 m/s. During the fuse (45 and 90 ticks) a
+  target walking at 5.5 m/s covers 4.1 and 8.25 m, so a target that stands is hit (the scene of
+  `ysmeer.test.ts`: 20 damage exactly 45 ticks after the cast fires) and a target that walks leaves
+  the area. A bot that leads for the fuse is not built (see Not built yet); how her stars land is for
+  the balance package that measures her.
 - Fallback: aim at the target when `c = 0`, `a >= 0` (the target is at least as
   fast as the projectile) or `t` is not finite.
 - Error: the vector to the aim point turns by `2 atan(u)` with the rational
@@ -1528,9 +1547,13 @@ match replays exactly from its input stream.
 
 - A full match to matchEnd in the headless runs of the first three kits: they run
   a fixed 3600 ticks of free play, and only Lumeth's four seeded runs, the 18
-  cells of Ondrel and Brimwick and the 12 of Durnhal and the one of Wrenna play to the end (see Testing). A 3v3 with the six
+  cells of Ondrel and Brimwick and the 12 of Durnhal and the one each of Wrenna and Ysmeer play to the end (see Testing). A 3v3 with the six
   kits is not played in a bots test either; the balance report plays 3v3s over
   the six (`balance.md` section 5.9, #189).
+- A fuse-aware lead (#307): the aim ignores `fuseTicks`, so the Falling Star and Supernova land where
+  the target is (plus the capped offset) and not where it will be 0.75 or 1.5 s later; a lead over
+  the fuse would predict the target's path for 45 to 90 ticks and is not measured. How her stars
+  land on a moving target is for the package that plays the nine-kit balance report.
 - A kit-derived speed for the areas: the lead uses the nominal 20 m/s for every
   area (the one-hit aimed ones cap the offset, #187; see Aim). The lingering
   areas stay nominal because their pulses walk the circle over the whole
@@ -2747,8 +2770,50 @@ prototype chain changed`), and the new bot's `move` then stays in Sparkplug (sta
 Quillon in her place reads 32 B in 1 of 4 runs, and a fresh process reads 0 B. Why V8 does not tier
 `move` up there is not understood; tracked in #303.
 
+The rules of #307 (Ysmeer's profile, roadmap #176 step 4.3), pinned in `profile.test.ts`, the new
+`ysmeer.test.ts`, `headless-kits.test.ts` and `allocation.test.ts`. The profile: `PROFILES` has
+`profileOf(8, 10)` and `KIT_RULES` rangeMin 8, so with her kit rangeMax is 10 (Starbolt's 11 m less
+the margin), the stand reach and the deadlock reach 10. The rules row is `rule([], ['SPACE', 'R'],
+false)`: no opener (her stuns are fused and her pushes land at any motion, so no slot has a motion
+condition), escapes SPACE (Drift) then R (Eclipse) on the common trigger, the kite inside 8 m, no hold
+of F (a fused area of 1.5 s is no answer to low health), no wait, no ally slot, no `escapeOnly`, no
+`spendBase`. No field, no change to `casting.ts` or `bot.ts`: the architect's call, which the lead
+confirmed on #307. The bands, worked out again from `ysmeer.json` in `headless-kits.test.ts` (the kit
+band, then less the 1 m margin): M1 11 (10), M2 13.5 (12.5), M2 EX 14 (13), Q 10 (9), E and E EX 12
+(11), R 3.5 (2.5), F 16 (15); SPACE has none (a dash with no effect after it). The oracle got `NINE_SET`,
+the two escape rows (`ysmeer:SPACE` is `{ teleport: null, dash: 4, after: null }`, `ysmeer:R` follows
+it), `ysmeer:SPACE` in the dash set and a literal rangeMin 8. The frozen scenes (a hard bot, the nine
+shipped kits, each red under its mutation): a kite think at 6 m with Drift and Eclipse ready presses
+SPACE, with Drift on cooldown it presses R, and at 9 m with both ready it presses nothing (with
+SPACE dropped from the row the Drift scene and the cell are red, with the row removed both scenes,
+the cell, the free-play run and `profile.test.ts` are); the Falling Star
+pressed at a standing target at 9 m fires after its 24-tick windup and deals 20 exactly 45 ticks
+later, the fuse. The seeded cell (`ysmeer.test.ts`, played on `NINE_SET`): Ysmeer and Quillon against
+Hargrim and Quillon on arena01, seeds 101 to 104, match seed 7, normal tier, to matchEnd: it passes
+the oracle, no escape is blocked, no bot stalls for more than 120 ticks, it ends at tick 3629 with 1072
+as the longest ordinary round, and her casts fired (counted on `castFired`, not `castStarted`) are
+M1 47, M2 5, M2 EX 4, SPACE 4, Q 5, E 5, E EX 2 and R 4. It is the first of 16 candidates (the eight
+other kits on arenas 01 and 02, in roster order): all 16 end with a winner and block no escape, and 15
+fire the eight (against Hargrim on arena02 she fires no Comet EX). The ultimate never fires in a match
+with flow: energy resets to 0 at each round start and her EX casts keep the bar low (the highest of
+the four longest candidates was 80), so the cell cannot carry a start edit and a second run does, as
+Durnhal's Last Bastion does: free play with no round start, Ysmeer at 100 energy, and Supernova fires
+once, at tick 99. No pinned hash and no end tick of another kit moved.
+
+The heap check got three Ysmeer scenes as list entries after Wrenna's (the 24th to 26th of the scene
+test), each made through `scene()` with `configYsmeer()` and no think in its arrange: a star windup
+(a Falling Star frozen 12 ticks into its windup, the target strafing at 9 m: `aim` takes the capped
+branch over a fused area spec), a well press (Gravity Well pressed on every think at 8.5 m: `aim` reads
+the speed of a projectile spec that has an `endArea` key) and a dodge over an end-area bolt (the dodge
+scene with the roles turned: the bot is the Quillon of team B and the second of two bolts carries an
+`endArea`, so the threat scan reads two shapes of projectile entity; `spawnBolt` has an `endArea`
+option). They read 0 B a think in the default tiers on Node 24 in 3 of 3 local runs and on Node 26.7.0 in both
+tiers in 3 of 3, under the unchanged 128 B and 8 B. A six-double object kept in a module variable in
+the capped branch of `aim`'s area loop reads 88 B in the star windup scene (and in Brimwick's windup
+scene, which takes the same branch): red in Maglev alone, under the 128 B of the default tiers.
+
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-three frozen scenes on arena 1 with the eight shipped kits (a
+section. It builds twenty-six frozen scenes on arena 1 with the nine shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
@@ -2767,7 +2832,7 @@ both and the sidestep run on every think, an orb contest: a Hargrim 7 m from the
 orb with the orb up and the enemy far out of reach, so the nearer scan, the reach
 scan and the path to the orb run on every think, an orb ignored: a Quillon
 nearer the orb than an enemy in her reach, so the nearer scan passes and the reach
-test stops the contest on every think), warms each bot up with 20000 thinks,
+test stops the contest on every think, a Wrenna spend, and the three Ysmeer scenes above), warms each bot up with 20000 thinks,
 settles it in the default tiers (windows read like a round until one is under
 the bound, at most 20, which decide nothing: a series that falls is a late
 tier-up the settle absorbs, a series flat through the cap is a state it does not
@@ -2901,7 +2966,7 @@ back of `computeCues`' clearance on fresh scratch objects (0.6 at 100, 0.5 at 99
 scene reaches the branch. A scene added to the list that reaches the branch first would warm it and
 make the pin unable to fail. The mutation table in the header of the test
 reverts each fix of a Maglev boxing site alone, on Node 26.7 in Maglev alone,
-red in 3 of 3 runs, with the clean figures beside it (all 23 scenes at 0 B, the
+red in 3 of 3 runs, with the clean figures beside it (all 26 scenes at 0 B, the
 plan step 2784 B and 2400 to 2416 B, the blocks and the three pins 0 B). The rows added by
 #290 are `spendBase` (a double stored in a module variable: 32 B in Wrenna's scene) and
 `computeCues` (above). Re-run on the final head: the `+ 0` pins (944 and 288 B), the bare

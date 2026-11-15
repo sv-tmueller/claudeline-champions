@@ -5,9 +5,10 @@ model is built, and Wrenna's section is written, her kit is data (#270) and her
 model is built, her bot profile and client entry are built and she is in the
 balance harness roster (#281, step 3.4; the committed block is still the
 seven-kit report); Ysmeer's section is written, her kit is data (#271, roadmap
-step 4.2, the first kit with a fuse and an end area) and her model is built
-(#273), but she has no bot profile, no select entry and no place in the balance
-harness yet (roadmap step 4.3)
+step 4.2, the first kit with a fuse and an end area), her model is built (#273),
+and her bot profile and client entry are built and she is in the balance harness
+roster, the ninth kit (#307, step 4.3; the committed block is still the seven-kit
+report)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -704,8 +705,8 @@ by rules 3.1. SPACE and R carry none and earn none: R has a shield on self
 and a knockback, and a shield or a push alone gives nothing (rules 3.1). EX
 variants sit on M2 and E, never on F, at 25 energy, and F costs 100. A number
 changes in the file, here and in the scripted fixture in the same change.
-Ysmeer joins the balance harness in the last step of her series (v3 spec
-section 9.3).
+Ysmeer joined the balance harness in the last step of her series (v3 spec
+section 9.3; #307).
 
 **Range table.** The intended range of every champion, in the shape of
 [roster v2](roster-v2.md) section 1 and the closing step of spec section 5.4.
