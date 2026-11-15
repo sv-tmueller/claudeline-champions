@@ -1,14 +1,15 @@
-import { expect, test, type CDPSession, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   LIVE_ALLOCATION_LIMIT_BYTES,
   LIVE_BOTS_LIMIT_BYTES,
   PROBE_VIEWPORT,
   PROFILER_SANITY_BYTES,
-  allocationsOverAWindow,
   conclude,
   openProbe,
+  runMarkedWindow,
   runWindow,
-  type Allocations,
+  startSampling,
+  stopSampling,
 } from './heap-probe';
 import { DEFAULT_MATCH, orFail, watchProblems } from './support';
 
@@ -197,7 +198,7 @@ type PointerPoint = (typeof POINTERS)[number];
  * next press are dispatched in the page before the call returns, so the window
  * that follows samples them. The walk starts again with every round.
  */
-function createDriver(page: Page, cdp: CDPSession) {
+function createDriver(page: Page) {
   let held: readonly string[] = [];
   let round = '';
   let roundWindows = 0;
@@ -234,10 +235,10 @@ function createDriver(page: Page, cdp: CDPSession) {
       await press(hooks);
       await runWindow(page);
     },
-    /** One window under the profiler, from a read. */
-    async measure(hooks: Hooks): Promise<Allocations> {
+    /** One window between its two markers, inside the profiler session that the caller started, from a read. */
+    async measure(hooks: Hooks): Promise<void> {
       await press(hooks);
-      return allocationsOverAWindow(page, cdp);
+      await runMarkedWindow(page);
     },
   };
 }
@@ -255,7 +256,7 @@ test('the live match: the writes of a changing match allocate under the limit', 
     const cdp = await openProbe(page);
     // M1 is held to the end.
     await page.mouse.down();
-    const driver = createDriver(page, cdp);
+    const driver = createDriver(page);
 
     // The warm-up: plain windows from tick 0, reads between them only, to the first
     // round that begins after WARM_UP_TICKS.
@@ -280,11 +281,13 @@ test('the live match: the writes of a changing match allocate under the limit', 
 
     // The measured windows. Every read is kept, for the end assertions.
     const reads: Hooks[] = [hooks];
-    const windows: Allocations[] = [];
     // The pointer point each measured window started with.
     const sides: number[] = [];
+    // One profiler session for the five windows: the sampler forces a full collection when it stops, and
+    // one per window would throw the bots' optimized code back to baseline code between windows (#304).
+    await startSampling(cdp);
     for (let window = 0; window < MEASURED_WINDOWS; window++) {
-      windows.push(await driver.measure(hooks));
+      await driver.measure(hooks);
       sides.push(driver.pointer.side);
       hooks = await readHooks(page);
       console.log(
@@ -292,6 +295,7 @@ test('the live match: the writes of a changing match allocate under the limit', 
       );
       reads.push(hooks);
     }
+    const windows = await stopSampling(cdp, MEASURED_WINDOWS);
     const measured = conclude('live', test.info().repeatEachIndex, windows);
 
     // The same round, still in its round phase, with nobody dead since it began, so
