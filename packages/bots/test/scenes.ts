@@ -3,6 +3,7 @@ import type {
   ArenaDef,
   ChampionState,
   Effect,
+  EndAreaSpec,
   GameState,
   KitDef,
   MatchConfig,
@@ -197,6 +198,8 @@ export interface BoltOptions {
   effects?: readonly Effect[];
   /** Makes it an ally bolt, like Lumeth's: with empty `effects` it passes the other team. */
   allyEffects?: readonly Effect[];
+  /** The area it spawns where it ends, like Ysmeer's Gravity Well and Comet EX: the entity gets the key. */
+  endArea?: EndAreaSpec;
   /** Sweeps left, set on the projectile after the spawn. */
   remaining?: number;
   /** Champions it has hit already, set after the spawn. */
@@ -217,6 +220,7 @@ export function spawnBolt(state: GameState, options: BoltOptions): ProjectileSta
     pierce: options.pierce ?? false,
     effects: options.effects ?? [{ type: 'damage', amount: 10 }],
     ...(options.allyEffects !== undefined ? { allyEffects: options.allyEffects } : {}),
+    ...(options.endArea !== undefined ? { endArea: options.endArea } : {}),
   });
   const bolt = state.projectiles.find((p) => p.id === id) as ProjectileState;
   if (options.remaining !== undefined) bolt.remainingTicks = options.remaining;

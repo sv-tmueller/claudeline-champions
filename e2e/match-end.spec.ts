@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countPixels, orFail, watchProblems, type ColourRange } from './support';
+import { countPixels, expectChampionRowFits, orFail, watchProblems, type ColourRange } from './support';
 
 // Two tests on a dev-only time scale (`?timescale=100`, packages/client/src/dev-launch.ts):
 // the default match played to its result screen, and the ring warning in the sandbox.
@@ -43,7 +43,7 @@ const RING_BUDGET_TICKS = 8000;
 const RING_BUDGET_FRAMES = 100;
 // The human stands at (-12, 2): the ring passes it when its radius falls below sqrt(148) m.
 const HUMAN_DISTANCE_M = Math.sqrt(12 * 12 + 2 * 2);
-const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna'];
+const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna', 'ysmeer'];
 // Red pixels: the red edge is #ff4d4f at about 70 % over the dark background at its
 // rim and fainter inwards. The box keeps green and blue under 100, which an orange
 // edge (the energy colour) at that strength would pass. Anything else red in the
@@ -281,6 +281,8 @@ for (const arena of ROWS) {
 
       await page.setViewportSize(SCREENSHOT_VIEWPORT);
       await runFrames(page, 2);
+      // The champion row of the result panel is one line of nine, and the panel lies inside the viewport.
+      await expectChampionRowFits(page, '[data-result="panel"]', ROSTER);
       await page.screenshot({ path: testInfo.outputPath('result.png') });
 
       // Following a link reloads the page as that champion on the same arena and team size:

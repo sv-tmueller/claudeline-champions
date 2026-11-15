@@ -8,6 +8,7 @@ import ondrelJson from '../../../data/kits/ondrel.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
 import wrennaJson from '../../../data/kits/wrenna.json';
+import ysmeerJson from '../../../data/kits/ysmeer.json';
 import {
   Button,
   CHAMPION_RADIUS,
@@ -111,6 +112,15 @@ export function sevenKits(): KitDef[] {
  */
 export function eightKits(): KitDef[] {
   return [...sevenKits(), structuredClone(wrennaJson) as unknown as KitDef];
+}
+
+/**
+ * The nine shipped kits: `eightKits()` and the shipped Ysmeer (#307). `eightKits()` keeps its
+ * eight, so the pins that read a Ysmeer with no kit stay as they are, and `createMatch` keeps only
+ * the kits in use.
+ */
+export function nineKits(): KitDef[] {
+  return [...eightKits(), structuredClone(ysmeerJson) as unknown as KitDef];
 }
 
 function validAxis(v: number): boolean {
@@ -239,6 +249,19 @@ export function configWrenna(): MatchConfig {
     players: [
       { championId: 'hargrim', team: 'A' },
       { championId: 'wrenna', team: 'A' },
+      { championId: 'hargrim', team: 'B' },
+      { championId: 'quillon', team: 'B' },
+    ],
+  };
+}
+
+/** Hargrim and Ysmeer against Hargrim and Quillon: the controller on team A, so champion 1. */
+export function configYsmeer(): MatchConfig {
+  return {
+    teamSize: 2,
+    players: [
+      { championId: 'hargrim', team: 'A' },
+      { championId: 'ysmeer', team: 'A' },
       { championId: 'hargrim', team: 'B' },
       { championId: 'quillon', team: 'B' },
     ],

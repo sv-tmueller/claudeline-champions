@@ -52,7 +52,7 @@ first.
   test and latched stand reading a `latchReach` profile double (#222); the
   clear-shot test
   (none for a melee arc, whose press lands as the sim's arc does, #186); casting
-  from kit data with range profiles for all eight roster ids; the energy reserve;
+  from kit data with range profiles for all nine roster ids; the energy reserve;
   openers and escapes for Hargrim, Quillon and Skerrow (#81), Skerrow's wait at
   6 to 8 m and her Quiet Dart opener, and no dash pressed on an escape think for
   any kit (#98); aim leading and three tiers; the contest of the energy orb (a
@@ -77,7 +77,11 @@ first.
   `escapeOnly` field of his rule). Wrenna (#281) keeps 10 to 13 m, throws Pinning
   Shot at a target walking toward her, escapes by Tumble then Fade Step, and
   presses the base Heartseeker while her counter stands (the `spendBase` field of
-  her rule), so the stacks are spent, not left on the EX variant.
+  her rule), so the stacks are spent, not left on the EX variant. Ysmeer (#307)
+  keeps 8 to 10 m, has no opener, escapes by Drift then Eclipse and presses every
+  other slot on its kit band; the bots read neither a fuse nor an end area, so
+  her fused areas are aimed at the capped lead like any one-hit area (see
+  [bots](bots.md), Aim).
 - `client`: a 2v2 with three bots or a 3v3 with five (`?teamsize=`), on either
   arena (`main.ts` reads every file under `data/arenas`). `?champion=` picks any
   champion with a kit, `?difficulty=` picks the tier and `?arena=` picks the
@@ -110,11 +114,10 @@ first.
   profiles since #165); Durnhal's kit as data (#204) with his bot profile
   (#211); Wrenna's kit as data (#270), the first with a counter, with her bot
   profile and client entry (#281, roadmap step 3.4); Ysmeer's kit as data
-  (#271), the first with a fuse and an end area, and her model (#273), with no
-  bot profile, select entry or balance harness place yet (roadmap step 4.3), so
-  the client does not load her model until then; models for the eight roster
-  ids and the placeholder, each rigged, with six clips (the client registers and
-  plays all eight).
+  (#271), the first with a fuse and an end area, and her model (#273), with her
+  bot profile, client entry and harness place (#307, roadmap step 4.3); models
+  for the nine roster ids and the placeholder, each rigged, with six clips (the
+  client registers and plays all nine).
   The v1 kits carry the first tuning pass's two numbers, Skerrow's Rend damage
   and Lumeth's Binding Sigil radius (see [balance.md](../design/balance.md)).
 - `tools/balance`: the balance harness. `npm run balance` plays every champion
@@ -126,13 +129,12 @@ first.
   two jobs. Its unit tests are the `tools` Vitest project, and a manual workflow
   reproduces the report on a runner (see [Testing](testing.md)). It needs Node
   22.15 or later. It plays the `HARNESS_KITS` of `tools/balance/inputs.ts`
-  (eight since #281, every kit file but `ysmeer.json`, which waits for roadmap
-  step 4.3), with the standard match (the arena's orb point of
-  `data/orbs.json`): 168 cells and 31 248 matches over three arenas, at 32 seeds
-  a 2v2 config and 6 a 3v3 config. The committed block is still the
+  (nine since #307, every kit file), with the standard match (the arena's orb
+  point of `data/orbs.json`): 216 cells and 39 312 matches over three arenas,
+  at 28 seeds a 2v2 config and 4 a 3v3 config. The committed block is still the
   seven-kit report of #244 (126 cells, 25 200 matches, about 31 minutes on Apple
   silicon), so `--check` and the manual workflow fail on purpose until the
-  nine-kit report of batch 21 rewrites it.
+  nine-kit report of a later package rewrites it.
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test

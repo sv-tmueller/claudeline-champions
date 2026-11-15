@@ -11,7 +11,7 @@ const THREE_SPAWNS = { teamA: [[-12, 2], [-12, -2], [-12, 0]], teamB: [[12, 2], 
 const TWO_SPAWNS = { teamA: THREE_SPAWNS.teamA.slice(0, 2), teamB: THREE_SPAWNS.teamB.slice(0, 2) } as ArenaDef['spawns'];
 
 describe('champion select entries', () => {
-  it('lists the eight roster ids in order, with their names', () => {
+  it('lists the nine roster ids in order, with their names', () => {
     const entries = selectEntries(['hargrim', 'quillon'], 'normal', 'arena01', 2);
     expect(entries.map((entry) => [entry.id, entry.name])).toEqual([
       ['hargrim', 'Hargrim'],
@@ -22,13 +22,14 @@ describe('champion select entries', () => {
       ['brimwick', 'Brimwick'],
       ['durnhal', 'Durnhal'],
       ['wrenna', 'Wrenna'],
+      ['ysmeer', 'Ysmeer'],
     ]);
   });
 
-  it('gives eight available entries when the kit files are eight, and leaves out a kit file the client has not registered', () => {
-    const eight = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna'];
-    const entries = selectEntries([...eight, 'unregistered'], 'normal', 'arena01', 2);
-    expect(entries.map((entry) => entry.id)).toEqual(eight);
+  it('gives nine available entries when the kit files are nine, and leaves out a kit file the client has not registered', () => {
+    const nine = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna', 'ysmeer'];
+    const entries = selectEntries([...nine, 'unregistered'], 'normal', 'arena01', 2);
+    expect(entries.map((entry) => entry.id)).toEqual(nine);
     expect(entries.every((entry) => entry.available)).toBe(true);
   });
 
@@ -52,6 +53,7 @@ describe('champion select entries', () => {
     expect(entries[5]).toMatchObject({ available: false, href: null });
     expect(entries[6]).toMatchObject({ available: false, href: null });
     expect(entries[7]).toMatchObject({ available: false, href: null });
+    expect(entries[8]).toMatchObject({ available: false, href: null });
   });
 
   it('picks up a later kit file without a change', () => {

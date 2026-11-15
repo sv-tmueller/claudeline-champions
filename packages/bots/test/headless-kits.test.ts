@@ -3,8 +3,8 @@ import type { ChampionState, MatchConfig, Slot } from '@claudeline/sim';
 import type { AbilitySpec, KitDef } from '@claudeline/sim';
 import { SLOTS } from '@claudeline/sim';
 import { RANGE_MIN, WITHIN } from './escape-oracle';
-import { configMirror, configLumeth, configSkerrow, createRun, eightKits, rosterKits, sevenKits, sixKits } from './helpers';
-import { EIGHT_SET, ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, SEVEN_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
+import { configMirror, configLumeth, configSkerrow, createRun, eightKits, nineKits, rosterKits, sevenKits, sixKits } from './helpers';
+import { EIGHT_SET, ESCAPES, HELD, KIT_SETS, LUMETH_SET, MELEE, NINE_SET, SEVEN_SET, SIX_SET, TICKS, expectNoStall, play } from './press-oracle';
 import type { AllyRow, KitSet } from './press-oracle';
 
 // The death this run asserts depends on these seeds: seeds 301 to 304 give none. A miss
@@ -211,7 +211,7 @@ describe('the band and clearance tables of the shipped kits', () => {
   // Dance start with a dash and a teleport, so they are not among them.
   it('has the melee keys of the shipped kits: the abilities whose first effect is a melee arc', () => {
     const found = new Set<string>();
-    for (const kit of eightKits()) {
+    for (const kit of nineKits()) {
       for (const slot of SLOTS) {
         const spec = kit.slots[slot];
         if (spec.effects[0]?.type === 'meleeArc') found.add(`${kit.id}:${slot}`);
@@ -633,5 +633,82 @@ describe('the band and clearance tables of Wrenna', () => {
 
   it('is not a melee kit: no key of hers is in MELEE', () => {
     expect([...MELEE].filter((key) => key.startsWith('wrenna:'))).toEqual([]);
+  });
+});
+
+// Ysmeer's kit (#307), worked out again from ysmeer.json by the same rules: a bolt reaches speed
+// times lifetime over 60 (multiplied first) and its `endArea` adds nothing, the Falling Star and
+// Supernova (areas at the aim) reach range plus radius plus 0.5, and Eclipse (an area around her)
+// its radius plus 0.5. `fuseTicks` changes no band. Drift is a dash: it reaches nobody, so it has
+// no band, only an escape row.
+describe('the band and clearance tables of Ysmeer', () => {
+  const kits = nineKits();
+  const kit = kits.find((k) => k.id === 'ysmeer') as KitDef;
+  const slotOf = (key: string): AbilitySpec => {
+    const [slot, variant] = key.split(':') as [Slot, string | undefined];
+    const base = kit.slots[slot];
+    return variant === 'ex' ? (base.ex as AbilitySpec) : base;
+  };
+  const bolt = (key: string) => {
+    const effect = slotOf(key).effects[0];
+    if (effect === undefined || effect.type !== 'projectile') throw new Error(`${key} is no bolt`);
+    return effect;
+  };
+  const area = (key: string) => {
+    const effect = slotOf(key).effects[0];
+    if (effect === undefined || effect.type !== 'area') throw new Error(`${key} is no area`);
+    return effect;
+  };
+
+  it('has the reach and the shot width of every Ysmeer bolt, the end areas of Gravity Well and the Comet EX not counted', () => {
+    for (const key of ['M1', 'Q', 'E', 'E:ex']) {
+      const reach = { min: 0, max: (bolt(key).speed * bolt(key).lifetimeTicks) / 60 };
+      expect(NINE_SET.bands[`ysmeer:${key}`], key).toEqual(reach);
+      expect(NINE_SET.clearances[`ysmeer:${key}`], key).toBe(bolt(key).radius);
+    }
+    // Only Gravity Well and the Comet EX have an endArea key, and no bot reads it.
+    expect(bolt('E').endArea).toBeUndefined();
+    expect(bolt('E:ex').endArea).toBeDefined();
+    expect(bolt('Q').endArea).toBeDefined();
+  });
+
+  it('has the reach of the fused areas at the aim (Falling Star, its EX and Supernova): range plus radius plus 0.5, the fuse not counted', () => {
+    for (const key of ['M2', 'M2:ex', 'F']) {
+      const spec = area(key);
+      if (spec.placement.type !== 'aim') throw new Error(`${key} is no aim area`);
+      expect(spec.fuseTicks, `${key} is fused`).toBeGreaterThan(0);
+      expect(NINE_SET.bands[`ysmeer:${key}`], key).toEqual({ min: 0, max: spec.placement.range + spec.radius + 0.5 });
+      expect(NINE_SET.clearances[`ysmeer:${key}`], key).toBe(0.5);
+    }
+    // Held for nobody: Supernova's fuse of 1.5 s is no answer to low health.
+    expect(HELD['ysmeer:F']).toBeUndefined();
+  });
+
+  it('has the reach of Eclipse, the area around her: radius 3 plus 0.5', () => {
+    const eclipse = area('R');
+    if (eclipse.placement.type !== 'self') throw new Error('R is no self area');
+    expect(NINE_SET.bands['ysmeer:R']).toEqual({ min: 0, max: eclipse.radius + 0.5 });
+    expect(NINE_SET.clearances['ysmeer:R']).toBe(0.5);
+  });
+
+  it('has no band for Drift, and the escape rows from the kit literals', () => {
+    expect(NINE_SET.bands['ysmeer:SPACE']).toBeUndefined();
+    const drift = slotOf('SPACE').effects[0];
+    if (drift === undefined || drift.type !== 'dash') throw new Error('no dash');
+    expect(ESCAPES['ysmeer:SPACE']).toEqual({ slot: 'SPACE', teleport: null, dash: drift.distance, after: null });
+    expect(ESCAPES['ysmeer:R']).toEqual({
+      slot: 'R',
+      teleport: null,
+      after: { slot: 'SPACE', teleport: null, dash: drift.distance },
+    });
+  });
+
+  it('has the trigger of the common kind: rangeMin 8, and no trigger of her own', () => {
+    expect(RANGE_MIN['ysmeer']).toBe(8);
+    expect(WITHIN['ysmeer']).toBeUndefined();
+  });
+
+  it('is not a melee kit: no key of hers is in MELEE', () => {
+    expect([...MELEE].filter((key) => key.startsWith('ysmeer:'))).toEqual([]);
   });
 });

@@ -81,6 +81,19 @@
   text-decoration: none;
 }
 
+/*
+ * The champion row is one line of nine entries (#307): its entries are tighter than the rows of
+ * the arena, team size and difficulty, so the row and the panel fit 1280 x 720 whole. e2e/support.ts
+ * (`expectChampionRowFits`) measures it.
+ */
+#result [data-part='select'] {
+  gap: calc(var(--result-u) * 1);
+}
+
+#result [data-champion] {
+  padding: calc(var(--result-u) * 0.6) calc(var(--result-u) * 0.8);
+}
+
 #result [data-champion][data-available='false'],
 #result [data-team-size][data-available='false'] {
   opacity: 0.35;

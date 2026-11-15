@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * The address the pre-match select's Start writes for its defaults (Hargrim, normal, arena01,
@@ -121,4 +121,97 @@ export async function countPixels(
  */
 export async function waitForPhase(page: Page, phase: string, failed: Problems['failed']): Promise<void> {
   await orFail(page.waitForSelector(`canvas[data-phase="${phase}"]`), failed);
+}
+
+/** A box in CSS pixels. */
+interface Box {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** A panel with a champion row: the panel's box and the box of each champion entry, in DOM order. */
+interface ChampionRow {
+  panel: Box;
+  /** The panel's horizontal padding in px: a row wider than the panel's content box squeezes it. */
+  padding: { left: number; right: number };
+  /**
+   * The computed column gap and horizontal entry padding of the champion row and of the arena row of the
+   * same panel, in px. The champion row is tighter than the arena row (a gap of 1.0u against 1.5u, a
+   * padding of 0.8u against 1.2u): a rule of the champion row that a later shared rule overrides leaves
+   * its own measure at the arena row's, and the row is still one line, only wider.
+   */
+  tight: { gap: number; padding: number; arenaGap: number; arenaPadding: number };
+  entries: { id: string | null; box: Box }[];
+}
+
+/** Reads the box of the panel at `panel` and of each entry of its champion row (`[data-part="select"]`). */
+export async function readChampionRow(page: Page, panel: string): Promise<ChampionRow> {
+  return page.evaluate((selector) => {
+    const read = (element: Element): Box => {
+      const { left, right, top, bottom } = element.getBoundingClientRect();
+      return { left, right, top, bottom };
+    };
+    const root = document.querySelector(selector);
+    if (root === null) throw new Error(`no panel at ${selector}`);
+    const style = getComputedStyle(root);
+    const px = (value: string): number => Number.parseFloat(value);
+    const row = root.querySelector('[data-part="select"]');
+    const arenaRow = root.querySelector('[data-part="arena-select"]');
+    const entry = root.querySelector('[data-champion]');
+    const arenaEntry = root.querySelector('[data-arena-id]');
+    if (row === null || arenaRow === null || entry === null || arenaEntry === null) {
+      throw new Error(`no champion row or arena row in ${selector}`);
+    }
+    return {
+      tight: {
+        gap: px(getComputedStyle(row).columnGap),
+        padding: px(getComputedStyle(entry).paddingLeft),
+        arenaGap: px(getComputedStyle(arenaRow).columnGap),
+        arenaPadding: px(getComputedStyle(arenaEntry).paddingLeft),
+      },
+      panel: read(root),
+      padding: { left: Number.parseFloat(style.paddingLeft), right: Number.parseFloat(style.paddingRight) },
+      entries: [...root.querySelectorAll('[data-part="select"] > *')].map((entry) => ({
+        id: entry.getAttribute('data-champion'),
+        box: read(entry),
+      })),
+    };
+  }, panel);
+}
+
+/**
+ * The champion row of a panel is one line, inside the panel's padding, and the panel lies whole inside a
+ * 1280 x 720 viewport (#307: with nine champions the row has no room to wrap, so the entries are tighter,
+ * not on a second line).
+ * `ids` are the champions in order. The measured sizes are logged, rounded to a pixel.
+ */
+export async function expectChampionRowFits(page: Page, panel: string, ids: readonly string[]): Promise<void> {
+  const viewport = page.viewportSize();
+  expect(viewport).toEqual({ width: 1280, height: 720 });
+  const row = await readChampionRow(page, panel);
+  expect(row.entries.map((entry) => entry.id)).toEqual(ids);
+  expect(row.panel.left, `${panel} starts inside the viewport`).toBeGreaterThanOrEqual(0);
+  expect(row.panel.right, `${panel} ends inside the viewport`).toBeLessThanOrEqual(1280);
+  expect(row.panel.top, `${panel} starts inside the viewport`).toBeGreaterThanOrEqual(0);
+  expect(row.panel.bottom, `${panel} ends inside the viewport`).toBeLessThanOrEqual(720);
+  const first = row.entries[0];
+  // The champion row's own measures are in force: 1.0u of 1.5u for the gap, 0.8u of 1.2u for the padding.
+  expect(row.tight.gap / row.tight.arenaGap, `${panel} champion row gap against the arena row's`).toBeCloseTo(1 / 1.5, 2);
+  expect(row.tight.padding / row.tight.arenaPadding, `${panel} champion entry padding against the arena entry's`).toBeCloseTo(0.8 / 1.2, 2);
+  // The panel keeps its padding: the panel is a flex item that shrinks to the viewport, so a row too
+  // wide for the content box would leave the entries inside the panel but across its padding.
+  const inner = { left: row.panel.left + row.padding.left, right: row.panel.right - row.padding.right };
+  for (const { id, box } of row.entries) {
+    expect(box.left, `${id} starts inside the panel's padding`).toBeGreaterThanOrEqual(inner.left - 0.5);
+    expect(box.right, `${id} ends inside the panel's padding`).toBeLessThanOrEqual(inner.right + 0.5);
+    expect(box.top, `${id} is on the first line`).toBe(first?.box.top);
+  }
+  const rowWidth = (row.entries[row.entries.length - 1]?.box.right ?? 0) - (first?.box.left ?? 0);
+  console.log(
+    `${panel}: ${Math.round(row.panel.right - row.panel.left)} x ${Math.round(row.panel.bottom - row.panel.top)} px, ` +
+      `champion row ${Math.round(rowWidth)} px of ${row.entries.length} entries, ` +
+      `entries ${row.entries.map((e) => Math.round(e.box.right - e.box.left)).join(' ')} px`,
+  );
 }

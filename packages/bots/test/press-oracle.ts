@@ -18,6 +18,7 @@ import {
   jsonKits,
   kitOf,
   eightKits,
+  nineKits,
   rosterKits,
   sevenKits,
   sixKits,
@@ -115,6 +116,10 @@ export const ESCAPES: Record<string, EscapeRow> = {
   // landing, and spends the counter to cut Tumble's cooldown.
   'wrenna:SPACE': { slot: 'SPACE', teleport: null, dash: 5, after: null },
   'wrenna:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: null, dash: 5 } },
+  // Drift: a 4 m dash with a landing of its own, the first escape of Ysmeer and an escape only (no
+  // band below); Eclipse follows it, pressed only when Drift is not ready, rooted or without a landing.
+  'ysmeer:SPACE': { slot: 'SPACE', teleport: null, dash: 4, after: null },
+  'ysmeer:R': { slot: 'R', teleport: null, after: { slot: 'SPACE', teleport: null, dash: 4 } },
 };
 
 /**
@@ -327,6 +332,33 @@ const WRENNA_CLEARANCES: Record<string, number> = {
   'wrenna:F': 0.5,
 };
 
+// data/kits/ysmeer.json, in the nine-kit set only: Starbolt, Gravity Well and Comet are bolts (speed
+// times lifetime in ticks over 60; the `endArea` of Gravity Well and of the Comet EX adds nothing to
+// the reach); the Falling Star (range 11, radius 2, and 2.5 for the EX variant) and Supernova (range
+// 12, radius 3.5) are areas at the aim plus 0.5, and the fuse changes no band; Eclipse is the area
+// around her (radius 3) plus 0.5. Drift reaches nobody (a dash), so it has no band: it is pressed as
+// an escape, the row in `ESCAPES`. No slot has an opener condition.
+const YSMEER_BANDS: Record<string, Band> = {
+  'ysmeer:M1': { min: 0, max: (20 * 33) / 60 },
+  'ysmeer:M2': { min: 0, max: 11 + 2 + 0.5 },
+  'ysmeer:M2:ex': { min: 0, max: 11 + 2.5 + 0.5 },
+  'ysmeer:Q': { min: 0, max: (12 * 50) / 60 },
+  'ysmeer:E': { min: 0, max: (18 * 40) / 60 },
+  'ysmeer:E:ex': { min: 0, max: (18 * 40) / 60 },
+  'ysmeer:R': { min: 0, max: 3 + 0.5 },
+  'ysmeer:F': { min: 0, max: 12 + 3.5 + 0.5 },
+};
+const YSMEER_CLEARANCES: Record<string, number> = {
+  'ysmeer:M1': 0.25,
+  'ysmeer:M2': 0.5,
+  'ysmeer:M2:ex': 0.5,
+  'ysmeer:Q': 0.5,
+  'ysmeer:E': 0.4,
+  'ysmeer:E:ex': 0.4,
+  'ysmeer:R': 0.5,
+  'ysmeer:F': 0.5,
+};
+
 export const KIT_SETS: KitSet[] = [
   {
     // packages/bots/test/kits.ts: Quillon with speeds and lifetimes that give exact decimal
@@ -420,6 +452,15 @@ export const EIGHT_SET: KitSet = {
   clearances: { ...SEVEN_SET.clearances, ...WRENNA_CLEARANCES },
 };
 
+/** The nine shipped kits: the eight and Ysmeer's, for the runs of #307. */
+export const NINE_SET: KitSet = {
+  ...EIGHT_SET,
+  name: 'the nine shipped kits',
+  kits: nineKits,
+  bands: { ...EIGHT_SET.bands, ...YSMEER_BANDS },
+  clearances: { ...EIGHT_SET.clearances, ...YSMEER_CLEARANCES },
+};
+
 /** The pressed abilities that start with a dash, which a root skips and an escape think holds. */
 const DASHES = new Set([
   'hargrim:SPACE',
@@ -431,6 +472,7 @@ const DASHES = new Set([
   'ondrel:SPACE',
   'durnhal:SPACE',
   'wrenna:SPACE',
+  'ysmeer:SPACE',
 ]);
 
 /**

@@ -24,7 +24,8 @@ import {
   configOndrel,
   configSkerrow,
   configWrenna,
-  eightKits,
+  configYsmeer,
+  nineKits,
 } from './helpers';
 import { spawnBolt } from './scenes';
 
@@ -165,7 +166,8 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  * between the two.
  *
  * Each fix of the Maglev boxing sites, reverted alone (a mutation), on Node 26.7 in Maglev alone,
- * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 23 scenes, the plan
+ * red in 3 of 3 runs. The clean tree reads, in every run: 0 B a think in all 26 scenes (the last three,
+ * Ysmeer's, read 0 B on Node 26.7.0 in 3 of 3 runs, #307), the plan
  * step 2784 B clear and 2400 to 2416 B fallback, the draw block and the dodge block 0 B, both -0
  * pins and the computeCues pin 0 B.
  *
@@ -203,6 +205,9 @@ const MAGLEV = process.env['BOTS_HEAP_TIER'] === 'maglev';
  *     behind `cues.reserve` and a full bar (#290)
  *   SIGHT_CLEARANCE, the import, as the else of    the computeCues pin, 16 B in both windows
  *     the select that stores the stand clearance
+ *   a six-double object kept in a module           the brimwick windup and ysmeer star windup
+ *     variable in the capped branch of aim's       scenes, 88 B each (the default tiers read 88
+ *     area loop (#307)                             too, under their limit of 128)
  *
  * Two mutations stay under the limits and are not guarded: `Number.isFinite` for the final aim
  * test (`aimX - aimX === 0`) and `needsPlan`'s distance through hypot2. Both read 0 B, the clean
@@ -403,7 +408,7 @@ function put(state: GameState, id: number, x: number, y: number): void {
 const madeScenes: Scene[] = [];
 
 /**
- * A frozen mirror match on arena01 with the eight shipped kits (`createMatch` keeps only the kits in
+ * A frozen mirror match on arena01 with the nine shipped kits (`createMatch` keeps only the kits in
  * use, so a scene of the first four is the match it always was): nothing steps inside a scene, and
  * `think` never mutates the state, so the same think repeats. Champions 0 and 3 are dead unless
  * a scene needs them; the bot is `id`, on a normal tier (reaction delay 15, cast delay 8) with
@@ -419,7 +424,7 @@ function scene(
   config: MatchConfig = configMirror(),
   seed = 5,
 ): Scene {
-  const state = createMatch(config, arena01, 1, eightKits());
+  const state = createMatch(config, arena01, 1, nineKits());
   for (const dead of [0, 1, 2, 3]) if (dead !== id && dead !== 2) ch(state, dead).alive = false;
   const bot = createBot(id, 'normal', seed);
   arrange(state, bot);
@@ -750,6 +755,73 @@ function buildScenes(): Scene[] {
       },
       configWrenna(),
     ),
+    // A Ysmeer star windup: Ysmeer has pressed the Falling Star and its 24-tick cast is frozen
+    // part-way (her other slots on cooldown), the Hargrim 9 m away strafing: `aim` resolves the cap
+    // from the winding-up Falling Star (#187), a one-hit area at the aim with a fuse (`fuseTicks` is
+    // not read), and takes the capped branch on every think over a fused area spec. No press (the
+    // cast is in progress), no move (the target is inside her range of 8 to 10 m).
+    scene(
+      'ysmeer star windup',
+      1,
+      'engage',
+      false,
+      false,
+      (state) => {
+        put(state, 1, -7, -3);
+        put(state, 2, 2, -3);
+        ch(state, 2).vy = 5.5;
+        const me = ch(state, 1);
+        me.cooldowns.fill(100);
+        me.cast = { castId: 1, slot: 'M2', ex: false, windupTicks: 24, windupLeft: 12 };
+      },
+      configYsmeer(),
+    ),
+    // A Ysmeer well press: Ysmeer 8.5 m from a Hargrim on a clear lane, Gravity Well ready, energy 0
+    // and every other slot cooling down: Q is pressed on every think, and `aim` reads the speed of
+    // its projectile, a spec with an `endArea` key. She stands (8.5 m is inside her stand reach).
+    scene(
+      'ysmeer well press',
+      1,
+      'engage',
+      true,
+      false,
+      (state) => {
+        put(state, 1, -4.25, -3);
+        put(state, 2, 4.25, -3);
+        const me = ch(state, 1);
+        me.cooldowns.fill(100);
+        me.cooldowns[SLOTS.indexOf('Q')] = 0;
+      },
+      configYsmeer(),
+    ),
+    // A dodge over an end-area bolt: the dodge scene with the roles turned. The bot is the Quillon
+    // of team B (champion 3), 8 m from Ysmeer (champion 1, alive), every slot on cooldown, and two
+    // bolts of Ysmeer's team aimed at it, as in the dodge scene: the first plain and flying along an
+    // axis, the second on a diagonal and with an `endArea` key like a Gravity Well or a Comet EX, the
+    // one it steps from (seed 5: the first coin is a no and the second a yes). The threat scan reads
+    // two shapes of projectile entity on every think.
+    scene(
+      'dodge, end-area bolt',
+      3,
+      'engage',
+      false,
+      true,
+      (state) => {
+        ch(state, 1).alive = true;
+        put(state, 3, -4, -3);
+        put(state, 1, 4, -3);
+        ch(state, 3).cooldowns.fill(100);
+        spawnBolt(state, { from: [3, -3], dir: [-1, 0], owner: 1 });
+        spawnBolt(state, {
+          from: [-7, 0],
+          dir: [1, -1],
+          owner: 1,
+          endArea: { radius: 2, durationTicks: 1, intervalTicks: 1, targets: 'enemies', effects: [{ type: 'damage', amount: 14 }] },
+        });
+      },
+      configYsmeer(),
+      5,
+    ),
   ];
 }
 
@@ -834,7 +906,9 @@ describe('think allocation', () => {
   // 16.3 s, so 20 (it was 13.8 s, so 15, before the orb scenes). A red run to the cap of the settle takes 14.2 to 14.7 s on a Linux host with Node 22.23.3
   // (the `{ slot, ex }` mutation of bots.md, all 23 scenes at the cap; main's file reads 14.3 to
   // 14.6 s there, so the time is not this change's), inside it. The heap jobs (Node 24 and 26, both tiers)
-  // read 3.6 to 5.3 s.
+  // read 3.6 to 5.3 s. With Ysmeer's three scenes (26 scenes, #307): 6.7 s in the unit job (run
+  // 43691427587, a fast runner, Node 22) and 2.9 to 3.3 s in the heap jobs; twice 6.7 s is 13.4 s, so
+  // the 20 s stays.
   it('allocates under the limit per think in every scene', { timeout: 20_000 }, () => {
     const thinkLimit = MAGLEV ? THINK_MAGLEV_LIMIT_BYTES : THINK_ALLOCATION_LIMIT_BYTES;
     const scenes = buildScenes();

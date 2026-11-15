@@ -144,16 +144,15 @@ The commands and file list are in `tools/blender/README.md`.
   model is about 1.7 m tall.
 - Flat colours only. Every champion model is rigged and has six clips, which
   the client plays through its own sampler ([client](client.md#animation)).
-- Each of the eight roster ids has `champions/<id>.glb` with the placeholder's
+- Each of the nine roster ids has `champions/<id>.glb` with the placeholder's
   nodes, origin, facing, body geometry, rig, clips and accent. They differ only
   in body colour, one cue and one head piece that stay below 1.9 m, Durnhal's,
   Wrenna's and the head pieces in parts on more than one bone. The client
-  registers and loads all eight (batch #177, package C, then #212 for Durnhal
-  and #281 for Wrenna). Ysmeer's `champions/ysmeer.glb` (#273) has the same
-  parts, with a night blue body, a star crown and two star motes, and it is
-  built and committed but not loaded: her kit is data (#271), but she has no bot
-  profile, select entry or balance harness place yet, so her model waits for
-  roadmap step 4.3.
+  registers and loads all nine (batch #177, package C, then #212 for Durnhal,
+  #281 for Wrenna and #307 for Ysmeer). Ysmeer's `champions/ysmeer.glb` (#273)
+  has the same parts, with a night blue body, a star crown and two star motes; it
+  loads with her select entry (#307), and `scene-ysmeer.png` is the one in-game
+  look at it.
   `placeholder.glb` stays the generic model and has the same rig and clips, so
   every champion id has them. The ids, colours, cues and head pieces are in
   [`tools/blender/README.md`](../../tools/blender/README.md).

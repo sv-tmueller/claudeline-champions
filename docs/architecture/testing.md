@@ -23,7 +23,9 @@ CI is split by cost:
   default tiers. Wrenna's spend scene (#281) is a list entry of the scene test
   in both tiers (#290 put it back into the Maglev run), so her `spendBase`
   branch has Maglev coverage; as a test of its own after the -0 pins it would read
-  32 B, a known limit (#303). The unit job runs it on Node 22. The job has no
+  32 B, a known limit (#303). Ysmeer's three scenes (#307: a star windup over a fused
+  area, a Gravity Well press and a dodge over an end-area bolt) are list entries too, and
+  read 0 B in both tiers. The unit job runs it on Node 22. The job has no
   `needs:`, runs on drafts in parallel with the unit job and takes about half a
   minute.
   See [bots](bots.md), Testing.
@@ -55,7 +57,7 @@ file and its registration in `vitest.config.ts` and `tsconfig.tools.json`
 to it, read 4258 passed and 6 skipped in 153 files (job 132449462016): +7
 from the sequencer's test file, and no other file's count changed.
 
-- The list is every file that took 10 s or more in job 132439224766, slowest
+- The list as first written is every file that took 10 s or more in job 132439224766, slowest
   first, except that `packages/bots/test/allocation.test.ts` goes first. It has
   always run first, and its readings depend on the load around it and on what the
   tests before it allocated (a major GC inside a measured window deoptimizes the
@@ -74,6 +76,17 @@ from the sequencer's test file, and no other file's count changed.
 - The rule: a file that reads 10 s or more in a unit job, on a slow runner
   included, goes on the list at its place by time. A new champion's bot file
   (`packages/bots/test/<kit>.test.ts`) takes this check on its first CI run.
+  #307 applied it: `ysmeer.test.ts` read 16.2, 16.1 and 14.0 s in the three unit jobs of its pull
+  request (runs 43691427587, 43692315600 and 43692924665, fast runners) and sits between the loopback
+  file (23 s) and `reproduce.test.ts` (12 s). The balance CLI's file, whose one row plays 756 matches
+  with nine kits, read 154.6, 165.5 and 151.4 s (the row alone 152.4 and 163.3 s, about 229 s on a slow
+  runner, twice which is 457 s inside its 600 s), above every other file, so it moved to second place,
+  after the heap check. The rest of the list was re-ordered by the mean of those three jobs, since
+  the file times had moved since job 132439224766: harness 119 s, durnhal 118 s (harness was listed behind
+  ondrel, and clip-sampler ahead of brimwick and lumeth, before), ondrel 99 s, brimwick 79 s, lumeth 72 s, clip-sampler 70 s,
+  headless-kits 65 s, orb-match 37 s, loopback 23 s, ysmeer 15 s, reproduce 12 s, wrenna 11 s and
+  roster-fixtures 9.9 s (under 10 s in this mean, kept as it read 10.0 s in one of the three). Files within a few
+  seconds of each other swap places between runs, so the order of such neighbours is not exact.
 - The result, on the same runner speed: 2.9 workers busy in every attempt
   (2.88), against 2.6, and the job 374 and 369 s on two fast runners (Vitest 302
   and 304 s, typecheck 15 s). On slow runners the job reads 469 s (job
@@ -122,7 +135,9 @@ limit stops it. The reason:
   the trigger. Ordering saves 20 to 60 s on every runner, but the slow reading
   still sits at 509 and 510 s.
 - Each new champion adds about 65 s to the job (#281), so the 480 s trigger would
-  have fired again with the next kit.
+  have fired again with the next kit. Ysmeer's package read 400 and 404 s on fast runners (Vitest 333
+  and 336 s, typecheck 15 and 16 s; main at e335907 read 378 s on one), so about 570 s on a slow one by
+  the factor of 1.4, against the trigger of 720 s.
 
 The check name and the branch protection do not change, and no test is cut. When
 a slow-runner unit job on main passes 12 minutes again, the trigger calls for
@@ -170,10 +185,11 @@ jobs of the three green runs of PR #219 (41207597802, 41210693459,
 figures were measured at a load average of about 240 on 18 CPUs with other
 jobs running, so they are not idle figures: the seven-model idle baseline was
 1.1 to 1.8 s for the Run test, 0.34 to 0.47 s and 0.41 to 0.54 s for the two
-others. The sampler has nine models since #281 (Wrenna's): the three cases below
-gain one case each, which read 2.0, 0.62 and 0.77 s locally on Linux x64 (Node 24,
-a load average of 3 to 7) beside Durnhal's 1.9, 0.61 and 0.72 s, so the figures
-and the timeouts stand.
+others. The sampler has nine models since #281 (Wrenna's) and ten since #307 (Ysmeer's):
+the three cases below gain one case each per model, which read 2.0, 0.62 and 0.77 s
+(Wrenna) and 2.0, 0.68 and 0.83 s (Ysmeer) locally on Linux x64 (Node 24, a load average
+of 3 to 7 and then 6 to 10) beside Durnhal's 1.9, 0.61 and 0.72 s, so the figures and the
+timeouts stand.
 
 - `packages/bots/test/allocation.test.ts`, "allocates under the limit per
   think in every scene": 1.6 s locally, 2.9 to 3.9 s green, 5.7 to 5.9 s red,
@@ -187,6 +203,12 @@ and the timeouts stand.
   six-core Linux host: 3.55 to 3.75 s in the Maglev project, 3.8 to 4.0 s in the default
   tiers, and 14.2 to 14.7 s for a red run to the cap of the settle on Node 22.23.3 (the
   `{ slot, ex }` mutation; main's file reads 14.3 to 14.6 s there), so the timeout stays 20 s.
+  With Ysmeer's three scenes (the 24th to 26th, 26 scenes after #307): 4.8 s on Node 24 in the default tiers, and
+  4.6 s in Maglev and 4.8 s in the default tiers on Node 26.7.0, on a Linux host at a load
+  average of 6 to 10. The unit job (run 43691427587, b2bab13, Node 22, a fast runner) reads 6.7 s,
+  under the 10 s at which the timeout rule has no step left (6.7 s again in the second run), and the heap jobs read 2.9 s (Node 24),
+  3.0 s (Node 26.7.0, default tiers) and 3.3 s (Node 26.7.0, Maglev alone); twice 6.7 s is 13.4 s, so
+  the timeout stays 20 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
   every phase" (eight models): 2.5 to 4.0 s locally, 3.3 to
   7.2 s green, 3.3 to 8.0 s red, timeout 20 s.
@@ -365,6 +387,18 @@ The Wrenna cell (`wrenna.test.ts`, one seeded 2v2 match) read 11.0 s on the runn
 (unit job of run 43544274291, 9fe3ec7). Twice that is 22 s, above the 20 s top of
 the rule, so it keeps the 60 s timeout of the long-match precedent.
 
+The Ysmeer cell and her free-play run (`ysmeer.test.ts`, #307) have the timeouts of the cell
+above, 60 s and 30 s (the long-match precedent and the start-edit precedent of
+`durnhal.test.ts`). Locally (Linux x64, Node 24.22.3, load average 6 to 10) the cell takes 5.1 s and
+the run 4.4 s, the whole file about 10 s. On the runner (unit jobs of runs 43691427587 and 43692315600, fast
+runners: typecheck 15 and 16 s, Node 22) the cell read 8.8 and 8.0 s and the run 7.3 and 8.0 s, the file
+16.2 and 16.1 s. The
+slowest cell read 8.845 s, so twice it is 17.7 s, but runners differ by about 1.4, which makes 24.8 s on a slow one, above the 20 s
+top of the rule, so the cell keeps its 60 s and the run its 30 s (as `wrenna.test.ts` and
+`durnhal.test.ts` do). The three sampler cases for her read 5.2, 1.6 and 1.6 s there, against
+Wrenna's 4.0, 1.7 and 1.9 s: twice her slowest, 5.160 s, is 10.3 s, under the 20 s of the first and the
+timeouts stand.
+
 ## Test types
 
 - Unit tests (Vitest): sim math, collision, statuses, abilities, match flow,
@@ -407,17 +441,17 @@ the rule, so it keeps the 60 s timeout of the long-match precedent.
   and 11 903 on the bots of #213), and three of the four moved with the bots of #225, which contest
   it (5476, 5794, 7557 and 8780), so each match logs the warnings and pickups it saw. Every other client unit test is orb-off.
 - Balance harness tests (the `tools` Vitest project, `tools/**/*.test.ts`): the
-  pairings, fills and the seed schedule (32 and 6 seeds at eight kits), the cell plan (a
+  pairings, fills and the seed schedule (28 and 4 seeds at nine kits), the cell plan (a
   seven-name kit list gives 21 pairings and 126 cells over three arenas, with 5 and 20
-  fills, played by nothing; the shipped data has eight kits, 28 pairings and 6 and 30
-  fills), the orb wiring (the eight-kit roster, each arena's loaded point,
+  fills, played by nothing; the shipped data has nine kits, 36 pairings and 7 and 42
+  fills), the orb wiring (the nine-kit roster, each arena's loaded point,
   and `matchConfig` set and left out),
   `playMatch` against a reference loop with the arena orb, the aggregation and
   the report text, the
   one-mode `--check` on synthetic blocks, and the CLI's flags. They run in
   `npm run test` with the other projects and play 1 or 2 seeds, not the full
-  report; only the CLI row plays eight-kit cells (504 matches, one seed of the 2v2
-  mode, 84 rows, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
+  report; only the CLI row plays nine-kit cells (756 matches, one seed of the 2v2
+  mode, 108 rows, with the orb on; on the loaded check box the timeout is 600 s), the 3v3
   success path is a
   36-match row on the four v1 kits (with the orb, timeout 180 s; the CLI's 3v3 row at six
   kits is 360 matches, so
@@ -475,7 +509,7 @@ the rule, so it keeps the 60 s timeout of the long-match precedent.
 
 ## Balance reproduction
 
-`npm run balance` plays all 31 248 matches of the eight listed kits for the report in
+`npm run balance` plays all 39 312 matches of the nine listed kits for the report in
 [balance.md](../design/balance.md) and writes its block; `-- --check`
 regenerates the block in memory and exits 1 when it differs from the committed
 one (the head line is not compared), `-- --out <file>` writes the block to a
@@ -486,13 +520,13 @@ it needs `--out` or `--check`, and with `--check` compares that mode's cell rows
 and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
-`npm run check`: the full run of the eight kits now listed plays 31 248 matches
-(168 cells, at 32 seeds a 2v2 config and 6 a 3v3 config), about 38 minutes by
+`npm run check`: the full run of the nine kits now listed plays 39 312 matches
+(216 cells, at 28 seeds a 2v2 config and 4 a 3v3 config), about 48 minutes by
 match count on Apple silicon, not measured. It plays every kit of `HARNESS_KITS` in
 `tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
-step 1.3, #244, and Wrenna at her step 3.4, #281; Ysmeer's file, #271, waits
-for her step 4.3). Every
+step 1.3, #244, Wrenna at her step 3.4, #281, and Ysmeer at her step 4.3, #307,
+so every kit file is listed). Every
 cell plays the standard match, so it sets the arena's orb
 point from `data/orbs.json` (spec section 6).
 
@@ -506,10 +540,10 @@ orb and three arenas it is about
 about 34 (2v2) and 59 (3v3) on a runner, so the jobs have `timeout-minutes` of
 90 and 150, twice the projected check time (the failure step plays the mode
 again) and a margin. Those figures and timeouts are of the seven-kit block, which
-the document still holds: the roster is eight kits (#281), the committed block is
+the document still holds: the roster is nine kits (#307), the committed block is
 the seven-kit report, so `npm run balance -- --check` and the manual workflow fail
-on purpose (168 cells against the committed 126) until the nine-kit report of batch
-21 rewrites the block and re-sizes the jobs. The
+on purpose (216 cells against the committed 126) until the nine-kit report of a
+later package rewrites the block and re-sizes the jobs. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 
@@ -622,9 +656,14 @@ enters on a bare `/`, through a constant, so a grep for `goto('/')` finds no
 other spec.
 
 - `select.spec.ts`: the pre-match select (`select.png`, at 1280x720). On `/` the
-  panel shows and no canvas exists; the champion row is the eight roster ids in
-  order, all available, each box inside the 1280 px viewport on one line (a ninth
-  entry will not fit and needs the wrap), with Hargrim, arena01, 2v2 and normal current and the
+  panel shows and no canvas exists; the champion row is the nine roster ids in
+  order, all available, on one line inside the panel's padding, the panel inside the 1280 x
+  720 viewport (`expectChampionRowFits` of `support.ts`: the select panel measures
+  1216 x 665 px with a row of 1114 px; `match-end.spec.ts` and `menu.spec.ts` call it for the
+  result panel, 1208 x 679 px with a row of 1106 px, and the menu's select, 1208 x 666 px with the same row;
+  the helper also reads the computed gap and entry padding of the champion row against the arena row's, 1.0u
+  of 1.5u and 0.8u of 1.2u, which fails when a later shared rule of the same specificity overrides them: it
+  did in `menu.css` until fix round 2 of #307, where the row measured 1157 px and the panel 1260 px), with Hargrim, arena01, 2v2 and normal current and the
   Start href the default setup. Picking Quillon, arena02, 3v3 and Hard updates
   each `data-current`, leaves the address search empty and makes the Start href
   `?champion=quillon&difficulty=hard&arena=arena02&teamsize=3`. Start plays it:
@@ -641,16 +680,17 @@ other spec.
 - `scene.spec.ts`: the default match's HUD (`scene.png`): health, the round
   timer against the tick, the hidden result panel with its champion, arena and
   team select (every href writes `teamsize`, with 2v2 current), and the launch
-  address `?champion=quillon`. Four rows next to it, `?champion=ondrel`,
-  `?champion=brimwick`, `?champion=durnhal` and `?champion=wrenna`, read health 130 / 130,
-  120 / 120, 160 / 160 and 120 / 120, the scoreboard's row 0 name (built hidden at startup, so
-  readable without Tab) as Ondrel, Brimwick, Durnhal and Wrenna, and the champion
+  address `?champion=quillon`. Five rows next to it, `?champion=ondrel`,
+  `?champion=brimwick`, `?champion=durnhal`, `?champion=wrenna` and `?champion=ysmeer`, read health
+  130 / 130, 120 / 120, 160 / 160, 120 / 120 and 120 / 120, the scoreboard's row 0 name (built hidden at
+  startup, so readable without Tab) as Ondrel, Brimwick, Durnhal, Wrenna and Ysmeer, and the champion
   glbs the page requests (collected with `page.on('request')` before `goto`)
   as the pick's own, Quillon's and Hargrim's, with no `placeholder.glb`; they
   are red when the roster has no such id, and a missing clip is a page error
   at load. Durnhal's row also writes `scene-durnhal.png` (1280x720), the one
   in-game look at his model, and Wrenna's `scene-wrenna.png` with the HUD's counter pips
-  visible and three slots, the first e2e read of pips on a real kit. A row on `/?arena=arena02`
+  visible and three slots, the first e2e read of pips on a real kit, and Ysmeer's
+  `scene-ysmeer.png` (1280x720), the one in-game look at her model. A row on `/?arena=arena02`
   (`scene-arena02.png`) checks `data-arena` and the human's position,
   (-1100, 200), which proves the sim got arena02 and not only the hook, and
   the arena links; the row on `/?arena=arena03` (`scene-arena03.png`) does the
@@ -660,8 +700,8 @@ other spec.
   default test also reads the difficulty row (easy, normal and hard, normal
   current, the three hrefs written out). A row on
   `/?champion=quillon&difficulty=hard&arena=arena02&teamsize=3` has hard current
-  and every link of the other three rows carrying `difficulty=hard` (thirteen links:
-  eight champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
+  and every link of the other three rows carrying `difficulty=hard` (fourteen links:
+  nine champions, three arenas, two team sizes), and `/?difficulty=brutal` reads
   normal as current. The default test lists eight `data-hud` elements (the
   eighth is `scoreboard`, hidden and not displayed) and reads
   `data-silenced="false"` on all seven slots, while only F reads
@@ -725,8 +765,8 @@ other spec.
   timeout is more than twice that. It does not use `__runProbeFrames`.
 - `fuse.spec.ts`: the armed look of a fused area (`fuse.png`, at 1280x720), on
   the dev-only sandbox with a paused clock and tick budgets, like
-  `lingering.spec.ts`. No champion in the client's select has a fuse (Ysmeer's
-  kit is data since #271; her select entry is roadmap step 4.3), so Shift+F4
+  `lingering.spec.ts`. Only Ysmeer's kit has fuses (#271; she is in the select
+  since #307, but the sandbox plays the Hargrim and Quillon kits), so Shift+F4
   spawns one at the aim through `debug.spawnArea` (fuse 90 ticks, radius 2.5 m,
   one hit of 30 damage to the enemy team; client.md, Input). After the warmup the cursor goes
   to the pixel of champion 2 (12, 2) at the probe viewport, one frame samples

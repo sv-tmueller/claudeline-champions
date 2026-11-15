@@ -24,16 +24,16 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
                                  # combat.png, death.png, match.png, result.png,
                                  # ring.png, scene-arena02.png,
                                  # scene-arena03.png, scene-durnhal.png,
-                                 # scene-wrenna.png, match-arena02.png,
-                                 # match-3v3.png,
+                                 # scene-wrenna.png, scene-ysmeer.png,
+                                 # match-arena02.png, match-3v3.png,
                                  # match-3v3-arena02.png, menu.png,
                                  # scoreboard.png, select.png, lingering.png,
                                  # orb.png, fuse.png
                                  # in test-results/*/
-npm run balance                  # bot-versus-bot win-rate report: plays 31248
-                                 # matches (eight kits, the energy orb on) and
+npm run balance                  # bot-versus-bot win-rate report: plays 39312
+                                 # matches (nine kits, the energy orb on) and
                                  # writes the block of docs/design/balance.md,
-                                 # about 38 minutes by match count, not
+                                 # about 48 minutes by match count, not
                                  # measured. The committed block is still the
                                  # seven-kit one, so --check fails until the
                                  # nine-kit report. Flags
@@ -44,7 +44,7 @@ npm run balance                  # bot-versus-bot win-rate report: plays 31248
                                  # (needs --out or --check; --check then compares
                                  # only that mode's rows). Seeds per config: the
                                  # largest even number at or under 200 over the
-                                 # cell's fills (32 in 2v2, 6 in 3v3). Needs
+                                 # cell's fills (28 in 2v2, 4 in 3v3). Needs
                                  # Node 22.15. The manual workflow
                                  # .github/workflows/balance.yml runs --check
                                  # --mode on a runner, one job per mode.

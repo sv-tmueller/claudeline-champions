@@ -101,6 +101,20 @@
   gap: calc(var(--menu-u) * 1.5);
 }
 
+/*
+ * The champion row is one line of nine entries (#307): its entries are tighter than the rows of
+ * the arena, team size and difficulty, so the row and the panel fit 1280 x 720 whole. e2e/support.ts
+ * (`expectChampionRowFits`) measures it. The rules sit after the shared rules of the same
+ * specificity (the gap of the rows, the padding of the entries), which they would lose to otherwise.
+ */
+#menu [data-part='select'] {
+  gap: calc(var(--menu-u) * 1);
+}
+
+#menu [data-champion] {
+  padding: calc(var(--menu-u) * 0.6) calc(var(--menu-u) * 0.8);
+}
+
 #menu [data-champion][data-available='false'],
 #menu [data-team-size][data-available='false'] {
   opacity: 0.35;
