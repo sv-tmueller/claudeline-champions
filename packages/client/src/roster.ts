@@ -1,4 +1,4 @@
-/** The eight champions: the four v1 ones in the order of docs/design/roster-v1.md, then the two of docs/design/roster-v2.md, then the two of docs/design/roster-v3.md. */
+/** The nine champions: the four v1 ones in the order of docs/design/roster-v1.md, then the two of docs/design/roster-v2.md, then the three of docs/design/roster-v3.md. */
 export const ROSTER_IDS: readonly string[] = [
   'hargrim',
   'quillon',
@@ -8,9 +8,10 @@ export const ROSTER_IDS: readonly string[] = [
   'brimwick',
   'durnhal',
   'wrenna',
+  'ysmeer',
 ];
 
-// Display names of the eight champions, from docs/design/roster-v1.md, roster-v2.md and roster-v3.md.
+// Display names of the nine champions, from docs/design/roster-v1.md, roster-v2.md and roster-v3.md.
 const NAMES: Readonly<Record<string, string>> = {
   hargrim: 'Hargrim',
   quillon: 'Quillon',
@@ -20,6 +21,7 @@ const NAMES: Readonly<Record<string, string>> = {
   brimwick: 'Brimwick',
   durnhal: 'Durnhal',
   wrenna: 'Wrenna',
+  ysmeer: 'Ysmeer',
 };
 
 /** The name to show for a champion id. An unknown id shows as itself. */

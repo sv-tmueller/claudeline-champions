@@ -17,7 +17,7 @@ import orbsJson from '../../../data/orbs.json';
 import { createBotDriver } from './bot-driver';
 import type { Launch } from './launch';
 import { LOCAL_SEED, createLocalMatch, playableTeamSize } from './match-setup';
-import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS, WRENNA_KIT } from './test-kits';
+import { HARGRIM_KIT, LUMETH_KIT, QUILLON_KIT, TEST_KITS, WRENNA_KIT, YSMEER_KIT } from './test-kits';
 
 const arena = parseArenaDef(arena01Json);
 const arena02 = parseArenaDef(arena02Json);
@@ -389,6 +389,60 @@ describe('a Wrenna pick on the shipped kits', () => {
     const { state } = createLocalMatch(launch3('wrenna'), arena, KITS_WRENNA);
     expect(state.champions.map((c) => [c.championId, c.team])).toEqual([
       ['wrenna', 'A'],
+      ['quillon', 'A'],
+      ['lumeth', 'A'],
+      ['hargrim', 'B'],
+      ['quillon', 'B'],
+      ['lumeth', 'B'],
+    ]);
+  });
+});
+
+// Ysmeer (roadmap 4.3, #307) on the shipped kit files: the first pick with a fused area and an end area. The
+// match is the one the page starts, so on every arena and at both sizes she is champion 0 with 120
+// health and no counter key, the size is the one `playableTeamSize` allows, and 600 ticks of the bot
+// driver (the human sends no input, as in the e2e specs) step without a throw.
+describe('a Ysmeer pick on the shipped kits', () => {
+  const ARENAS = [
+    ['arena01', arena],
+    ['arena02', arena02],
+    ['arena03', parseArenaDef(arena03Json)],
+  ] as const;
+  const KITS_YSMEER: readonly KitDef[] = [...KITS_3V3, YSMEER_KIT];
+
+  describe.each(ARENAS)('on %s', (arenaId, played) => {
+    it.each([2, 3] as const)('builds the match of a team size of %i asked, with her at champion 0, and steps 600 ticks', (asked) => {
+      const orb = orbPointFor(orbsJson, played);
+      const { state, botIds } = createLocalMatch(
+        { ...launch('ysmeer'), arena: arenaId, teamSize: asked },
+        played,
+        KITS_YSMEER,
+        DEFAULT_ROUNDS_TO_WIN,
+        orb,
+      );
+      const size = playableTeamSize(asked, played);
+      expect(state.champions).toHaveLength(2 * size);
+      expect(botIds).toEqual(Array.from({ length: 2 * size - 1 }, (_, index) => index + 1));
+      const ysmeer = state.champions[0];
+      expect([ysmeer?.championId, ysmeer?.team, ysmeer?.maxHealth, ysmeer?.health]).toEqual(['ysmeer', 'A', 120, 120]);
+      expect(ysmeer !== undefined && 'counter' in ysmeer).toBe(false);
+      expect(state.kits.map((kit) => kit.id)).toContain('ysmeer');
+      expect(state.arena.id).toBe(arenaId);
+
+      const driver = createBotDriver(botIds, 'normal', LOCAL_SEED);
+      const inputs: (PlayerInput | undefined)[] = state.champions.map(() => undefined);
+      for (let tick = 0; tick < 600; tick++) {
+        driver.think(state, inputs);
+        step(state, inputs);
+      }
+      expect(state.tick).toBe(600);
+    });
+  });
+
+  it('puts the quillon and the lumeth beside her in the 3v3, against the usual enemy row', () => {
+    const { state } = createLocalMatch(launch3('ysmeer'), arena, KITS_YSMEER);
+    expect(state.champions.map((c) => [c.championId, c.team])).toEqual([
+      ['ysmeer', 'A'],
       ['quillon', 'A'],
       ['lumeth', 'A'],
       ['hargrim', 'B'],

@@ -10,6 +10,7 @@ import ondrelJson from '../../../data/kits/ondrel.json';
 import quillonJson from '../../../data/kits/quillon.json';
 import skerrowJson from '../../../data/kits/skerrow.json';
 import wrennaJson from '../../../data/kits/wrenna.json';
+import ysmeerJson from '../../../data/kits/ysmeer.json';
 
 // createMatch validates a kit, so the cast needs no check of its own.
 export const HARGRIM_KIT = hargrimJson as unknown as KitDef;
@@ -30,4 +31,7 @@ export const BRIMWICK_KIT = brimwickJson as unknown as KitDef;
 // Not in TEST_KITS: the first champion with an on-hit counter (Longbow builds it, Heartseeker and Fade
 // Step spend it), so the first whose HUD shows pips. match-setup.test.ts plays her on every arena.
 export const WRENNA_KIT = wrennaJson as unknown as KitDef;
+// Not in TEST_KITS: the first champion with a fused area (Falling Star, Supernova) and a projectile
+// that leaves an area where it ends (Gravity Well, Comet EX). match-setup.test.ts plays her on every arena.
+export const YSMEER_KIT = ysmeerJson as unknown as KitDef;
 export const TEST_KITS: readonly KitDef[] = [HARGRIM_KIT, QUILLON_KIT];
