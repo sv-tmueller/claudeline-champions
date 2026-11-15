@@ -43,23 +43,36 @@ CI is split by cost:
 The unit job's time is mostly `npm run test`, and Vitest's order decides how
 much of the job the three workers spend busy (#285). The runner has 4 vCPUs, so
 Vitest starts 3 workers. Its default order groups the files by project name, and
-the `tools` project came last: on job 132439224766 (main at 4eb2778, the job 527
-s, Vitest 444 s) `tools/balance/harness.test.ts` (135 s) started at 310 s and
-`tools/balance/run.test.ts` (106 s) at 317 s, and for the last 128 s only one or
-two workers were busy (the files' times add up to 1154 s, so 2.6 workers busy on
-average). `tests/vitest-sequencer.ts`, registered in `vitest.config.ts`, moves
-the files on its `SLOW_FIRST` list to the front, in list order, and leaves every
-other file in Vitest's order. No test is cut, skipped or changed: main's 4251
-passed and 6 skipped are the same, and the sequencer's own test file adds 7.
+the `tools` project came last: on job 132439224766 (the pull request run of
+PR #288 at 9bf4bee, the same tree as main's 4eb2778; the job 527 s, Vitest
+444 s) `tools/balance/harness.test.ts` (135 s) started at 310 s and
+`tools/balance/run.test.ts` (106 s) at 317 s, and for the last 128 s only
+one or two workers were busy (the files' times add up to 1154 s, so 2.6
+workers busy on average). `tests/vitest-sequencer.ts`, registered in
+`vitest.config.ts`, moves the files on its `SLOW_FIRST` list to the front,
+in list order, and leaves every other file in Vitest's order. No test is
+cut, skipped or changed. That tree read 4251 passed and 6 skipped in 152
+files (job 132439224766). 09a6ad4, which adds only the sequencer, its test
+file and its registration in `vitest.config.ts` and `tsconfig.tools.json`
+to it, read 4258 passed and 6 skipped in 153 files (job 132449462016): +7
+from the sequencer's test file, and no other file's count changed.
 
 - The list is every file that took 10 s or more in job 132439224766, slowest
   first, except that `packages/bots/test/allocation.test.ts` goes first. It has
   always run first, and its readings depend on the load around it and on what the
   tests before it allocated (a major GC inside a measured window deoptimizes the
-  shared Maglev code of dead bots, #290; the test keeps its bots alive since), so
-  its run conditions stay as they were. `tests/vitest-sequencer.test.ts` fails if a
-  listed path does not exist, so a renamed file cannot silently drop back to the
-  end.
+  shared Maglev code of dead bots, #290; the test keeps its bots alive since).
+  Its run conditions in the unit job did change: it still starts first, but now
+  beside the two heaviest files, `durnhal.test.ts` (178 s) and `ondrel.test.ts`
+  (148 s) in job 132439224766, where it used to start beside light bots files.
+  It was green in every measured attempt: the unit job and both heap jobs passed
+  in all eight runs of the table below, the baseline included. #290, closed by
+  PR #302, settled the within-file part (what the earlier scenes leave behind).
+  The load from the two files that now start beside it rests on those green
+  attempts only. The heap jobs run the file alone and are not affected by the
+  order.
+  `tests/vitest-sequencer.test.ts` fails if a listed path does not exist, so a
+  renamed file cannot silently drop back to the end.
 - The rule: a file that reads 10 s or more in a unit job, on a slow runner
   included, goes on the list at its place by time. A new champion's bot file
   (`packages/bots/test/<kit>.test.ts`) takes this check on its first CI run.
@@ -71,12 +84,13 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
 - The result, on the same runner speed: 2.9 workers busy in every attempt
   (2.88), against 2.6, and the job 374 and 369 s on two fast runners (Vitest 302
   and 304 s, typecheck 15 s). On slow runners the job reads 469 s (job
-  132456632009, Vitest 391 s, typecheck 18 s) and 510 and 509 s (jobs 132458686040 and
-  132461266927, Vitest 429 and 426 s, typecheck 20 s), against 527 s on the unordered run. The three workers
-  cannot do better than the files' times divided by 3: 1237 s of file time is 412
-  s, and the run took 429 s. The slow reading was above the old trigger of 480
-  s, and the order and the worker count were used up, so the limit and the
-  trigger were re-sized (see the decision below).
+  132456632009, Vitest 391 s, typecheck 18 s) and 510 and 509 s (jobs
+  132458686040 and 132461266927, Vitest 429 and 426 s, typecheck 20 s), against
+  527 s on the unordered run. The three workers cannot do better than the files'
+  times divided by 3: 1237 s of file time is 412 s, and the run took 429 s. The
+  slow reading was above the old trigger of 480 s, and the order and the worker
+  count were used up, so the limit and the trigger were re-sized (see the
+  decision below).
 - One worker per CPU (`--maxWorkers=100%`, four workers) was tried in CI only and
   dropped. The work is CPU-bound, so each file took 38 percent longer with four
   workers than with three (the files' times add up to 1210 s against 870 s on
@@ -89,7 +103,7 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
 
 | Run (SHA) | Workers | Job | Job s | Typecheck s | Vitest s | File-time sum s | Workers busy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| main, 4eb2778 | 3, default order | 132439224766 | 527 | 20 to 21 | 444.4 | 1154 | 2.6 |
+| PR #288 at 9bf4bee (main's 4eb2778 tree) | 3, default order | 132439224766 | 527 | 20 to 21 | 444.4 | 1154 | 2.6 |
 | 09a6ad4, attempt 1 | 3, slow files first | 132449462016 | 374 | 15 | 302.5 | 870 | 2.88 |
 | 09a6ad4, attempt 2 | 3, slow files first | 132451025209 | 369 | 15 | 303.9 | 875 | 2.88 |
 | 2119bc3, attempt 1 | 4 | 132452763764 | 384 | 16 | 315.4 | 1210 | 3.84 |
@@ -127,7 +141,7 @@ owner, a second job because it is not a required check until the owner adds it
 to the branch protection, a larger runner because of its cost. A test is never
 cut to get under the trigger.
 
-Rescan with the log command above, then add the job id and the times to this
+Rescan with the log command below, then add the job id and the times to this
 table. The typecheck step's seconds (15 on a fast runner, 20 and over on a slow
 one) tell the runner's speed, because every step slows by the same factor.
 
@@ -342,9 +356,9 @@ s, with no timeout. The file took 155, 107 and 113 s of those attempts. The unit
 job of that commit took 449, 342 and 336 s (Vitest 370, 272 and 271 s), against
 373 s (Vitest 295 s) on main at 88b5603 (job 124649346673); the first attempt ran
 on a slow runner (`ondrel.test.ts` 147 s against 99 and 104 s) and stayed under
-the trigger of the time, 8 minutes (480 s), at 94 percent of it. The two pushes before
-it, without and with the file, took 230 and 254 s (the second one red on a
-melee-key list that this package then extended).
+the trigger, which was 8 minutes (480 s) at the time, at 94 percent of it. The
+two pushes before it, without and with the file, took 230 and 254 s (the second
+one red on a melee-key list that this package then extended).
 
 The seeded orb matches of `packages/bots/test/orb-match.test.ts` (#225: two cells, a
 Quillon and a Hargrim against a Lumeth and a Hargrim on each arena, with the energy orb
@@ -357,10 +371,11 @@ request read 7 min 11 s and 7 min 24 s (347.8 and 353.0 s of Vitest over 146 fil
 them. #187 re-read the scan and moved the cells to the Lumeth mirror (its rounds are long
 enough for the orb rounds; the Quillon v Lumeth pair of #225 then read exactly half on
 arena01): 8.0 and 6.2 s locally, the arena01 cell's rounds longer than the old pair's, so
-the 60 s timeout still covers twice the slowest. They
-are the only matches the package commits (the optional orb-on determinism row was left out
-for the unit job's time), and the job was to pass the 8 minutes the trigger was then, once the
-unit job of #230, which read up to 449 s, merged with them (#285 re-sized it to 12 minutes).
+the 60 s timeout still covers twice the slowest. They are the only matches the
+package commits (the optional orb-on determinism row was left out for the unit
+job's time), and the job was to pass the 8 minutes the trigger was then, once the
+unit job of #230, which read up to 449 s, merged with them (#285 re-sized it to
+12 minutes).
 
 The Wrenna cell (`wrenna.test.ts`, one seeded 2v2 match) read 11.0 s on the runner
 (unit job of run 43544274291, 9fe3ec7). Twice that is 22 s, above the 20 s top of
