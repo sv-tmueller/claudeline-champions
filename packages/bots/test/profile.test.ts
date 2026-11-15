@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KitDef, SlotSpec } from '@claudeline/sim';
 import { profileFor, rulesFor } from '../src/profile';
-import { eightKits, jsonKits, profileOf, rosterKits, sevenKits, sixKits } from './helpers';
+import { eightKits, jsonKits, nineKits, profileOf, rosterKits, sevenKits, sixKits } from './helpers';
 import { boltSlot, hargrimKit, quietKit, quillonKit } from './kits';
 
 function withM1(kit: KitDef, m1: SlotSpec): KitDef {
@@ -360,6 +360,53 @@ describe('Wrenna, the marksman of roadmap 3.4', () => {
   });
 });
 
+describe('Ysmeer, the controller of roadmap 4.3', () => {
+  const kits = nineKits();
+  const ysmeer = kits.find((k) => k.id === 'ysmeer') as KitDef;
+
+  it('reads rangeMax from the base M1 band of 11 m, less the margin: 10 m, rangeMin 8, stand and latch reach 10', () => {
+    expect(profileFor('ysmeer', ysmeer)).toEqual(profileOf(8, 10));
+    expect(profileFor('ysmeer', ysmeer).standReach).toBe(10);
+    expect(profileFor('ysmeer', ysmeer).latchReach).toBe(10);
+  });
+
+  it('keeps the table of 8 and 10 with no kit, no M1 band or a kit of another id', () => {
+    expect(profileFor('ysmeer')).toEqual(profileOf(8, 10));
+    expect(profileFor('ysmeer', quietKit('ysmeer'))).toEqual(profileOf(8, 10));
+    expect(profileFor('ysmeer', quietKit('hargrim'))).toEqual(profileOf(8, 10));
+  });
+
+  it('derives rangeMax instead of hard-coding it: 20 m/s for 36 ticks reaches 12 m, so 11; for 33 ticks 11, so 10', () => {
+    expect(profileFor('ysmeer', withM1(quietKit('ysmeer'), boltSlot(20, 36)))).toEqual(profileOf(8, 11));
+    expect(profileFor('ysmeer', withM1(quietKit('ysmeer'), boltSlot(20, 33)))).toEqual(profileOf(8, 10));
+  });
+
+  it('falls back to the table when the derived rangeMax is at most rangeMin', () => {
+    // 20 m/s for 27 ticks reaches 9 m: rangeMax 8, not above rangeMin 8.
+    expect(profileFor('ysmeer', withM1(quietKit('ysmeer'), boltSlot(20, 27)))).toEqual(profileOf(8, 10));
+  });
+
+  it('has no opener, Drift then Eclipse as escapes, F not held, and no other field', () => {
+    const rules = rulesFor('ysmeer', ysmeer);
+    expect(rules.openers).toEqual([]);
+    expect(rules.escapes).toEqual(['SPACE', 'R']);
+    expect(rules.holdF).toBe(false);
+    expect(rules.wait).toBeNull();
+    expect(rules.escapeWithin).toBeNull();
+    expect(rules.allies).toEqual([]);
+    expect(rules.escapeOnly).toEqual([]);
+    expect(rules.spendBase).toEqual([]);
+    expect(Object.isFrozen(rules)).toBe(true);
+    expect(Object.isFrozen(rules.openers)).toBe(true);
+    expect(Object.isFrozen(rules.escapes)).toBe(true);
+  });
+
+  it('gives her no rule without her kit or with a kit of another id', () => {
+    expect(rulesFor('ysmeer').escapes).toEqual([]);
+    expect(rulesFor('ysmeer', kits.find((k) => k.id === 'hargrim') as KitDef).escapes).toEqual([]);
+  });
+});
+
 describe('the stand reach (#213)', () => {
   const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
 
@@ -374,8 +421,8 @@ describe('the stand reach (#213)', () => {
   });
 
   it('is rangeMax for every champion that keeps its range, with a kit and without', () => {
-    const roster = eightKits();
-    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick', 'wrenna']) {
+    const roster = nineKits();
+    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick', 'wrenna', 'ysmeer']) {
       const kit = roster.find((k) => k.id === id) as KitDef;
       expect(profileFor(id, kit).standReach, id).toBe(profileFor(id, kit).rangeMax);
       expect(profileFor(id).standReach, `${id} without a kit`).toBe(profileFor(id).rangeMax);
@@ -409,8 +456,8 @@ describe('the deadlock reach (#222)', () => {
   });
 
   it('is rangeMax for every champion that keeps its range, with a kit and without', () => {
-    const roster = eightKits();
-    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick', 'wrenna']) {
+    const roster = nineKits();
+    for (const id of ['quillon', 'lumeth', 'ondrel', 'brimwick', 'wrenna', 'ysmeer']) {
       const kit = roster.find((k) => k.id === id) as KitDef;
       expect(profileFor(id, kit).latchReach, id).toBe(profileFor(id, kit).rangeMax);
       expect(profileFor(id).latchReach, `${id} without a kit`).toBe(profileFor(id).rangeMax);

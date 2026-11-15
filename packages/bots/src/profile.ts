@@ -68,6 +68,7 @@ const PROFILES = new Map<string, BotProfile>([
   ['brimwick', profileOf(7, 10)],
   ['durnhal', profileOf(0, 3.5)],
   ['wrenna', profileOf(10, 13)],
+  ['ysmeer', profileOf(8, 10)],
 ]);
 
 /**
@@ -83,6 +84,7 @@ const KIT_RULES = new Map<string, number>([
   ['brimwick', 7],
   ['durnhal', 0],
   ['wrenna', 10],
+  ['ysmeer', 8],
 ]);
 
 /**
@@ -184,7 +186,7 @@ export interface ChampionRules {
    * profile.test.ts). The kit cache zeroes the base band of these slots, so the walk does not press
    * one on it and only `chooseEscape` does (see `refreshKitCache`). Durnhal's
    * Bulwark Charge (#211): with rangeMin 0 its band would cover every engage, and its knock-away
-   * would push a target out of the stand reach. Empty for the other seven.
+   * would push a target out of the stand reach. Empty for the other eight.
    */
   readonly escapeOnly: readonly Slot[];
   /**
@@ -192,7 +194,7 @@ export interface ChampionRules {
    * 0, the EX variant of a listed slot is not cast (see `exFor` in casting.ts), so the base ability
    * is pressed and spends the stacks. Wrenna's Heartseeker: the base shot adds 4 damage a stack and
    * saves 25 energy, and ties the EX at 1 stack and beats it from 2. The test is `count > 0`, so a kit
-   * whose base shot beats its EX only from a higher count needs a threshold. Empty for the other seven.
+   * whose base shot beats its EX only from a higher count needs a threshold. Empty for the other eight.
    */
   readonly spendBase: readonly Slot[];
 }
@@ -248,6 +250,13 @@ const NO_RULES: ChampionRules = Object.freeze({
  * its cut of Tumble's cooldown is not wasted on a Tumble that is ready. Longbow (M1) builds the
  * counter on its band and needs no rule. Heartseeker is pressed as the base shot while the counter
  * stands, see `spendBase`.
+ * Ysmeer (roadmap 4.3, docs/design/roster-v3.md; roster-v3 has no bot sketch for her either): no
+ * opener, so every slot is pressed on its kit band less the margin. Her stuns are fused (the Falling
+ * Star's EX and Supernova) and her pushes (Comet, Eclipse) land at any motion, so no slot has a motion
+ * condition the way a root or an arrival stun does. Drift, a 4 m dash with a landing found like
+ * Glide's, then Eclipse, a push and a shield, are her escapes on the common trigger, a kite inside
+ * rangeMin (8). She does not hold Supernova (F): a fused area of 1.5 s is no answer to low
+ * health, see `holdF`.
  */
 const RULES = new Map<string, ChampionRules>([
   [
@@ -318,6 +327,7 @@ const RULES = new Map<string, ChampionRules>([
       ['E'],
     ),
   ],
+  ['ysmeer', rule([], ['SPACE', 'R'], false)],
 ]);
 
 /** A frozen row: the row, its lists, each opener and each literal band, and the wait. */
