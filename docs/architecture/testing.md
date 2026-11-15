@@ -534,16 +534,19 @@ point from `data/orbs.json` (spec section 6).
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
 pull request or a push). It can be dispatched with
 `gh workflow run balance.yml --ref <branch>` once the file is on the default
-branch. The whole run was 12 to 16 minutes at four kits and about 31 minutes
-locally at seven kits with the orb and three arenas (2v2 11.2, 3v3 19.5, 12 600
-matches each). At nine kits (#307) the six-kit three-arena 8.0 and 13.4 minutes,
-scaled by the match counts (21 168 in 2v2, 18 144 in 3v3), give 18.8 (2v2) and
-28.1 (3v3) locally, about 47 together, and 2.9 to 3.1 times that on a runner is
-about 55 to 58 (2v2) and 82 to 87 (3v3). These are estimates by match count, not
-measurements. The jobs have `timeout-minutes` of 150 and 220, up from 90 and 150
-at seven kits: twice the check time at 3.1 (117 and 175, the failure step plays
-the mode again) and a margin of about 25 to 30 percent, rounded up to 10
-minutes, under the 6 hours GitHub allows a hosted job. The committed block is
+branch. The whole run was 12 to 16 minutes at four kits (measured). At seven
+kits with the orb and three arenas it is about 31 minutes locally by match
+count, not measured (2v2 11.2, 3v3 19.5, 12 600 matches each), and the two
+runner jobs of its PR (#257) took 34 min 18 s and 57 min 55 s. At nine kits
+(#307) the six-kit three-arena 8.0 and 13.4 minutes, scaled by the match counts
+(21 168 in 2v2, 18 144 in 3v3), give 18.8 (2v2) and 28.1 (3v3) locally, about 47
+together, and 2.9 to 3.1 times that on a runner is about 55 to 58 (2v2) and 82
+to 87 (3v3). These are estimates by match count, not measurements. The jobs have
+`timeout-minutes` of 150 and 220, up from 90 and 150 at seven kits: twice the
+check time at 3.1 (117 and 175, the failure step plays the mode again) and a
+margin of at least 25 percent, then rounded up to the next multiple of 10
+minutes (146 and 218 before rounding), under the 6 hours GitHub allows a hosted
+job. The committed block is
 still the seven-kit report, so `npm run balance -- --check` and the manual
 workflow fail on purpose (216 cells against the committed 126) until the
 nine-kit report of a later package rewrites the block. The
