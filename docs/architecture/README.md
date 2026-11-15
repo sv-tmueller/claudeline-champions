@@ -226,6 +226,9 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [the owner's decision on #290](https://github.com/sv-tmueller/claudeline-champions/issues/290#issuecomment-6881084227),
   [the lead's decision after the second measurement](https://github.com/sv-tmueller/claudeline-champions/issues/294#issuecomment-6881795100),
   [the lead's decisions on the developer's report](https://github.com/sv-tmueller/claudeline-champions/issues/294#issuecomment-6884318728).
+  Measured by #318 (the drops of #303, a rule that sorts them into fix and accept, the figures per
+  configuration): [the lead's decision on #318](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6894158392),
+  recorded in [Bots](bots.md#the-drops-of-303-measured-318).
   Recorded in [Bots](bots.md#allocation) and its [API](bots.md#api).
 - The `Platform` settings methods are asynchronous, so the Electron port reaches
   files over IPC without a signature change, and only those two are built:
