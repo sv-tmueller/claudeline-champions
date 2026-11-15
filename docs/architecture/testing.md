@@ -65,8 +65,9 @@ passed and 6 skipped are the same, and the sequencer's own test file adds 7.
   (`packages/bots/test/<kit>.test.ts`) takes this check on its first CI run.
   #307 applied it: `ysmeer.test.ts` read 16.2 s (unit job of run 43691427587, a fast runner) and
   sits between the loopback file (23.5 s) and Wrenna's (10.5 s), and the balance CLI's file, whose
-  one row plays 756 matches with nine kits, read 154.6 s against `durnhal.test.ts`'s 120.1 s, so it
-  moved to second place, after the heap check. The other files kept their places.
+  one row plays 756 matches with nine kits, read 154.6 and 165.5 s against `durnhal.test.ts`'s 120.1
+  and 123.0 s, so it moved to second place, after the heap check (the CLI row alone 152.4 and 163.3 s,
+  about 229 s on a slow runner, twice which is 457 s inside its 600 s). The other files kept their places.
 - The result, on the same runner speed: 2.9 workers busy in every attempt
   (2.88), against 2.6, and the job 374 and 369 s on two fast runners (Vitest 302
   and 304 s, typecheck 15 s). On slow runners the job reads 469 s (job
@@ -114,9 +115,9 @@ limit stops it. The reason:
   the trigger. Ordering saves 20 to 60 s on every runner, but the slow reading
   still sits at 509 and 510 s.
 - Each new champion adds about 65 s to the job (#281), so the 480 s trigger would
-  have fired again with the next kit. Ysmeer's package read 400 s on a fast runner (Vitest 333 s,
-  typecheck 15 s; main at e335907 read 378 s on one), so about 560 s on a slow one by the factor
-  of 1.4, against the trigger of 720 s.
+  have fired again with the next kit. Ysmeer's package read 400 and 404 s on fast runners (Vitest 333
+  and 336 s, typecheck 15 and 16 s; main at e335907 read 378 s on one), so about 570 s on a slow one by
+  the factor of 1.4, against the trigger of 720 s.
 
 The check name and the branch protection do not change, and no test is cut. When
 a slow-runner unit job on main passes 12 minutes again, the trigger calls for
@@ -185,7 +186,7 @@ timeouts stand.
   With Ysmeer's three scenes (the 24th to 26th): 4.8 s on Node 24 in the default tiers, and
   4.6 s in Maglev and 4.8 s in the default tiers on Node 26.7.0, on a Linux host at a load
   average of 6 to 10. The unit job (run 43691427587, b2bab13, Node 22, a fast runner) reads 6.7 s,
-  under the 10 s at which the timeout rule has no step left, and the heap jobs read 2.9 s (Node 24),
+  under the 10 s at which the timeout rule has no step left (6.7 s again in the second run), and the heap jobs read 2.9 s (Node 24),
   3.0 s (Node 26.7.0, default tiers) and 3.3 s (Node 26.7.0, Maglev alone); twice 6.7 s is 13.4 s, so
   the timeout stays 20 s.
 - `packages/client/src/clip-sampler.test.ts`, "entering and leaving Run at
@@ -368,8 +369,9 @@ the rule, so it keeps the 60 s timeout of the long-match precedent.
 The Ysmeer cell and her free-play run (`ysmeer.test.ts`, #307) have the timeouts of the cell
 above, 60 s and 30 s (the long-match precedent and the start-edit precedent of
 `durnhal.test.ts`). Locally (Linux x64, Node 24.22.3, load average 6 to 10) the cell takes 5.1 s and
-the run 4.4 s, the whole file about 10 s. On the runner (unit job of run 43691427587, b2bab13, a
-fast runner: typecheck 15 s, Node 22) the cell read 8.8 s and the run 7.3 s, the file 16.2 s. Twice
+the run 4.4 s, the whole file about 10 s. On the runner (unit jobs of runs 43691427587 and 43692315600, fast
+runners: typecheck 15 and 16 s, Node 22) the cell read 8.8 and 8.0 s and the run 7.3 and 8.0 s, the file
+16.2 and 16.1 s. Twice
 the cell is 17.7 s, but runners differ by about 1.4, which makes 25 s on a slow one, above the 20 s
 top of the rule, so the cell keeps its 60 s and the run its 30 s (as `wrenna.test.ts` and
 `durnhal.test.ts` do). The three sampler cases for her read 5.2, 1.6 and 1.6 s there, against

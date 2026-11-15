@@ -75,11 +75,12 @@ describe('Falling Star, the fused area', () => {
 // oracle and block no escape, and 15 fire the eight abilities below (against Hargrim on arena02 she
 // fires no Comet EX). Seeds: bots 101 to 104 on normal tiers, match seed 7 (`six-cells.ts`). A stall
 // here is a reason to report, not to move `rangeMin`.
-// The cell takes 5.1 s locally (Linux x64, Node 24.22, load average 6 to 10) and 8.8 s on the runner
-// (unit job of run 43691427587, b2bab13, a fast runner: typecheck 15 s, Node 22); the free-play run
-// below takes 4.4 s locally and 7.3 s there. Twice the cell is 17.7 s, but runners differ by about 1.4
-// (testing.md, Check suite), so on a slow one it is 25 s, above the 20 s top of the rule: both keep the
-// 60 s and 30 s of the long-match and start-edit precedents (wrenna.test.ts, durnhal.test.ts).
+// The cell takes 5.1 s locally (Linux x64, Node 24.22, load average 6 to 10) and 8.8 and 8.0 s on the
+// runner (unit jobs of runs 43691427587 and 43692315600, fast runners: typecheck 15 and 16 s, Node
+// 22); the free-play run below takes 4.4 s locally and 7.3 and 8.0 s there. Twice the cell is 17.7 s,
+// but runners differ by about 1.4 (testing.md, Check suite), so on a slow one it is 25 s, above the
+// 20 s top of the rule: both keep the 60 s and 30 s of the long-match and start-edit precedents
+// (wrenna.test.ts, durnhal.test.ts).
 const CELL = cellOf('ysmeer', 'hargrim', 'arena01', 3629, 1072);
 
 /** Her tallies in the cell: the casts that fired, by slot, and the EX ones apart. */

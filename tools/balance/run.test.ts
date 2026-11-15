@@ -24,8 +24,8 @@ describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
   // 756 matches in a spawned process (nine kits: 36 pairings on 3 arenas, 7 fills, 1 seed) with the
   // orb on, so the matches run long. Measured here on the loaded box and sized twice the check time
   // plus a margin (testing.md, Check suite). 102 s locally (Linux x64, Node 24, load average 6 to 10)
-  // and 152.4 s on the runner (unit job of run 43691427587, b2bab13, a fast runner, Node 22): about
-  // 214 s on a slow one (about 1.4 times), so twice is 427 s, inside the 600 s.
+  // and 152.4 and 163.3 s on the runner (unit jobs of runs 43691427587 and 43692315600, fast runners,
+  // Node 22): about 229 s on a slow one (about 1.4 times), so twice is 457 s, inside the 600 s.
   it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 600_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), 'balance-'));
     try {
