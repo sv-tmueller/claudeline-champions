@@ -285,8 +285,10 @@ times) and against 16.1 and 21.8 s on the last two pushes to main (runs
 seed, kits and inputs at every tick" read 1.16 s (2v2) and 4.05 s (3v3). The log
 has no time for a `beforeAll`, so the 3v3 hook is derived: the file less the two
 rows is 23.8 s, and less the 2v2 hook at 2.2 times its 2.0 s locally (about 4.4
-s) leaves about 19 s. That is under half of its 60 s, so the rule needs no
-second pass, and the 3v3 row's 4.05 s is under half of its 15 s. The ratio of the
+s) leaves at most about 19 s: an upper bound, because the file time still holds
+the 18 other rows (nine a spec, of ten), which the log does not print. That is
+under half of its 60 s, so the rule needs no second pass, and the 3v3 row's
+4.05 s is under half of its 15 s. The ratio of the
 header of `loopback.test.ts` (4.5 s over 2.7 s, about 1.7) underestimated the
 runner here, as it did for Durnhal's file above. No timeout moves.
 
