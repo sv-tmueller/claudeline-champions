@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { DEFAULT_MATCH, orFail, watchProblems } from './support';
+import { DEFAULT_MATCH, expectChampionRowFits, orFail, watchProblems } from './support';
 
 // The Escape menu: the pause, restart, the champion, arena, team and difficulty select (the
 // team row, the 3v3 relaunch and a Restart that keeps it, the hard-tier relaunch likewise),
@@ -38,6 +38,7 @@ const SOUND_SCALE = 100;
 const SOUND_FRAME_BUDGET = Math.ceil(5400 / 96) + 12;
 // The saved settings, as the platform writes them (packages/client/src/platform.ts).
 const SETTINGS_KEY = 'claudeline-champions.settings';
+const ROSTER = ['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna', 'ysmeer'];
 
 interface Hooks {
   tick: number;
@@ -197,6 +198,8 @@ test('goes back to the select from the menu and relaunches on another arena', as
     await openMenu(page);
     await page.locator('[data-menu="panel"] [data-action="select"]').click();
     await expectMenu(page, true, 'select');
+    // The champion row of the menu's select is one line of nine, and the panel lies inside the viewport.
+    await expectChampionRowFits(page, '[data-menu="panel"]', ROSTER);
 
     // The select of the menu: the champion links stay on this arena, and every arena is offered.
     const links = await page.evaluate(() => ({
@@ -216,7 +219,7 @@ test('goes back to the select from the menu and relaunches on another arena', as
         entry.textContent,
       ]),
     }));
-    expect(links.champions.map(([id]) => id)).toEqual(['hargrim', 'quillon', 'lumeth', 'skerrow', 'ondrel', 'brimwick', 'durnhal', 'wrenna']);
+    expect(links.champions.map(([id]) => id)).toEqual(ROSTER);
     expect(links.champions.find(([id]) => id === 'quillon')?.[1]).toBe('?champion=quillon&difficulty=normal&arena=arena01&teamsize=2');
     expect(links.arenas).toEqual([
       ['arena01', 'true', '?champion=hargrim&difficulty=normal&arena=arena01&teamsize=2'],
