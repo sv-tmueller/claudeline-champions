@@ -521,7 +521,7 @@ and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
 `npm run check`: the full run of the nine kits now listed plays 39 312 matches
-(216 cells, at 28 seeds a 2v2 config and 4 a 3v3 config), about 48 minutes by
+(216 cells, at 28 seeds a 2v2 config and 4 a 3v3 config), about 47 minutes by
 match count on Apple silicon, not measured. It plays every kit of `HARNESS_KITS` in
 `tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
@@ -534,16 +534,22 @@ point from `data/orbs.json` (spec section 6).
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
 pull request or a push). It can be dispatched with
 `gh workflow run balance.yml --ref <branch>` once the file is on the default
-branch. The whole run was 12 to 16 minutes at four kits; at seven kits with the
-orb and three arenas it is about
-31 minutes locally (2v2 11.2, 3v3 19.5, 12 600 matches each) and projects to
-about 34 (2v2) and 59 (3v3) on a runner, so the jobs have `timeout-minutes` of
-90 and 150, twice the projected check time (the failure step plays the mode
-again) and a margin. Those figures and timeouts are of the seven-kit block, which
-the document still holds: the roster is nine kits (#307), the committed block is
-the seven-kit report, so `npm run balance -- --check` and the manual workflow fail
-on purpose (216 cells against the committed 126) until the nine-kit report of a
-later package rewrites the block and re-sizes the jobs. The
+branch. The whole run was 12 to 16 minutes at four kits (measured). At seven
+kits with the orb and three arenas it is about 31 minutes locally by match
+count, not measured (2v2 11.2, 3v3 19.5, 12 600 matches each), and the two
+runner jobs of its PR (#257) took 34 min 18 s and 57 min 55 s. At nine kits
+(#307) the six-kit three-arena 8.0 and 13.4 minutes, scaled by the match counts
+(21 168 in 2v2, 18 144 in 3v3), give 18.8 (2v2) and 28.1 (3v3) locally, about 47
+together, and 2.9 to 3.1 times that on a runner is about 55 to 58 (2v2) and 82
+to 87 (3v3). These are estimates by match count, not measurements. The jobs have
+`timeout-minutes` of 150 and 220, up from 90 and 150 at seven kits: twice the
+check time at 3.1 (117 and 175, the failure step plays the mode again) and a
+margin of at least 25 percent, then rounded up to the next multiple of 10
+minutes (146 and 218 before rounding), under the 6 hours GitHub allows a hosted
+job. The committed block is
+still the seven-kit report, so `npm run balance -- --check` and the manual
+workflow fail on purpose (216 cells against the committed 126) until the
+nine-kit report of a later package rewrites the block. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 

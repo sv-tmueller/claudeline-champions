@@ -138,7 +138,7 @@ Sources:
   matches) and 6 for each of the 30 fills of a 3v3 cell (180): 168 cells and
   31 248 matches. With nine kits it is 28 seeds for each of the 7 fills of a 2v2
   cell (196 matches) and 4 for each of the 42 fills of a 3v3 cell (168): 216 cells
-  and 39 312 matches (21 168 in 2v2 and 18 144 in 3v3), about 48 minutes by match
+  and 39 312 matches (21 168 in 2v2 and 18 144 in 3v3), about 47 minutes by match
   count on Apple silicon, not measured.
   The count is even so that X plays each side equally often. When the
   two modes get the same count the head of the block says "Seeds 1 to N for each
@@ -1396,20 +1396,30 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 
 ## 7. How to regenerate
 
-- `npm run balance` plays all 39 312 matches of the nine listed kits (about 48 minutes by match count, not measured) and writes the block of section 4.
+- `npm run balance` plays all 39 312 matches of the nine listed kits (about 47 minutes by match count, not measured) and writes the block of section 4.
   It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
-  stops with a message below that. A full run takes about 31 minutes on one
-  core of an Apple silicon laptop (the seven-kit block of #244 with the orb; the
-  cells are about 52 ms a 2v2 match and 92 ms a 3v3 match before the orb, and the
-  seven-kit block scales the six-kit three-arena 8.0 and 13.4 minutes by the
-  match counts, so 2v2 is about 11.2 minutes of it and 3v3 about 19.5).
+  stops with a message below that. The seven-kit block of #244 with the orb is
+  estimated at about 31 minutes on one core of an Apple silicon laptop, by match
+  count and not measured: the cells are about 52 ms a 2v2 match and 92 ms a 3v3
+  match before the orb, which gave the six-kit three-arena 8.0 and 13.4 minutes,
+  and those scale by the seven-kit match counts, so 2v2 is about 11.2 minutes of
+  it and 3v3 about 19.5. The nine-kit run is not measured either.
   On the runner of the manual
   workflow the four-kit run took 12 to 16 minutes in one job (runs 38990892639
   at 933 s, 38997052269 at 953 s and 39005677735 at 737 s) and 6 min 28 s (2v2)
   and 11 min 26 s (3v3) in the check steps of the split (run 40461329366), 2.9
-  to 3.1 times the local time in 3v3. At seven kits with the orb and three arenas
-  the same factor projects to about 34 minutes for 2v2 and about 59 for 3v3, one
-  mode a job. The wall time
+  to 3.1 times the local time in 3v3. At nine kits with the orb and three arenas
+  the same factor projects to about 55 to 58 minutes for 2v2 and about 82 to 87
+  for 3v3, one mode a job: an estimate by match count, not a measurement. The
+  six-kit three-arena 8.0 and 13.4 minutes (from the 52 and 92 ms a match
+  above, over 9000 and 8640 matches) scale by the nine-kit counts, 21 168 in 2v2
+  and 18 144 in 3v3, to 18.8 and 28.1 minutes locally (about 47 together), and
+  the runner factor 2.9 to 3.1 takes those to the two ranges. The factor holds
+  at seven kits: the two check jobs of the seven-kit block's PR (#257, jobs
+  128743268960 and 128743268704) took 34 min 18 s (2v2) and 57 min 55 s (3v3) on
+  the runner, 3.06 and 2.97 times the 11.2 and 19.5 minute local estimates (the
+  projection then was about 34 and 59). Scaled by the nine-kit match counts
+  those two jobs give 57.6 and 83.4 minutes, inside the two ranges. The wall time
   goes to stdout and never into the file.
 - It refuses to write when `data/`, `packages/sim/src`, `packages/bots/src` or
   `tools/balance` differ from HEAD, because the head line would then name a
@@ -1436,11 +1446,16 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   `gh workflow run balance.yml --ref <branch>`. It runs `npm ci` and
   `npm run balance -- --check --mode <mode>` on ubuntu, as two jobs side by
   side, one for 2v2 and one for 3v3 (a matrix by mode, so each stays inside its
-  `timeout-minutes`: 90 for 2v2 and 150 for 3v3, set from the projection of the
-  runner above, twice the check time of the mode because the failure step plays
-  the mode again, and a margin; the run below confirmed the two-arena four-kit
-  pair at 45 and 75, arena03 raised both by a third, and the seven-kit orb block
-  raises them again by about the half). The seeds are
+  `timeout-minutes`: 150 for 2v2 and 220 for 3v3, set from the projection of the
+  runner above, twice the check time of the mode at the factor 3.1 (117 and 175
+  minutes, because the failure step plays the mode again) and a margin of at
+  least 25 percent, then rounded up to the next multiple of 10 minutes (146 and
+  218 before rounding); both are under the 6 hours
+  GitHub allows a hosted job. The run below confirmed the two-arena four-kit
+  pair at 45 and 75, arena03 raised both by a third, the seven-kit orb block
+  raised them to 90 and 150, and the nine-kit counts (#307) raise them again, to
+  150 and 220. The nine-kit pair is an estimate by match count; the manual run of
+  the nine-kit report will be the measurement). The seeds are
   never lowered to fit the runner: they set the noise of section 3, and a
   timeout is raised instead. On a difference a job prints the differing rows of
   its mode (its cell rows and budget-hit lines, from a fresh `--out` against the
