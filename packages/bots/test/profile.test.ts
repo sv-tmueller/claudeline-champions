@@ -410,7 +410,9 @@ describe('Ysmeer, the controller of roadmap 4.3', () => {
 describe('the stand reach (#213)', () => {
   const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
 
-  it('is 0.8 of rangeMax for the two champions that never kite, with a kit and without', () => {
+  // Durnhal never kites either (rangeMin 0); his whole profile, standReach included, is pinned in the
+  // Durnhal block above.
+  it('is 0.8 of rangeMax for Hargrim and Skerrow, with a kit and without', () => {
     expect(profileFor('hargrim', hargrimKit()).standReach).toBe(2 * 0.8);
     expect(profileFor('skerrow', skerrow).standReach).toBe(1.5 * 0.8);
     expect(profileFor('hargrim').standReach).toBe(3 * 0.8);
@@ -445,7 +447,9 @@ describe('the stand reach (#213)', () => {
 describe('the deadlock reach (#222)', () => {
   const skerrow = jsonKits().find((kit) => kit.id === 'skerrow') as KitDef;
 
-  it('is 1.25 of rangeMax for the two champions that never kite, with a kit and without', () => {
+  // Durnhal never kites either (rangeMin 0); his whole profile, latchReach included, is pinned in the
+  // Durnhal block above.
+  it('is 1.25 of rangeMax for Hargrim and Skerrow, with a kit and without', () => {
     expect(profileFor('hargrim', hargrimKit()).latchReach).toBe(2 * 1.25);
     expect(profileFor('skerrow', skerrow).latchReach).toBe(1.5 * 1.25);
     expect(profileFor('hargrim').latchReach).toBe(3 * 1.25);

@@ -3,7 +3,8 @@
 // The fixture runs 600 ticks on arena01 with four champions. `segments` hold the inputs as
 // in the replay fixture: a segment holds its inputs for `ticks` ticks, an entry is
 // [moveX, moveY, aimX, aimY, buttons], or null for a missing input. `actions` drive the
-// combat toolkit directly, because no ability calls it yet: an action runs when
+// combat toolkit directly, so that the committed checksums do not depend on kit data (the
+// fixture's champions have no kit, though the shipped kits do call the toolkit): an action runs when
 // `state.tick === tick`, before that tick's step, in array order. Types are `projectile`
 // and `area` (the spec of spawnProjectile and spawnArea), `damage` and `heal` (`targetId`,
 // `amount`, `sourceId`). `checkpoints` hold the checksum after the step that makes

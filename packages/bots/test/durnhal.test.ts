@@ -37,7 +37,7 @@ describe('a match of bots with Durnhal, played to matchEnd', () => {
   // never reach with 100 energy (the declared start edit below does), and Bulwark Charge as a dash
   // escape in every cell without another dash escaper. `glides` counts the dash escapes of every
   // champion in the cell, so the cells where another kit's dash could count are left out: the
-  // escapers are read from `ESCAPES`, which gives Lumeth, Ondrel and Durnhal himself a dash row.
+  // escapers are read from `ESCAPES` (every champion but Durnhal with a dash row).
   // Bulwark Charge is an escape only (decision 8 of batch #223), so every press of it is a dash
   // escape and `slots['durnhal:SPACE']` is its count: the oracle fails a press off the trigger.
   it('starts M1, M2, Bulwark Charge, Q, Breaker Throw and Aegis Line, and escapes by dashing', { timeout: 60_000 }, () => {

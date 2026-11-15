@@ -2,11 +2,12 @@
 // values are frozen: change one and the committed checksums of `scripted-abilities-arena01-2v2.json`
 // move. Every cosine is a decimal literal, never `Math.cos(...)`, so no platform can differ.
 //
-// Together the two kits use every top-level effect (projectile; area `self`, `ahead` and `aim`;
-// meleeArc including a 360-degree arc; dash with `then`; fixed and up-to teleport; applyStatus,
-// shield and heal on the caster), every hit effect (all eight status types, shield, knockback
-// `away` and `toward`, energyGain), all three movement rules, a windup of 0 and above 0, exactly two
-// EX variants per kit (one changing the windup) and an F on each. Values stay inside the ranges of
+// Together the striker and the mender use every top-level effect (projectile; area `self`, `ahead`
+// and `aim`; meleeArc including a 360-degree arc; dash with `then`; fixed and up-to teleport;
+// applyStatus, shield and heal on the caster) but `consumeCounter`, which the tests of the verb add
+// to kits of their own, every hit effect (all eight status types, shield, knockback `away` and
+// `toward`, energyGain), all three movement rules, a windup of 0 and above 0, exactly two EX
+// variants per kit (one changing the windup) and an F on each. Values stay inside the ranges of
 // docs/design/rules.md, which `validateKit` does not check.
 import type { AbilitySpec, KitDef, Slot, SlotSpec } from '../src/index';
 

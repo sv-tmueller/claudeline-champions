@@ -1,7 +1,7 @@
 // The roster kits as data: `data/kits/hargrim.json`, `quillon.json`, `skerrow.json`, `lumeth.json`,
 // `ondrel.json`, `brimwick.json`, `durnhal.json`, `wrenna.json` and `ysmeer.json`, whose numbers come from docs/design/roster-v1.md,
 // docs/design/roster-v2.md and docs/design/roster-v3.md (ticks = seconds x 60, one hit =
-// durationTicks 1 / intervalTicks 1, and the lingering areas of Ondrel carry the three rules of
+// durationTicks 1 / intervalTicks 1, and the lingering areas of every kit carry the three rules of
 // roster-v2 section 0).
 //
 // Every number the doc fixes is written out again here as a literal, so a kit file that drifts from
