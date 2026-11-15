@@ -948,18 +948,50 @@ other spec.
 
 ### The heap probe
 
-The probe's sampler is not free of side effects (#290): started and stopped with garbage
-included, the CDP sampling profiler forces a Mark-Compact in every sampled window, one per window
-(43 against 2 over a 3v3 match with a Wrenna champion). A major GC clears the weak objects embedded in optimized code and throws
-it back to baseline, so a per-function figure of a window can be inflated, and has to be read with
-the tier of the function (bots.md, "What the rule guarantees in a match"). Tracked in #304.
+The sampler is not free of side effects (#290, #304). The CDP sampling profiler, started with
+garbage included, forces a full Mark-Compact whenever it is stopped. A full collection clears the
+weak objects embedded in optimized code (`embedded weak objects cleared`) and throws that code back
+to baseline code, where every double load and double result is boxed. A probe that started and
+stopped a session per window therefore forced one collection per window (32 in 32 windows of a
+Wrenna 3v3 match; 43 against 2 in the first measurement of #290) and read bytes in functions that
+allocate nothing while they stay in TurboFan or Maglev. The CDP cannot include garbage without the
+collection: with `includeObjectsCollectedByMajorGC` and `includeObjectsCollectedByMinorGC` both
+true, or with the minor flag alone, every stop collected (20 in 20 windows with the minor flag
+alone); with neither flag there was no collection and no garbage in the profile either (2.7 to 28 KB
+a window where the garbage sessions read 330 to 880 KB). So the probe keeps the flags and starts
+the collection less often: all the measured windows of an attempt run inside one session, and the
+one collection happens when it stops, after the last window.
+
+The windows are told apart inside the session by markers. `runMarkedWindow` runs a window as one
+`page.evaluate` that calls the page's `probeWindowMarker` (installed by `openProbe`, an array of
+1024 elements, so a 4 KB sample the sampler records every time), then the frame hook, then the
+marker again. `stopSampling` returns the profile with its ordered `samples` (node id, size and
+ordinal), and `splitWindows` gives each window the samples whose ordinals lie between its two
+markers, summed per node and sorted by `summarise` like a whole profile used to be. The reads,
+key presses and pointer moves between windows run inside the session too, and their samples lie
+outside every window. A profile with other than two markers per window throws.
+
+The control, one function measured both ways (Chromium 153.0.8010.12, a scratch script, not
+committed; the same Wrenna 3v3 match on arena01 with an idle human, 150 plain windows of 30 frames
+and then 32 measured, `dodgeInto` bytes in the 32 windows, 3 runs of each): with a session per
+window, 32 collections, `dodgeInto` read 40 332 to 41 316, 46 428 to 48 384 and 67 584 to 69 600 B
+in windows 3, 4 and 5, and 24 B in three or four others, 0 B in the rest; with one session, 1
+collection (the stop, traced once), 0 B in all 32 windows of all 3 runs.
+The totals of the windows agree to a few percent (330 to 880 KB: the sweep files and
+three's render). The two scenes read the same functions in the same ranges before and after (live:
+counted code 336 to 708 B and bots 2.9 to 8.3 KB a window, `splitPath`, `plan`, `cellCenter`,
+`seekShot`, `acquire` and `frameMany`; sandbox: 300 to 1200 B, `frameMany`, `acquire` and
+`bot.ts:move`; 3 runs of each with the change and 3 without, and no figure near a limit), so
+no limit moved. The tier of a reported function is still not printed: reading it needs
+`--allow-natives-syntax` and a handle on the function, and a function that is not exported has none.
 
 Two specs count the allocations of the per-frame code over windows of frames,
 with the sampling heap profiler and garbage included, so a plain heap delta is
 not needed: `combat.spec.ts` on the dev-only sandbox and `live-probe.spec.ts` on
 the default match. They share `e2e/heap-probe.ts`, which is not a spec (like
 `support.ts`) and holds the counted-code pattern, the limits, `summarise`, the
-window runner, `openProbe`, `measureWindows`, `probeLine` and the one function
+window runners (`runWindow` and `runMarkedWindow`), `openProbe`, `startSampling` and
+`stopSampling`, `splitWindows`, `measureWindows`, `probeLine` and the one function
 that picks the asserted figure. Each spec keeps its scene, its driving and its
 end assertions. `tests/heap-probe.test.ts` pins the pure part.
 
@@ -1089,7 +1121,8 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   optimizing tier: `draw`, `loop.ts:advance`, `health-bars.ts:update`,
   `writeHooks`). Rounds 1 and 2 supply the time. The profiler and the tier-up,
   answered by a bounded local test on 1670d1b (a scratch spec, not committed): 3
-  attempts with the profiler on in every window from tick 0, against 3 first
+  attempts with the profiler on in every window from tick 0 (a session per window then, with the
+  collection each stop forced: see the start of this section), against 3 first
   profiled at tick 800, 1200 and 1600, one attempt each. The profiler does not
   move the tier-up of the per-frame functions. `writeHooks`, `advance`,
   `health-bars.ts:update`, `main.ts:draw` and the interpolation read bytes up to

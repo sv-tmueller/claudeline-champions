@@ -1217,15 +1217,22 @@ here beyond the second measurement's trace of main: rounds 1 and 2 of the defaul
 `scoreIntentsInto` 2, `dodgeInto` 2 and one each of `think`, `exFor`, `follow`, `orbUpInto`,
 `chooseTarget`, `lineOfSight` and `computeCues @109`). All of these are tracked in #303.
 
-The profiler caveat. The CDP sampling profiler of the live probe, with garbage included, forces a
-Mark-Compact in every sampled window (one per window): 43 against 2 over the same 3v3 match with a
-Wrenna champion, per `--trace-gc`. Each one clears the weak objects embedded in optimized code
-(`embedded weak objects cleared`) and throws the code back to baseline. So a per-function figure
-of the sampler can be inflated, the live probe's included, and has to be read with the tier of
-the function. The first measurement's 250 B a think in `dodgeInto` was this effect: without the
-profiler `dodgeInto` stayed in TurboFan (Maglev under `--no-turbofan`) in all 32 windows and
-read 0 B. Tracked in #304. (Node's `HeapProfiler.startSampling` forced one Mark-Compact at its
-stop in the heap test's lab runs.)
+The profiler caveat, and how the probe handles it (#304). The CDP sampling profiler, started with
+garbage included, forces a Mark-Compact whenever it stops (`--trace-gc`: 43 against 2 over a 3v3
+match with a Wrenna champion, with a session per window). Each one clears the weak objects embedded
+in optimized code (`embedded weak objects cleared`) and throws the code back to baseline, where it
+allocates. The live probe used to stop the profiler after every window, so a per-function figure
+of its windows could be inflated, and the first measurement's 250 B a think in `dodgeInto` was
+this effect: without the profiler `dodgeInto` stayed in TurboFan (Maglev under `--no-turbofan`) in
+all 32 windows and read 0 B. The probe now runs its five measured windows in one session and
+stops it once, after the last window (testing.md, "The heap probe"), so no measured window runs on
+code that the collection of an earlier window threw back. The control, the same Wrenna 3v3 match
+and windows both ways, 3 runs of each: `dodgeInto` read 40 332 to 41 316, 46 428 to 48 384 and 67 584
+to 69 600 B in three windows with a session per window and 0 B in all 32 windows with one session. The CDP offers no way to include garbage
+without the collection, so one collection per attempt remains, after the last window. A reading
+of the probe can still come from baseline code for the ordinary reasons (a first-time deopt, as
+`computeCues` above): the probe does not print the tier of a function. (Node's
+`HeapProfiler.startSampling` forced one Mark-Compact at its stop in the heap test's lab runs.)
 
 ### The default tiers on the runner
 
