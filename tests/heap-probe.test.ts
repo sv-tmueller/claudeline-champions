@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  allocationsOverAWindow,
+  MARKER_FUNCTION,
+  MARKER_MIN_BYTES,
+  WINDOW_FRAMES,
   conclude,
   measureWindows,
   pickAsserted,
   probeLine,
+  splitWindows,
   summarise,
   type Allocations,
   type ProfileNode,
+  type SamplingProfile,
 } from '../e2e/heap-probe';
 import { originOf, readPort } from '../e2e/port';
 
@@ -15,8 +19,8 @@ import { originOf, readPort } from '../e2e/port';
 // two probe specs run in a browser: how a profile is sorted into counted code,
 // bots, sweep files and the rest, and which window's figure a spec asserts.
 
-function node(url: string, functionName: string, selfSize: number, children: ProfileNode[] = []): ProfileNode {
-  return { callFrame: { functionName, url }, selfSize, children };
+function node(url: string, functionName: string, selfSize: number, children: ProfileNode[] = [], id = 0): ProfileNode {
+  return { id, callFrame: { functionName, url }, selfSize, children };
 }
 
 const ORIGIN = originOf(readPort());
@@ -205,43 +209,90 @@ describe('conclude', () => {
   });
 });
 
+// A profile as the CDP returns it for a session that ran three windows, each between two markers:
+// node 1 is `draw` (counted), node 2 `frameMany` (counted), node 3 the marker function, node 4 a
+// bots function. `selfSize` of a node is the sum of its samples, over the whole session.
+const MARK = MARKER_MIN_BYTES + 100;
+function session(): SamplingProfile {
+  const draw = node(`${CLIENT}entity-views.ts`, 'draw', 700 + 40, [], 1);
+  const frameMany = node(`${CLIENT}main.ts`, 'frameMany', 360 + 24 + 24, [], 2);
+  const marker = node('', MARKER_FUNCTION, MARK * 6 + 16, [], 3);
+  const think = node(`${BOTS}bot.ts`, 'think', 900, [], 4);
+  const head = node('', '(root)', 0, [draw, frameMany, marker, think], 0);
+  return {
+    head,
+    samples: [
+      // Before the first window: a read between windows, not counted.
+      { nodeId: 1, size: 40, ordinal: 1 },
+      { nodeId: 3, size: MARK, ordinal: 2 },
+      { nodeId: 1, size: 700, ordinal: 3 },
+      { nodeId: 2, size: 360, ordinal: 4 },
+      // A small allocation of the marker function (the array header) is not a boundary, and not counted.
+      { nodeId: 3, size: 16, ordinal: 5 },
+      { nodeId: 3, size: MARK, ordinal: 6 },
+      // Between the windows.
+      { nodeId: 2, size: 24, ordinal: 7 },
+      { nodeId: 3, size: MARK, ordinal: 8 },
+      { nodeId: 4, size: 900, ordinal: 9 },
+      { nodeId: 3, size: MARK, ordinal: 10 },
+      // The third window.
+      { nodeId: 3, size: MARK, ordinal: 11 },
+      { nodeId: 2, size: 24, ordinal: 12 },
+      { nodeId: 3, size: MARK, ordinal: 13 },
+    ],
+  };
+}
+
+describe('splitWindows', () => {
+  it('gives each window the samples between its two markers, and none of the reads around them', () => {
+    const windows = splitWindows(session(), 3);
+    expect(windows).toHaveLength(3);
+    expect(windows[0]?.combat).toBe(1060);
+    expect(windows[0]?.combatByFunction).toEqual({ 'entity-views.ts:draw': 700, 'main.ts:frameMany': 360 });
+    expect(windows[0]?.bots).toBe(0);
+    expect(windows[1]?.combat).toBe(0);
+    expect(windows[1]?.bots).toBe(900);
+    expect(windows[1]?.botsByFunction).toEqual({ 'bots/bot.ts:think': 900 });
+    expect(windows[2]?.combat).toBe(24);
+  });
+
+  it('leaves every allocation of the marker function out of the windows, the small ones too', () => {
+    const windows = splitWindows(session(), 3);
+    expect(windows.map((w) => w.total)).toEqual([1060, 900, 24]);
+  });
+
+  it('refuses a profile with a marker missing or extra, and says how many it found', () => {
+    expect(() => splitWindows(session(), 4)).toThrow(/found 6 window markers, expected 8/);
+    expect(() => splitWindows(session(), 1)).toThrow(/found 6 window markers, expected 2/);
+  });
+});
+
 describe('measureWindows', () => {
-  it('profiles each window in turn, counting every function of the pattern, and concludes on them', async () => {
+  it('runs every window inside one sampling session, so the profiler forces one collection and not one per window', async () => {
     const calls: string[] = [];
-    const draw = node(`${CLIENT}entity-views.ts`, 'draw', 700);
-    const frameMany = node(`${CLIENT}main.ts`, 'frameMany', 360);
-    const page = {
-      evaluate: async () => void calls.push('window'),
-    };
+    const page = { evaluate: async (_fn: unknown, frames: number) => void calls.push(`window ${frames}`) };
+    const sent: Array<{ method: string; params: unknown }> = [];
+    const profile = session();
     const cdp = {
-      send: async (method: string) => {
+      send: async (method: string, params?: unknown) => {
         calls.push(method);
-        return method === 'HeapProfiler.stopSampling' ? { profile: { head: node('', '(root)', 0, [draw, frameMany]) } } : {};
+        sent.push({ method, params });
+        return method === 'HeapProfiler.stopSampling' ? { profile } : {};
       },
     };
     const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     try {
       const measured = await measureWindows(page as never, cdp as never, 'sandbox', 0, 3);
-      expect(calls).toEqual(Array.from({ length: 3 }, () => ['HeapProfiler.startSampling', 'window', 'HeapProfiler.stopSampling']).flat());
-      expect(measured.windows.map((w) => w.combat)).toEqual([1060, 1060, 1060]);
-      expect(measured.asserted.combat).toBe(1060);
+      expect(calls).toEqual([
+        'HeapProfiler.startSampling',
+        ...Array.from({ length: 3 }, () => `window ${WINDOW_FRAMES}`),
+        'HeapProfiler.stopSampling',
+      ]);
+      expect(sent[0]?.params).toMatchObject({ includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+      expect(measured.windows.map((w) => w.combat)).toEqual([1060, 0, 24]);
+      expect(measured.asserted.combat).toBe(24);
     } finally {
       spy.mockRestore();
     }
-  });
-});
-
-describe('allocationsOverAWindow', () => {
-  it('counts the entity views draw in the window it runs, on either scene', async () => {
-    const draw = node(`${CLIENT}entity-views.ts`, 'draw', 700);
-    const frameMany = node(`${CLIENT}main.ts`, 'frameMany', 360);
-    const page = { evaluate: async () => undefined };
-    const cdp = {
-      send: async (method: string) =>
-        method === 'HeapProfiler.stopSampling' ? { profile: { head: node('', '(root)', 0, [draw, frameMany]) } } : {},
-    };
-    const window = await allocationsOverAWindow(page as never, cdp as never);
-    expect(window.combat).toBe(1060);
-    expect(window.combatByFunction).toEqual({ 'entity-views.ts:draw': 700, 'main.ts:frameMany': 360 });
   });
 });

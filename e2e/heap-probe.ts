@@ -174,9 +174,23 @@ export const WINDOW_FRAMES = 30;
 export const PROBE_VIEWPORT = { width: 320, height: 180 };
 
 export interface ProfileNode {
+  id: number;
   callFrame: { functionName: string; url: string };
   selfSize: number;
   children: ProfileNode[];
+}
+
+/** One sampled allocation: the node it belongs to, its bytes and its place in the session's order. */
+export interface ProfileSample {
+  nodeId: number;
+  size: number;
+  ordinal: number;
+}
+
+/** The CDP's sampling profile: the tree of nodes and the ordered samples it sums up. */
+export interface SamplingProfile {
+  head: ProfileNode;
+  samples: ProfileSample[];
 }
 
 export interface Allocations {
@@ -253,10 +267,29 @@ export function probeLine(scene: string, attempt: number, windows: readonly Allo
   return `heap probe ${scene} attempt ${attempt}: bytes per window, total/onAnimationFrame/fake requestAnimationFrame/outside the sweep files/counted code/bots: ${figures.join(' ')}`;
 }
 
+/**
+ * The function that marks the borders of a window in the profile (see `runMarkedWindow`). It
+ * allocates one array whose elements are over MARKER_MIN_BYTES, so the sampler (interval 16 B)
+ * records it every time, under this name, with an ordinal between those of the window's own samples.
+ */
+export const MARKER_FUNCTION = 'probeWindowMarker';
+/** A marker's elements array is 4 KB in the browser; the array object beside it is 16 B and is not a border. */
+export const MARKER_MIN_BYTES = 2048;
+const MARKER_ELEMENTS = 1024;
+
 /** A CDP session with the heap profiler enabled, for the page. Open it after the clock is paused. */
 export async function openProbe(page: Page): Promise<CDPSession> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
+  // The marker function lives in the page. It keeps no state, so it is never optimized away: it runs
+  // twice per measured window.
+  await page.evaluate(
+    ({ name, elements }) => {
+      const body = `return function ${name}() { const a = new Array(${elements}); for (let i = 0; i < a.length; i++) a[i] = i; return a.length; }`;
+      (window as unknown as { __probeMarker?: () => number }).__probeMarker = new Function(body)() as () => number;
+    },
+    { name: MARKER_FUNCTION, elements: MARKER_ELEMENTS },
+  );
   return cdp;
 }
 
@@ -275,19 +308,82 @@ export async function runWindow(page: Page): Promise<void> {
 }
 
 /**
- * Runs one window under the sampling heap profiler, which counts garbage as
- * well as live objects. A plain heap delta cannot be used: the sim allocates
- * inside `step` on every projectile sweep, far more than any view.
+ * Runs one window like `runWindow`, between two marker allocations in the same call, so that
+ * `splitWindows` can tell the window's samples from every other sample of the session.
  */
-export async function allocationsOverAWindow(page: Page, cdp: CDPSession): Promise<Allocations> {
+export async function runMarkedWindow(page: Page): Promise<void> {
+  await page.evaluate((frames) => {
+    const w = window as unknown as { __runProbeFrames?: (frames: number) => void; __probeMarker?: () => number };
+    if (!w.__runProbeFrames) throw new Error('the dev-only frame hook is missing');
+    if (!w.__probeMarker) throw new Error('the window marker is missing: openProbe installs it');
+    w.__probeMarker();
+    w.__runProbeFrames(frames);
+    w.__probeMarker();
+  }, WINDOW_FRAMES);
+}
+
+/**
+ * Starts the sampling heap profiler, which counts garbage as well as live objects. A plain heap
+ * delta cannot be used: the sim allocates inside `step` on every projectile sweep, far more than
+ * any view. Every window of the attempt runs inside this one session (`runMarkedWindow`), and
+ * `stopSampling` ends it: the profiler forces a full collection at every stop, and a collection
+ * throws optimized code back to baseline code, which allocates (#304), so a session per window
+ * would make the next window's functions read bytes that the shipped code does not allocate.
+ */
+export async function startSampling(cdp: CDPSession): Promise<void> {
   await cdp.send('HeapProfiler.startSampling', {
     samplingInterval: 16,
     includeObjectsCollectedByMajorGC: true,
     includeObjectsCollectedByMinorGC: true,
   });
-  await runWindow(page);
+}
+
+/** Ends the session and returns one figure per window, `count` of them, in the order they ran. */
+export async function stopSampling(cdp: CDPSession, count: number): Promise<Allocations[]> {
   const { profile } = await cdp.send('HeapProfiler.stopSampling');
-  return summarise(profile.head as ProfileNode);
+  return splitWindows(profile as unknown as SamplingProfile, count);
+}
+
+/**
+ * Cuts a session's profile into its windows: the samples that lie between the two marker
+ * samples of a window (by ordinal), summed per node of the tree and sorted by `summarise`.
+ * Samples between two windows, before the first and after the last are not in any window, and
+ * neither are the marker function's own samples.
+ */
+export function splitWindows(profile: SamplingProfile, count: number): Allocations[] {
+  const byId = new Map<number, ProfileNode>();
+  const pending = [profile.head];
+  for (let node = pending.pop(); node; node = pending.pop()) {
+    byId.set(node.id, node);
+    pending.push(...node.children);
+  }
+  const isMarker = (sample: ProfileSample): boolean => byId.get(sample.nodeId)?.callFrame.functionName === MARKER_FUNCTION;
+  const borders = profile.samples
+    .filter((sample) => isMarker(sample) && sample.size >= MARKER_MIN_BYTES)
+    .map((sample) => sample.ordinal)
+    .sort((a, b) => a - b);
+  if (borders.length !== 2 * count) {
+    throw new Error(`found ${borders.length} window markers, expected ${2 * count}: a marker was not sampled, or a window did not run`);
+  }
+  const copy = (node: ProfileNode, bytes: Map<number, number>): ProfileNode => ({
+    id: node.id,
+    callFrame: node.callFrame,
+    selfSize: bytes.get(node.id) ?? 0,
+    children: node.children.map((child) => copy(child, bytes)),
+  });
+  const windows: Allocations[] = [];
+  for (let index = 0; index < count; index++) {
+    const from = borders[2 * index] as number;
+    const to = borders[2 * index + 1] as number;
+    const bytes = new Map<number, number>();
+    for (const sample of profile.samples) {
+      if (sample.ordinal > from && sample.ordinal < to && !isMarker(sample)) {
+        bytes.set(sample.nodeId, (bytes.get(sample.nodeId) ?? 0) + sample.size);
+      }
+    }
+    windows.push(summarise(copy(profile.head, bytes)));
+  }
+  return windows;
 }
 
 export interface Measured {
@@ -298,12 +394,12 @@ export interface Measured {
 }
 
 /**
- * Measures `count` windows in a row with nothing between them, logs the probe
- * line of the attempt and, for every window with counted bytes, its functions
+ * Measures `count` windows in a row with nothing between them, in one sampling session, logs
+ * the probe line of the attempt and, for every window with counted bytes, its functions
  * (counted and bots), so every runner log names the function of any spike,
  * whether the attempt passed or failed. A spec that must read or drive between
- * windows measures them one by one with `allocationsOverAWindow` and ends with
- * `conclude`.
+ * windows starts the session itself, runs `runMarkedWindow` for each window, and ends with
+ * `stopSampling` and `conclude`.
  */
 export async function measureWindows(
   page: Page,
@@ -312,9 +408,9 @@ export async function measureWindows(
   attempt: number,
   count: number,
 ): Promise<Measured> {
-  const windows: Allocations[] = [];
-  for (let i = 0; i < count; i++) windows.push(await allocationsOverAWindow(page, cdp));
-  return conclude(scene, attempt, windows);
+  await startSampling(cdp);
+  for (let i = 0; i < count; i++) await runMarkedWindow(page);
+  return conclude(scene, attempt, await stopSampling(cdp, count));
 }
 
 /** Logs the probe line and the per-function figures of measured windows and picks the asserted one. */
