@@ -459,9 +459,9 @@ describe('checksum of the on-hit counter', () => {
 
 describe('checksum of the consumeCounter kit fields', () => {
   function spending(): GameState {
-    // The verb lives in the kit, which the checksum covers. Wrenna's kit ships both spend verbs
-    // (Heartseeker's bonus damage per stack, Fade Step's cooldown cut), but this is a test kit that
-    // declares the counter the validator requires, so the test does not move when her data is tuned.
+    // The verb lives in the kit, which the checksum covers. Wrenna's kit ships both spend verbs, but
+    // this is a test kit that declares the counter the validator requires, so the test does not move
+    // when her data is tuned.
     const striker = testStriker();
     striker.slots.M1.effects = [
       { type: 'consumeCounter', bonusDamagePerStack: 4 },
