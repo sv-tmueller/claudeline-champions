@@ -968,9 +968,9 @@ one collection happens when it stops, after the last window.
 The windows are told apart inside the session by markers. `runMarkedWindow` runs a window as one
 `page.evaluate` that calls the page's `probeWindowMarker` (installed by `openProbe`, an array of
 1024 elements, so a 4 KB sample the sampler records every time), then the frame hook, then the
-marker again. `stopSampling` returns the profile with its ordered `samples` (node id, size and
-ordinal), and `splitWindows` gives each window the samples whose ordinals lie between its two
-markers, summed per node and sorted by `summarise` like a whole profile used to be. The reads,
+marker again. `stopSampling` returns the profile with its `samples` (node id, size and a
+time-ordered ordinal; the CDP orders the ordinals, not the array), and `splitWindows` gives each
+window the samples whose ordinals lie between its two markers, summed per node and sorted by `summarise` like a whole profile used to be. The reads,
 key presses and pointer moves between windows run inside the session too, and their samples lie
 outside every window. A profile with other than two markers per window throws.
 
@@ -979,12 +979,12 @@ committed; the same Wrenna 3v3 match on arena01 with an idle human, 150 plain wi
 and then 32 measured, `dodgeInto` bytes in the 32 windows, 3 runs of each): with a session per
 window, 32 collections, `dodgeInto` read 40 332 to 41 316, 46 428 to 48 384 and 67 584 to 69 600 B
 in windows 3, 4 and 5, and 24 B in three or four others, 0 B in the rest; with one session, 1
-collection (the stop, traced once), 0 B in all 32 windows of all 3 runs.
+collection (the stop, traced in 3 of 3 runs), 0 B in all 32 windows of all 3 runs.
 The totals of the windows agree to a few percent (330 to 880 KB: the sweep files and
 three's render). The two scenes read the same functions in the same ranges before and after (live:
 counted code 336 to 708 B and bots 2.9 to 8.3 KB a window, `splitPath`, `plan`, `cellCenter`,
 `seekShot`, `acquire` and `frameMany`; sandbox: 300 to 1200 B, `frameMany`, `acquire` and
-`bot.ts:move`; 3 runs of each with the change and 3 without, and no figure near a limit), so
+`bot.ts:move`; 3 runs of each with the change and 3 without, and no median near a limit), so
 no limit moved. The tier of a reported function is still not printed: reading it needs
 `--allow-natives-syntax` and a handle on the function, and a function that is not exported has none.
 
@@ -1071,8 +1071,9 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   as decisions 7 and 11 of batch #223 allow (the limits of 600, 780 and 18 000 B
   do not move): the warm-up is 2100 again (round 3 begins by tick 3149; its budget
   is 2100 + 7000 = 9100), and the lead 11. The lead is read off a scratch run of 30
-  measured windows from the round start, with the profiler on in each, and the
-  median of the bots' bytes over each run of five: leads 0 to 9 read 57 628, 38 356,
+  measured windows from the round start, with the profiler on in each (one session
+  per window, as the derivation of the lead 2 above ran, and not the one session
+  of the probe now), and the median of the bots' bytes over each run of five: leads 0 to 9 read 57 628, 38 356,
   36 668, 33 120, 21 552, 33 120, 33 120, 24 696, 20 768 and 20 768 B (the plans of
   the chase, `splitPath` 12 to 35 KB a window, over the limit of 18 000 B; the orb is
   not up before tick 1200, so no walk to it runs in them), lead 10 reads 8724, lead 11 6928 and lead 12 2320 B, and the

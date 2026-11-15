@@ -1228,11 +1228,12 @@ all 32 windows and read 0 B. The probe now runs its five measured windows in one
 stops it once, after the last window (testing.md, "The heap probe"), so no measured window runs on
 code that the collection of an earlier window threw back. The control, the same Wrenna 3v3 match
 and windows both ways, 3 runs of each: `dodgeInto` read 40 332 to 41 316, 46 428 to 48 384 and 67 584
-to 69 600 B in three windows with a session per window and 0 B in all 32 windows with one session. The CDP offers no way to include garbage
-without the collection, so one collection per attempt remains, after the last window. A reading
-of the probe can still come from baseline code for the ordinary reasons (a first-time deopt, as
-`computeCues` above): the probe does not print the tier of a function. (Node's
-`HeapProfiler.startSampling` forced one Mark-Compact at its stop in the heap test's lab runs.)
+to 69 600 B in three windows with a session per window and 0 B in all 32 windows with one
+session. The CDP offers no way to include garbage without the collection, so one collection
+per attempt remains, after the last window. A reading of the probe can still come from
+baseline code for the ordinary reasons (a first-time deopt, as `computeCues` above): the
+probe does not print the tier of a function. (Node's `HeapProfiler.startSampling` forced
+one Mark-Compact at its stop in the heap test's lab runs.)
 
 ### The default tiers on the runner
 

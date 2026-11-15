@@ -256,6 +256,19 @@ describe('splitWindows', () => {
     expect(windows[2]?.combat).toBe(24);
   });
 
+  it('cuts by ordinal, not by array position, when the samples arrive in another order', () => {
+    const ordered = splitWindows(session(), 3);
+    // The CDP orders the ordinals, not the array: the same samples reversed, and shuffled by a fixed
+    // permutation, must give the same windows.
+    const reversed = session();
+    reversed.samples.reverse();
+    const shuffled = session();
+    shuffled.samples = [7, 2, 12, 0, 9, 4, 11, 1, 6, 10, 3, 8, 5].map((at) => session().samples[at]!);
+    expect(shuffled.samples.map((s) => s.ordinal)).not.toEqual(session().samples.map((s) => s.ordinal));
+    expect(splitWindows(reversed, 3)).toEqual(ordered);
+    expect(splitWindows(shuffled, 3)).toEqual(ordered);
+  });
+
   it('leaves every allocation of the marker function out of the windows, the small ones too', () => {
     const windows = splitWindows(session(), 3);
     expect(windows.map((w) => w.total)).toEqual([1060, 900, 24]);
