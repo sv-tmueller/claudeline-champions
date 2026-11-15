@@ -521,7 +521,7 @@ and budget-hit lines only. It needs Node 22.15 or later, for
 `module.registerHooks` (see `tools/balance/register.ts`), which is why the
 `engines` field of `package.json` reads `^22.15.0 || >=24`. It is not in
 `npm run check`: the full run of the nine kits now listed plays 39 312 matches
-(216 cells, at 28 seeds a 2v2 config and 4 a 3v3 config), about 48 minutes by
+(216 cells, at 28 seeds a 2v2 config and 4 a 3v3 config), about 47 minutes by
 match count on Apple silicon, not measured. It plays every kit of `HARNESS_KITS` in
 `tools/balance/inputs.ts` (the kits it lists, so a kit file added to the
 directory joins the report by being listed there; Durnhal joined them at his
@@ -534,16 +534,22 @@ point from `data/orbs.json` (spec section 6).
 on a runner, one job per mode (`workflow_dispatch` only, so it never runs on a
 pull request or a push). It can be dispatched with
 `gh workflow run balance.yml --ref <branch>` once the file is on the default
-branch. The whole run was 12 to 16 minutes at four kits; at seven kits with the
-orb and three arenas it is about
-31 minutes locally (2v2 11.2, 3v3 19.5, 12 600 matches each) and projects to
-about 34 (2v2) and 59 (3v3) on a runner, so the jobs have `timeout-minutes` of
-90 and 150, twice the projected check time (the failure step plays the mode
-again) and a margin. Those figures and timeouts are of the seven-kit block, which
-the document still holds: the roster is nine kits (#307), the committed block is
-the seven-kit report, so `npm run balance -- --check` and the manual workflow fail
-on purpose (216 cells against the committed 126) until the nine-kit report of a
-later package rewrites the block and re-sizes the jobs. The
+branch. The whole run was 12 to 16 minutes at four kits (measured). At seven
+kits with the orb and three arenas it is about 31 minutes locally by match
+count, not measured (2v2 11.2, 3v3 19.5, 12 600 matches each), and the two
+runner jobs of its PR (#257) took 34 min 18 s and 57 min 55 s. At nine kits
+(#307) the six-kit three-arena 8.0 and 13.4 minutes, scaled by the match counts
+(21 168 in 2v2, 18 144 in 3v3), give 18.8 (2v2) and 28.1 (3v3) locally, about 47
+together, and 2.9 to 3.1 times that on a runner is about 55 to 58 (2v2) and 82
+to 87 (3v3). These are estimates by match count, not measurements. The jobs have
+`timeout-minutes` of 150 and 220, up from 90 and 150 at seven kits: twice the
+check time at 3.1 (117 and 175, the failure step plays the mode again) and a
+margin of at least 25 percent, then rounded up to the next multiple of 10
+minutes (146 and 218 before rounding), under the 6 hours GitHub allows a hosted
+job. The committed block is
+still the seven-kit report, so `npm run balance -- --check` and the manual
+workflow fail on purpose (216 cells against the committed 126) until the
+nine-kit report of a later package rewrites the block. The
 seeds are never lowered to fit the runner. The runs on record are in
 [balance.md](../design/balance.md#7-how-to-regenerate).
 
@@ -968,23 +974,24 @@ one collection happens when it stops, after the last window.
 The windows are told apart inside the session by markers. `runMarkedWindow` runs a window as one
 `page.evaluate` that calls the page's `probeWindowMarker` (installed by `openProbe`, an array of
 1024 elements, so a 4 KB sample the sampler records every time), then the frame hook, then the
-marker again. `stopSampling` returns the profile with its ordered `samples` (node id, size and
-ordinal), and `splitWindows` gives each window the samples whose ordinals lie between its two
-markers, summed per node and sorted by `summarise` like a whole profile used to be. The reads,
-key presses and pointer moves between windows run inside the session too, and their samples lie
-outside every window. A profile with other than two markers per window throws.
+marker again. `stopSampling` returns the profile with its `samples` (node id, size and an
+ordinal; the ordinals follow time, the array is in no set order), and `splitWindows` gives each
+window the samples whose ordinals lie between its two markers, summed per node and sorted by
+`summarise` like a whole profile used to be. The reads, key presses and pointer moves between
+windows run inside the session too, and their samples lie outside every window. A profile with
+other than two markers per window throws.
 
 The control, one function measured both ways (Chromium 153.0.8010.12, a scratch script, not
 committed; the same Wrenna 3v3 match on arena01 with an idle human, 150 plain windows of 30 frames
 and then 32 measured, `dodgeInto` bytes in the 32 windows, 3 runs of each): with a session per
 window, 32 collections, `dodgeInto` read 40 332 to 41 316, 46 428 to 48 384 and 67 584 to 69 600 B
 in windows 3, 4 and 5, and 24 B in three or four others, 0 B in the rest; with one session, 1
-collection (the stop, traced once), 0 B in all 32 windows of all 3 runs.
+collection (the stop, traced in 3 of 3 runs), 0 B in all 32 windows of all 3 runs.
 The totals of the windows agree to a few percent (330 to 880 KB: the sweep files and
 three's render). The two scenes read the same functions in the same ranges before and after (live:
 counted code 336 to 708 B and bots 2.9 to 8.3 KB a window, `splitPath`, `plan`, `cellCenter`,
 `seekShot`, `acquire` and `frameMany`; sandbox: 300 to 1200 B, `frameMany`, `acquire` and
-`bot.ts:move`; 3 runs of each with the change and 3 without, and no figure near a limit), so
+`bot.ts:move`; 3 runs of each with the change and 3 without, and no median near a limit), so
 no limit moved. The tier of a reported function is still not printed: reading it needs
 `--allow-natives-syntax` and a handle on the function, and a function that is not exported has none.
 
@@ -1071,11 +1078,13 @@ end assertions. `tests/heap-probe.test.ts` pins the pure part.
   as decisions 7 and 11 of batch #223 allow (the limits of 600, 780 and 18 000 B
   do not move): the warm-up is 2100 again (round 3 begins by tick 3149; its budget
   is 2100 + 7000 = 9100), and the lead 11. The lead is read off a scratch run of 30
-  measured windows from the round start, with the profiler on in each, and the
-  median of the bots' bytes over each run of five: leads 0 to 9 read 57 628, 38 356,
+  measured windows from the round start, with the profiler on in each (one session
+  per window, as every profiled run did before #304: see "The heap probe" above), and
+  the median of the bots' bytes over each run of five: leads 0 to 9 read 57 628, 38 356,
   36 668, 33 120, 21 552, 33 120, 33 120, 24 696, 20 768 and 20 768 B (the plans of
   the chase, `splitPath` 12 to 35 KB a window, over the limit of 18 000 B; the orb is
-  not up before tick 1200, so no walk to it runs in them), lead 10 reads 8724, lead 11 6928 and lead 12 2320 B, and the
+  not up before tick 1200, so no walk to it runs in them), lead 10 reads 8724, lead 11
+  6928 and lead 12 2320 B, and the
   first death of the round is read at tick 3719, so lead 12 would leave the floor of
   60 ticks and lead 11 leaves 90. The five windows are 11 to 15 of round 3, ticks 3479
   to 3629: the round's first projectile is live by window 2, and the windows hold a

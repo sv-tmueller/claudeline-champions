@@ -2,13 +2,17 @@ name: Balance reproduction
 
 # A manual run only: it plays the bot matches of docs/design/balance.md and checks that the block
 # reproduces on linux/amd64. Two jobs run side by side, one per mode (--mode 2v2 and --mode 3v3),
-# each comparing that mode's cell rows and budget-hit lines with the committed block: the whole run
-# is about 31 minutes of matches on Apple silicon at seven kits with the orb (2v2 11.2, 3v3 19.5,
-# the six-kit three-arena 8.0 and 13.4 scaled by the match counts, 12 600 each) and 2.9 to 3.1
-# times that on a runner, so one job per mode keeps each inside its timeout. A job that fails plays
-# its mode again in a second step to print the differing rows, so each timeout-minutes is twice that
-# job's check time plus a margin (2v2 90, 3v3 150; the seeds are never lowered to fit, see
-# balance.md section 7). Trigger it on a branch with
+# each comparing that mode's cell rows and budget-hit lines with the committed block. The whole run
+# is about 47 minutes of matches on Apple silicon at nine kits with the orb, an estimate by match
+# count and not a measurement: the six-kit three-arena 2v2 8.0 and 3v3 13.4 minutes (from about 52
+# and 92 ms a match, over 9000 and 8640 matches) scaled by the nine-kit counts, 21 168 in 2v2 (28
+# seeds a config) and 18 144 in 3v3 (4 seeds), give 2v2 18.8 and 3v3 28.1. A runner takes 2.9 to 3.1
+# times that: 2v2 55 to 58 and 3v3 82 to 87 minutes. One job per mode keeps each inside its timeout.
+# A job that fails plays its mode again in a second step to print the differing rows, so each
+# timeout-minutes is twice that job's check time at 3.1 (2v2 117, 3v3 175) plus a margin of at least
+# 25 percent, then rounded up to the next multiple of 10 minutes (2v2 150, 3v3 220; both under the
+# 6 hours GitHub allows a job). The seeds are never lowered to fit, see balance.md section 7.
+# Trigger it on a branch with
 #   gh workflow run balance.yml --ref <branch>
 # It never runs on pull requests or pushes. A newer run on the same ref cancels the older one.
 on:
@@ -31,9 +35,9 @@ jobs:
       matrix:
         include:
           - mode: 2v2
-            timeout: 90
-          - mode: 3v3
             timeout: 150
+          - mode: 3v3
+            timeout: 220
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
