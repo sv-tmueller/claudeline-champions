@@ -1115,8 +1115,9 @@ ends, begun by tick 3839: a median window of 4048, 4156 and 4344 B, `move` and
 Maglev and compiles them, deoptimizes none of them, and never compiles `move`
 on its own (it is inlined into a caller or stays in a lower tier; the trace
 does not say which). The cause is not found: no scene of the heap check reads a
-byte in `move` (as measured at #142, when the check had 17 scenes, 23 after PR
-#302: 0 B in all 17, in Maglev alone as in the default tiers),
+byte in `move` (as measured at #114, when the check had 16 scenes: 0 B in all
+16, in Maglev alone as in the default tiers; the dodge scene of #142, the 17th,
+read 0 B there too; 23 scenes after PR #302),
 so it is consistent with a state of the first few hundred thinks that a long
 run does not have, and nothing in `move` or in follow.ts changed. The sandbox
 figure stays unasserted.
@@ -1329,10 +1330,10 @@ scenes). The `{ slot, ex }` figures of #184, a record from when the check had
 17 scenes (23 after #302): all 17 scenes red, 280 B in twelve and 200 B in
 five, the whole red run 2.2 to 3.9 s locally against the 15 s timeout of the
 file then. On the file after #302 (23 scenes, timeout 20 s) the same mutation
-is red in 3 of 3 runs on Node 22, 200 to 360 B in every scene, and the whole
-red run takes 14.2 to 14.7 s on a Linux host with Node 22.23.3, inside the
-timeout (the comment above the scene test has the figures; main's file read
-14.3 to 14.6 s there). The clean tree read 0 B in all 17 scenes of #184 with
+is red in 3 of 3 runs on Node 22, 200 to 360 B in every scene (PR #302), and
+the whole red run takes 14.2 to 14.7 s on a Linux host with Node 22.23.3,
+inside the timeout (the times are in the comment above the scene test; the file
+before #302 read 14.3 to 14.6 s there). The clean tree read 0 B in all 17 scenes of #184 with
 one settle window each, in every run without a delay, and on Node 26.7 the
 Maglev project read 0 B in all 17 and its kite scene 16 B against 8 B with
 `bestDistance` of the sight scan made a local; after #302 the clean tree reads
@@ -2938,12 +2939,12 @@ B; the other three are Maglev's.
 The CI runs the file in its own job: Node 26.7.0 (pinned: a bump means
 measuring again) with both projects, and Node 24 with the default tier; Node 22
 keeps the check in the unit job. On the runner (an AMD EPYC 7763), in the runs
-recorded at #142 when the check had 17 scenes (23 after #302), Node 26.7.0
-reads 0 B in all 17 scenes in both projects, the plan step 2784 B clear and
-2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2416 B in
-Maglev alone, the control 40 B a call and the block and both pins 0 B; Node 24
-reads 0 B in all 17 scenes and 2832 B clear and 2080 to 2084 B fallback for the
-plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
+of #114 (16 scenes; the dodge scene of #142, the 17th, read 0 B there too; 23
+scenes after PR #302), Node 26.7.0 reads 0 B in every scene in both projects,
+the plan step 2784 B clear and 2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2416 B
+in Maglev alone, the control 40 B a call and the block and both pins 0 B; Node
+24 reads 0 B in every scene and 2832 B clear and 2080 to 2084 B fallback for
+the plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
 the limits are 2950 and 2300 B.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
