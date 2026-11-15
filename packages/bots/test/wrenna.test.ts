@@ -135,7 +135,8 @@ describe('Pinning Shot, the opener on a target that closes in', () => {
 // Hargrim on arena02, on the eight shipped kits. The sub-plan named Wrenna and Quillon against
 // Hargrim and Quillon on arena01, a cell that ends without a stall but whose four Fade Steps all
 // come at 0 stacks, so it shows no spend; this cell (chosen from the 14 of the eight-kit cells of
-// the other kits by its spends: 4 Heartseekers and 3 Fade Steps on stacks) does. The cell takes
+// the other kits by its spends: 4 Heartseekers and 3 Fade Steps fired on stacks, counted when the
+// cast fires, since the stacks are spent then and a Heartseeker winds up for 30 ticks) does. The cell takes
 // 6.1 s locally (Linux x64, Node 24.22, load average 3 to 7), the slowest of the cells of the other
 // kits on the runner 17.1 s (durnhal.test.ts): the timeout of 60 s is at least twice that
 // (testing.md, Check suite, with the long-match precedent of durnhal.test.ts). A stall here is a
@@ -169,10 +170,10 @@ describe('a match of bots with Wrenna, played to matchEnd', () => {
         const now = (state.champions[0] as ChampionState).counter?.count ?? 0;
         if (now > stacks) tallies.builds++;
         for (const e of state.events) {
-          if (e.type !== 'castStarted' || e.championId !== 0 || stacks === 0) continue;
-          if (e.slot === 'E' && !e.ex) tallies.heartseekers++;
-          if (e.slot === 'E' && e.ex) tallies.exWithStacks++;
-          if (e.slot === 'R') tallies.fadeSteps++;
+          if ((e.type !== 'castStarted' && e.type !== 'castFired') || e.championId !== 0 || stacks === 0) continue;
+          if (e.type === 'castFired' && e.slot === 'E' && !e.ex) tallies.heartseekers++;
+          if (e.type === 'castStarted' && e.slot === 'E' && e.ex) tallies.exWithStacks++;
+          if (e.type === 'castFired' && e.slot === 'R') tallies.fadeSteps++;
         }
       },
     });
