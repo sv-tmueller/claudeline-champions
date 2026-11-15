@@ -162,6 +162,10 @@ describe('the seed schedule', () => {
     expect(() => seedsPerConfig(0)).toThrow(/fills/);
   });
 
+  // "Today's" in the title below was the four-kit roster of its time: each mode has 2 fills there
+  // (fillCount), so 100 seeds make 200 matches a cell, the target. HARNESS_KITS now holds nine kits,
+  // which the last test of this block pins: 28 seeds over 7 fills (196 matches) in 2v2, 4 over 42
+  // (168) in 3v3.
   it('is 100 and 100 at four kits, today\'s 200 matches a cell', () => {
     expect(seedSchedule(4)).toEqual({ '2v2': 100, '3v3': 100 });
   });
