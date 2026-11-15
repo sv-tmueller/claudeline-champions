@@ -41,18 +41,19 @@ CI is split by cost:
 The unit job's time is mostly `npm run test`, and Vitest's order decides how
 much of the job the three workers spend busy (#285). The runner has 4 vCPUs, so
 Vitest starts 3 workers. Its default order groups the files by project name, and
-the `tools` project came last: on job 132439224766 (the pull request run of PR
-#288 at 9bf4bee, the same tree as main's 4eb2778; the job 527 s, Vitest 444 s)
-`tools/balance/harness.test.ts` (135 s) started at 310 s and
-`tools/balance/run.test.ts` (106 s) at 317 s, and for the last 128 s only one or
-two workers were busy (the files' times add up to 1154 s, so 2.6 workers busy on
-average). `tests/vitest-sequencer.ts`, registered in `vitest.config.ts`, moves
-the files on its `SLOW_FIRST` list to the front, in list order, and leaves every
-other file in Vitest's order. No test is cut, skipped or changed. That tree read
-4251 passed and 6 skipped in 152 files (job 132439224766). 09a6ad4, which adds
-only the sequencer, its test file and two config lines to it, read 4258 passed
-and 6 skipped in 153 files (job 132449462016): +7 from the sequencer's test file,
-and no other file's count changed.
+the `tools` project came last: on job 132439224766 (the pull request run of
+PR #288 at 9bf4bee, the same tree as main's 4eb2778; the job 527 s, Vitest
+444 s) `tools/balance/harness.test.ts` (135 s) started at 310 s and
+`tools/balance/run.test.ts` (106 s) at 317 s, and for the last 128 s only
+one or two workers were busy (the files' times add up to 1154 s, so 2.6
+workers busy on average). `tests/vitest-sequencer.ts`, registered in
+`vitest.config.ts`, moves the files on its `SLOW_FIRST` list to the front,
+in list order, and leaves every other file in Vitest's order. No test is
+cut, skipped or changed. That tree read 4251 passed and 6 skipped in 152
+files (job 132439224766). 09a6ad4, which adds only the sequencer, its test
+file and its registration in `vitest.config.ts` and `tsconfig.tools.json`
+to it, read 4258 passed and 6 skipped in 153 files (job 132449462016): +7
+from the sequencer's test file, and no other file's count changed.
 
 - The list is every file that took 10 s or more in job 132439224766, slowest
   first, except that `packages/bots/test/allocation.test.ts` goes first. It has
@@ -63,10 +64,11 @@ and no other file's count changed.
   beside the two heaviest files, `durnhal.test.ts` (178 s) and `ondrel.test.ts`
   (148 s) in job 132439224766, where it used to start beside light bots files.
   It was green in every measured attempt: the unit job and both heap jobs passed
-  in all eight runs of the table below, the baseline included. #290 is the issue
-  on this test's sensitivity to what runs around it, and PR #302 has closed it
-  (every scene's bot stays reachable for the whole file), so that part is settled
-  now; the heap jobs run the file alone and are not affected by the order.
+  in all eight runs of the table below, the baseline included. #290, closed by
+  PR #302, settled the within-file part (what the earlier scenes leave behind).
+  The load from the two files that now start beside it rests on those green
+  attempts only. The heap jobs run the file alone and are not affected by the
+  order.
   `tests/vitest-sequencer.test.ts` fails if a listed path does not exist, so a
   renamed file cannot silently drop back to the end.
 - The rule: a file that reads 10 s or more in a unit job, on a slow runner
