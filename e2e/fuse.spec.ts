@@ -2,14 +2,17 @@ import { expect, test, type Page } from '@playwright/test';
 import { PROBE_VIEWPORT } from './heap-probe';
 import { orFail, watchProblems } from './support';
 
-// The armed look of a fused area (rules 2.7), in a browser. No shipped kit has a fuse, so the dev-only
-// Shift+F4 key of the sandbox spawns one at the aim: a one-hit area of 2.5 m with a fuse of 90 ticks
-// and 30 damage to the enemy team, through `debug.spawnArea`. The aim is the cursor on champion 2, who
-// has no kit and no bot and stands still at (12, 2). The area is drawn from the area entity alone, with
-// no event: `data-areas` reads 1 through the whole fuse, the picture `fuse.png` is taken while it is
-// armed, and `data-areas` reads 0 just after the detonation, which took 30 of the 120 health of
-// champion 2 (`data-bar2` 75). The units behind it are entity-views-fuse.test.ts (the armed look, its
-// release in the detonation step and at a round decision) and area.test.ts (the fuse itself).
+// The armed look of a fused area (rules 2.7), in a browser. Of the kits only ysmeer.json ships fuses (45
+// ticks on M2 and its EX, 90 on F), and the sandbox scene names the Hargrim and Quillon kits itself
+// (match-setup.ts), neither of which has one. So the dev-only Shift+F4 key of the sandbox spawns an area
+// at the aim, whatever a kit file holds: a one-hit area of 2.5 m with a fuse of 90 ticks and 30 damage
+// to the enemy team, through `debug.spawnArea`, with no cast, windup or cooldown. The aim is the cursor
+// on champion 2, who has no kit and no bot and stands still at (12, 2). The area is drawn from the
+// area entity alone, with no event: `data-areas` reads 1 through the whole fuse, the picture `fuse.png`
+// is taken while it is armed, and `data-areas` reads 0 just after the detonation, which took 30 of the
+// 120 health of champion 2 (`data-bar2` 75). The units behind it are entity-views-fuse.test.ts (the
+// armed look, its release in the detonation step and at a round decision) and area.test.ts (the fuse
+// itself).
 //
 // Every wait is a tick budget read from the canvas hooks, `data-tick`, `data-phase` and `data-areas`,
 // and the waits are batches of one `runFor`, as in lingering.spec.ts.

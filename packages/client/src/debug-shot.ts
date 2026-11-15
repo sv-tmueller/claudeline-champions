@@ -5,8 +5,10 @@ const SHOT_DAMAGE = 30;
 const SHOT_SPEED = 10;
 const SHOT_RADIUS = 0.25;
 const SHOT_LIFETIME_TICKS = 180;
-// The fused area of Shift+F4 (rules 2.7): no shipped kit has a fuse, so the e2e of the armed look
-// spawns one. 90 ticks is inside the 15 to 120 range; one hit of 30 damage, as a shot does.
+// The fused area of Shift+F4 (rules 2.7), for the e2e of the armed look. Only ysmeer.json ships fuses,
+// and the sandbox the e2e plays in names the Hargrim and Quillon kits (match-setup.ts), neither of which
+// has one, so the area is spawned here with its own numbers, whatever a kit file holds. 90 ticks is
+// inside the 15 to 120 range; one hit of 30 damage, as a shot does.
 const AREA_FUSE_TICKS = 90;
 const AREA_RADIUS = 2.5;
 const AREA_DAMAGE = 30;
