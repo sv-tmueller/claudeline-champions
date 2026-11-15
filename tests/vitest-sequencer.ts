@@ -10,24 +10,27 @@ import type { TestSpecification } from 'vitest/node';
 // check goes first: it has always run first, and its readings depend on the
 // load around it (#290). A file that passes 10 s on a slow runner is added at
 // its place. docs/architecture/testing.md, Check suite, has the rule. #307 added
-// `ysmeer.test.ts` (16.2 s in the unit job of run 43691427587) between the loopback and the Wrenna
-// file, and moved the balance CLI's file to second: with nine kits its CLI row reads 152 s, above
-// `durnhal.test.ts` (120 s), so it is the slowest file after the heap check.
+// `ysmeer.test.ts` and re-ordered the rest by the mean of the three unit jobs of its pull request
+// (runs 43691427587, 43692315600 and 43692924665, fast runners): the balance CLI's file 157 s, then
+// harness 119 s, durnhal 118 s, ondrel 99 s, brimwick 79 s, lumeth 72 s, clip-sampler 70 s,
+// headless-kits 65 s, orb-match 37 s, loopback 23 s, ysmeer 15 s, reproduce 12 s, wrenna 11 s and
+// roster-fixtures 9.9 s. Files within a few seconds of each other (harness and durnhal, lumeth and
+// clip-sampler) swap places between runs.
 export const SLOW_FIRST: readonly string[] = [
   'packages/bots/test/allocation.test.ts',
   'tools/balance/run.test.ts',
+  'tools/balance/harness.test.ts',
   'packages/bots/test/durnhal.test.ts',
   'packages/bots/test/ondrel.test.ts',
-  'tools/balance/harness.test.ts',
-  'packages/client/src/clip-sampler.test.ts',
-  'packages/bots/test/lumeth.test.ts',
   'packages/bots/test/brimwick.test.ts',
+  'packages/bots/test/lumeth.test.ts',
+  'packages/client/src/clip-sampler.test.ts',
   'packages/bots/test/headless-kits.test.ts',
   'packages/bots/test/orb-match.test.ts',
   'packages/server/test/loopback.test.ts',
   'packages/bots/test/ysmeer.test.ts',
-  'packages/bots/test/wrenna.test.ts',
   'tools/fixtures/reproduce.test.ts',
+  'packages/bots/test/wrenna.test.ts',
   'packages/sim/test/roster-fixtures.test.ts',
 ];
 

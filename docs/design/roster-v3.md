@@ -356,7 +356,7 @@ series (v3 spec section 9.3), step 3.4 (#281): `HARNESS_KITS` in
 `tools/balance/inputs.ts` lists her, and the balance block of
 [balance](balance.md) is not regenerated for her, so it is still the seven-kit
 report and `npm run balance -- --check` fails on purpose until the nine-kit
-report of batch 21.
+report of a later package.
 
 **Bot profile (#281).** Roster-v3 has no bot sketch for her, so her profile
 follows roster-v2's recipe (see [bots](../architecture/bots.md)): she keeps 10

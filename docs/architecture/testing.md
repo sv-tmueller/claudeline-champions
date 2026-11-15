@@ -57,7 +57,7 @@ file and its registration in `vitest.config.ts` and `tsconfig.tools.json`
 to it, read 4258 passed and 6 skipped in 153 files (job 132449462016): +7
 from the sequencer's test file, and no other file's count changed.
 
-- The list is every file that took 10 s or more in job 132439224766, slowest
+- The list as first written is every file that took 10 s or more in job 132439224766, slowest
   first, except that `packages/bots/test/allocation.test.ts` goes first. It has
   always run first, and its readings depend on the load around it and on what the
   tests before it allocated (a major GC inside a measured window deoptimizes the
@@ -76,11 +76,17 @@ from the sequencer's test file, and no other file's count changed.
 - The rule: a file that reads 10 s or more in a unit job, on a slow runner
   included, goes on the list at its place by time. A new champion's bot file
   (`packages/bots/test/<kit>.test.ts`) takes this check on its first CI run.
-  #307 applied it: `ysmeer.test.ts` read 16.2 s (unit job of run 43691427587, a fast runner) and
-  sits between the loopback file (23.5 s) and Wrenna's (10.5 s), and the balance CLI's file, whose
-  one row plays 756 matches with nine kits, read 154.6 and 165.5 s against `durnhal.test.ts`'s 120.1
-  and 123.0 s, so it moved to second place, after the heap check (the CLI row alone 152.4 and 163.3 s,
-  about 229 s on a slow runner, twice which is 457 s inside its 600 s). The other files kept their places.
+  #307 applied it: `ysmeer.test.ts` read 16.2, 16.1 and 14.0 s in the three unit jobs of its pull
+  request (runs 43691427587, 43692315600 and 43692924665, fast runners) and sits between the loopback
+  file (23 s) and `reproduce.test.ts` (12 s). The balance CLI's file, whose one row plays 756 matches
+  with nine kits, read 154.6, 165.5 and 151.4 s (the row alone 152.4 and 163.3 s, about 229 s on a slow
+  runner, twice which is 457 s inside its 600 s), above every other file, so it moved to second place,
+  after the heap check. The rest of the list was re-ordered by the mean of those three jobs, since
+  the file times had moved since job 132439224766: harness 119 s, durnhal 118 s (harness was listed behind
+  ondrel, and clip-sampler ahead of brimwick and lumeth, before), ondrel 99 s, brimwick 79 s, lumeth 72 s, clip-sampler 70 s,
+  headless-kits 65 s, orb-match 37 s, loopback 23 s, ysmeer 15 s, reproduce 12 s, wrenna 11 s and
+  roster-fixtures 9.9 s (under 10 s in this mean, kept as it read 10.0 s in one of the three). Files within a few
+  seconds of each other swap places between runs, so the order of such neighbours is not exact.
 - The result, on the same runner speed: 2.9 workers busy in every attempt
   (2.88), against 2.6, and the job 374 and 369 s on two fast runners (Vitest 302
   and 304 s, typecheck 15 s). On slow runners the job reads 469 s (job
@@ -197,7 +203,7 @@ timeouts stand.
   six-core Linux host: 3.55 to 3.75 s in the Maglev project, 3.8 to 4.0 s in the default
   tiers, and 14.2 to 14.7 s for a red run to the cap of the settle on Node 22.23.3 (the
   `{ slot, ex }` mutation; main's file reads 14.3 to 14.6 s there), so the timeout stays 20 s.
-  With Ysmeer's three scenes (the 24th to 26th): 4.8 s on Node 24 in the default tiers, and
+  With Ysmeer's three scenes (the 24th to 26th, 26 scenes after #307): 4.8 s on Node 24 in the default tiers, and
   4.6 s in Maglev and 4.8 s in the default tiers on Node 26.7.0, on a Linux host at a load
   average of 6 to 10. The unit job (run 43691427587, b2bab13, Node 22, a fast runner) reads 6.7 s,
   under the 10 s at which the timeout rule has no step left (6.7 s again in the second run), and the heap jobs read 2.9 s (Node 24),

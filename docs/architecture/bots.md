@@ -1128,7 +1128,7 @@ on its own (it is inlined into a caller or stays in a lower tier; the trace
 does not say which). The cause is not found: no scene of the heap check reads a
 byte in `move` (as measured at #114, when the check had 16 scenes: 0 B in all
 16, in Maglev alone as in the default tiers; the dodge scene of #142, the 17th,
-read 0 B there too; 23 scenes after PR #302),
+read 0 B there too; 23 scenes after PR #302, 26 after #307),
 so it is consistent with a state of the first few hundred thinks that a long
 run does not have, and nothing in `move` or in follow.ts changed. The sandbox
 figure stays unasserted.
@@ -1348,7 +1348,7 @@ before #302 read 14.3 to 14.6 s there). The clean tree read 0 B in all 17 scenes
 one settle window each, in every run without a delay, and on Node 26.7 the
 Maglev project read 0 B in all 17 and its kite scene 16 B against 8 B with
 `bestDistance` of the sight scan made a local; after #302 the clean tree reads
-0 B in all 23 scenes. The measured
+0 B in all 23 scenes, and after #307 in all 26 (Node 26.7.0, Maglev alone). The measured
 loop is written out twice, word for word (the settle's and the rounds'),
 because one copy in a loop over both read 80 B a think in 3 to 12 of the 17
 scenes of #184 on the clean tree (a record, like the figures above): the loop
@@ -2794,9 +2794,11 @@ band, then less the 1 m margin): M1 11 (10), M2 13.5 (12.5), M2 EX 14 (13), Q 10
 the two escape rows (`ysmeer:SPACE` is `{ teleport: null, dash: 4, after: null }`, `ysmeer:R` follows
 it), `ysmeer:SPACE` in the dash set and a literal rangeMin 8. The frozen scenes (a hard bot, the nine
 shipped kits, each red under its mutation): a kite think at 6 m with Drift and Eclipse ready presses
-SPACE, with Drift on cooldown it presses R, and at 9 m with both ready it presses nothing (with
-SPACE dropped from the row the Drift scene and the cell are red, with the row removed both scenes,
-the cell, the free-play run and `profile.test.ts` are); the Falling Star
+SPACE, with Drift on cooldown it presses R, and at 9 m with both ready it presses nothing (the
+mutations, run alone: with SPACE dropped from the row, 4 tests are red: the row test of
+`profile.test.ts`, the Drift scene, the cell and the free-play run; with the whole row removed, 4
+are red: the row test, the Drift scene, the Eclipse scene and the cell, and the free-play run stays
+green, since Supernova is pressed on its band with no rule); the Falling Star
 pressed at a standing target at 9 m fires after its 24-tick windup and deals 20 exactly 45 ticks
 later, the fuse. The seeded cell (`ysmeer.test.ts`, played on `NINE_SET`): Ysmeer and Quillon against
 Hargrim and Quillon on arena01, seeds 101 to 104, match seed 7, normal tier, to matchEnd: it passes
@@ -2811,7 +2813,7 @@ Durnhal's Last Bastion does: free play with no round start, Ysmeer at 100 energy
 once, at tick 99. No pinned hash and no end tick of another kit moved.
 
 The heap check got three Ysmeer scenes as list entries after Wrenna's (the 24th to 26th of the scene
-test), each made through `scene()` with `configYsmeer()` and no think in its arrange: a star windup
+test, which has 26 scenes after #307), each made through `scene()` with `configYsmeer()` and no think in its arrange: a star windup
 (a Falling Star frozen 12 ticks into its windup, the target strafing at 9 m: `aim` takes the capped
 branch over a fused area spec), a well press (Gravity Well pressed on every think at 8.5 m: `aim` reads
 the speed of a projectile spec that has an `endArea` key) and a dodge over an end-area bolt (the dodge
@@ -2824,7 +2826,7 @@ the capped branch of `aim`'s area loop reads 88 B in the star windup scene (and 
 scene, which takes the same branch): red in Maglev alone, under the 128 B of the default tiers.
 
 A heap check, `packages/bots/test/allocation.test.ts`, pins the Allocation
-section. It builds twenty-six frozen scenes on arena 1 with the nine shipped kits (a
+section. It builds twenty-six frozen scenes (after #307; 23 after #302) on arena 1 with the nine shipped kits (a
 press, an engage stand, a path follow past the age of the segment test, a kite
 with no clear shot, a kite step, a retreat, the deadlock rule's advance, flee
 and latched stand, an opener press, an escape press with its landing search, a
