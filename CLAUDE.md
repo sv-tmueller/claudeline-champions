@@ -33,7 +33,7 @@ npm run e2e                      # Playwright e2e; screenshots scene.png,
 npm run balance                  # bot-versus-bot win-rate report: plays 39312
                                  # matches (nine kits, the energy orb on) and
                                  # writes the block of docs/design/balance.md,
-                                 # about 48 minutes by match count, not
+                                 # about 47 minutes by match count, not
                                  # measured. The committed block is still the
                                  # seven-kit one, so --check fails until the
                                  # nine-kit report. Flags
