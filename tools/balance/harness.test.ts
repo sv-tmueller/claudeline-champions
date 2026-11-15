@@ -105,12 +105,22 @@ describe('the pairings, the fills and the configs', () => {
 });
 
 describe('the shipped data', () => {
-  it('has the eight kits, sorted, and every arena', () => {
-    expect(KIT_IDS).toEqual(['brimwick', 'durnhal', 'hargrim', 'lumeth', 'ondrel', 'quillon', 'skerrow', 'wrenna']);
+  it('has the nine kits, sorted, and every arena', () => {
+    expect(KIT_IDS).toEqual([
+      'brimwick',
+      'durnhal',
+      'hargrim',
+      'lumeth',
+      'ondrel',
+      'quillon',
+      'skerrow',
+      'wrenna',
+      'ysmeer',
+    ]);
     expect(DATA.arenas.map((a) => a.id)).toEqual(['arena01', 'arena02', 'arena03']);
-    expect(pairings(KIT_IDS)).toHaveLength(28);
-    // 6 fills in each 2v2 pairing and 30 in each 3v3 pairing.
-    expect(configs(KIT_IDS)).toHaveLength(28 * (6 + 30));
+    expect(pairings(KIT_IDS)).toHaveLength(36);
+    // 7 fills in each 2v2 pairing and 42 in each 3v3 pairing.
+    expect(configs(KIT_IDS)).toHaveLength(36 * (7 + 42));
   });
 
   it('loads the orb point of every arena, so each cell plays the standard match', () => {
@@ -166,6 +176,10 @@ describe('the seed schedule', () => {
 
   it('is 32 and 6 at eight kits', () => {
     expect(seedSchedule(8)).toEqual({ '2v2': 32, '3v3': 6 });
+  });
+
+  it('is 28 and 4 at nine kits: 200 over 7 fills is 28.6, 200 over 42 is 4.8', () => {
+    expect(seedSchedule(9)).toEqual({ '2v2': 28, '3v3': 4 });
   });
 });
 

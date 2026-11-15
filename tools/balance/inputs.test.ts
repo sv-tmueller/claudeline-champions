@@ -18,6 +18,7 @@ describe('the harness roster', () => {
       'quillon',
       'skerrow',
       'wrenna',
+      'ysmeer',
     ]);
     const files = readdirSync(fileURLToPath(new URL('data/kits/', ROOT))).filter((n) => n.endsWith('.json'));
     expect(files).toContain('durnhal.json');
@@ -25,11 +26,10 @@ describe('the harness roster', () => {
     expect(files).toContain('ysmeer.json');
     for (const id of HARNESS_KITS) expect(files).toContain(`${id}.json`);
     // A kit joins the harness in its own step, so the files outside the list are exactly the kits
-    // built ahead of it. Ysmeer's kit file is in data/kits (roster-v3 step 4.2) and she joins the
-    // harness in step 4.3 (v3 spec 9.3), so she is the only one outside the list; that step moves her
-    // into HARNESS_KITS and this line then names no one.
+    // built ahead of it. Ysmeer's kit file (roster-v3 step 4.2) joined at step 4.3 (v3 spec 9.3), so
+    // none is left outside the list; the next kit file will be the first, and this line then names it.
     const unlisted = files.map((n) => n.replace(/\.json$/, '')).filter((id) => !HARNESS_KITS.includes(id));
-    expect(unlisted).toEqual(['ysmeer']);
+    expect(unlisted).toEqual([]);
     expect(loadInputs(ROOT).kits.map((kit) => kit.id)).toEqual([...HARNESS_KITS]);
   });
 

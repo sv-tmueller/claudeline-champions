@@ -21,7 +21,7 @@ function balance(...args: string[]) {
 }
 
 describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
-  // 504 matches in a spawned process (eight kits: 28 pairings on 3 arenas, 6 fills, 1 seed) with the
+  // 756 matches in a spawned process (nine kits: 36 pairings on 3 arenas, 7 fills, 1 seed) with the
   // orb on, so the matches run long. Measured here on the loaded box and sized twice the check time
   // plus a margin (testing.md, Check suite).
   it('writes the block of a 1-seed 2v2 run to --out and prints the wall time to stdout only', { timeout: 600_000 }, () => {
@@ -30,12 +30,12 @@ describe.skipIf(!HAS_HOOKS)('the balance CLI', () => {
       const file = join(dir, 'report.md');
       const run = balance('--mode', '2v2', '--seeds', '1', '--out', file);
       expect(run.status, run.stderr).toBe(0);
-      // Eight kits: 28 pairings on 3 arenas, each with 6 fills and 1 seed.
-      expect(run.stdout).toMatch(/played 504 matches in \d+\.\d s/);
+      // Nine kits: 36 pairings on 3 arenas, each with 7 fills and 1 seed.
+      expect(run.stdout).toMatch(/played 756 matches in \d+\.\d s/);
       const text = readFileSync(file, 'utf8');
       expect(text.startsWith(`${REPORT_START}\n`)).toBe(true);
       expect(text.endsWith(`${REPORT_END}\n`)).toBe(true);
-      expect(text.split('\n').filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(84);
+      expect(text.split('\n').filter((line) => /^\| 2v2 \|/.test(line))).toHaveLength(108);
       expect(text.split('\n').filter((line) => /^\| 3v3 \|/.test(line))).toHaveLength(0);
       expect(text).toContain('Seeds 1 to 1 for each config');
       expect(text).not.toMatch(/\d+\.\d s\b/);
