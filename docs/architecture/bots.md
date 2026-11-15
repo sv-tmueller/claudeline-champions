@@ -2716,9 +2716,10 @@ not at one that stands or walks away. The seeded cell (`wrenna.test.ts`, played 
 Wrenna and Hargrim against Ondrel and Hargrim on arena02, seeds 101 to 104, match seed 7, normal
 tier, to matchEnd: it passes the oracle, no escape is blocked, no bot stalls for more than 120
 ticks (the worst is 15), it ends at tick 4206 with 913 as the longest ordinary round, and her
-tallies show 28 builds, 4 Heartseekers and 3 Fade Steps cast on stacks and no EX
-Heartseeker on stacks (the oracle fails one, `SPEND_BASE` in press-oracle.ts, which also
-fails the press at any other time). The cell the sub-plan named, Wrenna and Quillon against
+tallies show 28 builds, 4 Heartseekers and 3 Fade Steps fired on stacks (counted when the
+cast fires, with the stacks read before that tick's step, since the counter is spent then and a
+Heartseeker winds up for 30 ticks) and no EX Heartseeker started on stacks (the oracle fails
+one, `SPEND_BASE` in press-oracle.ts, which also fails the press at any other time). The cell the sub-plan named, Wrenna and Quillon against
 Hargrim and Quillon on arena01, ends too (at tick 4457, the longest ordinary round 1200, no stall) but
 its four Fade Steps all come at 0 stacks (they come early in a round, before a Longbow hit lands),
 so it shows no spend; it was chosen among the cells of Wrenna against each of the other
