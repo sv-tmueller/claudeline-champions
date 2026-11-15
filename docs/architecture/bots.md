@@ -1115,7 +1115,9 @@ ends, begun by tick 3839: a median window of 4048, 4156 and 4344 B, `move` and
 Maglev and compiles them, deoptimizes none of them, and never compiles `move`
 on its own (it is inlined into a caller or stays in a lower tier; the trace
 does not say which). The cause is not found: no scene of the heap check reads a
-byte in `move` (0 B in all 17 scenes, in Maglev alone as in the default tiers),
+byte in `move` (as measured at #114, when the check had 16 scenes: 0 B in all
+16, in Maglev alone as in the default tiers; the dodge scene of #142, the 17th,
+read 0 B there too; 23 scenes after PR #302),
 so it is consistent with a state of the first few hundred thinks that a long
 run does not have, and nothing in `move` or in follow.ts changed. The sandbox
 figure stays unasserted.
@@ -1270,8 +1272,9 @@ feedback had optimised ("Insufficient type feedback", `updateRuns`, `move`,
 run, and every reoptimisation waits the delay again. The code a window measures
 is then still a lower tier's until the job lands.
 
-Pinning one function out of Turbofan (`--turbo-filter=-<fn>`, one run each)
-gives no kite-only state. `nearestSightCellIn`: the kite scene at 62224 B, the
+Pinning one function out of Turbofan (`--turbo-filter=-<fn>`, one run each; a
+record of #184, when the check had 17 scenes, 23 after #302) gives no kite-only
+state. `nearestSightCellIn`: the kite scene at 62224 B, the
 retreat at 29232, the deadlock advance at 35616; `lineOfSight`: 6 to 175 KB in
 15 scenes; `distanceInto`: 48 to 272 B in all 17; `steerTowardInto`: 176 B in
 the path follow, kite and deadlock flee scenes; `seekShot`: 32 to 64 B in four
@@ -1321,17 +1324,24 @@ tier the users run.
 A mutation that allocates on every think settles to the cap and stays red, in 3
 of 3 runs each, on Node 22 in the default tiers: a six-double object kept in
 `waitsFor` (168 B in the skerrow engage and wait scenes), a `{ slot, ex }`
-object per slot in `updateRuns` (all 17 scenes red, 280 B in twelve and 200 B
-in five, the whole red run 2.2 to 3.9 s locally against the 15 s timeout), and
-a two-double cell centre object in the sight scan (14328 to 17784 B in the
-kite, retreat and deadlock advance scenes). The clean tree reads 0 B in all 17
-scenes with one settle window each, in every run without a delay, and on Node
-26.7 the Maglev project reads 0 B in all 17 and its kite scene reads 16 B
-against 8 B with `bestDistance` of the sight scan made a local. The measured
+object per slot in `updateRuns`, and a two-double cell centre object in the
+sight scan (14328 to 17784 B in the kite, retreat and deadlock advance
+scenes). The `{ slot, ex }` figures of #184, a record from when the check had
+17 scenes (23 after #302): all 17 scenes red, 280 B in twelve and 200 B in
+five, the whole red run 2.2 to 3.9 s locally against the 15 s timeout of the
+file then. On the file after #302 (23 scenes, timeout 20 s) the same mutation
+is red in 3 of 3 runs on Node 22, 200 to 360 B in every scene (PR #302), and
+the whole red run takes 14.2 to 14.7 s on a Linux host with Node 22.23.3,
+inside the timeout (the times are in the comment above the scene test; the file
+before #302 read 14.3 to 14.6 s there). The clean tree read 0 B in all 17 scenes of #184 with
+one settle window each, in every run without a delay, and on Node 26.7 the
+Maglev project read 0 B in all 17 and its kite scene 16 B against 8 B with
+`bestDistance` of the sight scan made a local; after #302 the clean tree reads
+0 B in all 23 scenes. The measured
 loop is written out twice, word for word (the settle's and the rounds'),
-because one copy in a loop over both read 80 B a think in 3 to 12 of 17 scenes
-of the clean tree: the loop sat in another tier, as in the 144 B case of
-Testing.
+because one copy in a loop over both read 80 B a think in 3 to 12 of the 17
+scenes of #184 on the clean tree (a record, like the figures above): the loop
+sat in another tier, as in the 144 B case of Testing.
 
 On the runner (the three attempts of run 40339535608 of PR #184, the checks job
 and both heap jobs, nine jobs) every scene settled in one window of 10 to 58 ms
@@ -2928,12 +2938,13 @@ B; the other three are Maglev's.
 
 The CI runs the file in its own job: Node 26.7.0 (pinned: a bump means
 measuring again) with both projects, and Node 24 with the default tier; Node 22
-keeps the check in the unit job. On the runner (an AMD EPYC 7763) Node 26.7.0
-reads 0 B in all 17 scenes in both projects, the plan step 2784 B clear and
-2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2416 B in
-Maglev alone, the control 40 B a call and the block and both pins 0 B; Node 24
-reads 0 B in all 17 scenes and 2832 B clear and 2080 to 2084 B fallback for the
-plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
+keeps the check in the unit job. On the runner (an AMD EPYC 7763), in the runs
+of #114 (16 scenes; the dodge scene of #142, the 17th, read 0 B there too; 23
+scenes after PR #302), Node 26.7.0 reads 0 B in every scene in both projects,
+the plan step 2784 B clear and 2064 to 2068 B fallback in the default tier and 2784 B and 2400 to 2416 B
+in Maglev alone, the control 40 B a call and the block and both pins 0 B; Node
+24 reads 0 B in every scene and 2832 B clear and 2080 to 2084 B fallback for
+the plan step, which are 2688 and 1936 B on its earlier runs, a spread of 144 B:
 the limits are 2950 and 2300 B.
 
 A stall tracker in the test helpers counts, per bot, consecutive ticks whose
