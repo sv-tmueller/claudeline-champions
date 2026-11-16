@@ -162,6 +162,9 @@ describe('the seed schedule', () => {
     expect(() => seedsPerConfig(0)).toThrow(/fills/);
   });
 
+  // The 100 and 100 figure is the schedule of a four-kit roster, not of HARNESS_KITS: each mode has
+  // 2 fills there (fillCount), so 100 seeds make 200 matches a cell, the target. The tests below pin
+  // the schedule for larger rosters.
   it('is 100 and 100 at four kits, today\'s 200 matches a cell', () => {
     expect(seedSchedule(4)).toEqual({ '2v2': 100, '3v3': 100 });
   });
