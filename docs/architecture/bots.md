@@ -848,8 +848,8 @@ reaches 0 B there, and a function that first reaches a cold branch drops to base
 for some hundred ticks (30 to 630 measured for the functions that run on every think). Functions
 the bots call rarely can stay out of optimized code for thousands of ticks, mostly under 8 B a
 think; the exceptions are C3 `chooseEscape` (11.4 B), the upper bounds of the C1 and C4
-persistent rows (10.8 and 8.8 B), 8.1 B for one bot in the C2 `kiteDirectionInto` windows in the
-second measurement (class U inside), and one stint of the default match, `needsPlan`, reaches 240
+persistent rows (10.8 and 8.8 B), 8.1 B for one bot in the C2 persistent row's windows (`orbUpInto` open)
+in the second measurement (class U inside), and one stint of the default match, `needsPlan`, reaches 240
 ticks into the steady state at about 11.3 B a think (the browser measurements, below, are in "What
 the rule guarantees in a match (#290)", which lists the configurations measured, and in "The drops
 of #303, measured (#318)"). What makes the optimized figure true, and what
@@ -1281,8 +1281,8 @@ reach past it:
 |---|---|---|---|---|---|
 | `dodgeInto @806`, `decide @51`, `chooseCast @236` (type feedback) | 2519 to 2759 | 330 to 540, back at 3059 to 3089 | 0 (mean per bot over the 35 windows from 3029: 0.7 to 2.4) | 0 | accept (3) |
 | `orbUpInto @51` | 2759 to 2789 | open, 1500 to the end, Sparkplug | same | 0 | accept (3; 1530 ticks left) |
-| `needsPlan @94` (out of bounds, private) | 1289 to 1319 | whole stint 1950 to 1980, back at 3269; 240 after the warm-up end | 11.4 (bot 2, 24 B on 103 of 216 thinks; 11.1 in run B) | 4.6 (T = 240) | persistent on the whole stint, so fix by the rule; the owner's question (below) |
-| `segmentHitsBox @228` (wrong map, private helper of geometry.ts) | 209 to 239 | no compile line after the drop in 2 of 4 hook-free runs (1 of 2 in each measurement; open, 4050); back in TurboFan at once in the other 2 (a compile queued before the drop lands in the same window); no compile line in the traced instrumented run of either measurement | not separable | - | persistent on the whole stint in 2 of 4 runs, so fix by the rule there; the owner's question (below). The outcome depends on a compile race. No compile line of its own in those runs, so it stays in baseline code or is inlined |
+| `needsPlan @94` (out of bounds, private) | 1289 to 1319 | whole stint 1950 to 1980, back at 3269; 240 after the warm-up end | 11.4 (bot 2, 24 B on 103 of 216 thinks; 11.1 in run B) | 4.6 (T = 240) | persistent on the whole stint, so fix by the rule; the owner's question (below). Back at 3269 in 5 of 6 runs and at 3299 in 1 (a run of the second measurement: stint 2010, 270 after the warm-up end, S 5.1); the decision is the same |
+| `segmentHitsBox @228` (wrong map, private helper of geometry.ts) | 209 to 239 | no compile line after the drop in 2 of 4 hook-free runs (1 of 2 in each measurement; open, 4050); back in TurboFan at once in the other 2 (a compile queued before the drop completes in the window of the drop or the next, at tick 239: the drop is at 239 in one run and at 209 in the other); no compile line in the traced instrumented run of either measurement | not separable | - | persistent on the whole stint in 2 of 4 runs, so fix by the rule there; the owner's question (below). The outcome depends on a compile race. No compile line of its own in those runs, so it stays in baseline code or is inlined |
 
 Hargrim 3v3 on arena01 (C1; 3929, 5159):
 
@@ -1306,7 +1306,7 @@ Hargrim 2v2 on arena03 (C3; 2639, 12 539):
 |---|---|---|---|---|---|
 | `move @678` (wrong call target, 3 of 3), with `splitPath @34`, `decide @116` | 2609 to 2669 | 330 to 450, 420 after the warm-up end | 23.3 (24 B on 87% of the thinks) | 16.3 | fix |
 | `computeCues @267` (type feedback, 3 of 3) | 3119 to 3149 | 90 to 150 (tier reads 120) | 163.5 (168 or 204 B on 105 of 120 thinks) | 41 | fix |
-| `dodgeInto @123` (keyed access, 3 of 3) | 3359 | 330 to 420 (tier reads 360) | 30.7 | 21.5 | fix |
+| `dodgeInto @123` (keyed access, 3 of 3) | 3359 | 330 to 420 (tier reads 360) | 30.7 against the 5 windows after, which hold class U (24 B reads); 37.5 against zero | 21.5; 26.3 against zero | fix either way |
 | `dodgeInto @52` (wrong map, 3 of 3) | 3929 to 3959 | 300 to 330 | 33.6 (264 B) | 18.5 | fix |
 | wave of `dependent prototype chain changed` (3 of 3; about 43 marks and wrong-map deopts in 25 functions) | 9749 | 30 to 630 for the hot functions | 126 over 9749 to 10349 (bot 3: 120 B on 76% of its thinks, plan thinks 32% against 1%; mean of all thinks 704 B against 7 B) | 126 (T 630, over 600) | fix (class X) |
 | the same wave, 10349 to 11069 | | 720 | 1.1 | 1.1 | accept (the functions still down are not called) |
@@ -1314,7 +1314,7 @@ Hargrim 2v2 on arena03 (C3; 2639, 12 539):
 | `hasStatus @7` and `@27` (listed here at 11159 and 11249) | instrumented runs only | 60 to 90 | - | - | artifact (step 1): no `hasStatus` deopt after tick 9749 in any hook-free run (0 of 3 in the first measurement, 0 of 3 in the second). The tier reads disagree: in both instrumented runs of the first measurement `hasStatus` reads Sparkplug at 11129 and 11219, in both of the second it reads Maglev throughout. No decision, no slice |
 | `chooseEscape` after the wave (class X: marked at 9749, no code, never recompiled in 3 of 3 hook-free traces; Sparkplug from 11099) | 9749, baseline from 11099 | open, 1440 to the match end (tier reads, runs A and B) | 11.4 (bots 1 and 3 read 168 and 192 B in 11099 to 11129); 8.8 without the windows of `dodgeInto @806`, 11159 to 11339, with which it is a joint row (the second measurement read 10.1 to 10.3 over the whole stint and 6.7 to 6.8 without those windows) | 11.4; 8.8 (6.8) | fix (class X, folded into the wave investigation; the whole-stint E is 8 B or more in both measurements) |
 | `think @691` (wrong call target, 3 of 3) | 12239 to 12269 | 90 to 180 | 0.0 | 0.0 | accept (3) |
-| `enemyInReach`, `nearerThanEnemies` after the wave (class X: no code, status 1, until called again at 12239) | 9749 | over 1800 (back at 12239); not called | 0.4 over 28 windows | - | fix: persistent, class X, folded into the wave investigation |
+| `enemyInReach`, `nearerThanEnemies` after the wave (class X: no code until called again; `nearerThanEnemies` is exported and reads status 1 from 9749 to 12179, `enemyInReach` is private and has no tier read) | 9749 | over 1800 (compiled again at 12179 to 12239); not called | 0.4 over 28 windows | - | fix: persistent, class X, folded into the wave investigation; accepted when a hook-free trace shows the wave not marking either at 9749 (the unfixed code marks both in 4 of 4 traced runs of the first measurement) |
 | `hasStatus`, `chooseCast` (`embedded weak objects cleared`) | 5279 instrumented; hook-free 1469 (2 of 3, before the warm-up end, none after; 0 of 4 in the second measurement: 3 hook-free runs and 1 traced instrumented run) | 120 | 0.5 | 0.1 | accept (class G, depends on collection timing) |
 
 Quillon 3v3 on arena02 (C4; 3809, 5849):
@@ -1354,7 +1354,7 @@ of a block. `hasStatus` is also a function name in the sim; the tier reads of th
   code at once in the other 2, a compile race); both are the owner's question below. Their bytes are not broken down per
   window.
 - **P, after the warm-up.** Fix: `computeCues @267` (C3, C4), `dodgeInto @123`, `@52`, `@806` (C3),
-  `move @678` (C3), `followPathInto` and `aim` (C5) and the persistent rows. Undetermined, in the
+  `move @678` (C3), `followPathInto` and `aim` (C5) and the persistent rows of C1, C2, C4 and C5. Undetermined, in the
   class U investigation: C1 `chooseEscape @176`. Accepted with figures: `decide @287` with
   `finisher @108` (C2), `think @691` (C3), `decide @51` with `orbUpInto @51` (C5) and the crossing
   rows of C0. Artifact: C3 `hasStatus @7` and `@27`.
@@ -1367,7 +1367,7 @@ of a block. `hasStatus` is also a function name in the sim; the tier reads of th
   which never recompiles (3 of 3 hook-free traces), joint with `dodgeInto @806` where the stints
   overlap (11.4 B, 8.8 B without those windows; 10.1 to 10.3 and 6.7 to 6.8 in the second
   measurement); and `enemyInReach` and `nearerThanEnemies`, which the wave leaves without code until
-  they are called again at 12239. It is one investigation, whose exit may be "no
+  they are called again (compiled at 12179 to 12239). It is one investigation, whose exit may be "no
   source fix". `move` is back in the same window after the wave, so the Node-only rows (Wrenna's
   scene as its own test, bots that think before the scene list) are accepted as test constraints
   (#302's figures stand). The default match's `think` drop at 3269 is not reproduced: the only
@@ -1388,8 +1388,8 @@ of a block. `hasStatus` is also a function name in the sim; the tier reads of th
   investigation attributes them and then decides the row by the rule.
 
 **The owner's question: the default match.** No drop of a bots function begins after tick 3029 in the
-default match (2 hook-free runs and 1 traced instrumented run in the second measurement). One that began in the warm-up, `needsPlan @94`
-(out of bounds, dropped at 1289 to 1319), is back in Maglev only at tick 3269, 240 ticks into the
+default match (2 hook-free runs and 1 traced instrumented run in each measurement). One that began in the warm-up, `needsPlan @94`
+(out of bounds, dropped at 1289 to 1319), is back in Maglev only at tick 3269 (5 of 6 runs; 3299 in 1), 240 ticks into the
 steady state, and costs about 11.3 B a think there (bot 2, 11.4 in run A and 11.1 in run B, 24 B on
 103 of 216 thinks; the unattributed class U of C0 coincides with its end). T in S is the 240 ticks after the
 warm-up end, so S is 4.6 B; the whole stint is 1950 to 1980 ticks, over the 1800 of the persistence
@@ -1400,10 +1400,11 @@ of geometry.ts, dropped at 209 to 239) is in the same position in part of the ru
 hook-free runs (1 of 2 in each measurement) and in the traced instrumented run of each measurement
 it has no compile line of its own after the drop, so it stays in baseline code or is inlined, for 4050
 ticks to the match end, over the 1800; in the other 2 a TurboFan compile queued before the drop
-completes in the same window at tick 239 and it is back in optimized code at once. The outcome
+completes in the window of the drop or the next, at tick 239 (the drop is at 239 in one run and at 209 in the other), and it is back in optimized code at once. The outcome
 depends on a compile race, and no cost is separable, so the question is whether such a row counts.
-If not, the row is accepted; if so, the slice is accepted when a hook-free trace of C0 shows no deopt
-of `segmentHitsBox` after tick 179 (its `@228` drop gone) in every run.
+If not, both rows are accepted; if so, the `needsPlan` slice is accepted when a hook-free trace of C0
+shows it back in Maglev or TurboFan by tick 3029, and the `segmentHitsBox` slice when it shows no deopt
+of `segmentHitsBox` after tick 179 (its `@228` drop gone), in every run.
 
 **Not measured.** The other six picks (Ysmeer included) and the easy and hard tiers have never been
 traced, so first-time drops that those states cause are unknown; a forced-tier replay on a frozen
