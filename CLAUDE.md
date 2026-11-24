@@ -51,6 +51,8 @@ npm run balance                  # bot-versus-bot win-rate report: plays 39312
 npm run fixtures:search -- <kit>   # rebuild a kit's scripted roster fixture; Node 22.15+
 npm run assets:validate          # validate_glb.py over assets/models (Python 3.9+, no Blender)
 npm run assets:test              # tools/blender unit tests; the Blender ones skip without Blender
+npm run trace                    # drops out of optimized code in one match, from Chromium's trace; manual,
+                                 # starts its own dev server (CLAUDELINE_PORT); -- --parse <log> needs no browser
 npm run build                    # production client bundle; CI runs it, check does not
 ```
 

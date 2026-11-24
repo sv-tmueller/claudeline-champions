@@ -17,6 +17,7 @@ packages/desktop/           Electron shell + Steamworks (milestone 8)
 tools/blender/              Python scripts run via Blender in background mode
 tools/balance/              bot-versus-bot win-rate harness, `npm run balance`
 tools/fixtures/             scripted roster fixture search, `npm run fixtures:search`
+tools/trace/                hook-free Chromium trace of a match, `npm run trace`
 data/arenas/                arena definitions (JSON), read by sim and by Blender scripts
 data/kits/                  roster kit definitions (JSON, one `KitDef` per champion), read like arenas
 assets/models/              generated .glb files, committed
@@ -78,6 +79,13 @@ docs/superpowers/specs/     approved designs (the design spec)
   package, no `@claudeline/bots` and nothing under `node_modules`, `tests` or
   `e2e`. It reads `data/` and writes `packages/sim/test/fixtures/` by file path.
   The sim test lint is unchanged: the sim suite does not import the tool.
+- `tools/trace` imports `node:` builtins, `@playwright/test` and
+  `e2e/port.ts` by relative path, and imports no package. `parse.ts` imports
+  nothing. It reads `packages/bots/src`, `packages/sim/src` and
+  `packages/client/src` as text, to name the functions of the bots, and the
+  dev server it starts is the client's. It has no lint block, since it
+  imports no package and a block would protect nothing; `tsconfig.tools.json`
+  typechecks it.
 - Lint enforces these boundaries. A violation fails `npm run check`. Today
   that holds for `sim`, `bots`, `protocol`, `server`, `tools/balance` and
   `tools/fixtures`, and for the client's deny of `server`. The segment bans of

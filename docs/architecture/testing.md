@@ -469,6 +469,15 @@ timeouts stand.
   3v3 on arena02 whose snapshots, spliced and decoded, rebuild to the live
   `checksum` (with checks that it saw a projectile, an area, a status, and
   snapshot ticks with and without events). See [online](online.md).
+- Trace parser tests (the `tools` Vitest project, `tools/trace/parse.test.ts`,
+  #328): trace lines in, rows out, with no browser and no file: a drop that
+  never recompiles, one recompiled in its own window, a compile before the drop
+  line, an OSR compile, a mark followed by a lazy bailout, the window a line
+  belongs to, names outside `packages/bots/src`, the ambiguous names, the
+  warm-up and match ends, `botsNames` on source snippets, the format, and five
+  lines as Chromium 153.0.8010.12 printed them. The command itself,
+  `npm run trace`, starts a browser and is manual: no workflow runs it, and
+  Playwright does not collect `tools/` (`testDir: 'e2e'`).
 - Server tests (the `server` Vitest project, `packages/server/test`): the
   input queue, the step clock and the data loader, the lobby rules as pure
   functions, the Room's lobby and loop rows, the bad-message counter, the
