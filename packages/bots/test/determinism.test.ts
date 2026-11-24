@@ -104,7 +104,7 @@ describe('bot determinism within one process, with kits', () => {
   });
 });
 
-describe('bot determinism within one process, with the shipped kits', () => {
+describe('bot determinism within one process, with the three shipped kits', () => {
   const options = () => ({ config: configMirror(), kits: jsonKits() });
   const jsonRun = (seeds: number[], tiers: Difficulty[], ticks: number, matchSeed = 7) =>
     runMatch(seeds, tiers, ticks, undefined, undefined, matchSeed, options());
