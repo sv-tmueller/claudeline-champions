@@ -4,8 +4,8 @@ name: Balance reproduction
 # reproduces on linux/amd64. Two jobs run side by side, one per mode (--mode 2v2 and --mode 3v3),
 # each comparing that mode's cell rows and budget-hit lines with the committed block. The whole run
 # is about 47 minutes of matches on Apple silicon at nine kits with the orb, an estimate by match
-# count and not a measurement: the six-kit three-arena 2v2 8.0 and 3v3 13.4 minutes (from about 52
-# and 92 ms a match, over 9000 and 8640 matches) scaled by the nine-kit counts, 21 168 in 2v2 (28
+# count and not a measurement: the six-kit three-arena 2v2 8.0 and 3v3 13.4 minutes (about 52 and
+# 92 ms a match before the orb, over 9000 and 8640 matches, are 7.8 and 13.2) scaled by the nine-kit counts, 21 168 in 2v2 (28
 # seeds a config) and 18 144 in 3v3 (4 seeds), give 2v2 18.8 and 3v3 28.1. A runner takes 2.9 to 3.1
 # times that: 2v2 55 to 58 and 3v3 82 to 87 minutes. One job per mode keeps each inside its timeout.
 # A job that fails plays its mode again in a second step to print the differing rows, so each

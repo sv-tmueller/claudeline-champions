@@ -1837,10 +1837,12 @@ match replays exactly from its input stream.
 - A fuse-aware lead (#307): the aim ignores `fuseTicks`, so the Falling Star and Supernova land where
   the target is (plus the capped offset) and not where it will be 0.75 or 1.5 s later; a lead over
   the fuse would predict the target's path for 45 to 90 ticks and is not measured. How her stars
-  land on a moving target is for the package that plays the nine-kit balance report. That package
-  also inherits a bigger gap: in every match with flow measured for #307 her bot never reached 100
-  energy (the most was 80), so Supernova, the one fused area with a stun of 1 s, was not played at all
-  (the 16 cells ran without the orb; a harness match has it). See Testing, the rules of #307.
+  land on a moving target is still open: the nine-kit balance report (#327) changed no bot and
+  measured nothing about it. The bigger gap #307 found, that in every match with flow it measured her
+  bot never reached 100 energy (the most was 80), was measured again with the energy orb on for #317,
+  and it is corrected there: her ultimate fires in 1.6% of her 2v2 matches and 13.9% of her 3v3
+  ones (see Testing, the rules of #307, and
+  [balance.md](../design/balance.md#3-the-method), "Ultimates").
 - A kit-derived speed for the areas: the lead uses the nominal 20 m/s for every
   area (the one-hit aimed ones cap the offset, #187; see Aim). The lingering
   areas stay nominal because their pulses walk the circle over the whole
@@ -3087,10 +3089,12 @@ fire the eight (against Hargrim on arena02 she fires no Comet EX). Her ultimate 
 match with flow that was measured, and her energy never reached 100 in one: the 16 candidate cells
 (no energy orb) and the tester's 44 matches of #307 (normal and hard tiers, 2v2 and 3v3, three arenas,
 several seeds; energy topped out at 80) read the same. Energy resets to 0 at each round start and her EX
-casts spend the bar, so in a match as the bots play it Supernova is not played. That is a question of
-bot tuning (when an EX is worth more than the road to F) for the package that plays the nine-kit
-balance report, not a property of the kit; matches with the energy orb, which the harness plays, were
-not measured for her. The cell cannot carry a start edit (the round start resets it), so a second
+casts spend the bar, so in those matches Supernova is not played. Corrected by #317: the harness's
+matches have the energy orb, and with it her bot reaches 100 energy and fires Supernova in some
+(1.6% of her 2v2 matches and 13.9% of her 3v3 ones, on three arenas, 11 of 672 and 281 of 2016
+matches; balance.md section 3, "Ultimates", has every kit). When an EX is worth more than the road to
+F is a question of bot tuning, not a property of the kit, and the owner decided on #317 (2026-11-16)
+to leave the ultimates as they are: the nine-kit balance report (#327) changed no bot. The cell cannot carry a start edit (the round start resets it), so a second
 run does, as Durnhal's Last Bastion does: free play with no round start, Ysmeer at 100 energy, and
 Supernova fires once, at tick 99. No pinned hash and no end tick of another kit moved.
 

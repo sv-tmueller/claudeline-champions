@@ -75,20 +75,22 @@ lists are candidates, sliced batch by batch at dispatch time.
   Ysmeer are merged (the on-hit counter and its spend verbs, the fuse, the end
   area), Wrenna's model is on main ([#235](https://github.com/sv-tmueller/claudeline-champions/issues/235), [PR #242](https://github.com/sv-tmueller/claudeline-champions/pull/242)), and
   Wrenna's kit as data is on main ([#270](https://github.com/sv-tmueller/claudeline-champions/issues/270), [PR #274](https://github.com/sv-tmueller/claudeline-champions/pull/274), batch #269), which
-  makes eight kits as data, with the client roster and the select unchanged at
-  seven champions. Open: Wrenna's bot profile and client entry,
-  Ysmeer's kit ([#271](https://github.com/sv-tmueller/claudeline-champions/issues/271), parked behind the sim defect
-  [#276](https://github.com/sv-tmueller/claudeline-champions/issues/276)), her bot profile and client entry, and her model
-  ([#273](https://github.com/sv-tmueller/claudeline-champions/issues/273)), and the nine-kit balance report. The owner decided on
-  2026-11-13 that the roster freezes at nine.
+  makes eight kits as data. Wrenna's bot profile and client entry
+  ([#281](https://github.com/sv-tmueller/claudeline-champions/issues/281)), Ysmeer's kit ([#271](https://github.com/sv-tmueller/claudeline-champions/issues/271)), her model
+  ([#273](https://github.com/sv-tmueller/claudeline-champions/issues/273)), and her bot profile and client entry
+  ([#307](https://github.com/sv-tmueller/claudeline-champions/issues/307)) are on main, so nine kits are playable and in the balance
+  harness, and the nine-kit balance report is committed
+  ([#327](https://github.com/sv-tmueller/claudeline-champions/issues/327)). The owner decided on 2026-11-13 that the roster
+  freezes at nine.
 - The energy orb: the sim ([#218](https://github.com/sv-tmueller/claudeline-champions/issues/218)), the client and the bots
   ([batch #223](https://github.com/sv-tmueller/claudeline-champions/issues/223)) and the balance harness playing the standard match
   with it ([#244](https://github.com/sv-tmueller/claudeline-champions/issues/244)).
 - A balance pass with a recorded bot-versus-bot win-rate report (the harness,
   the baseline report and the first tuning pass are in, [batch #105](https://github.com/sv-tmueller/claudeline-champions/issues/105);
   the seven-kit report with the orb on is in, [batch #251](https://github.com/sv-tmueller/claudeline-champions/issues/251); the
-  nine-kit report and the rules candidates [#214](https://github.com/sv-tmueller/claudeline-champions/issues/214) to [#217](https://github.com/sv-tmueller/claudeline-champions/issues/217)
-  wait for the last two kits).
+  nine-kit report is in, [#327](https://github.com/sv-tmueller/claudeline-champions/issues/327); the rules candidates
+  [#214](https://github.com/sv-tmueller/claudeline-champions/issues/214) to [#217](https://github.com/sv-tmueller/claudeline-champions/issues/217) are open, and
+  so is any balance change the report suggests).
 - The presentation pass, needs design and a spec section 5 amendment (not
   started, and no package is filed before its design is approved). Candidates:
   a camera that follows the champion with wheel zoom out to today's

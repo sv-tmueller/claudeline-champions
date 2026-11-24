@@ -1,4 +1,4 @@
-# Balance: the bands, the baseline, the tuning passes and the seven-kit report
+# Balance: the bands, the baseline, the tuning passes and the nine-kit report
 
 ## 1. Status and sources
 
@@ -28,8 +28,12 @@ section 1 and lists what the orb moved. The block was regenerated after #187
 capped the lead of a one-hit aim-placed area (at 4407c96): still 126 cells and
 15 in band, read in the same section. It was regenerated once more on the merge
 of #222 with main (at 0246028): still 126 cells and 15 in band, read against the
-4407c96 block in section 5.13. Sections 5.1 to 5.8 and 6 stay the record of the
-four-kit report at 9a9c653 and of the passes made on it.
+4407c96 block in section 5.13. The nine-kit report (issue #327, step 4.3 of
+roadmap #176) added Wrenna and Ysmeer to the played roster and regenerated the
+block at b6978fa: 216 cells and 29 in band, with no kit and no bot changed; it
+counts and states figures, and reads no cell against a counter web. Sections 5.1
+to 5.8 and 6 stay the record of the four-kit report at 9a9c653 and of the passes
+made on it.
 
 Sources:
 
@@ -53,8 +57,12 @@ Sources:
   5.9.
 - Batch #251 takes up Durnhal: #244 adds him to the harness at step 1.3 of
   roadmap #176 and turns the energy orb on in every cell (spec section 6), so
-  section 4 is the seven-kit block and section 5.12 reads his 36 cells and the
+  section 4 was the seven-kit block and section 5.12 reads his 36 cells and the
   orb's effect on the 90 six-kit ones.
+- Issue #327 plays the nine kits (roadmap step 4.3, which also closes the
+  balance check of step 3.4): the block of section 4 is its output, and the run
+  times of section 7 are measured on it. It also carries the wording follow-up
+  #321 and the measured ultimate rates of #317 (section 3, "Ultimates").
 - [roster-v2.md](roster-v2.md) holds the two kits of #148 and their counter web
   (section 1), the intended counters of the six-kit report; its section 6
   forecasts how the bots will bias it.
@@ -70,16 +78,16 @@ Sources:
 
 - A cell is one mode (2v2 or 3v3), one arena and one pairing. The harness
   roster has nine kits since #307, so a full run plays 216 cells (36 pairings a
-  mode and arena, three arenas); the block of section 4 is still the seven-kit
-  one, 126 cells and 21 pairings (the 24 of the four v1 kits on the first two
-  arenas and the 90 of the six-kit report are among them).
+  mode and arena, three arenas), and the block of section 4 is that run (the 126
+  cells and 21 pairings of the seven-kit report, the 90 of the six-kit report
+  and the 24 of the four v1 kits on the first two arenas are among them).
 - The band is 40 to 60 percent inclusive on X's win rate in the cell. The test
   is on the exact rate (wins times 100 against 40 and 60 times the decided
   matches), not on the rounded figure in the table.
 - X is the first kit of the pairing in the order of the kit files of the
   harness roster (`brimwick`, `durnhal`, `hargrim`, `lumeth`, `ondrel`,
-  `quillon`, `skerrow`, and `wrenna` and `ysmeer` after them, which the block of
-  section 4 does not have yet). A rate under 50 means Y is ahead.
+  `quillon`, `skerrow`, `wrenna` and `ysmeer`). A rate under 50 means Y is
+  ahead.
 - A roster counter (an intended counter in roster-v1.md, or in the web of
   roster-v2.md section 1) is read as the favoured side inside the band: the
   favourite at 50 to 60 percent and the other side at 40 to 50. A favourite
@@ -94,24 +102,18 @@ Sources:
   in file order, and a listed kit with no file is an error. A kit file the list
   leaves out is not played; every kit file is listed since Ysmeer (#271, her kit as
   data) joined it at step 4.3 of roadmap #176 (#307), after Wrenna (#270) at step 3.4
-  (#281). The block of section 4 is not regenerated for either: it is still the
-  seven-kit report, and `npm run balance -- --check` and the manual `balance.yml`
-  fail on purpose (216 cells against the committed 126) until the nine-kit report of a
-  later package rewrites it. Ondrel and Brimwick
+  (#281). The block of section 4 was regenerated for both by the nine-kit report
+  (#327), so it has all 216 cells and `npm run balance -- --check` and the manual
+  `balance.yml` compare a run of the nine kits with it. Ondrel and Brimwick
   (#148) joined the four v1 kits in the six-kit report (#189; [decision 3 of batch
   #147](https://github.com/sv-tmueller/claudeline-champions/issues/147#issuecomment-6273786667))
   and Durnhal (#204, his kit as data) joined them at step 1.3 of roadmap #176
-  (#244), so the 126 cells, the 25 200 matches and the block of section 4 are
-  those of seven kits on three arenas (arena03 of #238); with Wrenna and Ysmeer the full
-  run is 216 cells and 39 312 matches. For the nine-kit report: Ysmeer's bot did not reach 100
-  energy in any match with flow measured for #307 (the 16 cells of her bot test, played without the
-  orb, and 44 matches of the tester at normal and hard, energy at most 80), so her Supernova is not
-  played in those matches, and her EX casts spend the bar first. How it is in the harness's matches,
-  which have the orb, is not measured. It is a bot-tuning question for that report, not a kit number.
-  The harness plays the
+  (#244), so the seven-kit report had 126 cells and 25 200 matches on three
+  arenas (arena03 of #238); with Wrenna and Ysmeer the full run, and the block of
+  section 4, are 216 cells and 39 312 matches. The harness plays the
   standard match, so every cell sets the arena's orb point (`data/orbs.json`,
-  spec section 6): the block of section 4 is the seven-kit one with the orb on
-  and section 5.12 reads what the orb moved.
+  spec section 6): the block of section 4 has the orb on in every cell, as the
+  seven-kit one had, and section 5.12 reads what the orb moved.
   "Pairing" is read as the matchup of two champions, as decision 6
   words it, and not as the duo of roster-v1.md section 5.
 - **Fills.** Both teams get the same fill, so the pair is the only difference.
@@ -138,8 +140,9 @@ Sources:
   matches) and 6 for each of the 30 fills of a 3v3 cell (180): 168 cells and
   31 248 matches. With nine kits it is 28 seeds for each of the 7 fills of a 2v2
   cell (196 matches) and 4 for each of the 42 fills of a 3v3 cell (168): 216 cells
-  and 39 312 matches (21 168 in 2v2 and 18 144 in 3v3), about 47 minutes by match
-  count on Apple silicon, not measured.
+  and 39 312 matches (21 168 in 2v2 and 18 144 in 3v3), which the generating run
+  played in 7511.9 s on a shared Linux host (measured, with the load of
+  section 7).
   The count is even so that X plays each side equally often. When the
   two modes get the same count the head of the block says "Seeds 1 to N for each
   config"; when they differ it names each mode's count, and the Seeds / matches
@@ -188,12 +191,34 @@ Sources:
   variant of Lumeth's M2 and R; no 8 m leash and no M1 finisher for Lumeth; her
   heals count the instant part only; no Lunge away for Skerrow. A kit that is
   balanced for players may not be for these bots, and the reverse.
+- **Ultimates.** How often the bots play their ultimate (F) was measured for
+  #317 on main at `02dc630`, with no code change, and the owner decided on
+  2026-11-16 to leave the ultimates as they are (#317). Those figures are
+  quoted as recorded there; the run of section 4 does not count casts. The
+  sample is arena01 only, every harness config of both modes (36 pairings, 7
+  fills in 2v2 and 42 in 3v3), seeds 1 and 2, the orb on, every bot at the
+  normal tier: 3528 matches, 504 in 2v2 and 3024 in 3v3. The share of a kit's
+  matches with at least one F, 2v2 / 3v3: Lumeth 76% / 91%, Ondrel 9% / 20%,
+  Quillon 7% / 12%, Wrenna 7% / 10%, Durnhal 4% / 8.5%, Skerrow 2% / 7%,
+  Brimwick 2% / 4%, Hargrim 1% / 3.5% and Ysmeer 0% / 7.6%. Lumeth is far above
+  the rest, and Ysmeer's 3v3 rate is mid-pack. The per-kit sample sizes and
+  whether a match or a champion place was counted were not recorded with these
+  shares, so none is stated here. Ysmeer's 0% in 2v2 is a small
+  sample, not "never": a larger sample of #317 (2520 matches a setting, on all
+  three arenas) had her cast F in 11 of 672 of her 2v2 matches (1.6%) and 281
+  of 2016 of her 3v3 ones (13.9%). This replaces the note of #307 that her
+  Supernova is not played in matches: that note rests on the 16 cells of her
+  bot test, played without the orb, and 44 matches of the tester (energy at
+  most 80), and #317 measured her in the harness's matches, which have it.
 - **Noise.** A rate over `n` decided matches has a 95 percent interval of
   about 7 points at n = 200 (every cell, 200 in every seven-kit cell) around 50
   percent, and about 10 at n = 100 (one fill alone, as the four-kit report
   had it). A seven-kit fill has fewer matches, 40 in 2v2 (about 16 points) and
   10 in 3v3 (about 31), so one fill of a seven-kit cell is read with that
-  distance. A cell within the 7 points of 40 or 60 cannot be told from the
+  distance. A nine-kit cell has 196 matches in 2v2 (7.0 points) and 168 in 3v3
+  (7.6), and a nine-kit fill 28 in 2v2 (about 19) and 4 in 3v3 (about 49), so a
+  3v3 fill alone says almost nothing and the cell is the unit that is read.
+  A cell within the 7 points (7.6 in 3v3) of 40 or 60 cannot be told from the
   band by one run. Two things were measured once with scratch
   code that is not part of the tool (X's rate over 100 matches, in the
   four-kit report). First, the
@@ -211,19 +236,28 @@ Sources:
 ## 4. The report
 
 The block below is generated by `npm run balance`; do not edit it. The head line
-names the commit the sources were read at, `0246028`. It is the seven-kit report
-(#244, the tools half of batch #251) with the capped lead of #187 and the
-deadlock reach of #222 (batch 18): 126 cells and 25 200 matches, 15 cells in
-band (11 of the 90 cells the six kits share and 4 of Durnhal's 36), the summed
-distance of the 126 cells to the band 3227.5 points (2266.5 in the 90 six-kit
-cells, 961.0 in Durnhal's 36), and no budget hit. Per champion over all of its
-cells: Brimwick 60.6, Durnhal 21.5, Hargrim 13.8, Lumeth 88.5, Ondrel 66.6,
-Quillon 78.1 and Skerrow 20.9. It was regenerated on the merge of #222 with
-main, with Durnhal in the harness roster, the energy orb on in every cell (spec
-section 6), #187's cap on the one-hit area lead and #222's reach; section 5.13
-reads it against the block of #187 (generated at `4407c96`), and section 5.12
-reads that block: Durnhal's cells and what the orb, his fill and the cap moved
-in the other 90. The block this one replaced, the block of #187's cap at
+names the commit the sources were read at, `b6978fa`. It is the nine-kit report
+(#327, step 4.3 of roadmap #176), the seven-kit one with Wrenna and Ysmeer in the
+harness roster: 216 cells and 39 312 matches (108 cells and 21 168 matches in
+2v2, 108 and 18 144 in 3v3), the energy orb on in every cell (spec section 6),
+#187's cap on the one-hit area lead and #222's reach, 29 cells in band (12 in
+2v2 and 17 in 3v3; 16 of the 126 cells of the seven kits and 13 of the 90 cells
+with Wrenna or Ysmeer), the summed distance of the 216 cells to the band 4907.7
+points (3177.0 in the 126 seven-kit cells, 1730.7 in the 90 others), and no
+budget hit. Per champion over all of its cells: Brimwick 51.9, Durnhal 17.7,
+Hargrim 13.2, Lumeth 84.4, Ondrel 55.6, Quillon 73.1, Skerrow 17.6, Wrenna 65.9
+and Ysmeer 70.5. No kit and no bot changed for it, and these are the counts and
+figures of the block: the cells of Wrenna and Ysmeer are not read against the
+counter web of roster-v3.md here. In the 90 six-kit cells 12 are in band, at
+2223.0 points, against 11 and 2266.5 in the block replaced, and in Durnhal's 36
+4 are in band, at 954.0 against 961.0; the two new kits are fills in those
+cells, and this report does not say why any of them moved. The block this one replaced, the seven-kit block at `0246028`
+(regenerated on the merge of #222 with main, with Durnhal in the harness roster,
+the orb, #187's cap and #222's reach; section 5.13 reads it against the block
+of #187 and section 5.12 reads that block), read 15 in band (11 of the 90 cells
+the six kits share and 4 of Durnhal's 36), 3227.5 points (2266.5 and 961.0) and
+Brimwick 60.6, Durnhal 21.5, Hargrim 13.8, Lumeth 88.5, Ondrel 66.6, Quillon
+78.1 and Skerrow 20.9. The block that one replaced, the block of #187's cap at
 `4407c96` (before the reach of #222), read 15 in band (11 of the 90 and 4 of
 Durnhal's 36), 3204.5 points (2254.5 and 950.0) and Brimwick 60.3, Durnhal 21.4,
 Hargrim 14.7, Lumeth 89.0, Ondrel 66.1, Quillon 77.3 and Skerrow 21.1. The block
@@ -550,7 +584,7 @@ three-arena block; 5.12 reads the seven-kit block (Durnhal in the harness
 roster, the energy orb on, #244; regenerated again for #187's capped one-hit
 area lead, at 4407c96); 5.13 reads what the deadlock reach of #222 (batch 18)
 did to the 90-cell three-arena block of 5.11 (at 094b42e) and to the seven-kit
-block (the block of section 4, at 0246028).
+block (the block of section 4 before the nine-kit report, at 0246028).
 
 After the tuning passes of #121 and #124 three cells are in the band and 21 are
 outside. Each is in band or accepted with its reason, with its reading. The
@@ -1299,8 +1333,8 @@ down, and the reach does not close the band: the step after stays a kit change,
 if the standing stays. No share of any cell is stated as the cause, and the
 decision stays with the lead.
 
-**The seven-kit block on the merge with main.** Section 4 is the block
-regenerated on the merge of #222 with main (0246028: seven kits, the orb on,
+**The seven-kit block on the merge with main.** Section 4 held, until the
+nine-kit report, the block regenerated on the merge of #222 with main (0246028: seven kits, the orb on,
 #187's cap; #160's endArea and #254's spend verbs are in no shipped kit), so
 against the block 5.12 reads (4407c96) the move is the reach alone. Cells in
 band: 15 of 126 (15), still 4 of Durnhal's 36 and 11 of the shared 90. 110 of
@@ -1488,14 +1522,24 @@ that row's pin is out of date, and it is no ground to drop a candidate.
 
 ## 7. How to regenerate
 
-- `npm run balance` plays all 39 312 matches of the nine listed kits (about 47 minutes by match count, not measured) and writes the block of section 4.
-  It needs Node 22.15 or later (the resolve hook is `module.registerHooks`) and
-  stops with a message below that. The seven-kit block of #244 with the orb is
-  estimated at about 31 minutes on one core of an Apple silicon laptop, by match
-  count and not measured: the cells are about 52 ms a 2v2 match and 92 ms a 3v3
-  match before the orb, which gave the six-kit three-arena 8.0 and 13.4 minutes,
-  and those scale by the seven-kit match counts, so 2v2 is about 11.2 minutes of
-  it and 3v3 about 19.5. The nine-kit run is not measured either.
+- `npm run balance` plays all 39 312 matches of the nine listed kits and writes
+  the block of section 4. It needs Node 22.15 or later (the resolve hook is
+  `module.registerHooks`) and stops with a message below that.
+  **Local time, measured (the generating run of #327):** `played 39312 matches
+  in 7511.9 s`, which is 125 minutes, run on a 6-core Linux host with Node
+  24.22.3, one process, from 11:11 to 13:16 UTC on 2026-11-24 (`time -v`: 2 h
+  5 min 12 s wall, 5933.8 s of user CPU time, 79 percent of a core). The host
+  was shared: other work of the same batch (check suites, Playwright e2e) ran
+  on it while this one played, so this is a time under load and not a quiet-host
+  time. The 1-minute load average, read about every three minutes, was 10.2 at
+  the start, 15 to 53 from 11:15 to 11:48 UTC, 1.5 to 17 from 11:50 to 12:47, and
+  about 1.0 from 12:50 to the end. The run prints one total, so there is no measured local split by mode.
+  The earlier local figures were estimates by match count on one core of an
+  Apple silicon laptop and were never measured: about 47 minutes for the nine
+  kits and about 31 for the seven-kit block of #244 (the cells are about 52 ms a
+  2v2 match and 92 ms a 3v3 match before the orb, which is 7.8 and 13.2 minutes
+  over the six-kit three-arena 9000 and 8640 matches; the 8.0 and 13.4 minutes
+  that run gave scale by the seven-kit match counts to 2v2 11.2 and 3v3 19.5).
   On the runner of the manual
   workflow the four-kit run took 12 to 16 minutes in one job (runs 38990892639
   at 933 s, 38997052269 at 953 s and 39005677735 at 737 s) and 6 min 28 s (2v2)
@@ -1504,7 +1548,7 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   the same factor projects to about 55 to 58 minutes for 2v2 and about 82 to 87
   for 3v3, one mode a job: an estimate by match count, not a measurement. The
   six-kit three-arena 8.0 and 13.4 minutes (from the 52 and 92 ms a match
-  above, over 9000 and 8640 matches) scale by the nine-kit counts, 21 168 in 2v2
+  above, over 9000 and 8640 matches, about 7.8 and 13.2 minutes) scale by the nine-kit counts, 21 168 in 2v2
   and 18 144 in 3v3, to 18.8 and 28.1 minutes locally (about 47 together), and
   the runner factor 2.9 to 3.1 takes those to the two ranges. The factor holds
   at seven kits: the two check jobs of the seven-kit block's PR (#257, jobs
@@ -1541,8 +1585,8 @@ that row's pin is out of date, and it is no ground to drop a candidate.
   `timeout-minutes`: 150 for 2v2 and 220 for 3v3, set from the projection of the
   runner above, twice the check time of the mode at the factor 3.1 (117 and 175
   minutes, because the failure step plays the mode again) and a margin of at
-  least 25 percent, then rounded up to the next multiple of 10 minutes (146 and
-  218 before rounding); both are under the 6 hours
+  least 25 percent, then rounded up to the next multiple of 10 minutes (117 times
+  1.25 is 146.25 and 175 times 1.25 is 218.75 before rounding); both are under the 6 hours
   GitHub allows a hosted job. The run below confirmed the two-arena four-kit
   pair at 45 and 75, arena03 raised both by a third, the seven-kit orb block
   raised them to 90 and 150, and the nine-kit counts (#307) raise them again, to
