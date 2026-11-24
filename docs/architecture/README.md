@@ -143,6 +143,17 @@ first.
   `packages/sim/test/roster-fixture.ts`. Its tests reproduce the committed roster
   fixtures byte for byte (see [Testing](testing.md#fixture-search)). It needs
   Node 22.15 or later.
+- `tools/trace`: a hook-free trace of one match (#328). `CLAUDELINE_PORT=<port>
+  npm run trace -- [--champion <kit>] [--teamsize 2|3] [--arena <id>]
+  [--difficulty <tier>] [--log <file>]` starts the dev server on that port,
+  runs the unmodified client in Playwright's Chromium with only
+  `--trace-opt --trace-deopt`, drives the match to its end with the live probe's
+  script and prints, per function of `packages/bots/src`, each drop out of
+  optimized code and its return, in ticks of the 30-tick windows (the method of
+  [Bots](bots.md), "The drops of #303, measured (#318)"). `npm run trace --
+  --parse <log>` prints the same from a saved log, with no browser. It is
+  manual: CI neither runs nor builds it, and only its parser's tests run in the
+  unit job (see [Testing](testing.md)).
 - `protocol`: the message types of the online design, `PROTOCOL_VERSION`, three
   total decoders (first message, session message, server message), the
   encoders in the spec's key order and the snapshot splice, with the lint
