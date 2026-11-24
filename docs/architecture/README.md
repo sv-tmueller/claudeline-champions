@@ -228,8 +228,8 @@ Batch decisions that shaped the structure (none of them is a new ADR):
   [the lead's decisions on the developer's report](https://github.com/sv-tmueller/claudeline-champions/issues/294#issuecomment-6884318728).
   Measured by #318 (the drops of #303, a rule that sorts them into fix and accept, the figures per
   configuration; no drop begins after the warm-up of the default match, but one that began in it lasts
-  240 ticks into the steady state at about 11.3 B a think (`needsPlan @94`), and `segmentHitsBox @228`
-  may too (a compile race: 2 of 4 hook-free runs), the owner's question): [the rule decided on #318](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6894158392),
+  240 to 270 ticks into the steady state at about 11.3 B a think (`needsPlan @94`), and
+  `segmentHitsBox @228` may too (a compile race: 2 of 4 hook-free runs), the owner's question): [the rule decided on #318](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6894158392),
   recorded in [Bots](bots.md#the-drops-of-303-measured-318).
   Recorded in [Bots](bots.md#allocation) and its [API](bots.md#api).
 - The `Platform` settings methods are asynchronous, so the Electron port reaches

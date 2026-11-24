@@ -847,12 +847,15 @@ interpreter code box every double load and every double result, so no change of 
 reaches 0 B there, and a function that first reaches a cold branch drops to baseline code
 for some hundred ticks (30 to 630 measured for the functions that run on every think). Functions
 the bots call rarely can stay out of optimized code for thousands of ticks, mostly under 8 B a
-think; the exceptions are C3 `chooseEscape` (11.4 B), the upper bounds of the C1 and C4
-persistent rows (10.8 and 8.8 B), 8.1 B for one bot in the C2 persistent row's windows (`orbUpInto` open)
-in the second measurement (class U inside), and one stint of the default match, `needsPlan`, reaches 240
-ticks into the steady state at about 11.3 B a think (the browser measurements, below, are in "What
-the rule guarantees in a match (#290)", which lists the configurations measured, and in "The drops
-of #303, measured (#318)"). What makes the optimized figure true, and what
+think; the exceptions are `chooseEscape` after the prototype-chain wave in hargrim 2v2 on arena03
+(11.4 B), the upper bounds of the persistent rows of hargrim 3v3 on arena01 and quillon 3v3 on
+arena02 (10.8 and 8.8 B), 8.1 B for one bot in the windows of the persistent row of hargrim 2v2 on
+arena02 (`orbUpInto` open) in the second measurement (reads of 24 to 48 B that no function explains
+inside), and one stint of the default match (the time `needsPlan` spends out of optimized code)
+reaches 240 to 270 ticks into the steady state at about 11.3 B a think (the browser measurements,
+below, are in "What the rule guarantees in a match (#290)", which lists the configurations
+measured, and in "The drops of #303, measured (#318)", whose Terms paragraph defines the
+configurations, stints and classes named there). What makes the optimized figure true, and what
 stays outside it:
 
 - Every record a think reads or writes is made once, in `createBot`, and rewritten
@@ -1198,16 +1201,18 @@ No drop begins after the warm-up of the default match: a traced run of the head
 (`--trace-opt --trace-deopt`, Chromium 153.0.8010.12, no hook, no wrapper) shows no deopt of a
 function of `packages/bots/src` from the first window after the warm-up (tick 3029, the round that
 begins after tick 2100) to the end of the match at tick 4289. One that began in the warm-up lasts
-240 ticks into the steady state (`needsPlan @94`, back in Maglev at tick 3269, about 11.3 B a think),
-and `segmentHitsBox @228` may (a compile race: in 2 of 4 hook-free runs it has no compile line after
-its drop, in the other 2 it is back in optimized code at once; #318 below, the owner's question).
+240 to 270 ticks into the steady state (`needsPlan @94`, back in Maglev at tick 3269 to 3299, about
+11.3 B a think), and `segmentHitsBox @228` may (a compile race: in 2 of 4 hook-free runs it has no
+compile line after its drop, in the other 2 it is back in optimized code at once; #318 below, the
+owner's question).
 
 The other shipped configurations have first-time deopts after their warm-up, and rounds 1 and 2 of the
 default match have first-time deopts of their own. #318 measured all of them on 02dc630 and sorted each
-by the rule decided on #318: "The drops of #303, measured (#318)" below holds a table per configuration, a
-decision per class and the steps to reproduce. No drop begins after the warm-up of the default match,
-but `needsPlan @94` began in it and lasts 240 ticks into the steady state at about 11.3 B a think (the
-owner's question, with `segmentHitsBox @228`); by the rule every configuration has fix rows.
+by the rule decided on #318: "The drops of #303, measured (#318)" below holds a table of the rows by
+configuration, a decision per class and the steps to reproduce. No drop begins after the warm-up of
+the default match, but `needsPlan @94` began in it and lasts 240 to 270 ticks into the steady state
+at about 11.3 B a think (the owner's question, with `segmentHitsBox @228`); by the rule every
+configuration has fix rows.
 
 The profiler caveat, and how the probe handles it (#304). The CDP sampling profiler, started with
 garbage included, forces a Mark-Compact whenever it stops (`--trace-gc`: 43 against 2 over a 3v3
@@ -1231,275 +1236,200 @@ one Mark-Compact at its stop in the heap test's lab runs.)
 
 #318 measured the first-time drops out of optimized code that #303 lists and sorted each one by
 [the rule decided on #318](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6894158392),
-as clarified in [a later decision](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6896146071) and [a second one](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6896415726).
-Every figure here is a record of main 02dc630 (main 0eb9732 has the same `packages/`), in Chromium
-153.0.8010.12 (Playwright's, headless, not the shipped Chrome), on the paused clock, with the normal
-tier and the scripted human of the live probe, no sampling profiler. Nothing was fixed: the fix
-slices are on #303. Two measurements were made: the first (the figures here) and a second, independent
-one, whose figures are cited where they differ. Run A and run B are the first measurement's two
-instrumented runs of a configuration, with and without the trace flags.
+as clarified in [a later decision](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6896146071)
+and [a second one](https://github.com/sv-tmueller/claudeline-champions/issues/318#issuecomment-6896415726).
+Every figure is a record of main 02dc630 (0eb9732 has the same `packages/`) in Chromium 153.0.8010.12
+(Playwright's, headless, not the shipped Chrome), on the paused clock, with the normal tier and the
+scripted human of the live probe, no sampling profiler. Nothing was fixed: the fix slices are on #303.
+Two independent measurements were made; the figures are the first one's, and the second one's are
+cited where they differ. The run-by-run record is in PR #324 and on #303.
+
+Terms. A hook-free trace is a run of the unmodified client with only `--trace-opt --trace-deopt`,
+which places each deopt and compile line of a bots function in the 30-tick window that printed it.
+An instrumented run is a run of a copy with a dev-only hook, which reads the heap around every
+think and the tier of each exported bots function between windows (a tier read); run A and run B are
+the first measurement's two of a configuration, with and without the trace flags. A stint is the
+time a function spends out of Maglev and TurboFan after a drop, up to its next optimized compile or
+the match end. The six configurations are C0 hargrim 2v2 arena01 (the default match), C1 hargrim 3v3
+arena01, C2 hargrim 2v2 arena02, C3 hargrim 2v2 arena03, C4 quillon 3v3 arena02 and C5 lumeth 3v3
+arena03. The warm-up of a configuration ends with the first round that begins after tick 2100 (the
+warm-up end). The five classes are W (the first-time drops of rounds 1 and 2 of the default match),
+P (the drops after the warm-up of a configuration, and the stints that stay out of optimized code
+for thousands of ticks), G (`embedded weak objects cleared`), X (`dependent prototype chain
+changed`, a wave of marks) and U (reads of 24 to 48 B a think that no function explains).
 
 The rule, in order, for each row:
 
 1. A drop that the hook-free trace does not show is an artifact of the instrument and gets no
    decision. A listed drop that does not appear on the commit is "not reproduced".
-2. A stint that ends before the warm-up end of its configuration (the first round that begins after
-   tick 2100) is accepted. Any part after it goes to 3.
+2. A stint that ends before the warm-up end of its configuration is accepted. Any part after it goes
+   to 3.
 3. Persistent (not back in Maglev or TurboFan within 1800 ticks, or open to the match end with more
    than 1800 ticks left): fix. Otherwise S = E x min(T, 600) / 600 for the worst bot, E the bytes a
    think and T the ticks in baseline code: S of 8 B or more is a fix, under 8 B is accepted. 8 B and
-   600 are the limit and the window of the Node heap test: would its guard fail if the stint fell
-   inside one of its rounds? Calibration: main's `computeCues @388` before #302 (E about 139 B,
+   600 are the limit and the window of the Node heap test (would its guard fail if the stint fell
+   inside one of its rounds?). Calibration: main's `computeCues @388` before #302 (E about 139 B,
    T about 540) gives S about 125 B, a fix.
-4. Overlapping stints that cannot be split are one joint row. 5. Node-only layout rows are
-   accepted as test constraints, unless the drop is persistent in a shipped match. 6. A class is
-   "fix" if any of its rows is.
+4. Overlapping stints that cannot be split are one joint row.
+5. Node-only layout rows are accepted as test constraints, unless the drop is persistent in a shipped
+   match.
+6. A class is "fix" if any of its rows is.
 
-E is the mean reading per think of the worst bot over the windows of the row's own stint, less the
+E is the mean reading per think of the worst bot over the windows of the row's own stint (readings
+of 0 to 300 B; plan thinks and collections left out, and where plans rise the row says so), less the
 mean of the rule's reference: the 5 steady windows after the function is optimized again, or else
-the 5 before the drop. A reference window needs the bot alive; where the windows after do not exist
-because the bot is dead, the reference is the 5 before, and T counts only the ticks in a round with
-the bot alive (the wrapper's 16 B already taken off; plan thinks of 300 to 5000 B and
-readings with a collection inside left out, and where plans rise it says so). Where a reference
-holds class U (24 to 48 B reads) the row gives E against it and against zero. A clean valid reference
-decides. Where no valid reference is clean, the row is undetermined, and goes to the class U
-investigation, only if the two S values fall on either side of 8 B (as C1's do); otherwise the
-decision both values agree on stands. Where two
-measurements of a row lie on either side of 8 B, the higher decides.
-S takes E and T from the same stint, with the upper T; a stint that crosses the warm-up end uses
-the part after it for T in S, and persistence is judged on the whole stint. T comes from the hook-free
-trace, one window of 30 ticks at best, and is a range where the tier reads of the instrumented run
-give a shorter one (the compile finishes in the background, so T grows with the load: 4.8 to 17.5
-over the first measurement's runs, above 6 in most). Where a round ends or the bot dies inside a stint, only the ticks in the round with the bot alive
-count in T and E is the mean over those windows (the same S as a diluted E over the whole stint).
-"x of n" counts hook-free runs.
+the 5 before the drop. A reference window needs the bot alive: where the windows after do not exist
+because the bot is dead, the reference is the 5 before. Where a round ends or the bot dies inside a
+stint, only the ticks in the round with the bot alive count in T and E is the mean over those
+windows (the same S as a diluted E over the whole stint). Where the reference holds class U, E is
+given against it and against zero; a clean valid reference decides. Where no valid reference is
+clean, the row is undetermined, and goes to the class U investigation, only if the two S values fall
+on either side of 8 B (as C1's do); otherwise the decision both values agree on stands. Where two
+measurements of a row lie on either side of 8 B, the higher decides. S takes E and T from the same
+stint, with the upper T; a stint that crosses the warm-up end uses the part after it for T, and
+persistence is judged on the whole stint. T comes from the hook-free trace, at best one window of 30
+ticks, so it is a range where the tier reads give a shorter one (the compile finishes in the
+background, so T grows with the load; the load average was 4.8 to 17.5, above 6 in most runs). "x of
+n" counts hook-free runs.
 
-Hargrim 2v2 on arena01 (C0, the default match; warm-up ends 3029, match ends 4289). No deopt of a
-bots function begins after tick 3029 in 2 of 2 hook-free runs (2 hook-free runs and 1 traced instrumented run in the second measurement). Rows that
-reach past it:
+The first column of the table is the configuration, with its warm-up end and match end in ticks.
 
-| Row | Drop tick | T | E (B) | S (B) | Decision |
-|---|---|---|---|---|---|
-| `dodgeInto @806`, `decide @51`, `chooseCast @236` (type feedback) | 2519 to 2759 | 330 to 540, back at 3059 to 3089 | 0 (mean per bot over the 35 windows from 3029: 0.7 to 2.4) | 0 | accept (3) |
-| `orbUpInto @51` | 2759 to 2789 | open, 1500 to the end, Sparkplug | same | 0 | accept (3; 1530 ticks left) |
-| `needsPlan @94` (out of bounds, private) | 1289 to 1319 | whole stint 1950 to 1980, back at 3269; 240 after the warm-up end | 11.4 (bot 2, 24 B on 103 of 216 thinks; 11.1 in run B) | 4.6 (T = 240) | persistent on the whole stint, so fix by the rule; the owner's question (below). Back at 3269 in 5 of 6 runs and at 3299 in 1 (a run of the second measurement: stint 2010, 270 after the warm-up end, S 5.1); the decision is the same |
-| `segmentHitsBox @228` (wrong map, private helper of geometry.ts) | 209 to 239 | no compile line after the drop in 2 of 4 hook-free runs (1 of 2 in each measurement; open, 4050); back in TurboFan at once in the other 2 (a compile queued before the drop completes in the window of the drop or the next, at tick 239: the drop is at 239 in one run and at 209 in the other); no compile line in the traced instrumented run of either measurement | not separable | - | persistent on the whole stint in 2 of 4 runs, so fix by the rule there; the owner's question (below). The outcome depends on a compile race. No compile line of its own in those runs, so it stays in baseline code or is inlined |
-
-Hargrim 3v3 on arena01 (C1; 3929, 5159):
-
-| Row | Drop tick | T | E (B) | S (B) | Decision |
-|---|---|---|---|---|---|
-| `chooseEscape @176` (type feedback) | 4139 to 4169 | 450 in all, 300 in a round with bot 2 alive (2 of 2) | bot 2 (36 B on 177 of 265 thinks): 10.4 against the 5 windows before, which hold class U (about 14.7 B a think), and 25.1 against zero (the 5 windows after have no bot 2: it is dead); the second measurement read 10.5 and 25.1 | 5.2 (against the 5 before) to 12.6 (against zero) | undetermined: no slice of its own, it goes to the class U investigation, which decides it by the rule |
-| `kiteDirectionInto @176`, `exFor @35` (private) | 2279 to 2309, 419 | open, to the end; `kiteDirectionInto` reads Sparkplug | at most 10.8 (mean of the worst bot, class U inside) | - | fix: persistent |
-
-Hargrim 2v2 on arena02 (C2; 5789, 7139):
-
-| Row | Drop tick | T | E (B) | S (B) | Decision |
-|---|---|---|---|---|---|
-| `hasStatus @7` and `@27` | - | - | - | - | not reproduced (0 of 2). The instrumented run (heap flags) shows `@27` at 6029 (T 90, E 0): artifact |
-| `hasStatus`, `chooseCast` (`embedded weak objects cleared`, 5579) | instrumented runs only | 270 to 450 | 8.6 to 11.4 over 5789 to 6029 | - | artifact (0 of 2 hook-free) |
-| `finisher @108` (compare), `decide @287` (call) | 6839 | `finisher` 60; `decide` open, 300 to the end, 90 of them in the round | `finisher` 35 (bot 3, 1 window); `decide` 25.4 over the 3 windows in the round (7.6 as a mean over all 300 ticks, the second measurement) | 3.5; 3.8 | accept (3): every consistent S is under 8 |
-| `kiteDirectionInto @213`, `orbUpInto @51` | 1859, 2729 | 4170 (back at 5999); open, 4410 | -4.6 to 2.0 over 6089 to 6809; 8.1 for bot 2 in the second measurement, class U inside | - | fix: persistent |
-
-Hargrim 2v2 on arena03 (C3; 2639, 12 539):
-
-| Row | Drop tick | T | E (B) | S (B) | Decision |
-|---|---|---|---|---|---|
-| `move @678` (wrong call target, 3 of 3), with `splitPath @34`, `decide @116` | 2609 to 2669 | 330 to 450, 420 after the warm-up end | 23.3 (24 B on 87% of the thinks) | 16.3 | fix |
-| `computeCues @267` (type feedback, 3 of 3) | 3119 to 3149 | 90 to 150 (tier reads 120) | 163.5 (168 or 204 B on 105 of 120 thinks) | 41 | fix |
-| `dodgeInto @123` (keyed access, 3 of 3) | 3359 | 330 to 420 (tier reads 360) | 30.7 against the 5 windows after, which hold class U (24 B reads); 37.5 against zero | 21.5; 26.3 against zero | fix either way |
-| `dodgeInto @52` (wrong map, 3 of 3) | 3929 to 3959 | 300 to 330 | 33.6 (264 B) | 18.5 | fix |
-| wave of `dependent prototype chain changed` (3 of 3; about 43 marks and wrong-map deopts in 25 functions) | 9749 | 30 to 630 for the hot functions | 126 over 9749 to 10349 (bot 3: 120 B on 76% of its thinks, plan thinks 32% against 1%; mean of all thinks 704 B against 7 B) | 126 (T 630, over 600) | fix (class X) |
-| the same wave, 10349 to 11069 | | 720 | 1.1 | 1.1 | accept (the functions still down are not called) |
-| `dodgeInto @806` (compare, 3 of 3) | 11189 | 150 to 180 | 101 (bot 1: 168 or 264 B); the second measurement read 78.4 on a strict tier-read stint and 107.7 over 11129 to 11339 | 30 | fix |
-| `hasStatus @7` and `@27` (listed here at 11159 and 11249) | instrumented runs only | 60 to 90 | - | - | artifact (step 1): no `hasStatus` deopt after tick 9749 in any hook-free run (0 of 3 in the first measurement, 0 of 3 in the second). The tier reads disagree: in both instrumented runs of the first measurement `hasStatus` reads Sparkplug at 11129 and 11219, in both of the second it reads Maglev throughout. No decision, no slice |
-| `chooseEscape` after the wave (class X: marked at 9749, no code, never recompiled in 3 of 3 hook-free traces; Sparkplug from 11099) | 9749, baseline from 11099 | open, 1440 to the match end (tier reads, runs A and B) | 11.4 (bots 1 and 3 read 168 and 192 B in 11099 to 11129); 8.8 without the windows of `dodgeInto @806`, 11159 to 11339, with which it is a joint row (the second measurement read 10.1 to 10.3 over the whole stint and 6.7 to 6.8 without those windows) | 11.4; 8.8 (6.8) | fix (class X, folded into the wave investigation; the whole-stint E is 8 B or more in both measurements) |
-| `think @691` (wrong call target, 3 of 3) | 12239 to 12269 | 90 to 180 | 0.0 | 0.0 | accept (3) |
-| `enemyInReach`, `nearerThanEnemies` after the wave (class X: no code until called again; `nearerThanEnemies` is exported and reads status 1 from 9749 to 12179, `enemyInReach` is private and has no tier read) | 9749 | over 1800 (compiled again at 12179 to 12239); not called | 0.4 over 28 windows | - | fix: persistent, class X, folded into the wave investigation; accepted when a hook-free trace shows the wave not marking either at 9749 (the unfixed code marks both in 4 of 4 traced runs of the first measurement) |
-| `hasStatus`, `chooseCast` (`embedded weak objects cleared`) | 5279 instrumented; hook-free 1469 (2 of 3, before the warm-up end, none after; 0 of 4 in the second measurement: 3 hook-free runs and 1 traced instrumented run) | 120 | 0.5 | 0.1 | accept (class G, depends on collection timing) |
-
-Quillon 3v3 on arena02 (C4; 3809, 5849):
-
-| Row | Drop tick | T | E (B) | S (B) | Decision |
-|---|---|---|---|---|---|
-| `computeCues @267` (hook-free 2 of 2; `@308` in the instrumented run) | 4859 to 4889 | 90 (tier reads) to 300 (trace; the second measurement read 300) | 204 (168 or 204 B on all thinks) | 31 (T 90) to 102 (T 300) | fix |
-| `orbUpInto @51`, `ownSpawnInto @125`, `findPath @79`, `kiteDirectionInto @213` | 1379 to 3089 | 2310 to 3690; `findPath` open | at most 8.8 (class U inside) | - | fix: persistent |
-
-Lumeth 3v3 on arena03 (C5; 2789, 4199):
-
-| Row | Drop tick | T | E (B) | S (B) | Decision |
-|---|---|---|---|---|---|
-| `followPathInto @101`, `aim @810` | 1829 to 2429 (`aim` in 3 of 3 hook-free runs of each measurement) | back at 2819 to 2939 (30 to 150 after the warm-up end) | 27 (bot 2, 17 thinks; 84% of the thinks of these windows are plans, a round begins); the second measurement read 32 to 33 | 6.8 (E 27, T 150); 8.3 (E 33) | fix: the two measurements lie on either side of 8 B, the higher decides |
-| `decide @51`, `orbUpInto @51` (3 of 3) | 3959 to 4019 | open, 180 to 240 | 0.0 (29 thinks) | 0 | accept (3) |
-| `dodgeInto @404`, `dodgeInto` (`embedded weak objects cleared`) | - | - | - | - | not reproduced (0 of 3) |
-| `kiteDirectionInto @213`, `findPath @79`, `insideShrunkBoundary @0` | 0 to 2159 | open | at most 4.0 | - | fix: persistent |
+| Cfg | Row | Drop tick | T | E (B) | S (B) | Decision |
+|---|---|---|---|---|---|---|
+| C0 (3029, 4289) | `dodgeInto @806`, `decide @51`, `chooseCast @236` | 2519 to 2759 | 330 to 540, back at 3059 to 3089 | 0 (per bot over the 35 windows from 3029: 0.7 to 2.4) | 0 | accept (3) |
+| C0 | `orbUpInto @51` | 2759 to 2789 | open, 1500 to the end, Sparkplug | same | 0 | accept (3; 1530 ticks left) |
+| C0 | `needsPlan @94` (out of bounds, private) | 1289 to 1319 | whole stint 1950 to 2010, back at 3269 (5 of 6 runs) or 3299 (1); 240 to 270 after the warm-up end | 11.4 (bot 2, 24 B on 103 of 216 thinks; 11.1 in run B) | 4.6 to 5.1 (T 240 to 270) | fix by the rule (persistent on the whole stint): the owner's question |
+| C0 | `segmentHitsBox @228` (wrong map, private) | 209 to 239 | no compile line after the drop in 2 of 4 hook-free runs (1 of 2 in each measurement) and in the traced instrumented run of each measurement (open, 4050); back in TurboFan at once in the other 2 (a compile queued before the drop completes in its window or the next, at 239) | not separable | - | fix by the rule where persistent: the owner's question (a compile race) |
+| C1 (3929, 5159) | `chooseEscape @176` (type feedback) | 4139 to 4169 | 450, 300 in a round with bot 2 alive (2 of 2) | bot 2 (36 B on 177 of 265 thinks): 10.4 against the 5 before, which hold class U (about 14.7 B); 25.1 against zero, as the 5 after have no bot 2: it is dead (second measurement 10.5 and 25.1) | 5.2 to 12.6 | undetermined: to the class U investigation |
+| C1 | `kiteDirectionInto @176`, `exFor @35` | 2279 to 2309, 419 | open, to the end; `kiteDirectionInto` reads Sparkplug | at most 10.8 (class U inside) | - | fix: persistent |
+| C2 (5789, 7139) | `hasStatus @7` and `@27` | - | - | - | - | not reproduced (0 of 2); the instrumented run shows `@27` at 6029 (T 90, E 0): artifact |
+| C2 | `hasStatus`, `chooseCast` (`embedded weak objects cleared`, 5579) | instrumented runs only | 270 to 450 | 8.6 to 11.4 over 5789 to 6029 | - | artifact (0 of 2 hook-free) |
+| C2 | `finisher @108` (compare), `decide @287` (call) | 6839 | 60; open, 300 (90 in the round) | 35 (bot 3, 1 window); 25.4 over 3 windows in the round (7.6 over all 300 ticks, second measurement) | 3.5; 3.8 | accept (3): every consistent S is under 8 |
+| C2 | `kiteDirectionInto @213`, `orbUpInto @51` | 1859, 2729 | 4170 (back at 5999); open, 4410 | -4.6 to 2.0 over 6089 to 6809 (8.1 for bot 2 in the second measurement, class U inside) | - | fix: persistent |
+| C3 (2639, 12 539) | `move @678` (wrong call target, 3 of 3), `splitPath @34`, `decide @116` | 2609 to 2669 | 330 to 450 (420 after the warm-up end) | 23.3 (24 B on 87% of the thinks) | 16.3 | fix |
+| C3 | `computeCues @267` (type feedback, 3 of 3) | 3119 to 3149 | 90 to 150 (tier reads 120) | 163.5 (168 or 204 B on 105 of 120 thinks) | 41 | fix |
+| C3 | `dodgeInto @123` (keyed access, 3 of 3) | 3359 | 330 to 420 (tier reads 360) | 30.7 against the 5 after, which hold class U (24 B reads); 37.9 against zero | 21.5; 26.5 | fix either way |
+| C3 | `dodgeInto @52` (wrong map, 3 of 3) | 3929 to 3959 | 300 to 330 | 33.6 (264 B) | 18.5 | fix |
+| C3 | wave of `dependent prototype chain changed` (3 of 3; about 43 marks and wrong-map deopts in 25 functions) | 9749 | 30 to 630 for the hot functions | 126 over 9749 to 10349 (bot 3: 120 B on 76% of its thinks, plan thinks 32% against 1%; all thinks 704 B against 7 B) | 126 (T 630, over 600) | fix (class X) |
+| C3 | the same wave, 10349 to 11069 | | 720 | 1.1 | 1.1 | accept (the functions still down are not called) |
+| C3 | `dodgeInto @806` (compare, 3 of 3) | 11189 | 150 to 180 | 101 (bot 1: 168 or 264 B; second measurement 78.4 on a strict tier-read stint and 107.7 over 11129 to 11339) | 30 | fix |
+| C3 | `chooseEscape` after the wave (marked at 9749, never recompiled in 3 of 3 hook-free traces; Sparkplug from 11099) | 9749 | open, 1440 (tier reads) | 11.4 (bots 1 and 3 read 168 and 192 B in 11099 to 11129); 8.8 without the windows of `dodgeInto @806`, 11159 to 11339 (joint row; second measurement 10.1 to 10.3 and 6.7 to 6.8) | 11.4; 8.8 (6.8) | fix (class X; whole-stint E is 8 B or more in both measurements) |
+| C3 | `enemyInReach` (private), `nearerThanEnemies` (exported, status 1 from 9749 to 12179): the wave leaves them without code | 9749 | over 1800 (compiled again at 12179 to 12239); not called | 0.4 over 28 windows | - | fix: persistent (class X); accepted when a hook-free trace shows the wave not marking either at 9749 (the unfixed code marks both in 4 of 4 traced runs) |
+| C3 | `think @691` (wrong call target, 3 of 3) | 12239 to 12269 | 90 to 180 | 0.0 | 0.0 | accept (3) |
+| C3 | `hasStatus`, `chooseCast` (`embedded weak objects cleared`) | 5279 instrumented; hook-free 1469 (2 of 3, before the warm-up end, none after; 0 of 4 in the second measurement: 3 hook-free runs and 1 traced instrumented run) | 120 | 0.5 | 0.1 | accept (class G) |
+| C3 | `hasStatus @7` and `@27` (at 11159 and 11249) | instrumented runs only | 60 to 90 | - | - | artifact (step 1, no decision, no slice): no `hasStatus` deopt after 9749 in any hook-free run (0 of 3 and 0 of 3); the tier reads disagree (Sparkplug at 11129 and 11219 in the first measurement's runs, Maglev throughout in the second's) |
+| C4 (3809, 5849) | `computeCues @267` (hook-free 2 of 2; `@308` in the instrumented run) | 4859 to 4889 | 90 (tier reads) to 300 (trace; the second measurement read 300) | 204 (168 or 204 B on all thinks) | 31 (T 90) to 102 (T 300) | fix |
+| C4 | `orbUpInto @51`, `ownSpawnInto @125`, `findPath @79`, `kiteDirectionInto @213` | 1379 to 3089 | 2310 to 3690; `findPath` open | at most 8.8 (class U inside) | - | fix: persistent |
+| C5 (2789, 4199) | `followPathInto @101`, `aim @810` (`aim` in 3 of 3 hook-free runs of each measurement) | 1829 to 2429 | back at 2819 to 2939 (30 to 150 after the warm-up end) | 27 (bot 2, 17 thinks, 84% plans); second measurement 32 to 33 | 6.8 (E 27, T 150); 8.3 (E 33) | fix: the measurements lie on either side of 8 B, the higher decides |
+| C5 | `decide @51`, `orbUpInto @51` (3 of 3) | 3959 to 4019 | open, 180 to 240 | 0.0 (29 thinks) | 0 | accept (3) |
+| C5 | `dodgeInto @404`, `dodgeInto` (`embedded weak objects cleared`) | - | - | - | - | not reproduced (0 of 3) |
+| C5 | `kiteDirectionInto @213`, `findPath @79`, `insideShrunkBoundary @0` | 0 to 2159 | open | at most 4.0 | - | fix: persistent |
 
 In Chromium's bytecode `computeCues @267` is `cache.hasBase[F_INDEX]`, the first load of the
 `cues.reserve` chain, although the reason text says named access: a reported offset can be the start
-of a block. `hasStatus` is also a function name in the sim; the tier reads of the bots' exported
-`hasStatus` tell the two apart, and a trace line cannot.
+of a block. `hasStatus` is also a function name in the sim; only the tier reads of the bots' exported
+one tell the two apart, not a trace line.
 
 **Decisions per class.**
 
-- **W, the warm-up of the default match.** Rounds 1 and 2 have 52 and 54 bots-named events in
-  two hook-free runs (23 and 26 by type feedback, in 25 functions; #290's trace of an earlier head
-  had 56): `chooseCast` 5, `hasStatus` 5, `decide` 4, `dodgeInto` 4, `segmentClear` 4,
-  `segmentHitsBox` 4, `updateRuns` 4, two each of `chooseTarget`, `distanceInto`,
-  `scoreIntentsInto`, `steerTowardInto`, and one each of `chooseIntent`, `clearShotWith`,
-  `computeCues @109`, `enemyAlive`, `exFor`, `finisher`, `follow`, `followPathInto`,
-  `insideShrunkBoundary`, `lineOfSight`, `needsPlan`, `orbUpInto`, `splitPath`, `think`. Accepted by
-  step 2 when the stint ends before tick 3029 (most end 0 to 1500 ticks after the drop). The class is
-  fix by step 6, because two of its rows reach past tick 3029 and are persistent on the whole
-  stint: `needsPlan @94` (E 11.4 B, S 4.6 B over its 240 ticks in the steady state) and
-  `segmentHitsBox @228` (no cost separable; persistent in 2 of 4 hook-free runs and back in optimized
-  code at once in the other 2, a compile race); both are the owner's question below. Their bytes are not broken down per
-  window.
-- **P, after the warm-up.** Fix: `computeCues @267` (C3, C4), `dodgeInto @123`, `@52`, `@806` (C3),
-  `move @678` (C3), `followPathInto` and `aim` (C5) and the persistent rows of C1, C2, C4 and C5. Undetermined, in the
-  class U investigation: C1 `chooseEscape @176`. Accepted with figures: `decide @287` with
-  `finisher @108` (C2), `think @691` (C3), `decide @51` with `orbUpInto @51` (C5) and the crossing
-  rows of C0. Artifact: C3 `hasStatus @7` and `@27`.
-- **G, `embedded weak objects cleared`.** Accept: E 0.5 B, S 0.1 (C3). Hook-free these happened only before
-  the warm-up end (C3 `hasStatus` 2 of 3, C5 `dodgeInto` 1 of 3, against 0 of 4 and 0 of 4 in the
-  second measurement: 3 hook-free runs and 1 traced instrumented run each); after it they showed only in the instrumented runs, which use `gc()` and heap flags
-  (C3 5279, C2 5579). The class depends on the timing of collections.
-- **X, prototype chain.** Fix: the wave of C3 at tick 9749 costs 126 B a think for 600 ticks, and all
-  thinks read plan-sized bytes in its first windows; and `chooseEscape`, which the wave marks and
-  which never recompiles (3 of 3 hook-free traces), joint with `dodgeInto @806` where the stints
-  overlap (11.4 B, 8.8 B without those windows; 10.1 to 10.3 and 6.7 to 6.8 in the second
-  measurement); and `enemyInReach` and `nearerThanEnemies`, which the wave leaves without code until
-  they are called again (compiled at 12179 to 12239). It is one investigation, whose exit may be "no
-  source fix". `move` is back in the same window after the wave, so the Node-only rows (Wrenna's
-  scene as its own test, bots that think before the scene list) are accepted as test constraints
-  (#302's figures stand). The default match's `think` drop at 3269 is not reproduced: the only
-  `think` deopt of C0 is at tick 599, in 2 hook-free runs and 1 traced instrumented run, so the
-  3269 one was the instrument.
+- **W, the warm-up of the default match.** Rounds 1 and 2 have 52 and 54 bots-named events in two
+  hook-free runs (23 and 26 by type feedback, in 25 functions; #290's trace of an earlier head had
+  56), the most in `chooseCast` and `hasStatus` (5 each). Accepted by step 2 when the stint ends
+  before tick 3029 (most end 0 to 1500 ticks after the drop). The class is fix by step 6, because
+  `needsPlan @94` and `segmentHitsBox @228` reach past 3029 and are persistent on the whole stint:
+  the owner's question below.
+- **P, after the warm-up.** Fix: `computeCues @267` (C3, C4), `dodgeInto @123`, `@52`, `@806` and
+  `move @678` (C3), `followPathInto` and `aim` (C5) and the persistent rows of C1, C2, C4 and C5.
+  Undetermined, in the class U investigation: C1 `chooseEscape @176`. Accepted with figures:
+  `decide @287` with `finisher @108` (C2), `think @691` (C3), `decide @51` with `orbUpInto @51` (C5)
+  and the crossing rows of C0. Artifact: C3 `hasStatus @7` and `@27`. Not reproduced: C2
+  `hasStatus @7` and `@27`.
+- **G, `embedded weak objects cleared`.** Accept: E 0.5 B, S 0.1 (C3). Hook-free it happened only
+  before the warm-up end (C3 2 of 3, C5 1 of 3; 0 of 4 and 0 of 4 in the second measurement); after
+  it only in instrumented runs, which use `gc()` and heap flags. It depends on collection timing.
+- **X, prototype chain.** Fix, one investigation (#303 slice 5), whose exit may be "no source fix":
+  the wave of C3 at 9749 (126 B a think for 600 ticks, and all thinks read plan-sized bytes in its
+  first windows), `chooseEscape` (joint with `dodgeInto @806` where the stints overlap; 11.4 B,
+  8.8 B without those windows) and `enemyInReach` with `nearerThanEnemies`. `move` is back in the same
+  window after the wave, so the Node-only rows (Wrenna's scene as its own test, bots that think
+  before the scene list) are accepted as test constraints (#302's figures stand). The default
+  match's `think` drop at 3269 is not reproduced: its only `think` deopt is at tick 599 (2 hook-free
+  runs and 1 traced instrumented run), so the 3269 one was the instrument.
 - **U, the unattributed 24 to 48 B.** After the warm-up of C0 it is 9.6% of the thinks (255 of
-  2670), nearly all in the windows 3059 to 3239 (8 to 72% of a window) and 0 to 6% after 3269, the
-  tick where `needsPlan`'s Maglev code is back: in the default match it coincides with the end of
-  that stint (a match in time only, not an attribution). In the other configurations it is 9.7% (C1), 17.5% (C2)
-  and 21% (C4) of the thinks, depends on the game state, and stays in windows where
-  `kiteDirectionInto` is in Maglev (C2, bot 2 reads 16 to 48 B in 6179 to 6329). Its best
-  correlates are `nearerThanEnemies` in C2 (33% of the thinks in the windows where it is in
-  baseline, 5.5% otherwise) and `kiteStepInto` and `chooseEscape` in C4 (41% against 10%), not
-  separable from "the function is not called". Not attributed: a bot averages up to 10.8 B (C1,
-  bot 2) and 8.8 B (C4) over the persistent windows, so the cost is unattributed. Fix: an investigation (#303 slice 6). It also decides C1 `chooseEscape @176`, whose
-  reference holds class U (about 14.7 B a think for bot 2): E is 10.4 against it and 25.1 against
-  zero, S 5.2 and 12.6, so the row is undetermined until those reads are attributed; the
-  investigation attributes them and then decides the row by the rule.
+  2670), nearly all in the windows 3059 to 3239 (8 to 72% of a window) and 0 to 6% after 3269, where
+  `needsPlan`'s Maglev code is back (a match in time only, not an attribution). Elsewhere it is 9.7%
+  (C1), 17.5% (C2) and 21% (C4) of the thinks, depends on the game state, and stays in windows where
+  `kiteDirectionInto` is in Maglev (C2, bot 2 reads 16 to 48 B in 6179 to 6329). Its best correlates
+  are `nearerThanEnemies` in C2 (33% of the thinks in the windows where it is in baseline, 5.5%
+  otherwise) and `kiteStepInto` and `chooseEscape` in C4 (41% against 10%), not separable from "the
+  function is not called". Fix: an investigation (#303 slice 6), which also decides
+  C1 `chooseEscape @176`.
 
-**The owner's question: the default match.** No drop of a bots function begins after tick 3029 in the
-default match (2 hook-free runs and 1 traced instrumented run in each measurement). One that began in the warm-up, `needsPlan @94`
-(out of bounds, dropped at 1289 to 1319), is back in Maglev only at tick 3269 (5 of 6 runs; 3299 in 1), 240 ticks into the
-steady state, and costs about 11.3 B a think there (bot 2, 11.4 in run A and 11.1 in run B, 24 B on
-103 of 216 thinks; the unattributed class U of C0 coincides with its end). T in S is the 240 ticks after the
-warm-up end, so S is 4.6 B; the whole stint is 1950 to 1980 ticks, over the 1800 of the persistence
-clause, so the rule says fix. The rule gives a drop in the default match after its warm-up to the
-owner, and the sentence that the rule stands for the default match after its warm-up needs the owner
-to say whether 240 ticks at 11 B are inside it. `segmentHitsBox @228` (wrong map, a private helper
-of geometry.ts, dropped at 209 to 239) is in the same position in part of the runs: in 2 of 4
-hook-free runs (1 of 2 in each measurement) and in the traced instrumented run of each measurement
-it has no compile line of its own after the drop, so it stays in baseline code or is inlined, for 4050
-ticks to the match end, over the 1800; in the other 2 a TurboFan compile queued before the drop
-completes in the window of the drop or the next, at tick 239 (the drop is at 239 in one run and at 209 in the other), and it is back in optimized code at once. The outcome
-depends on a compile race, and no cost is separable, so the question is whether such a row counts.
-If not, both rows are accepted; if so, the `needsPlan` slice is accepted when a hook-free trace of C0
-shows it back in Maglev or TurboFan by tick 3029, and the `segmentHitsBox` slice when it shows no deopt
-of `segmentHitsBox` after tick 179 (its `@228` drop gone), in every run.
+**The owner's question: the default match.** No drop of a bots function begins after tick 3029 in
+the default match (2 of 2 hook-free runs; 2 hook-free runs and 1 traced instrumented run in the
+second measurement), but two stints that began in the warm-up reach past it, and the rule gives such
+a row to the owner. `needsPlan @94` is back in Maglev at tick 3269 to 3299: 1950 to 2010 ticks in
+all, over the 1800 of the persistence clause, and 240 to 270 after the warm-up end, at about 11.3 B
+a think for bot 2 (11.4 in run A, 11.1 in run B; 24 B on 103 of 216 thinks), so S is 4.6 to 5.1 B (T
+240 to 270); the class U of C0 coincides with its end. `segmentHitsBox @228` (dropped at 209 to 239)
+stays in baseline code or is inlined for 4050 ticks to the match end in 2 of 4 hook-free runs, and
+is back in optimized code at once in the other 2 (a compile queued before the drop completes in the
+window of the drop or the next, at tick 239: a compile race, no cost separable). The question: are
+such rows inside what the rule promises for the default match after its warm-up, that is, is 240 to
+270 ticks at 11 B inside it? If so, both rows are accepted. If not, the `needsPlan` slice is
+accepted when a hook-free trace of C0 shows it back in Maglev or TurboFan by tick 3029, and the
+`segmentHitsBox` slice when it shows no deopt of `segmentHitsBox` after tick 179 (its `@228` drop
+gone), in every run.
 
 **Not measured.** The other six picks (Ysmeer included) and the easy and hard tiers have never been
-traced, so first-time drops that those states cause are unknown; a forced-tier replay on a frozen
-state (the per-call figure of an exported function) was cut, so joint rows stay joint and class U is
-unattributed; class W has ticks and T and no bytes per window; the Node rows cite #302. The persistent
-rows are fix by the letter of the rule. For most of them the measured upper bound is under 8 B (they
-are private helpers, or functions the bots rarely call and V8 does not tier up again), and 10.8 B (C1),
-8.8 B (C4) and 8.1 B (C2, second measurement) for the worst. They are one slice on #303, except the two of the default match,
-which are the owner's question.
+traced; a forced-tier replay on a frozen state was cut, so joint rows stay joint and class U is
+unattributed; class W has ticks and T and no bytes per window. The persistent rows are fix by the
+letter of the rule, though most have a measured upper bound under 8 B (the worst: 10.8 B in C1, 8.8 B
+in C4, 8.1 B in C2 in the second measurement); they are one slice on #303, except the two of C0.
 
 **Method and steps to reproduce** (the scripts are scratch and not committed).
 
-1. Two scratch copies of the commit from `git archive`, one plain for the hook-free traces and one
-   with two dev-only hooks; `node_modules` copied. `diff -r` shows `packages/bots` and `packages/sim`
-   identical to the commit, and the client differing in the two hooks only. The dev server runs from
-   the copy on its own port (`cd <copy> && CLAUDELINE_PORT=<port> setsid npm run dev`, then wait until it
-   answers; stop it with `kill -TERM -- -<pgid>` of that group). One server and
-   one browser at a time; read `/proc/loadavg` at the start and end of every run.
-
-   ```diff
-   # packages/client/src/bot-driver.ts, in createBotDriver (scratch, never commit)
-   +  (globalThis as any).__p290Driven = driven;
-   +      const m = (globalThis as any).__p290Measure;
-   -        inputs[entry.id] = entry.bot.think(state);
-   +        inputs[entry.id] = m !== undefined ? m(entry.bot, state, entry.id) : entry.bot.think(state);
-   # packages/client/src/main.ts, in the `import.meta.env.DEV` block (only for replays)
-   +  (window as any).__p290State = state;
-   ```
-
+1. Two scratch copies of the commit from `git archive`, `node_modules` copied: plain (hook-free
+   traces) and hooked (instrumented runs; `bot-driver.ts` calls `globalThis.__p290Measure(bot,
+   state, id)` in place of `bot.think(state)`; a second hook, for replays, is not used). `diff -r`
+   shows `packages/bots` and `packages/sim` identical to the commit. The dev server runs from the
+   copy on its own port (`CLAUDELINE_PORT`), one server and one browser at a time; read
+   `/proc/loadavg` at the start and end of every run.
 2. Driver: Playwright's Chromium with `--js-flags=...`, a 320 x 180 page, `requestAnimationFrame` and
-   `cancelAnimationFrame` replaced by no-ops in an init script, so that no frame ever runs on the
-   wall clock (the paused clock: the only frames are those of the hook below), the URL of the configuration, `page.mouse.down()`, then windows of
-   `window.__runProbeFrames(30)` from tick 0 to the `matchEnd` phase, with the keys and the two
-   pointers of `e2e/live-probe.spec.ts` (WALK and POINTERS, a `mousemove` before each window) and the
-   warm-up of that spec (to the first round that begins after tick 2100). Between windows read the
-   tick, phase, round and bars from `canvas.dataset`. The urls are `/?champion=<kit>&difficulty=normal&arena=<id>&teamsize=<n>`
-   with hargrim 2 arena01, hargrim 3 arena01, hargrim 2 arena02, hargrim 2 arena03, quillon 3
-   arena02 and lumeth 3 arena03.
-3. Hook-free trace: the plain copy, flags `--trace-opt --trace-deopt` only (no natives, no heap flags,
-   no hook, no wrapper), `DEBUG=pw:browser` for the browser's lines with timestamps, and a line
-   `<ISO time> WINDOW tick a-b` printed after each window. Parse the lines `[bailout (kind: K,
-   reason: R): begin. deoptimizing ... <JSFunction NAME (sfi = ...)> ... bytecode offset N`,
-   `[marking dependent code ... (... <SharedFunctionInfo NAME>) ... for deoptimization, reason: R]`
-   (a lazy deopt) and `[completed compiling ... <JSFunction NAME ...> (target MAGLEV|TURBOFAN_JS)`
-   (not OSR). A line belongs to the first WINDOW line printed after it. Match by name, not by the
-   `sfi` address (a collection moves it). Bots names are the `function` and `const` names of
-   `packages/bots/src` plus `think` and `inspect`. Against the tier reads of the instrumented run
-   the trace ticks have a median lag of 0 ticks and extremes of 60 (20 to 27 matched deopts a run).
+   `cancelAnimationFrame` replaced by no-ops (the paused clock), the URL of the configuration
+   (`/?champion=<kit>&difficulty=normal&arena=<id>&teamsize=<n>`), `page.mouse.down()`, then windows
+   of `window.__runProbeFrames(30)` to the `matchEnd` phase, with the keys, pointers and warm-up of
+   `e2e/live-probe.spec.ts`. Between windows read the tick, phase and round from `canvas.dataset`.
+3. Hook-free trace: the plain copy, `--trace-opt --trace-deopt` only, `DEBUG=pw:browser` for the
+   browser's lines with timestamps, and a `WINDOW tick a-b` line after each window. Parse the
+   `[bailout ... <JSFunction NAME ...> ... bytecode offset N` lines, the `[marking dependent code ...
+   <SharedFunctionInfo NAME> ... reason: R]` lines (a lazy deopt) and the `[completed compiling ...
+   (target MAGLEV|TURBOFAN_JS)` lines (not OSR). A line belongs to the first WINDOW line after it;
+   match by name, not by `sfi` address. Bots names are the `function` and `const` names of
+   `packages/bots/src` plus `think` and `inspect`. Against the tier reads the ticks have a median
+   lag of 0 and extremes of 60 (20 to 27 matched deopts a run).
 4. Instrumented run: the hooked copy, flags `--expose-gc --min-semi-space-size=64
-   --max-semi-space-size=64 --allow-natives-syntax` and `--enable-precise-memory-info`. The wrapper
-   is installed once with `page.addInitScript`, before tick 0, and never toggled:
-
-   ```js
-   const N = 16384, rec = new Float64Array(N), recId = new Int32Array(N), recTick = new Int32Array(N), recN = new Int32Array(1);
-   const mem = () => performance.memory.usedJSHeapSize;
-   globalThis.__p290Measure = (bot, state, id) => {
-     const a = mem(); const r = bot.think(state); const b = mem();
-     const n = recN[0];
-     if (n < N) { rec[n] = b - a; recId[n] = id; recTick[n] = state === null ? -1 : state.tick; recN[0] = n + 1; }
-     return r;
-   };
-   ```
-
-   Only between windows: `gc({ type: 'minor' })` and clearing `recN` before, and after the window
-   reading the arrays and `%GetOptimizationStatus` of every exported function of the bots modules
-   (69 exports of the 19 modules `aim bot casting difficulty dodge escape follow geometry grid hypot intent kite orb path profile reach rng sight steer`, plus one `think` read per driven bot: 3 in 2v2 and 5 in 3v3, so 72 or 74 reads; each read is `new Function('f', 'return %GetOptimizationStatus(f)')(fn)`, and each module is `await import('/@fs/<real path of the copy>/packages/bots/src/<module>.ts')`. The path must be the real one: through a symlink the page gets a second module instance and reads functions that never run) and of
-   each driven bot's `think`. A second run of every configuration adds the trace flags, for an own
-   timeline and the artifact check.
-5. Reading it. A reading is `usedJSHeapSize` after less before, less 16 B. Per bot, the mean of the
-   readings from 0 to 300 B in the windows of a stint less the mean of the rule's reference: the 5
-   steady windows (a round, the bot alive at both ends) after the function is optimized again, or
-   else the 5 before the drop; where the bot is dead after the stint there are no windows after, so
-   the reference is the 5 before, and T counts only the ticks in a round with the bot alive. Class U
-   sits in these windows too: a clean valid reference decides; where no valid reference is clean, give
-   E against it and against zero, and call the row undetermined, for the class U investigation to
-   decide, only if the two S values fall on either side of 8 B (C1 `chooseEscape @176`: 10.4 against
-   the 5 before, 25.1 against zero); otherwise the decision both values agree on stands. Readings over 300 B are plan thinks, over 5000 B or under 0 a
-   collection. Report the dominant reading and its share (for example 168 B on 105 of 120 thinks).
-   For an exported function the stint is the run of windows whose tier read is Sparkplug or
-   Ignition after one in Maglev or TurboFan; otherwise it is the trace. Status 1 and 131073 (no
-   code, not called) are not baseline.
-6. Controls (Chromium 153.0.8010.12). Tier codes from forced toy functions: 25 Maglev, 41 TurboFan,
-   65 Ignition, 16385 Sparkplug; 1 and 131073 are read in the matches and not derived. The wrapper
-   reads 16 B for a no-op think in 3000 of 3000 calls (second run; 2994 in the first, with 6
-   tier-up outliers), 32 B (+16) for a `{a:1}` think and 60 B (+44) for a think that makes an array
-   of one double. Steady windows of C0 read a median of 0 B. Positive control, 5a95dfa (main
-   before #302), instrumented, C0: `computeCues` in Sparkplug for 17 steady windows from tick 3509 (18 windows from 3509 to 4019 with the window of the drop, as the second measurement counted),
-   962 of 1080 thinks (89%) at 156 or 168 B; on 02dc630 there is none. Module identity: every
-   function named in a row reads Maglev or TurboFan in at least one window; of the 72 read, 38 to 39 never
-   do (constructors, helpers the think does not call such as `sight.clearShot`; the 72 are 69 exports and 3 `think` reads).
-7. Runs. Hook-free: C0, C1, C2, C4 twice, C3 and C5 three times. Instrumented: two for each
-   configuration, with and without trace flags, which gave the same E to within 1 B and the same
-   T from the tier reads, so no third run. A third run is due if E differs by more than 12 B or T
-   by more than one window.
+   --max-semi-space-size=64 --allow-natives-syntax --enable-precise-memory-info`. A wrapper installed
+   once before tick 0 records `usedJSHeapSize` after less before each `bot.think`, less 16 B (readings
+   over 300 B are plan thinks, over 5000 B or under 0 a collection; a row reports the dominant reading
+   and its share, as 168 B on 105 of 120 thinks). Between windows only: `gc({ type: 'minor' })`, then
+   the records and `%GetOptimizationStatus` of every exported function of the bots modules (69
+   exports of 19 modules plus one `think` per driven bot: 72 or 74 reads; 25 is Maglev, 41 TurboFan,
+   65 Ignition, 16385 Sparkplug), each module imported from the real path of the copy (through a
+   symlink the page gets a second module instance). A stint read from the tiers is the run of windows
+   in Sparkplug or Ignition after one in Maglev or TurboFan; otherwise it is the trace. Status 1 and
+   131073 (no code, not called) are not baseline. A second run per configuration adds the trace flags,
+   for an own timeline and the artifact check.
+5. Controls and runs. The wrapper reads 16 B for a no-op think in 3000 of 3000 calls (2994 in the
+   first run, with 6 tier-up outliers), 32 B (+16) for a `{a:1}` think and 60 B (+44) for one that
+   makes an array of one double; steady windows of C0 read a median of 0 B. Positive control, 5a95dfa
+   (main before #302), C0: `computeCues` in Sparkplug for 17 steady windows from tick 3509 (18 with the
+   window of the drop, as the second measurement counted), 962 of 1080 thinks (89%) at 156 or 168 B;
+   on 02dc630 there is none. Module identity: every function named in a row reads Maglev or TurboFan
+   in at least one window; 38 to 39 of the 72 reads never do (constructors, helpers the think does
+   not call). Hook-free: C0, C1, C2, C4 twice, C3 and C5 three times. Instrumented: two per
+   configuration, with the same E to within 1 B and the same T from the tier reads, so no third run.
+   A third run is due if E differs by more than 12 B or T by more than one window.
 
 ### The default tiers on the runner
 
