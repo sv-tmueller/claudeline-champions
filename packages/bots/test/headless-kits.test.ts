@@ -84,7 +84,7 @@ describe.each(KIT_SETS)('headless matches of bots with $name', (set) => {
 // stands, which the oracle's own clone does not see. The
 // oracle models the walks of the champions ahead. The seeds are pinned for that alone: a miss
 // after a change to the bots, the sim or the Node version is governed by batch #53 decision 8.3.
-describe('a headless 3v3 free play on the shipped kits, seeds 768 to 773', () => {
+describe('a headless 3v3 free play on the three shipped kits, seeds 768 to 773', () => {
   const set = KIT_SETS[1] as KitSet;
   const DISPLACED_SEEDS = [768, 769, 770, 771, 772, 773];
 
@@ -98,7 +98,7 @@ describe('a headless 3v3 free play on the shipped kits, seeds 768 to 773', () =>
   }, 30_000);
 });
 
-describe('a headless match with Skerrow on the shipped kits', () => {
+describe('a headless match with Skerrow on the three shipped kits', () => {
   const set = KIT_SETS[1] as KitSet;
   const NORMAL = ['normal', 'normal', 'normal', 'normal'] as const;
 
@@ -191,7 +191,7 @@ describe('a headless match with Lumeth on the four shipped kits', () => {
 // The run presses only some slots, so a wrong row of a table could go unseen. This reads the
 // kit files and works every row out again, by the rule of docs/architecture/bots.md (the end of
 // the first effect that reaches an enemy) written here by hand for the shapes these kits use.
-describe('the band and clearance tables of the shipped kits', () => {
+describe('the band and clearance tables of the four shipped kits', () => {
   const set = KIT_SETS[1] as KitSet;
   const kits = rosterKits();
   const slotOf = (id: string, key: string): AbilitySpec => {
@@ -209,7 +209,7 @@ describe('the band and clearance tables of the shipped kits', () => {
   // The keys the oracle asks no line of sight and no clear shot of (#186): every ability, base or EX
   // variant of an EX slot, whose first top-level effect is a melee arc. The EX Lunge and Reaper's
   // Dance start with a dash and a teleport, so they are not among them.
-  it('has the melee keys of the shipped kits: the abilities whose first effect is a melee arc', () => {
+  it('has the melee keys of the nine shipped kits: the abilities whose first effect is a melee arc', () => {
     const found = new Set<string>();
     for (const kit of nineKits()) {
       for (const slot of SLOTS) {

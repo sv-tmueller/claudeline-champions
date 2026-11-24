@@ -389,7 +389,7 @@ export const KIT_SETS: KitSet[] = [
   },
   {
     // data/kits/hargrim.json and quillon.json: speed times lifetime in ticks over 60 for each bolt.
-    name: 'the shipped kits',
+    name: 'the three shipped kits',
     kits: jsonKits,
     bands: {
       ...HARGRIM_BANDS,
