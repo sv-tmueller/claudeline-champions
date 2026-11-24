@@ -10,6 +10,7 @@
     "packages/*/src/**/*.test.ts",
     "tests/**/*.ts",
     "e2e/**/*.ts",
+    "tools/trace/**/*.ts",
     "*.config.ts",
     "packages/*/*.config.ts"
   ]

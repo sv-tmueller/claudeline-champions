@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { botsNames, formatReport, parseTrace } from './parse.ts';
 
-// Trace lines in, rows out. Nothing here starts a browser. The V8 lines below are the formats
-// of bots.md ("The drops of #303, measured (#318)", step 3 of the method).
+// Trace lines in, rows out. Nothing here starts a browser. The builders below make lines in the
+// format of Chromium 153.0.8010.12, which the first run of `npm run trace` on the default match
+// printed; the test of the verbatim lines copies five of them as they were printed.
 
 const NAMES = {
   bots: new Set(['segmentHitsBox', 'needsPlan', 'dodgeInto', 'hasStatus', 'think', 'orbUpInto']),
@@ -10,13 +11,13 @@ const NAMES = {
 };
 
 function bailout(name: string, offset: number, reason = 'wrong map', kind = 'deopt-eager', sfi = '0x1a2b'): string {
-  return `[bailout (kind: ${kind}, reason: ${reason}): begin. deoptimizing 0x3c4d <JSFunction ${name} (sfi = ${sfi})>, 0x5e6f <Code MAGLEV>, opt id 7, bytecode offset ${offset}, deopt exit 3, FP to SP delta 40, caller SP 0x7a8b, pc 0x9c0d]`;
+  return `[bailout (kind: ${kind}, reason: ${reason}): begin. deoptimizing 0x319301ac71a5 <JSFunction ${name} (sfi = ${sfi})>, 0x23b5010e40b9 <Code MAGLEV>, opt id 315, bytecode offset ${offset}, deopt exit 22, FP to SP delta 24, caller SP 0x7ffdc44c3ff0, pc 0x5d8a650904e7]`;
 }
 function marking(name: string, reason: string): string {
-  return `[marking dependent code 0x1e2f (opt id 4) (0x3a4b <SharedFunctionInfo ${name}>) for deoptimization, reason: ${reason}]`;
+  return `[marking dependent code 0x23b501163f19 <Code MAGLEV> (0x3193011e9f1d <SharedFunctionInfo ${name}>) (opt id 208) for deoptimization, reason: ${reason}]`;
 }
 function compiled(name: string, target = 'MAGLEV', osr = false, sfi = '0x1a2b'): string {
-  return `[completed compiling 0x3c4d <JSFunction ${name} (sfi = ${sfi})> (target ${target})${osr ? ' OSR' : ''} - took 0.1, 0.4, 0.2 ms]`;
+  return `[completed compiling 0x319301ac71a5 <JSFunction ${name} (sfi = ${sfi})> (target ${target})${osr ? ' OSR' : ''} - took 0.003, 6.767, 0.019 ms]`;
 }
 function window(tick: number, phase = 'round', round = '1'): string {
   return `#window ${JSON.stringify({ tick, phase, round })}`;
@@ -166,6 +167,31 @@ describe('parseTrace', () => {
     const none = parseTrace([window(2069, 'round', '2')], NAMES);
     expect(none.warmUpEnd).toBeNull();
     expect(none.matchEnd).toBeNull();
+  });
+});
+
+describe('parseTrace on lines as Chromium 153.0.8010.12 printed them', () => {
+  test('reads a bailout, a mark, a lazy bailout with a reason in parentheses, a TurboFan compile and an OSR compile', () => {
+    const lines = [
+      '[bailout (kind: deopt-eager, reason: wrong map): begin. deoptimizing 0x319301ac71a5 <JSFunction segmentHitsBox (sfi = 0x3193011e9f1d)>, 0x23b5010e40b9 <Code MAGLEV>, opt id 315, bytecode offset 228, deopt exit 22, FP to SP delta 24, caller SP 0x7ffdc44c3ff0, pc 0x5d8a650904e7]',
+      '[marking dependent code 0x23b501125df5 <Code TURBOFAN_JS> (0x3193011e9e5d <SharedFunctionInfo segmentClear>) (opt id 211) for deoptimization, reason: dependent field type constness changed]',
+      '[bailout (kind: deopt-lazy, reason: (unknown)): begin. deoptimizing 0x319301d2401d <JSFunction projectObject (sfi = 0x319301aea861)>, 0x23b50117f679 <Code TURBOFAN_JS>, opt id 297, bytecode offset 673, deopt exit 162, FP to SP delta 128, caller SP 0x7ffdc44c4240, pc 0x5d8a650512f5]',
+      '[completed compiling 0x31930180bf35 <JSFunction buildNavGrid (sfi = 0x31930139d551)> (target MAGLEV) OSR - took 0.000, 0.270, 0.010 ms]',
+      '[completed compiling 0x31930180bea9 <JSFunction segmentClear (sfi = 0x3193011e9e5d)> (target TURBOFAN_JS) - took 0.003, 6.767, 0.019 ms]',
+      window(239),
+    ];
+    const names = {
+      bots: new Set(['segmentHitsBox', 'segmentClear', 'projectObject', 'buildNavGrid']),
+      ambiguous: new Set<string>(),
+    };
+    const report = parseTrace(lines, names);
+    expect(report.stints.map((s) => [s.name, s.how, s.kind, s.offset, s.reason, s.backTarget])).toEqual([
+      ['segmentHitsBox', 'deopt', 'deopt-eager', 228, 'wrong map', undefined],
+      ['segmentClear', 'marked', undefined, undefined, 'dependent field type constness changed', 'TURBOFAN_JS'],
+      ['projectObject', 'deopt', 'deopt-lazy', 673, '(unknown)', undefined],
+    ]);
+    expect(report.stints[0]?.backTick).toBeNull();
+    expect(report.stints[2]?.backTick).toBeNull();
   });
 });
 
