@@ -3,12 +3,13 @@
 Status: in progress; Durnhal's section is written, his kit is data and his
 model is built, and Wrenna's section is written, her kit is data (#270) and her
 model is built, her bot profile and client entry are built and she is in the
-balance harness roster (#281, step 3.4; the committed block is still the
-seven-kit report); Ysmeer's section is written, her kit is data (#271, roadmap
-step 4.2, the first kit with a fuse and an end area), her model is built (#273),
-and her bot profile and client entry are built and she is in the balance harness
-roster, the ninth kit (#307, step 4.3; the committed block is still the seven-kit
-report)
+balance harness roster (#281, step 3.4); Ysmeer's section is written, her kit is
+data (#271, roadmap step 4.2, the first kit with a fuse and an end area), her
+model is built (#273), and her bot profile and client entry are built and she is
+in the balance harness roster, the ninth kit (#307, step 4.3). The committed
+balance block is the nine-kit report (#327, which closes the balance check of
+steps 3.4 and 4.3; the cells are not read against this document's counter web
+there)
 Source of truth for numbers: [roster v3 design
 spec](../superpowers/specs/2026-10-24-blc-feel-roster-v3-design.md), sections
 4.1 and 5, and [rules](rules.md), sections 4.1 and 5
@@ -353,10 +354,9 @@ none and earn none. EX variants sit on M2 and E, never on F, at 25 energy, and
 F costs 100. A number changes in the file, here and in the scripted fixture in
 the same change. Wrenna joined the balance harness in the last step of her
 series (v3 spec section 9.3), step 3.4 (#281): `HARNESS_KITS` in
-`tools/balance/inputs.ts` lists her, and the balance block of
-[balance](balance.md) is not regenerated for her, so it is still the seven-kit
-report and `npm run balance -- --check` fails on purpose until the nine-kit
-report of a later package.
+`tools/balance/inputs.ts` lists her. The balance block of [balance](balance.md)
+was regenerated for the nine kits by #327, so her cells are in it; they are not
+read against the counter web here (a later package may).
 
 **Bot profile (#281).** Roster-v3 has no bot sketch for her, so her profile
 follows roster-v2's recipe (see [bots](../architecture/bots.md)): she keeps 10

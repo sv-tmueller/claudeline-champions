@@ -131,10 +131,12 @@ first.
   22.15 or later. It plays the `HARNESS_KITS` of `tools/balance/inputs.ts`
   (nine since #307, every kit file), with the standard match (the arena's orb
   point of `data/orbs.json`): 216 cells and 39 312 matches over three arenas,
-  at 28 seeds a 2v2 config and 4 a 3v3 config. The committed block is still the
-  seven-kit report of #244 (126 cells, 25 200 matches, about 31 minutes on Apple
-  silicon), so `--check` and the manual workflow fail on purpose until the
-  nine-kit report of a later package rewrites it.
+  at 28 seeds a 2v2 config and 4 a 3v3 config. The committed block is that
+  nine-kit report (#327), which took 7511.9 s locally on a shared 6-core Linux
+  host under load (measured, see [balance.md](../design/balance.md#7-how-to-regenerate)),
+  and `--check` and the manual workflow compare a fresh run with it. The seven-kit
+  report of #244 (126 cells, 25 200 matches) was estimated at about 31 minutes
+  on Apple silicon by match count, not measured.
 - `tools/fixtures`: the scripted roster fixture search. `npm run
   fixtures:search -- <kit>` plays the seeded random player of the header of
   `roster-fixtures.test.ts` until an attempt covers everything the test
