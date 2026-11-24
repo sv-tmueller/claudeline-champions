@@ -850,7 +850,7 @@ the bots call rarely can stay out of optimized code for thousands of ticks, most
 think; the exceptions are C3 `chooseEscape` (11.4 B), the upper bounds of the C1 and C4
 persistent rows (10.8 and 8.8 B), 8.1 B for one bot in the C2 persistent row's windows (`orbUpInto` open)
 in the second measurement (class U inside), and one stint of the default match, `needsPlan`, reaches 240
-ticks into the steady state at about 11.3 B a think (the browser measurements, below, are in "What
+to 270 ticks into the steady state at about 11.3 B a think (the browser measurements, below, are in "What
 the rule guarantees in a match (#290)", which lists the configurations measured, and in "The drops
 of #303, measured (#318)"). What makes the optimized figure true, and what
 stays outside it:
@@ -1198,7 +1198,7 @@ No drop begins after the warm-up of the default match: a traced run of the head
 (`--trace-opt --trace-deopt`, Chromium 153.0.8010.12, no hook, no wrapper) shows no deopt of a
 function of `packages/bots/src` from the first window after the warm-up (tick 3029, the round that
 begins after tick 2100) to the end of the match at tick 4289. One that began in the warm-up lasts
-240 ticks into the steady state (`needsPlan @94`, back in Maglev at tick 3269, about 11.3 B a think),
+240 to 270 ticks into the steady state (`needsPlan @94`, back in Maglev at tick 3269 to 3299, about 11.3 B a think),
 and `segmentHitsBox @228` may (a compile race: in 2 of 4 hook-free runs it has no compile line after
 its drop, in the other 2 it is back in optimized code at once; #318 below, the owner's question).
 
@@ -1206,7 +1206,7 @@ The other shipped configurations have first-time deopts after their warm-up, and
 default match have first-time deopts of their own. #318 measured all of them on 02dc630 and sorted each
 by the rule decided on #318: "The drops of #303, measured (#318)" below holds a table per configuration, a
 decision per class and the steps to reproduce. No drop begins after the warm-up of the default match,
-but `needsPlan @94` began in it and lasts 240 ticks into the steady state at about 11.3 B a think (the
+but `needsPlan @94` began in it and lasts 240 to 270 ticks into the steady state at about 11.3 B a think (the
 owner's question, with `segmentHitsBox @228`); by the rule every configuration has fix rows.
 
 The profiler caveat, and how the probe handles it (#304). The CDP sampling profiler, started with
